@@ -1,10 +1,10 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { createId } from "@/lib/db/cuid";
-import { chunks, documents, users } from "@/lib/db/schema";
+import { chunks, documents, spaces, users } from "@/lib/db/schema";
 import { extractTextFromFile, isAllowedDocument } from "@/lib/documents";
 import { chunkText, getEmbeddings } from "@/lib/rag";
 
@@ -19,9 +19,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ spa
 
   const { spaceId } = await params;
 
-  const [user] = await db.select().from(users).where(eq(users.email, userEmail)).limit(1);
-  if (!user) {
-    return NextResponse.json({ error: "User not found" }, { status: 404 });
+  const [space] = await db
+    .select({ id: spaces.id })
+    .from(spaces)
+    .innerJoin(users, eq(spaces.userId, users.id))
+    .where(and(eq(spaces.id, spaceId), eq(users.email, userEmail)))
+    .limit(1);
+
+  if (!space) {
+    return NextResponse.json({ error: "Space not found" }, { status: 404 });
   }
 
   const formData = await request.formData();

@@ -7,7 +7,7 @@ import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { createId } from "@/lib/db/cuid";
 import { getDefaultModel, isPresetModel, isValidModelId } from "@/lib/models";
-import { messages, threads, users } from "@/lib/db/schema";
+import { messages, spaces, threads, users } from "@/lib/db/schema";
 import { createPerplexityClient } from "@/lib/perplexity";
 import { getEmbeddings, similaritySearch } from "@/lib/rag";
 
@@ -89,6 +89,7 @@ export async function POST(request: Request) {
     .select({
       id: threads.id,
       userId: threads.userId,
+      spaceId: threads.spaceId,
     })
     .from(threads)
     .innerJoin(users, eq(threads.userId, users.id))
@@ -97,6 +98,23 @@ export async function POST(request: Request) {
 
   if (!thread) {
     return NextResponse.json({ error: "Thread not found" }, { status: 404 });
+  }
+
+  if (parsed.data.spaceId) {
+    const [ownedSpace] = await db
+      .select({ id: spaces.id })
+      .from(spaces)
+      .innerJoin(users, eq(spaces.userId, users.id))
+      .where(and(eq(spaces.id, parsed.data.spaceId), eq(users.email, userEmail)))
+      .limit(1);
+
+    if (!ownedSpace) {
+      return NextResponse.json({ error: "Space not found" }, { status: 404 });
+    }
+
+    if (thread.spaceId && thread.spaceId !== parsed.data.spaceId) {
+      return NextResponse.json({ error: "Thread does not belong to this space" }, { status: 400 });
+    }
   }
 
   const lastMessage = inputMessages[inputMessages.length - 1];
