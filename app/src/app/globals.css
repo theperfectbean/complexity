@@ -7,6 +7,7 @@
   --muted-foreground: hsl(0 0% 45%);
   --border: hsl(0 0% 90%);
   --card: hsl(0 0% 100%);
+  color-scheme: light;
 }
 
 @theme inline {
@@ -19,15 +20,14 @@
   --font-sans: var(--font-inter);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: hsl(0 0% 7%);
-    --foreground: hsl(0 0% 95%);
-    --muted: hsl(0 0% 15%);
-    --muted-foreground: hsl(0 0% 64%);
-    --border: hsl(0 0% 18%);
-    --card: hsl(0 0% 10%);
-  }
+.dark {
+  --background: hsl(0 0% 7%);
+  --foreground: hsl(0 0% 95%);
+  --muted: hsl(0 0% 15%);
+  --muted-foreground: hsl(0 0% 64%);
+  --border: hsl(0 0% 18%);
+  --card: hsl(0 0% 10%);
+  color-scheme: dark;
 }
 
 body {

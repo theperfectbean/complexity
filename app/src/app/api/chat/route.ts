@@ -34,22 +34,32 @@ function extractTextFromMessage(message: UIMessage): string {
   );
 }
 
-function extractCitationsFromResponse(response: any): Citation[] {
+function asRecord(value: unknown): Record<string, unknown> | null {
+  if (typeof value !== "object" || value === null) {
+    return null;
+  }
+
+  return value as Record<string, unknown>;
+}
+
+function extractCitationsFromResponse(response: unknown): Citation[] {
   const citations = new Map<string, Citation>();
-  const outputItems = Array.isArray(response?.output) ? response.output : [];
+  const responseRecord = asRecord(response);
+  const outputItems = Array.isArray(responseRecord?.output) ? responseRecord.output : [];
 
   for (const item of outputItems) {
     const contentItems = Array.isArray(item?.content) ? item.content : [];
     for (const content of contentItems) {
       const annotations = Array.isArray(content?.annotations) ? content.annotations : [];
       for (const annotation of annotations) {
-        const url = typeof annotation?.url === "string" ? annotation.url : undefined;
+        const annotationRecord = asRecord(annotation);
+        const url = typeof annotationRecord?.url === "string" ? annotationRecord.url : undefined;
         if (!url) continue;
 
         citations.set(url, {
           url,
-          title: typeof annotation?.title === "string" ? annotation.title : undefined,
-          snippet: typeof annotation?.text === "string" ? annotation.text : undefined,
+          title: typeof annotationRecord?.title === "string" ? annotationRecord.title : undefined,
+          snippet: typeof annotationRecord?.text === "string" ? annotationRecord.text : undefined,
         });
       }
     }
@@ -145,16 +155,18 @@ export async function POST(request: Request) {
             tools: [{ type: "web_search" }, { type: "fetch_url" }],
           };
 
-      const eventStream = await client.responses.create(requestBody as any);
+      const eventStream = await client.responses.create(requestBody);
 
       let assistantText = "";
-      let completedResponse: any;
+      let completedResponse: unknown;
 
-      for await (const event of eventStream as unknown as AsyncIterable<any>) {
-        if (event?.type === "response.output_text.delta") {
+      for await (const event of eventStream as unknown as AsyncIterable<unknown>) {
+        const eventRecord = asRecord(event);
+        if (eventRecord?.type === "response.output_text.delta") {
+          const outputText = asRecord(eventRecord.output_text);
           const delta =
-            (typeof event?.delta === "string" && event.delta) ||
-            (typeof event?.output_text?.delta === "string" && event.output_text.delta) ||
+            (typeof eventRecord.delta === "string" && eventRecord.delta) ||
+            (typeof outputText?.delta === "string" && outputText.delta) ||
             "";
 
           if (delta) {
@@ -164,13 +176,16 @@ export async function POST(request: Request) {
           continue;
         }
 
-        if (event?.type === "response.completed") {
-          completedResponse = event?.response ?? event;
+        if (eventRecord?.type === "response.completed") {
+          completedResponse = eventRecord.response ?? event;
           continue;
         }
 
-        if (event?.type === "response.failed") {
-          throw new Error(event?.error?.message ?? "Agent API request failed");
+        if (eventRecord?.type === "response.failed") {
+          const errorRecord = asRecord(eventRecord.error);
+          throw new Error(
+            typeof errorRecord?.message === "string" ? errorRecord.message : "Agent API request failed",
+          );
         }
       }
 
