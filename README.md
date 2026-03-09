@@ -67,6 +67,11 @@ Self-hosted Perplexity-style AI search and RAG workspace.
 - `npm run build` passes in [app](app)
 - `npm test` passes in [app](app)
 
+### Test Suite Status
+- Framework: Vitest + React Testing Library
+- Current scope: 23 tests across component, utility, and API route integration-style coverage
+- Coverage includes auth guards, ownership checks, validation errors, cache-hit/rate-limit paths, and upload success/failure flows
+
 ## Documentation Index
 
 - Architecture: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)

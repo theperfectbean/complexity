@@ -1,19 +1,36 @@
 # Testing Guide
 
-This project uses **Vitest** + **React Testing Library** for automated tests.
+This project uses **Vitest** + **React Testing Library** for automated testing in the Next.js app.
 
-## Test Stack
+## Snapshot (Current State)
+
+- Test framework: `vitest` (`jsdom` environment)
+- Assertion DOM helpers: `@testing-library/jest-dom`
+- Component interaction utilities: `@testing-library/react`, `@testing-library/user-event`
+- Current suite size: **23 tests across 5 files**
+- Quality gate: `npm test && npm run lint`
+
+## Test Stack and Configuration
+
+Primary test dependencies:
 
 - `vitest`
+- `@vitest/coverage-v8`
 - `jsdom`
 - `@testing-library/react`
 - `@testing-library/jest-dom`
 - `@testing-library/user-event`
 
-Config:
+Config and setup files:
 
 - `app/vitest.config.ts`
 - `app/src/test/setup.ts`
+
+Key config behavior:
+
+- Test environment is browser-like (`jsdom`).
+- Path alias `@` resolves to `app/src`.
+- Coverage uses V8 provider with text/html reporters.
 
 ## Commands
 
@@ -25,39 +42,88 @@ npm run test:watch
 npm run test:coverage
 ```
 
-Lint + tests:
+Run full local quality gate:
 
 ```bash
-npm run lint
-npm test
+npm test && npm run lint
 ```
 
-## Current Test Coverage Areas
+## Test Inventory
 
-- Model helper behavior (`src/lib/models.test.ts`)
-- Shared search bar interactions (`src/components/search/SearchBar.test.tsx`)
-- Chat message list rendering and interactions (`src/components/chat/MessageList.test.tsx`)
-- Chat route branch coverage (`src/app/api/chat/route.test.ts`)
-- Upload route branch coverage (`src/app/api/spaces/upload.route.test.ts`)
+### Unit/Component Tests
 
-Additional covered scenarios:
+- `src/lib/models.test.ts`
+   - Validates model-id helper functions (`getDefaultModel`, `isPresetModel`, `isValidModelId`).
+- `src/components/search/SearchBar.test.tsx`
+   - Verifies input change propagation and submit disabled state behavior.
+- `src/components/chat/MessageList.test.tsx`
+   - Verifies empty state rendering, markdown/citation rendering, and related-question click handling.
 
-- Chat cache-hit short-circuit path (Redis cached answer)
-- Successful upload processing path (chunking + embeddings + ready status)
-- Redis failure fallback behavior in chat route (fail-open)
-- Oversized upload validation and extraction failure handling
+### Route Integration-Style Tests (Mocked Dependencies)
 
-## Recommended Next Additions
+- `src/app/api/chat/route.test.ts`
+   - Covers: unauthenticated request (`401`), rate limit (`429`), invalid payload (`400`), missing thread (`404`), thread-space mismatch (`400`), cache hit short-circuit path (`200`), Redis fail-open behavior, and unowned-space path (`404`).
+- `src/app/api/spaces/upload.route.test.ts`
+   - Covers: unauthenticated request (`401`), unowned space (`404`), missing file (`400`), invalid file type (`400`), oversized file (`400`), successful processing path (`ready`), and extraction failure (`500`).
 
-1. API route integration tests for:
-   - `POST /api/chat`
-   - `POST /api/spaces/[spaceId]/upload`
-   - `GET /api/threads/[threadId]`
-2. RAG utility tests for chunking edge cases.
-3. End-to-end browser tests for full user journeys.
+## Behavior Coverage Matrix
 
-## Test Design Principles
+Core risk areas currently covered:
 
-- Prefer user-level interaction tests over implementation details.
-- Keep tests deterministic; mock network-bound services.
-- Focus on high-risk behavior: auth, streaming, persistence, and ownership checks.
+- Authentication guards on API routes
+- Ownership checks (thread/space access control)
+- Input validation and file constraints
+- Redis rate-limiting and cache-hit behavior
+- Redis failure fallback (service unavailable)
+- Document-processing failure handling
+
+Core risk areas still not fully covered:
+
+- Threads CRUD route integration tests (`/api/threads`, `/api/threads/[threadId]`)
+- Spaces CRUD route integration tests (`/api/spaces`, `/api/spaces/[spaceId]`)
+- RAG utility edge cases (chunking boundaries, embedding service timeouts)
+- End-to-end browser journeys (auth → thread → spaces upload → RAG chat)
+
+## Mocking Strategy
+
+Route tests mock external/stateful dependencies:
+
+- `@/auth` for session identity
+- `@/lib/db` query and mutation chains
+- `@/lib/redis` for rate-limit/cache behavior
+- `@/lib/perplexity` for model client isolation
+- `@/lib/documents` and `@/lib/rag` for upload and embedding flows
+
+Rationale:
+
+- Keeps tests deterministic and fast.
+- Avoids coupling to live infrastructure (DB, Redis, embedder, external API).
+- Focuses each test on route control-flow and response contracts.
+
+## Writing New Tests
+
+Recommended conventions:
+
+1. Keep one behavior branch per test case.
+2. Assert both status code and response payload.
+3. For route tests, assert key side effects (insert/update call counts and payload shape).
+4. Prefer stable test doubles over real network/database access.
+5. Name tests with user-visible behavior (“returns 404 when …”).
+
+## CI/Automation Recommendation
+
+If you add CI, use this minimal gate:
+
+```bash
+cd app
+npm ci
+npm test
+npm run lint
+```
+
+Optional stricter gate:
+
+```bash
+cd app
+npm run test:coverage
+```

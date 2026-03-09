@@ -62,12 +62,19 @@ npm test
 
 Configured with Vitest + React Testing Library.
 
+Current coverage includes:
+
+- Helper logic (`src/lib/models.test.ts`)
+- Shared chat/search components (`src/components/**/*.test.tsx`)
+- API route integration-style tests for chat and document upload
+
 Commands:
 
 ```bash
 npm test
 npm run test:watch
 npm run test:coverage
+npm test && npm run lint
 ```
 
 See full project docs:
