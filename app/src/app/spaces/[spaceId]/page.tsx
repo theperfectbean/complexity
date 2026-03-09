@@ -8,6 +8,8 @@ import { FormEvent, useCallback, useEffect, useState } from "react";
 
 import { useSession } from "next-auth/react";
 
+import { FollowUpInput } from "@/components/chat/FollowUpInput";
+import { MessageList } from "@/components/chat/MessageList";
 import { AppShell } from "@/components/layout/AppShell";
 import { DocumentList, SpaceDocument } from "@/components/spaces/DocumentList";
 import { FileUploader } from "@/components/spaces/FileUploader";
@@ -170,34 +172,18 @@ export default function SpaceDetailPage() {
               </select>
             </div>
 
-            <div className="flex-1 space-y-3 overflow-y-auto rounded-md border p-3">
-              {messages.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Ask a question about your uploaded documents.</p>
-              ) : (
-                messages.map((message) => (
-                  <article key={message.id} className="space-y-1">
-                    <p className="text-xs uppercase tracking-wide text-zinc-500">{message.role}</p>
-                    <p className="whitespace-pre-wrap text-sm">
-                      {message.parts
-                        .filter((part) => part.type === "text")
-                        .map((part) => (part.type === "text" ? part.text : ""))
-                        .join("\n")}
-                    </p>
-                  </article>
-                ))
-              )}
+            <div className="flex-1 overflow-y-auto rounded-md border p-3">
+              <MessageList messages={messages} emptyLabel="Ask a question about your uploaded documents." />
             </div>
 
-            <form onSubmit={onSubmit} className="mt-3 flex gap-2">
-              <input
-                className="flex-1 rounded-md border bg-transparent px-3 py-2"
+            <form onSubmit={onSubmit}>
+              <FollowUpInput
                 value={prompt}
-                onChange={(event) => setPrompt(event.target.value)}
+                onChange={setPrompt}
                 placeholder="Ask this space"
+                submitLabel={chatStatus === "streaming" ? "Thinking..." : "Send"}
+                disabled={chatStatus === "streaming"}
               />
-              <button className="rounded-md border px-4 py-2 text-sm" type="submit" disabled={chatStatus === "streaming"}>
-                {chatStatus === "streaming" ? "Thinking..." : "Send"}
-              </button>
             </form>
           </section>
         </div>

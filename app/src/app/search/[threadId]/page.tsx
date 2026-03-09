@@ -5,6 +5,8 @@ import { DefaultChatTransport } from "ai";
 import { useParams } from "next/navigation";
 import { FormEvent, useState } from "react";
 
+import { FollowUpInput } from "@/components/chat/FollowUpInput";
+import { MessageList } from "@/components/chat/MessageList";
 import { AppShell } from "@/components/layout/AppShell";
 import { MODELS, getDefaultModel } from "@/lib/models";
 
@@ -63,30 +65,18 @@ export default function ThreadPage() {
           </select>
         </header>
 
-        <section className="flex-1 space-y-3 overflow-y-auto rounded-xl border p-4">
-          {messages.map((message) => (
-            <article key={message.id} className="space-y-1">
-              <p className="text-xs uppercase tracking-wide text-zinc-500">{message.role}</p>
-              <p className="whitespace-pre-wrap text-sm">
-                {message.parts
-                  .filter((part) => part.type === "text")
-                  .map((part) => (part.type === "text" ? part.text : ""))
-                  .join("\n")}
-              </p>
-            </article>
-          ))}
+        <section className="flex-1 overflow-y-auto rounded-xl border p-4">
+          <MessageList messages={messages} emptyLabel="Start this thread with your first question." />
         </section>
 
-        <form onSubmit={onSubmit} className="mt-4 flex gap-2">
-          <input
-            className="flex-1 rounded-md border bg-transparent px-3 py-2"
+        <form onSubmit={onSubmit}>
+          <FollowUpInput
             value={prompt}
-            onChange={(event) => setPrompt(event.target.value)}
+            onChange={setPrompt}
             placeholder="Ask anything"
+            submitLabel={status === "streaming" ? "Thinking..." : "Send"}
+            disabled={status === "streaming"}
           />
-          <button className="rounded-md bg-foreground px-4 py-2 text-background" type="submit" disabled={status === "streaming"}>
-            {status === "streaming" ? "Thinking..." : "Send"}
-          </button>
         </form>
       </main>
     </AppShell>
