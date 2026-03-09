@@ -49,6 +49,19 @@ Self-hosted Perplexity-style AI search and RAG workspace.
   - `/library`
 - Chat UI uses AI SDK v6 transport (`DefaultChatTransport`) and model selection grouped by category
 
+### Refactor Note: Perplexity SDK → Agent API
+- **What changed**
+  - Chat backend moved from provider-style model resolution to direct Agent API calls.
+  - Perplexity client is now initialized via `@perplexity-ai/perplexity_ai` in [app/src/lib/perplexity.ts](app/src/lib/perplexity.ts).
+  - Chat streaming now processes Agent API response events in [app/src/app/api/chat/route.ts](app/src/app/api/chat/route.ts).
+- **Modeling changes**
+  - Default thread model changed from Sonar-style IDs to Agent preset IDs (default: `pro-search`).
+  - Model defaults are reflected in schema + migrations (`0001_agent_api_models.sql`).
+- **Behavior changes**
+  - Preset models are sent as `preset` requests.
+  - Direct models are sent as `model` requests with explicit tools (`web_search`, `fetch_url`).
+  - Citations are extracted from Agent API annotations and stored in `messages.citations`.
+
 ### Validation Completed
 - `npm run lint` passes in [app](app)
 - `npm run build` passes in [app](app)
