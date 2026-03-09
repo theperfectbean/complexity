@@ -5,6 +5,7 @@ import { DefaultChatTransport } from "ai";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useState } from "react";
+import { toast } from "sonner";
 
 import { useSession } from "next-auth/react";
 
@@ -88,7 +89,7 @@ export default function SpaceDetailPage() {
     void loadDocuments();
   }, [loadDocuments, status]);
 
-  const { messages, sendMessage, status: chatStatus } = useChat({
+  const { messages, sendMessage, status: chatStatus, error } = useChat({
     transport: new DefaultChatTransport({
       api: "/api/chat",
       body: () => ({
@@ -107,6 +108,12 @@ export default function SpaceDetailPage() {
       .map((part) => (part.type === "text" ? part.text : ""))
       .join("\n"),
   }));
+
+  useEffect(() => {
+    if (error) {
+      toast.error(error.message || "Chat request failed");
+    }
+  }, [error]);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -128,6 +135,7 @@ export default function SpaceDetailPage() {
       });
 
       if (!createResponse.ok) {
+        toast.error("Failed to create thread");
         return;
       }
 
@@ -136,7 +144,11 @@ export default function SpaceDetailPage() {
       setThreadId(activeThreadId);
     }
 
-    await sendMessage({ text: prompt });
+    try {
+      await sendMessage({ text: prompt });
+    } catch {
+      toast.error("Failed to send message");
+    }
     setPrompt("");
   }
 
@@ -156,7 +168,13 @@ export default function SpaceDetailPage() {
 
         <div className="mt-6 grid gap-6 lg:grid-cols-[1fr,1.4fr]">
           <section className="space-y-4">
-            <FileUploader spaceId={spaceId} onUploaded={() => void loadDocuments()} />
+            <FileUploader
+              spaceId={spaceId}
+              onUploaded={() => {
+                void loadDocuments();
+                toast.success("Document uploaded");
+              }}
+            />
             <div className="rounded-lg border p-4">
               <h2 className="mb-3 text-sm font-semibold">Documents</h2>
               {docsLoading ? (
@@ -190,7 +208,11 @@ export default function SpaceDetailPage() {
             </div>
 
             <div className="flex-1 overflow-y-auto rounded-md border p-3">
-              <MessageList messages={chatItems} emptyLabel="Ask a question about your uploaded documents." />
+              <MessageList
+                messages={chatItems}
+                emptyLabel="Ask a question about your uploaded documents."
+                onRelatedQuestionClick={(question) => setPrompt(question)}
+              />
             </div>
 
             <form onSubmit={onSubmit}>

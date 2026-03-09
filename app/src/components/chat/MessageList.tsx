@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+import { RelatedQuestions } from "@/components/chat/RelatedQuestions";
 import { SourceCarousel } from "@/components/chat/SourceCarousel";
 import { MarkdownRenderer } from "@/components/shared/MarkdownRenderer";
 
@@ -21,6 +22,7 @@ export type ChatMessageItem = {
 type MessageListProps = {
   messages: ChatMessageItem[];
   emptyLabel: string;
+  onRelatedQuestionClick?: (question: string) => void;
 };
 
 const urlPattern = /(https?:\/\/[\w\-._~:/?#\[\]@!$&'()*+,;=%]+)/g;
@@ -30,7 +32,23 @@ function extractUrls(text: string): string[] {
   return Array.from(new Set(matches)).slice(0, 6);
 }
 
-export function MessageList({ messages, emptyLabel }: MessageListProps) {
+function extractRelatedQuestions(text: string): string[] {
+  const compact = text.replace(/\s+/g, " ").trim();
+  if (!compact) {
+    return [];
+  }
+
+  const sentenceCandidates = compact
+    .split(/(?<=[?!.])\s+/)
+    .map((item) => item.trim())
+    .filter((item) => item.endsWith("?"))
+    .map((item) => item.replace(/^[\-\d.)\s]+/, ""))
+    .filter((item) => item.length >= 14 && item.length <= 140);
+
+  return Array.from(new Set(sentenceCandidates)).slice(0, 3);
+}
+
+export function MessageList({ messages, emptyLabel, onRelatedQuestionClick }: MessageListProps) {
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   async function copyMessage(messageId: string, content: string) {
@@ -52,6 +70,7 @@ export function MessageList({ messages, emptyLabel }: MessageListProps) {
       {messages.map((message) => {
         const urlsFromCitations = (message.citations ?? []).map((citation) => citation.url).filter(Boolean) as string[];
         const urls = message.role === "assistant" ? (urlsFromCitations.length > 0 ? urlsFromCitations : extractUrls(message.content)) : [];
+        const relatedQuestions = message.role === "assistant" ? extractRelatedQuestions(message.content) : [];
 
         return (
           <article key={message.id} className="space-y-1 rounded-lg border p-3">
@@ -73,6 +92,9 @@ export function MessageList({ messages, emptyLabel }: MessageListProps) {
             ) : (
               <p className="whitespace-pre-wrap text-sm">{message.content}</p>
             )}
+            {message.role === "assistant" ? (
+              <RelatedQuestions questions={relatedQuestions} onSelect={onRelatedQuestionClick} />
+            ) : null}
           </article>
         );
       })}

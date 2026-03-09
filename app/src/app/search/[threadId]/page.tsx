@@ -4,6 +4,7 @@ import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { useParams } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 
 import { FollowUpInput } from "@/components/chat/FollowUpInput";
 import { ChatCitation, ChatMessageItem, MessageList } from "@/components/chat/MessageList";
@@ -55,7 +56,7 @@ export default function ThreadPage() {
     return accumulator;
   }, {});
 
-  const { messages, sendMessage, status } = useChat({
+  const { messages, sendMessage, status, error } = useChat({
     transport: new DefaultChatTransport({
       api: "/api/chat",
       body: () => ({
@@ -118,12 +119,22 @@ export default function ThreadPage() {
 
   const mergedMessages = [...historyMessages, ...liveMessages];
 
+  useEffect(() => {
+    if (error) {
+      toast.error(error.message || "Chat request failed");
+    }
+  }, [error]);
+
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
     if (!prompt.trim()) {
       return;
     }
-    await sendMessage({ text: prompt });
+    try {
+      await sendMessage({ text: prompt });
+    } catch {
+      toast.error("Failed to send message");
+    }
     setPrompt("");
   }
 
@@ -153,7 +164,11 @@ export default function ThreadPage() {
           {loadingHistory ? (
             <p className="text-sm text-muted-foreground">Loading thread...</p>
           ) : (
-            <MessageList messages={mergedMessages} emptyLabel="Start this thread with your first question." />
+            <MessageList
+              messages={mergedMessages}
+              emptyLabel="Start this thread with your first question."
+              onRelatedQuestionClick={(question) => setPrompt(question)}
+            />
           )}
         </section>
 
