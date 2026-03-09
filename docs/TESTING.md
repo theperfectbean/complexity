@@ -37,6 +37,8 @@ npm test
 - Model helper behavior (`src/lib/models.test.ts`)
 - Shared search bar interactions (`src/components/search/SearchBar.test.tsx`)
 - Chat message list rendering and interactions (`src/components/chat/MessageList.test.tsx`)
+- Chat route branch coverage (`src/app/api/chat/route.test.ts`)
+- Upload route branch coverage (`src/app/api/spaces/upload.route.test.ts`)
 
 ## Recommended Next Additions
 
