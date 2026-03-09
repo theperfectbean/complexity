@@ -40,6 +40,11 @@ npm test
 - Chat route branch coverage (`src/app/api/chat/route.test.ts`)
 - Upload route branch coverage (`src/app/api/spaces/upload.route.test.ts`)
 
+Additional covered scenarios:
+
+- Chat cache-hit short-circuit path (Redis cached answer)
+- Successful upload processing path (chunking + embeddings + ready status)
+
 ## Recommended Next Additions
 
 1. API route integration tests for:

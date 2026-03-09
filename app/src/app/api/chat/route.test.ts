@@ -27,6 +27,7 @@ vi.mock("@/lib/rag", () => ({
 
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
+import { createPerplexityClient } from "@/lib/perplexity";
 import { getRedisClient } from "@/lib/redis";
 
 import { POST } from "@/app/api/chat/route";
@@ -50,6 +51,15 @@ function mockSelectResults(results: unknown[]) {
     const from = vi.fn(() => ({ innerJoin }));
     selectMock.mockReturnValueOnce({ from } as never);
   }
+}
+
+function mockMutationChains() {
+  const values = vi.fn().mockResolvedValue(undefined);
+  vi.mocked(db.insert).mockReturnValue({ values } as never);
+
+  const where = vi.fn().mockResolvedValue(undefined);
+  const set = vi.fn(() => ({ where }));
+  vi.mocked(db.update).mockReturnValue({ set } as never);
 }
 
 describe("POST /api/chat", () => {
@@ -141,5 +151,37 @@ describe("POST /api/chat", () => {
     const response = await POST(request);
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toEqual({ error: "Thread does not belong to this space" });
+  });
+
+  it("serves cached response when redis cache hit exists", async () => {
+    mockSelectResult([{ id: "thread-1", userId: "user-1", spaceId: null }]);
+    mockMutationChains();
+
+    vi.mocked(getRedisClient).mockReturnValue({
+      incr: vi.fn().mockResolvedValue(1),
+      expire: vi.fn().mockResolvedValue(1),
+      get: vi.fn().mockResolvedValue(
+        JSON.stringify({
+          text: "cached answer",
+          citations: [{ url: "https://example.com" }],
+        }),
+      ),
+      set: vi.fn(),
+    } as never);
+
+    const request = new Request("http://localhost/api/chat", {
+      method: "POST",
+      body: JSON.stringify({
+        threadId: "thread-1",
+        model: "pro-search",
+        messages: [{ role: "user", parts: [{ type: "text", text: "hello" }] }],
+      }),
+      headers: { "Content-Type": "application/json" },
+    });
+
+    const response = await POST(request);
+    expect(response.status).toBe(200);
+    expect(db.insert).toHaveBeenCalledTimes(2);
+    expect(createPerplexityClient).not.toHaveBeenCalled();
   });
 });

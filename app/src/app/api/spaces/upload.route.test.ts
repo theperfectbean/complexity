@@ -24,7 +24,8 @@ vi.mock("@/lib/rag", () => ({
 
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
-import { isAllowedDocument } from "@/lib/documents";
+import { chunkText, getEmbeddings } from "@/lib/rag";
+import { extractTextFromFile, isAllowedDocument } from "@/lib/documents";
 
 import { POST } from "@/app/api/spaces/[spaceId]/upload/route";
 
@@ -41,6 +42,16 @@ describe("POST /api/spaces/[spaceId]/upload", () => {
     vi.clearAllMocks();
     vi.mocked(auth).mockResolvedValue({ user: { email: "gary@example.com" } } as never);
   });
+
+  function mockMutationChains() {
+    const firstValues = vi.fn().mockResolvedValue(undefined);
+    const secondValues = vi.fn().mockResolvedValue(undefined);
+    vi.mocked(db.insert).mockReturnValueOnce({ values: firstValues } as never).mockReturnValueOnce({ values: secondValues } as never);
+
+    const where = vi.fn().mockResolvedValue(undefined);
+    const set = vi.fn(() => ({ where }));
+    vi.mocked(db.update).mockReturnValue({ set } as never);
+  }
 
   it("returns 401 when unauthenticated", async () => {
     vi.mocked(auth).mockResolvedValue(null as never);
@@ -94,5 +105,33 @@ describe("POST /api/spaces/[spaceId]/upload", () => {
     const response = await POST(request, { params: Promise.resolve({ spaceId: "space-1" }) });
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toEqual({ error: "Only pdf/docx/txt/md are allowed" });
+  });
+
+  it("returns ready status for successful upload processing", async () => {
+    mockOwnedSpace([{ id: "space-1" }]);
+    mockMutationChains();
+    vi.mocked(isAllowedDocument).mockReturnValue(true);
+    vi.mocked(extractTextFromFile).mockResolvedValue("hello world");
+    vi.mocked(chunkText).mockReturnValue(["chunk-a", "chunk-b"]);
+    vi.mocked(getEmbeddings).mockResolvedValue([
+      [0.1, 0.2],
+      [0.2, 0.3],
+    ] as never);
+
+    const request = {
+      formData: async () => ({
+        get: () => new File(["hello"], "doc.txt", { type: "text/plain" }),
+      }),
+    } as unknown as Request;
+
+    const response = await POST(request, { params: Promise.resolve({ spaceId: "space-1" }) });
+    expect(response.status).toBe(200);
+
+    const payload = (await response.json()) as { status: string; chunkCount: number; documentId: string };
+    expect(payload.status).toBe("ready");
+    expect(payload.chunkCount).toBe(2);
+    expect(typeof payload.documentId).toBe("string");
+    expect(db.insert).toHaveBeenCalledTimes(2);
+    expect(db.update).toHaveBeenCalledTimes(1);
   });
 });
