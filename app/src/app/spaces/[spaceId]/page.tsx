@@ -13,6 +13,8 @@ import { MessageList } from "@/components/chat/MessageList";
 import { AppShell } from "@/components/layout/AppShell";
 import { DocumentList, SpaceDocument } from "@/components/spaces/DocumentList";
 import { FileUploader } from "@/components/spaces/FileUploader";
+import { EmptyState } from "@/components/shared/EmptyState";
+import { LoadingSkeleton } from "@/components/shared/LoadingSkeleton";
 import { MODELS, getDefaultModel } from "@/lib/models";
 
 type Space = {
@@ -140,7 +142,7 @@ export default function SpaceDetailPage() {
   return (
     <AppShell>
       <main className="mx-auto max-w-6xl p-6">
-        <h1 className="text-2xl font-semibold">{space?.name ?? `Space ${spaceId}`}</h1>
+        <h1 className="text-2xl font-semibold">{space ? space.name : `Space ${spaceId}`}</h1>
         <p className="mt-2 text-sm text-zinc-500">Upload docs and chat with this space as context.</p>
 
         <div className="mt-6 grid gap-6 lg:grid-cols-[1fr,1.4fr]">
@@ -148,7 +150,13 @@ export default function SpaceDetailPage() {
             <FileUploader spaceId={spaceId} onUploaded={() => void loadDocuments()} />
             <div className="rounded-lg border p-4">
               <h2 className="mb-3 text-sm font-semibold">Documents</h2>
-              <DocumentList documents={documents} loading={docsLoading} />
+              {docsLoading ? (
+                <LoadingSkeleton lines={3} />
+              ) : documents.length === 0 ? (
+                <EmptyState title="No documents yet" description="Upload PDF, DOCX, TXT, or MD files to build context." />
+              ) : (
+                <DocumentList documents={documents} />
+              )}
             </div>
           </section>
 

@@ -7,6 +7,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useSession } from "next-auth/react";
 
 import { AppShell } from "@/components/layout/AppShell";
+import { EmptyState } from "@/components/shared/EmptyState";
+import { LoadingSkeleton } from "@/components/shared/LoadingSkeleton";
 
 type Thread = {
   id: string;
@@ -118,10 +120,10 @@ export default function LibraryPage() {
         </div>
 
         <div className="mt-4 space-y-2">
-          {loading && <p className="text-sm text-muted-foreground">Loading threads...</p>}
-          {!loading && filteredThreads.length === 0 && (
-            <p className="rounded-md border p-4 text-sm text-muted-foreground">No matching threads.</p>
-          )}
+          {loading ? <LoadingSkeleton lines={4} /> : null}
+          {!loading && filteredThreads.length === 0 ? (
+            <EmptyState title="No matching threads" description="Try a different title search or start a new thread." />
+          ) : null}
 
           {filteredThreads.map((thread) => (
             <article key={thread.id} className="flex items-center justify-between rounded-lg border p-3">

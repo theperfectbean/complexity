@@ -8,6 +8,8 @@ import { useSession } from "next-auth/react";
 import { AppShell } from "@/components/layout/AppShell";
 import { CreateSpaceDialog } from "@/components/spaces/CreateSpaceDialog";
 import { SpaceCard } from "@/components/spaces/SpaceCard";
+import { EmptyState } from "@/components/shared/EmptyState";
+import { LoadingSkeleton } from "@/components/shared/LoadingSkeleton";
 
 type Space = {
   id: string;
@@ -69,10 +71,10 @@ export default function SpacesPage() {
         </div>
 
         <div className="mt-6 grid gap-3 md:grid-cols-2">
-          {loading && <p className="text-sm text-muted-foreground">Loading spaces...</p>}
-          {!loading && spaces.length === 0 && (
-            <p className="rounded-md border p-4 text-sm text-muted-foreground">No spaces yet. Create your first one above.</p>
-          )}
+          {loading ? <LoadingSkeleton lines={4} /> : null}
+          {!loading && spaces.length === 0 ? (
+            <EmptyState title="No spaces yet" description="Create your first space above to start uploading documents." />
+          ) : null}
           {spaces.map((space) => (
             <SpaceCard
               key={space.id}
