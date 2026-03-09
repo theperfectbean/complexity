@@ -9,7 +9,7 @@ import { FormEvent, useCallback, useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 
 import { FollowUpInput } from "@/components/chat/FollowUpInput";
-import { MessageList } from "@/components/chat/MessageList";
+import { ChatMessageItem, MessageList } from "@/components/chat/MessageList";
 import { AppShell } from "@/components/layout/AppShell";
 import { DocumentList, SpaceDocument } from "@/components/spaces/DocumentList";
 import { FileUploader } from "@/components/spaces/FileUploader";
@@ -99,6 +99,15 @@ export default function SpaceDetailPage() {
     }),
   });
 
+  const chatItems: ChatMessageItem[] = messages.map((message) => ({
+    id: message.id,
+    role: message.role,
+    content: message.parts
+      .filter((part) => part.type === "text")
+      .map((part) => (part.type === "text" ? part.text : ""))
+      .join("\n"),
+  }));
+
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!prompt.trim()) {
@@ -181,7 +190,7 @@ export default function SpaceDetailPage() {
             </div>
 
             <div className="flex-1 overflow-y-auto rounded-md border p-3">
-              <MessageList messages={messages} emptyLabel="Ask a question about your uploaded documents." />
+              <MessageList messages={chatItems} emptyLabel="Ask a question about your uploaded documents." />
             </div>
 
             <form onSubmit={onSubmit}>
