@@ -1,10 +1,54 @@
+"use client";
+
 import Link from "next/link";
+import { useEffect, useState } from "react";
 
-import { auth } from "@/auth";
+import { useSession } from "next-auth/react";
+
 import { AppShell } from "@/components/layout/AppShell";
+import { CreateSpaceDialog } from "@/components/spaces/CreateSpaceDialog";
+import { SpaceCard } from "@/components/spaces/SpaceCard";
 
-export default async function SpacesPage() {
-  const session = await auth();
+type Space = {
+  id: string;
+  name: string;
+  description?: string | null;
+  updatedAt: string;
+};
+
+export default function SpacesPage() {
+  const { data: session, status } = useSession();
+  const [spaces, setSpaces] = useState<Space[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (status !== "authenticated") {
+      return;
+    }
+
+    let active = true;
+    fetch("/api/spaces")
+      .then((response) => (response.ok ? response.json() : Promise.reject(new Error("Failed to load spaces"))))
+      .then((payload: { spaces: Space[] }) => {
+        if (active) {
+          setSpaces(payload.spaces);
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setSpaces([]);
+        }
+      })
+      .finally(() => {
+        if (active) {
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [status]);
 
   if (!session?.user) {
     return (
@@ -18,7 +62,27 @@ export default async function SpacesPage() {
     <AppShell>
       <main className="mx-auto max-w-5xl p-6">
         <h1 className="text-2xl font-semibold">Spaces</h1>
-        <p className="mt-2 text-sm text-zinc-500">Create and manage your RAG spaces from this page.</p>
+        <p className="mt-2 text-sm text-zinc-500">Create spaces and manage documents for RAG-enhanced chat.</p>
+
+        <div className="mt-6">
+          <CreateSpaceDialog onCreated={(space) => setSpaces((current) => [space, ...current])} />
+        </div>
+
+        <div className="mt-6 grid gap-3 md:grid-cols-2">
+          {loading && <p className="text-sm text-muted-foreground">Loading spaces...</p>}
+          {!loading && spaces.length === 0 && (
+            <p className="rounded-md border p-4 text-sm text-muted-foreground">No spaces yet. Create your first one above.</p>
+          )}
+          {spaces.map((space) => (
+            <SpaceCard
+              key={space.id}
+              id={space.id}
+              name={space.name}
+              description={space.description}
+              updatedAt={space.updatedAt}
+            />
+          ))}
+        </div>
       </main>
     </AppShell>
   );
