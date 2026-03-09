@@ -65,6 +65,14 @@ Self-hosted Perplexity-style AI search and RAG workspace.
 ### Validation Completed
 - `npm run lint` passes in [app](app)
 - `npm run build` passes in [app](app)
+- `npm test` passes in [app](app)
+
+## Documentation Index
+
+- Architecture: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+- API routes: [docs/API_REFERENCE.md](docs/API_REFERENCE.md)
+- Testing: [docs/TESTING.md](docs/TESTING.md)
+- Operations runbook: [docs/RUNBOOK.md](docs/RUNBOOK.md)
 
 ## Run
 
@@ -89,6 +97,16 @@ Self-hosted Perplexity-style AI search and RAG workspace.
 - Phase 3: Verify sidebar/mobile navigation, library search/delete, and theme toggle.
 - Phase 4: Create a space, upload a document, wait for `ready`, then ask a space-scoped question.
 - Phase 5: Trigger chat rate limit and verify `429` response behavior.
+
+## Local Quality Commands
+
+From [app](app):
+
+```bash
+npm run lint
+npm test
+npm run test:coverage
+```
 
 ## Backup Strategy (PostgreSQL)
 

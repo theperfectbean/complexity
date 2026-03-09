@@ -54,7 +54,28 @@ From this folder:
 npm install
 npm run build
 npm run dev
+npm run lint
+npm test
 ```
+
+## Test suite
+
+Configured with Vitest + React Testing Library.
+
+Commands:
+
+```bash
+npm test
+npm run test:watch
+npm run test:coverage
+```
+
+See full project docs:
+
+- `../docs/ARCHITECTURE.md`
+- `../docs/API_REFERENCE.md`
+- `../docs/TESTING.md`
+- `../docs/RUNBOOK.md`
 
 If running via Docker Compose, the app is published by the root compose file at:
 
