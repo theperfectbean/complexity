@@ -10,6 +10,7 @@ import { getDefaultModel, isPresetModel, isValidModelId } from "@/lib/models";
 import { messages, spaces, threads, users } from "@/lib/db/schema";
 import { createPerplexityClient } from "@/lib/perplexity";
 import { getEmbeddings, similaritySearch } from "@/lib/rag";
+import { getRedisClient } from "@/lib/redis";
 
 const schema = z.object({
   threadId: z.string().min(1),
@@ -23,6 +24,8 @@ type Citation = {
   title?: string;
   snippet?: string;
 };
+
+const CHAT_RATE_LIMIT_PER_MINUTE = 20;
 
 function extractTextFromMessage(message: UIMessage): string {
   return (
@@ -73,6 +76,23 @@ export async function POST(request: Request) {
   const userEmail = session?.user?.email;
   if (!userEmail) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const redis = getRedisClient();
+  if (redis) {
+    try {
+      const rateWindow = Math.floor(Date.now() / 60000);
+      const rateKey = `rate:chat:${userEmail}:${rateWindow}`;
+      const current = await redis.incr(rateKey);
+      if (current === 1) {
+        await redis.expire(rateKey, 61);
+      }
+      if (current > CHAT_RATE_LIMIT_PER_MINUTE) {
+        return NextResponse.json({ error: "Rate limit exceeded. Try again in a minute." }, { status: 429 });
+      }
+    } catch {
+      // Fail open if Redis is unavailable.
+    }
   }
 
   const parsed = schema.safeParse(await request.json());
