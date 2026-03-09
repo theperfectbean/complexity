@@ -44,6 +44,8 @@ Additional covered scenarios:
 
 - Chat cache-hit short-circuit path (Redis cached answer)
 - Successful upload processing path (chunking + embeddings + ready status)
+- Redis failure fallback behavior in chat route (fail-open)
+- Oversized upload validation and extraction failure handling
 
 ## Recommended Next Additions
 

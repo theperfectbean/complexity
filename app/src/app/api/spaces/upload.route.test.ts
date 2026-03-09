@@ -134,4 +134,45 @@ describe("POST /api/spaces/[spaceId]/upload", () => {
     expect(db.insert).toHaveBeenCalledTimes(2);
     expect(db.update).toHaveBeenCalledTimes(1);
   });
+
+  it("returns 400 for oversized file", async () => {
+    mockOwnedSpace([{ id: "space-1" }]);
+    vi.mocked(isAllowedDocument).mockReturnValue(true);
+
+    const oversizedFile = new File(["hello"], "big.pdf", { type: "application/pdf" });
+    Object.defineProperty(oversizedFile, "size", { value: 21 * 1024 * 1024 });
+
+    const request = {
+      formData: async () => ({
+        get: () => oversizedFile,
+      }),
+    } as unknown as Request;
+
+    const response = await POST(request, { params: Promise.resolve({ spaceId: "space-1" }) });
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({ error: "File exceeds 20MB limit" });
+  });
+
+  it("marks document failed when extraction throws", async () => {
+    mockOwnedSpace([{ id: "space-1" }]);
+    vi.mocked(isAllowedDocument).mockReturnValue(true);
+    vi.mocked(extractTextFromFile).mockRejectedValue(new Error("parse failed"));
+
+    const firstValues = vi.fn().mockResolvedValue(undefined);
+    vi.mocked(db.insert).mockReturnValue({ values: firstValues } as never);
+    const where = vi.fn().mockResolvedValue(undefined);
+    const set = vi.fn(() => ({ where }));
+    vi.mocked(db.update).mockReturnValue({ set } as never);
+
+    const request = {
+      formData: async () => ({
+        get: () => new File(["hello"], "doc.txt", { type: "text/plain" }),
+      }),
+    } as unknown as Request;
+
+    const response = await POST(request, { params: Promise.resolve({ spaceId: "space-1" }) });
+    expect(response.status).toBe(500);
+    await expect(response.json()).resolves.toEqual({ error: "parse failed" });
+    expect(db.update).toHaveBeenCalled();
+  });
 });

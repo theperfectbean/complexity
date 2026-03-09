@@ -184,4 +184,51 @@ describe("POST /api/chat", () => {
     expect(db.insert).toHaveBeenCalledTimes(2);
     expect(createPerplexityClient).not.toHaveBeenCalled();
   });
+
+  it("fails open when redis rate-limit call throws", async () => {
+    mockSelectResult([]);
+
+    vi.mocked(getRedisClient).mockReturnValue({
+      incr: vi.fn().mockRejectedValue(new Error("redis down")),
+      expire: vi.fn(),
+      get: vi.fn(),
+      set: vi.fn(),
+    } as never);
+
+    const request = new Request("http://localhost/api/chat", {
+      method: "POST",
+      body: JSON.stringify({
+        threadId: "thread-1",
+        model: "pro-search",
+        messages: [{ role: "user", parts: [{ type: "text", text: "hello" }] }],
+      }),
+      headers: { "Content-Type": "application/json" },
+    });
+
+    const response = await POST(request);
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toEqual({ error: "Thread not found" });
+  });
+
+  it("returns 404 when requested space is not owned", async () => {
+    mockSelectResults([
+      [{ id: "thread-1", userId: "user-1", spaceId: null }],
+      [],
+    ]);
+
+    const request = new Request("http://localhost/api/chat", {
+      method: "POST",
+      body: JSON.stringify({
+        threadId: "thread-1",
+        model: "pro-search",
+        spaceId: "space-1",
+        messages: [{ role: "user", parts: [{ type: "text", text: "hello" }] }],
+      }),
+      headers: { "Content-Type": "application/json" },
+    });
+
+    const response = await POST(request);
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toEqual({ error: "Space not found" });
+  });
 });
