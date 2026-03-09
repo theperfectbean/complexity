@@ -1,0 +1,202 @@
+import { createUIMessageStream, createUIMessageStreamResponse, UIMessage } from "ai";
+import { and, eq } from "drizzle-orm";
+import { NextResponse } from "next/server";
+import { z } from "zod";
+
+import { auth } from "@/auth";
+import { db } from "@/lib/db";
+import { createId } from "@/lib/db/cuid";
+import { getDefaultModel, isPresetModel, isValidModelId } from "@/lib/models";
+import { messages, threads, users } from "@/lib/db/schema";
+import { createPerplexityClient } from "@/lib/perplexity";
+import { getEmbeddings, similaritySearch } from "@/lib/rag";
+
+const schema = z.object({
+  threadId: z.string().min(1),
+  model: z.string().min(1),
+  messages: z.array(z.any()),
+  spaceId: z.string().optional(),
+});
+
+type Citation = {
+  url?: string;
+  title?: string;
+  snippet?: string;
+};
+
+function extractTextFromMessage(message: UIMessage): string {
+  return (
+    message.parts
+      ?.filter((part) => part.type === "text")
+      .map((part) => (part.type === "text" ? part.text : ""))
+      .join("\n")
+      .trim() ?? ""
+  );
+}
+
+function extractCitationsFromResponse(response: any): Citation[] {
+  const citations = new Map<string, Citation>();
+  const outputItems = Array.isArray(response?.output) ? response.output : [];
+
+  for (const item of outputItems) {
+    const contentItems = Array.isArray(item?.content) ? item.content : [];
+    for (const content of contentItems) {
+      const annotations = Array.isArray(content?.annotations) ? content.annotations : [];
+      for (const annotation of annotations) {
+        const url = typeof annotation?.url === "string" ? annotation.url : undefined;
+        if (!url) continue;
+
+        citations.set(url, {
+          url,
+          title: typeof annotation?.title === "string" ? annotation.title : undefined,
+          snippet: typeof annotation?.text === "string" ? annotation.text : undefined,
+        });
+      }
+    }
+  }
+
+  return Array.from(citations.values());
+}
+
+export async function POST(request: Request) {
+  const session = await auth();
+  const userEmail = session?.user?.email;
+  if (!userEmail) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const parsed = schema.safeParse(await request.json());
+  if (!parsed.success) {
+    return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
+  }
+
+  const inputMessages = parsed.data.messages as UIMessage[];
+  if (inputMessages.length === 0) {
+    return NextResponse.json({ error: "Messages required" }, { status: 400 });
+  }
+
+  const [thread] = await db
+    .select({
+      id: threads.id,
+      userId: threads.userId,
+    })
+    .from(threads)
+    .innerJoin(users, eq(threads.userId, users.id))
+    .where(and(eq(threads.id, parsed.data.threadId), eq(users.email, userEmail)))
+    .limit(1);
+
+  if (!thread) {
+    return NextResponse.json({ error: "Thread not found" }, { status: 404 });
+  }
+
+  const lastMessage = inputMessages[inputMessages.length - 1];
+  const userText = extractTextFromMessage(lastMessage);
+
+  if (!userText) {
+    return NextResponse.json({ error: "Message text required" }, { status: 400 });
+  }
+
+  await db.insert(messages).values({
+    id: createId(),
+    threadId: parsed.data.threadId,
+    role: "user",
+    content: userText,
+  });
+
+  let ragContext = "";
+  if (parsed.data.spaceId) {
+    const [embedding] = await getEmbeddings([userText]);
+    const topChunks = await similaritySearch(parsed.data.spaceId, embedding, 8);
+    if (topChunks.length > 0) {
+      ragContext = topChunks.map((chunk, index) => `(${index + 1}) ${chunk.content}`).join("\n\n");
+    }
+  }
+
+  const instructions = ragContext
+    ? `Use this local context if relevant:\n\n${ragContext}\n\nIf local context is insufficient, continue with normal web-grounded reasoning.`
+    : "Provide concise, accurate, citation-backed answers.";
+
+  const safeModel = isValidModelId(parsed.data.model) ? parsed.data.model : getDefaultModel();
+  const agentInput = inputMessages
+    .map((message) => ({ role: message.role, content: extractTextFromMessage(message) }))
+    .filter((message) => message.content.length > 0);
+
+  const stream = createUIMessageStream({
+    execute: async ({ writer }) => {
+      const responseMessageId = createId();
+      const textId = createId();
+      const client = createPerplexityClient();
+
+      writer.write({ type: "start", messageId: responseMessageId });
+      writer.write({ type: "text-start", id: textId });
+
+      const requestBody = isPresetModel(safeModel)
+        ? {
+            preset: safeModel,
+            input: agentInput,
+            instructions,
+            stream: true,
+          }
+        : {
+            model: safeModel,
+            input: agentInput,
+            instructions,
+            stream: true,
+            tools: [{ type: "web_search" }, { type: "fetch_url" }],
+          };
+
+      const eventStream = await client.responses.create(requestBody as any);
+
+      let assistantText = "";
+      let completedResponse: any;
+
+      for await (const event of eventStream as unknown as AsyncIterable<any>) {
+        if (event?.type === "response.output_text.delta") {
+          const delta =
+            (typeof event?.delta === "string" && event.delta) ||
+            (typeof event?.output_text?.delta === "string" && event.output_text.delta) ||
+            "";
+
+          if (delta) {
+            assistantText += delta;
+            writer.write({ type: "text-delta", id: textId, delta });
+          }
+          continue;
+        }
+
+        if (event?.type === "response.completed") {
+          completedResponse = event?.response ?? event;
+          continue;
+        }
+
+        if (event?.type === "response.failed") {
+          throw new Error(event?.error?.message ?? "Agent API request failed");
+        }
+      }
+
+      const citations = extractCitationsFromResponse(completedResponse);
+
+      await db.insert(messages).values({
+        id: createId(),
+        threadId: parsed.data.threadId,
+        role: "assistant",
+        content: assistantText,
+        model: safeModel,
+        citations: citations.length > 0 ? JSON.parse(JSON.stringify(citations)) : null,
+      });
+
+      await db
+        .update(threads)
+        .set({
+          model: safeModel,
+          updatedAt: new Date(),
+        })
+        .where(eq(threads.id, parsed.data.threadId));
+
+      writer.write({ type: "text-end", id: textId });
+      writer.write({ type: "finish" });
+    },
+  });
+
+  return createUIMessageStreamResponse({ stream });
+}

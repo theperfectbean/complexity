@@ -1,0 +1,8 @@
+node_modules
+.next
+npm-debug.log
+.git
+.gitignore
+Dockerfile
+README.md
+src/lib/db/migrations
