@@ -1,3 +1,7 @@
+"use client";
+
+import { useState } from "react";
+
 import { SourceCarousel } from "@/components/chat/SourceCarousel";
 import { MarkdownRenderer } from "@/components/shared/MarkdownRenderer";
 
@@ -27,6 +31,18 @@ function extractUrls(text: string): string[] {
 }
 
 export function MessageList({ messages, emptyLabel }: MessageListProps) {
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  async function copyMessage(messageId: string, content: string) {
+    try {
+      await navigator.clipboard.writeText(content);
+      setCopiedId(messageId);
+      setTimeout(() => setCopiedId((current) => (current === messageId ? null : current)), 1200);
+    } catch {
+      setCopiedId(null);
+    }
+  }
+
   if (messages.length === 0) {
     return <p className="text-sm text-muted-foreground">{emptyLabel}</p>;
   }
@@ -39,7 +55,18 @@ export function MessageList({ messages, emptyLabel }: MessageListProps) {
 
         return (
           <article key={message.id} className="space-y-1 rounded-lg border p-3">
-            <p className="text-xs uppercase tracking-wide text-zinc-500">{message.role}</p>
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs uppercase tracking-wide text-zinc-500">{message.role}</p>
+              {message.role === "assistant" ? (
+                <button
+                  type="button"
+                  className="rounded-md border px-2 py-0.5 text-xs"
+                  onClick={() => void copyMessage(message.id, message.content)}
+                >
+                  {copiedId === message.id ? "Copied" : "Copy"}
+                </button>
+              ) : null}
+            </div>
             {urls.length > 0 ? <SourceCarousel urls={urls} /> : null}
             {message.role === "assistant" ? (
               <MarkdownRenderer content={message.content} />
