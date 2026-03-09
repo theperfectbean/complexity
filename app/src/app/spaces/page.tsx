@@ -22,6 +22,7 @@ export default function SpacesPage() {
   const { data: session, status } = useSession();
   const [spaces, setSpaces] = useState<Space[]>([]);
   const [loading, setLoading] = useState(true);
+  const [busySpaceId, setBusySpaceId] = useState<string | null>(null);
 
   useEffect(() => {
     if (status !== "authenticated") {
@@ -60,6 +61,51 @@ export default function SpacesPage() {
     );
   }
 
+  async function renameSpace(space: Space) {
+    const nextName = window.prompt("Rename space", space.name)?.trim();
+    if (!nextName || nextName === space.name) {
+      return;
+    }
+
+    setBusySpaceId(space.id);
+    try {
+      const response = await fetch(`/api/spaces/${space.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: nextName }),
+      });
+
+      if (!response.ok) {
+        return;
+      }
+
+      setSpaces((current) =>
+        current.map((item) => (item.id === space.id ? { ...item, name: nextName, updatedAt: new Date().toISOString() } : item)),
+      );
+    } finally {
+      setBusySpaceId(null);
+    }
+  }
+
+  async function deleteSpace(space: Space) {
+    const confirmed = window.confirm(`Delete \"${space.name}\"? This removes all documents and chunks.`);
+    if (!confirmed) {
+      return;
+    }
+
+    setBusySpaceId(space.id);
+    try {
+      const response = await fetch(`/api/spaces/${space.id}`, { method: "DELETE" });
+      if (!response.ok) {
+        return;
+      }
+
+      setSpaces((current) => current.filter((item) => item.id !== space.id));
+    } finally {
+      setBusySpaceId(null);
+    }
+  }
+
   return (
     <AppShell>
       <main className="mx-auto max-w-5xl p-6">
@@ -82,6 +128,9 @@ export default function SpacesPage() {
               name={space.name}
               description={space.description}
               updatedAt={space.updatedAt}
+              busy={busySpaceId === space.id}
+              onRename={() => void renameSpace(space)}
+              onDelete={() => void deleteSpace(space)}
             />
           ))}
         </div>
