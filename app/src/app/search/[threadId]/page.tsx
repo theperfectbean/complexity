@@ -6,9 +6,9 @@ import { useParams } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
-import { FollowUpInput } from "@/components/chat/FollowUpInput";
 import { ChatCitation, ChatMessageItem, MessageList } from "@/components/chat/MessageList";
 import { AppShell } from "@/components/layout/AppShell";
+import { SearchBar } from "@/components/search/SearchBar";
 import { MODELS, getDefaultModel } from "@/lib/models";
 
 type ThreadPayload = {
@@ -172,13 +172,15 @@ export default function ThreadPage() {
           )}
         </section>
 
-        <form onSubmit={onSubmit}>
-          <FollowUpInput
+        <form onSubmit={onSubmit} className="mt-3">
+          <SearchBar
             value={prompt}
             onChange={setPrompt}
             placeholder="Ask anything"
             submitLabel={status === "streaming" ? "Thinking..." : "Send"}
             disabled={status === "streaming"}
+            layoutId="searchbar"
+            compact
           />
         </form>
       </main>

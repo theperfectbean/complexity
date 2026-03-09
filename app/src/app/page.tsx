@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 
+import { SearchBar } from "@/components/search/SearchBar";
 import { MODELS, getDefaultModel } from "@/lib/models";
 
 export default function Home() {
@@ -91,12 +92,14 @@ export default function Home() {
       </header>
 
       <div className="flex flex-1 items-center justify-center">
-        <form onSubmit={startThread} className="w-full max-w-3xl space-y-3 rounded-2xl border p-4">
-          <textarea
-            className="min-h-24 w-full resize-none rounded-md border bg-transparent px-3 py-2"
-            placeholder="Ask anything..."
+        <form onSubmit={startThread} className="w-full max-w-3xl space-y-3">
+          <SearchBar
             value={query}
-            onChange={(event) => setQuery(event.target.value)}
+            onChange={setQuery}
+            placeholder="Ask anything..."
+            submitLabel={loading ? "Starting..." : "Start"}
+            disabled={loading}
+            layoutId="searchbar"
           />
           <div className="flex items-center justify-between">
             <select
@@ -114,9 +117,7 @@ export default function Home() {
                 </optgroup>
               ))}
             </select>
-            <button className="rounded-md bg-foreground px-4 py-2 text-background" type="submit" disabled={loading}>
-              {loading ? "Starting..." : "Start"}
-            </button>
+            <span className="text-xs text-muted-foreground">Model applies to this new thread</span>
           </div>
         </form>
       </div>
