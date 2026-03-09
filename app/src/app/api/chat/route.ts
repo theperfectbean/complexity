@@ -26,6 +26,12 @@ type Citation = {
 };
 
 const CHAT_RATE_LIMIT_PER_MINUTE = 20;
+const CHAT_CACHE_TTL_SECONDS = 60 * 60;
+
+type CachedChatPayload = {
+  text: string;
+  citations: Citation[];
+};
 
 function extractTextFromMessage(message: UIMessage): string {
   return (
@@ -165,6 +171,51 @@ export async function POST(request: Request) {
     : "Provide concise, accurate, citation-backed answers.";
 
   const safeModel = isValidModelId(parsed.data.model) ? parsed.data.model : getDefaultModel();
+  const cacheKey = `cache:chat:${userEmail}:${safeModel}:${parsed.data.spaceId ?? "none"}:${Buffer.from(userText).toString("base64")}`;
+
+  if (redis) {
+    try {
+      const cachedRaw = await redis.get(cacheKey);
+      if (cachedRaw) {
+        const cachedPayload = JSON.parse(cachedRaw) as CachedChatPayload;
+
+        await db.insert(messages).values({
+          id: createId(),
+          threadId: parsed.data.threadId,
+          role: "assistant",
+          content: cachedPayload.text,
+          model: safeModel,
+          citations: cachedPayload.citations.length > 0 ? JSON.parse(JSON.stringify(cachedPayload.citations)) : null,
+        });
+
+        await db
+          .update(threads)
+          .set({
+            model: safeModel,
+            updatedAt: new Date(),
+          })
+          .where(eq(threads.id, parsed.data.threadId));
+
+        const stream = createUIMessageStream({
+          execute: ({ writer }) => {
+            const responseMessageId = createId();
+            const textId = createId();
+
+            writer.write({ type: "start", messageId: responseMessageId });
+            writer.write({ type: "text-start", id: textId });
+            writer.write({ type: "text-delta", id: textId, delta: cachedPayload.text });
+            writer.write({ type: "text-end", id: textId });
+            writer.write({ type: "finish" });
+          },
+        });
+
+        return createUIMessageStreamResponse({ stream });
+      }
+    } catch {
+      // Fail open if Redis cache fails.
+    }
+  }
+
   const agentInput = inputMessages
     .map((message) => ({ role: message.role, content: extractTextFromMessage(message) }))
     .filter((message) => message.content.length > 0);
@@ -228,6 +279,18 @@ export async function POST(request: Request) {
       }
 
       const citations = extractCitationsFromResponse(completedResponse);
+
+      if (redis && assistantText) {
+        try {
+          const payload: CachedChatPayload = {
+            text: assistantText,
+            citations,
+          };
+          await redis.set(cacheKey, JSON.stringify(payload), "EX", CHAT_CACHE_TTL_SECONDS);
+        } catch {
+          // Ignore cache write failures.
+        }
+      }
 
       await db.insert(messages).values({
         id: createId(),
