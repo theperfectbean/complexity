@@ -81,3 +81,25 @@ Self-hosted Perplexity-style AI search and RAG workspace.
 ## Notes
 - Host port is mapped to `3002` in compose.
 - Internal app runtime still reports `3000` inside container, which is expected.
+
+## Verification Checklist
+
+- Phase 1: `docker compose up --build` and verify all services become healthy.
+- Phase 2: Create a thread, send a prompt, confirm streaming response and persisted history after reload.
+- Phase 3: Verify sidebar/mobile navigation, library search/delete, and theme toggle.
+- Phase 4: Create a space, upload a document, wait for `ready`, then ask a space-scoped question.
+- Phase 5: Trigger chat rate limit and verify `429` response behavior.
+
+## Backup Strategy (PostgreSQL)
+
+Example daily `pg_dump` command:
+
+```bash
+docker exec complexity-postgres pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" > backup-$(date +%F).sql
+```
+
+Example cron entry (daily at 2 AM):
+
+```cron
+0 2 * * * cd /path/to/complexity && docker exec complexity-postgres pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" > backups/backup-$(date +\%F).sql
+```
