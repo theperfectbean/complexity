@@ -6,10 +6,11 @@ import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { createId } from "@/lib/db/cuid";
 import { threads } from "@/lib/db/schema";
+import { getDefaultModel } from "@/lib/models";
 
 const createSchema = z.object({
   title: z.string().min(1).max(200),
-  model: z.string().min(1).max(50).default("pro-search"),
+  model: z.string().min(1).max(50).default(getDefaultModel()),
   spaceId: z.string().optional(),
 });
 

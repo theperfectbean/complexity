@@ -1,24 +1,35 @@
 export const MODELS = [
   { id: "fast-search", label: "Fast Search", category: "Presets", isPreset: true },
   { id: "pro-search", label: "Pro Search", category: "Presets", isPreset: true },
-  { id: "deep-research", label: "Deep Research", category: "Presets", isPreset: true },
+  { id: "perplexity/sonar", label: "Perplexity Sonar", category: "Perplexity", isPreset: false },
   {
-    id: "advanced-deep-research",
-    label: "Advanced Deep Research",
-    category: "Presets",
-    isPreset: true,
+    id: "anthropic/claude-opus-4-6",
+    label: "Claude Opus 4.6",
+    category: "Anthropic",
+    isPreset: false,
   },
-  { id: "perplexity/sonar", label: "Sonar", category: "Perplexity", isPreset: false },
   {
     id: "anthropic/claude-sonnet-4-6",
     label: "Claude Sonnet 4.6",
     category: "Anthropic",
     isPreset: false,
   },
+  {
+    id: "anthropic/claude-haiku-4-5",
+    label: "Claude Haiku 4.5",
+    category: "Anthropic",
+    isPreset: false,
+  },
   { id: "openai/gpt-5.2", label: "GPT-5.2", category: "OpenAI", isPreset: false },
   {
-    id: "google/gemini-2.5-pro",
-    label: "Gemini 2.5 Pro",
+    id: "google/gemini-3.1-pro-preview",
+    label: "Gemini 3.1 Pro Preview",
+    category: "Google",
+    isPreset: false,
+  },
+  {
+    id: "google/gemini-3-flash-preview",
+    label: "Gemini 3 Flash Preview",
     category: "Google",
     isPreset: false,
   },
@@ -44,5 +55,5 @@ export function isPresetModel(model: string): boolean {
 }
 
 export function getDefaultModel(): ModelId {
-  return "pro-search";
+  return "perplexity/sonar";
 }

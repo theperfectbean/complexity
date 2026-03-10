@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 
+import { AppShell } from "@/components/layout/AppShell";
 import { AppProviders } from "@/lib/auth-client";
 import "./globals.css";
 
@@ -22,7 +23,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${inter.variable} antialiased`}>
-        <AppProviders>{children}</AppProviders>
+        <AppProviders>
+          <AppShell contentClassName="flex min-h-screen flex-1">{children}</AppShell>
+        </AppProviders>
       </body>
     </html>
   );

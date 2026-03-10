@@ -6,7 +6,6 @@ import { useEffect, useMemo, useState } from "react";
 
 import { useSession } from "next-auth/react";
 
-import { AppShell } from "@/components/layout/AppShell";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { LoadingSkeleton } from "@/components/shared/LoadingSkeleton";
 
@@ -82,11 +81,9 @@ export default function LibraryPage() {
 
   if (status === "loading") {
     return (
-      <AppShell>
-        <main className="mx-auto max-w-5xl p-6">
-          <p>Loading your library...</p>
-        </main>
-      </AppShell>
+      <main className="mx-auto max-w-5xl p-6">
+        <p>Loading your library...</p>
+      </main>
     );
   }
 
@@ -105,50 +102,48 @@ export default function LibraryPage() {
   }
 
   return (
-    <AppShell>
-      <main className="mx-auto max-w-5xl p-6">
-        <h1 className="text-2xl font-semibold">Library</h1>
-        <p className="mt-2 text-sm text-zinc-500">Search and manage your recent threads.</p>
+    <main className="mx-auto max-w-5xl p-6">
+      <h1 className="text-2xl font-semibold">Library</h1>
+      <p className="mt-2 text-sm text-zinc-500">Search and manage your recent threads.</p>
 
-        <div className="mt-4">
-          <input
-            className="w-full max-w-md rounded-md border bg-transparent px-3 py-2"
-            placeholder="Search by thread title"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-          />
-        </div>
+      <div className="mt-4">
+        <input
+          className="w-full max-w-md rounded-md border bg-transparent px-3 py-2"
+          placeholder="Search by thread title"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+        />
+      </div>
 
-        <div className="mt-4 space-y-2">
-          {loading ? <LoadingSkeleton lines={4} /> : null}
-          {!loading && filteredThreads.length === 0 ? (
-            <EmptyState title="No matching threads" description="Try a different title search or start a new thread." />
-          ) : null}
+      <div className="mt-4 space-y-2">
+        {loading ? <LoadingSkeleton lines={4} /> : null}
+        {!loading && filteredThreads.length === 0 ? (
+          <EmptyState title="No matching threads" description="Try a different title search or start a new thread." />
+        ) : null}
 
-          {filteredThreads.map((thread) => (
-            <article key={thread.id} className="flex items-center justify-between rounded-lg border p-3">
-              <button
-                type="button"
-                className="min-w-0 flex-1 text-left"
-                onClick={() => router.push(`/search/${thread.id}`)}
-              >
-                <p className="truncate font-medium">{thread.title}</p>
-                <p className="text-xs text-muted-foreground">
-                  {thread.model} · {new Date(thread.updatedAt).toLocaleString()}
-                </p>
-              </button>
-              <button
-                type="button"
-                className="ml-3 rounded-md border px-3 py-1 text-sm"
-                onClick={() => handleDelete(thread.id)}
-                disabled={deletingId === thread.id}
-              >
-                {deletingId === thread.id ? "Deleting..." : "Delete"}
-              </button>
-            </article>
-          ))}
-        </div>
-      </main>
-    </AppShell>
+        {filteredThreads.map((thread) => (
+          <article key={thread.id} className="flex items-center justify-between rounded-lg border p-3">
+            <button
+              type="button"
+              className="min-w-0 flex-1 text-left"
+              onClick={() => router.push(`/search/${thread.id}`)}
+            >
+              <p className="truncate font-medium">{thread.title}</p>
+              <p className="text-xs text-muted-foreground">
+                {thread.model} · {new Date(thread.updatedAt).toLocaleString()}
+              </p>
+            </button>
+            <button
+              type="button"
+              className="ml-3 rounded-md border px-3 py-1 text-sm"
+              onClick={() => handleDelete(thread.id)}
+              disabled={deletingId === thread.id}
+            >
+              {deletingId === thread.id ? "Deleting..." : "Delete"}
+            </button>
+          </article>
+        ))}
+      </div>
+    </main>
   );
 }

@@ -60,6 +60,8 @@ function mockMutationChains() {
   const where = vi.fn().mockResolvedValue(undefined);
   const set = vi.fn(() => ({ where }));
   vi.mocked(db.update).mockReturnValue({ set } as never);
+
+  return { values, set, where };
 }
 
 describe("POST /api/chat", () => {
@@ -230,5 +232,236 @@ describe("POST /api/chat", () => {
     const response = await POST(request);
     expect(response.status).toBe(404);
     await expect(response.json()).resolves.toEqual({ error: "Space not found" });
+  });
+
+  it("streams and persists assistant text from response.completed fallback", async () => {
+    mockSelectResult([{ id: "thread-1", userId: "user-1", spaceId: null }]);
+    const { values } = mockMutationChains();
+
+    async function* eventStream() {
+      yield {
+        type: "response.completed",
+        response: {
+          output: [
+            {
+              content: [{ text: "fallback answer from completed response" }],
+            },
+          ],
+        },
+      };
+    }
+
+    vi.mocked(createPerplexityClient).mockReturnValue({
+      responses: {
+        create: vi.fn().mockResolvedValue(eventStream()),
+      },
+    } as never);
+
+    const request = new Request("http://localhost/api/chat", {
+      method: "POST",
+      body: JSON.stringify({
+        threadId: "thread-1",
+        model: "pro-search",
+        messages: [{ role: "user", parts: [{ type: "text", text: "hello" }] }],
+      }),
+      headers: { "Content-Type": "application/json" },
+    });
+
+    const response = await POST(request);
+    expect(response.status).toBe(200);
+
+    await response.text();
+
+    expect(values).toHaveBeenCalledTimes(2);
+    expect(values.mock.calls[1]?.[0]).toEqual(
+      expect.objectContaining({
+        role: "assistant",
+        content: "fallback answer from completed response",
+      }),
+    );
+  });
+
+  it("streams and persists assistant text from response.output_text.done events", async () => {
+    mockSelectResult([{ id: "thread-1", userId: "user-1", spaceId: null }]);
+    const { values } = mockMutationChains();
+
+    async function* eventStream() {
+      yield {
+        type: "response.output_text.done",
+        text: "done event answer",
+      };
+
+      yield {
+        type: "response.completed",
+        response: {
+          output: [],
+        },
+      };
+    }
+
+    vi.mocked(createPerplexityClient).mockReturnValue({
+      responses: {
+        create: vi.fn().mockResolvedValue(eventStream()),
+      },
+    } as never);
+
+    const request = new Request("http://localhost/api/chat", {
+      method: "POST",
+      body: JSON.stringify({
+        threadId: "thread-1",
+        model: "pro-search",
+        messages: [{ role: "user", parts: [{ type: "text", text: "hello" }] }],
+      }),
+      headers: { "Content-Type": "application/json" },
+    });
+
+    const response = await POST(request);
+    expect(response.status).toBe(200);
+
+    await response.text();
+
+    expect(values).toHaveBeenCalledTimes(2);
+    expect(values.mock.calls[1]?.[0]).toEqual(
+      expect.objectContaining({
+        role: "assistant",
+        content: "done event answer",
+      }),
+    );
+  });
+
+  it("falls back to non-stream response when stream yields zero events", async () => {
+    mockSelectResult([{ id: "thread-1", userId: "user-1", spaceId: null }]);
+    const { values } = mockMutationChains();
+
+    async function* emptyStream() {
+      return;
+    }
+
+    const create = vi
+      .fn()
+      .mockResolvedValueOnce(emptyStream())
+      .mockResolvedValueOnce({
+        output_text: "non-stream fallback answer",
+        output: [
+          {
+            content: [{ type: "output_text", text: "non-stream fallback answer" }],
+          },
+        ],
+      });
+
+    vi.mocked(createPerplexityClient).mockReturnValue({
+      responses: {
+        create,
+      },
+    } as never);
+
+    const request = new Request("http://localhost/api/chat", {
+      method: "POST",
+      body: JSON.stringify({
+        threadId: "thread-1",
+        model: "pro-search",
+        messages: [{ role: "user", parts: [{ type: "text", text: "hello" }] }],
+      }),
+      headers: { "Content-Type": "application/json" },
+    });
+
+    const response = await POST(request);
+    expect(response.status).toBe(200);
+
+    const streamText = await response.text();
+
+    expect(create).toHaveBeenCalledTimes(2);
+    expect(streamText).toContain("non-stream fallback answer");
+    expect(values.mock.calls[1]?.[0]).toEqual(
+      expect.objectContaining({
+        role: "assistant",
+        content: "non-stream fallback answer",
+      }),
+    );
+  });
+
+  it("ignores cached fallback placeholder and clears cache entry", async () => {
+    mockSelectResult([{ id: "thread-1", userId: "user-1", spaceId: null }]);
+    const { values } = mockMutationChains();
+
+    async function* eventStream() {
+      yield {
+        type: "response.output_text.done",
+        text: "fresh provider answer",
+      };
+    }
+
+    vi.mocked(createPerplexityClient).mockReturnValue({
+      responses: {
+        create: vi.fn().mockResolvedValue(eventStream()),
+      },
+    } as never);
+
+    const redisDel = vi.fn().mockResolvedValue(1);
+    vi.mocked(getRedisClient).mockReturnValue({
+      incr: vi.fn().mockResolvedValue(1),
+      expire: vi.fn().mockResolvedValue(1),
+      get: vi.fn().mockResolvedValue(
+        JSON.stringify({
+          text: "I couldn't generate a response. Please try again.",
+          citations: [],
+        }),
+      ),
+      del: redisDel,
+      set: vi.fn(),
+    } as never);
+
+    const request = new Request("http://localhost/api/chat", {
+      method: "POST",
+      body: JSON.stringify({
+        threadId: "thread-1",
+        model: "pro-search",
+        messages: [{ role: "user", parts: [{ type: "text", text: "hello" }] }],
+      }),
+      headers: { "Content-Type": "application/json" },
+    });
+
+    const response = await POST(request);
+    expect(response.status).toBe(200);
+    await response.text();
+    expect(redisDel).toHaveBeenCalledTimes(1);
+    expect(values.mock.calls[1]?.[0]).toEqual(
+      expect.objectContaining({
+        role: "assistant",
+        content: "fresh provider answer",
+      }),
+    );
+  });
+
+  it("returns visible assistant fallback when provider request throws", async () => {
+    mockSelectResult([{ id: "thread-1", userId: "user-1", spaceId: null }]);
+    const { values } = mockMutationChains();
+
+    vi.mocked(createPerplexityClient).mockImplementation(() => {
+      throw new Error("provider exploded");
+    });
+
+    const request = new Request("http://localhost/api/chat", {
+      method: "POST",
+      body: JSON.stringify({
+        threadId: "thread-1",
+        model: "pro-search",
+        messages: [{ role: "user", parts: [{ type: "text", text: "hello" }] }],
+      }),
+      headers: { "Content-Type": "application/json" },
+    });
+
+    const response = await POST(request);
+    expect(response.status).toBe(200);
+
+    await response.text();
+
+    expect(values).toHaveBeenCalledTimes(2);
+    expect(values.mock.calls[1]?.[0]).toEqual(
+      expect.objectContaining({
+        role: "assistant",
+        content: "Model request failed: provider exploded",
+      }),
+    );
   });
 });

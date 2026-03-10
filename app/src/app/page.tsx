@@ -38,7 +38,7 @@ export default function Home() {
     }
 
     const payload = (await response.json()) as { thread: { id: string } };
-    router.push(`/search/${payload.thread.id}`);
+    router.push(`/search/${payload.thread.id}?q=${encodeURIComponent(query.trim())}`);
   }
 
   if (status === "loading") {

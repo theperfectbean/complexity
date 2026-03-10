@@ -2,12 +2,11 @@
 
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
-import { useParams } from "next/navigation";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { ChatCitation, ChatMessageItem, MessageList } from "@/components/chat/MessageList";
-import { AppShell } from "@/components/layout/AppShell";
 import { SearchBar } from "@/components/search/SearchBar";
 import { getDefaultModel } from "@/lib/models";
 
@@ -24,6 +23,23 @@ type ThreadPayload = {
     citations: unknown;
   }>;
 };
+
+function getChatErrorMessage(error: Error | undefined): string {
+  if (!error?.message) {
+    return "";
+  }
+
+  try {
+    const parsed = JSON.parse(error.message) as { error?: string };
+    if (typeof parsed.error === "string" && parsed.error.trim().length > 0) {
+      return parsed.error;
+    }
+  } catch {
+    // Ignore JSON parse errors and fall back to raw message.
+  }
+
+  return error.message;
+}
 
 function normalizeCitations(citations: unknown): ChatCitation[] {
   if (!Array.isArray(citations)) {
@@ -42,19 +58,19 @@ function normalizeCitations(citations: unknown): ChatCitation[] {
 
 export default function ThreadPage() {
   const params = useParams<{ threadId: string }>();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const threadId = params.threadId;
+  const initialQuery = searchParams.get("q")?.trim() ?? "";
   const [model, setModel] = useState<string>(getDefaultModel());
   const [threadTitle, setThreadTitle] = useState<string>(`Thread ${threadId.slice(0, 8)}`);
   const [historyMessages, setHistoryMessages] = useState<ChatMessageItem[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(true);
+  const hasSubmittedInitialQuery = useRef(false);
 
   const { messages, sendMessage, status, error } = useChat({
     transport: new DefaultChatTransport({
       api: "/api/chat",
-      body: () => ({
-        threadId,
-        model,
-      }),
     }),
   });
   const [prompt, setPrompt] = useState("");
@@ -110,6 +126,36 @@ export default function ThreadPage() {
   );
 
   const mergedMessages = [...historyMessages, ...liveMessages];
+  const chatErrorMessage = getChatErrorMessage(error);
+
+  useEffect(() => {
+    if (!initialQuery || hasSubmittedInitialQuery.current || loadingHistory) {
+      return;
+    }
+
+    if (mergedMessages.length > 0) {
+      hasSubmittedInitialQuery.current = true;
+      router.replace(`/search/${threadId}`);
+      return;
+    }
+
+    hasSubmittedInitialQuery.current = true;
+    void sendMessage(
+      { text: initialQuery },
+      {
+        body: {
+          threadId,
+          model,
+        },
+      },
+    )
+      .then(() => {
+        router.replace(`/search/${threadId}`);
+      })
+      .catch(() => {
+        toast.error("Failed to send initial query");
+      });
+  }, [initialQuery, loadingHistory, mergedMessages.length, model, router, sendMessage, threadId]);
 
   useEffect(() => {
     if (error) {
@@ -123,7 +169,15 @@ export default function ThreadPage() {
       return;
     }
     try {
-      await sendMessage({ text: prompt });
+      await sendMessage(
+        { text: prompt },
+        {
+          body: {
+            threadId,
+            model,
+          },
+        },
+      );
     } catch {
       toast.error("Failed to send message");
     }
@@ -131,38 +185,42 @@ export default function ThreadPage() {
   }
 
   return (
-    <AppShell>
-      <main className="mx-auto flex h-full min-h-screen w-full max-w-4xl flex-col px-4 py-6">
-        <header className="mb-4 flex items-center justify-between">
-          <h1 className="text-xl font-semibold">{threadTitle}</h1>
-        </header>
+    <main className="mx-auto flex h-full min-h-screen w-full max-w-4xl flex-col px-4 py-6">
+      <header className="mb-4 flex items-center justify-between">
+        <h1 className="text-xl font-semibold">{threadTitle}</h1>
+      </header>
 
-        <section className="flex-1 overflow-y-auto rounded-xl border p-4">
-          {loadingHistory ? (
-            <p className="text-sm text-muted-foreground">Loading thread...</p>
-          ) : (
-            <MessageList
-              messages={mergedMessages}
-              emptyLabel="Start this thread with your first question."
-              onRelatedQuestionClick={(question) => setPrompt(question)}
-            />
-          )}
-        </section>
+      {chatErrorMessage ? (
+        <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">
+          {chatErrorMessage}
+        </div>
+      ) : null}
 
-        <form onSubmit={onSubmit} className="mt-3">
-          <SearchBar
-            value={prompt}
-            onChange={setPrompt}
-            placeholder="Ask anything"
-            submitLabel={status === "streaming" ? "Thinking..." : "Send"}
-            disabled={status === "streaming"}
-            layoutId="searchbar"
-            compact
-            model={model}
-            onModelChange={setModel}
+      <section className="flex-1 overflow-y-auto">
+        {loadingHistory ? (
+          <p className="text-sm text-muted-foreground">Loading thread...</p>
+        ) : (
+          <MessageList
+            messages={mergedMessages}
+            emptyLabel="Start this thread with your first question."
+            onRelatedQuestionClick={(question) => setPrompt(question)}
           />
-        </form>
-      </main>
-    </AppShell>
+        )}
+      </section>
+
+      <form onSubmit={onSubmit} className="mt-3">
+        <SearchBar
+          value={prompt}
+          onChange={setPrompt}
+          placeholder="Ask anything"
+          submitLabel={status === "streaming" ? "Thinking..." : "Send"}
+          disabled={status === "streaming"}
+          layoutId="searchbar"
+          compact
+          model={model}
+          onModelChange={setModel}
+        />
+      </form>
+    </main>
   );
 }

@@ -72,4 +72,21 @@ describe("SearchBar", () => {
 
     expect(onModelChange).toHaveBeenCalledWith("model-b");
   });
+
+  it("submits on Enter and keeps newline on Shift+Enter", () => {
+    const onSubmit = vi.fn((event: Event) => event.preventDefault());
+
+    render(
+      <form onSubmit={onSubmit}>
+        <SearchBar value="query" onChange={() => {}} placeholder="Ask anything" submitLabel="Send" />
+      </form>,
+    );
+
+    const input = screen.getByPlaceholderText("Ask anything");
+    fireEvent.keyDown(input, { key: "Enter", code: "Enter" });
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+
+    fireEvent.keyDown(input, { key: "Enter", code: "Enter", shiftKey: true });
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+  });
 });

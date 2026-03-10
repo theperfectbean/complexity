@@ -85,7 +85,7 @@ export const threads = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     spaceId: text("space_id").references(() => spaces.id, { onDelete: "set null" }),
-    model: varchar("model", { length: 50 }).notNull().default("pro-search"),
+    model: varchar("model", { length: 50 }).notNull().default("perplexity/sonar"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },

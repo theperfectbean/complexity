@@ -61,6 +61,12 @@ export function SearchBar({
           maxRows={8}
           value={value}
           onChange={(event) => onChange(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" && !event.shiftKey) {
+              event.preventDefault();
+              event.currentTarget.form?.requestSubmit();
+            }
+          }}
           placeholder={placeholder}
           className="max-h-52 flex-1 resize-none bg-transparent px-2 py-2 text-sm outline-none"
         />

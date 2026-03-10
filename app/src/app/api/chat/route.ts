@@ -28,6 +28,7 @@ type Citation = {
 
 const CHAT_RATE_LIMIT_PER_MINUTE = 20;
 const CHAT_CACHE_TTL_SECONDS = 60 * 60;
+const EMPTY_RESPONSE_FALLBACK_TEXT = "I couldn't generate a response. Please try again.";
 
 type CachedChatPayload = {
   text: string;
@@ -35,13 +36,52 @@ type CachedChatPayload = {
 };
 
 function extractTextFromMessage(message: UIMessage): string {
-  return (
+  const partsText =
     message.parts
       ?.filter((part) => part.type === "text")
       .map((part) => (part.type === "text" ? part.text : ""))
       .join("\n")
-      .trim() ?? ""
-  );
+      .trim() ?? "";
+
+  if (partsText) {
+    return partsText;
+  }
+
+  const messageRecord = asRecord(message);
+  const rawContent = messageRecord?.content;
+
+  if (typeof rawContent === "string") {
+    return rawContent.trim();
+  }
+
+  if (Array.isArray(rawContent)) {
+    const text = rawContent
+      .map((item) => {
+        const itemRecord = asRecord(item);
+        if (!itemRecord) {
+          return "";
+        }
+
+        if (typeof itemRecord.text === "string") {
+          return itemRecord.text;
+        }
+
+        if (typeof itemRecord.input_text === "string") {
+          return itemRecord.input_text;
+        }
+
+        return "";
+      })
+      .filter(Boolean)
+      .join("\n")
+      .trim();
+
+    if (text) {
+      return text;
+    }
+  }
+
+  return "";
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -76,6 +116,40 @@ function extractCitationsFromResponse(response: unknown): Citation[] {
   }
 
   return Array.from(citations.values());
+}
+
+function collectTextStrings(value: unknown): string[] {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed ? [trimmed] : [];
+  }
+
+  if (Array.isArray(value)) {
+    return value.flatMap((item) => collectTextStrings(item));
+  }
+
+  const record = asRecord(value);
+  if (!record) {
+    return [];
+  }
+
+  const directText = ["text", "output_text", "input_text"]
+    .flatMap((key) => collectTextStrings(record[key]))
+    .filter(Boolean);
+
+  if (directText.length > 0) {
+    return directText;
+  }
+
+  const nestedText = ["output", "content", "response", "message", "data"]
+    .flatMap((key) => collectTextStrings(record[key]))
+    .filter(Boolean);
+
+  return nestedText;
+}
+
+function extractAssistantTextFromCompletedResponse(response: unknown): string {
+  return Array.from(new Set(collectTextStrings(response))).join("\n").trim();
 }
 
 export async function POST(request: Request) {
@@ -180,37 +254,41 @@ export async function POST(request: Request) {
       if (cachedRaw) {
         const cachedPayload = JSON.parse(cachedRaw) as CachedChatPayload;
 
-        await db.insert(messages).values({
-          id: createId(),
-          threadId: parsed.data.threadId,
-          role: "assistant",
-          content: cachedPayload.text,
-          model: safeModel,
-          citations: cachedPayload.citations.length > 0 ? JSON.parse(JSON.stringify(cachedPayload.citations)) : null,
-        });
-
-        await db
-          .update(threads)
-          .set({
+        if (cachedPayload.text.trim() === EMPTY_RESPONSE_FALLBACK_TEXT) {
+          await redis.del(cacheKey);
+        } else {
+          await db.insert(messages).values({
+            id: createId(),
+            threadId: parsed.data.threadId,
+            role: "assistant",
+            content: cachedPayload.text,
             model: safeModel,
-            updatedAt: new Date(),
-          })
-          .where(eq(threads.id, parsed.data.threadId));
+            citations: cachedPayload.citations.length > 0 ? JSON.parse(JSON.stringify(cachedPayload.citations)) : null,
+          });
 
-        const stream = createUIMessageStream({
-          execute: ({ writer }) => {
-            const responseMessageId = createId();
-            const textId = createId();
+          await db
+            .update(threads)
+            .set({
+              model: safeModel,
+              updatedAt: new Date(),
+            })
+            .where(eq(threads.id, parsed.data.threadId));
 
-            writer.write({ type: "start", messageId: responseMessageId });
-            writer.write({ type: "text-start", id: textId });
-            writer.write({ type: "text-delta", id: textId, delta: cachedPayload.text });
-            writer.write({ type: "text-end", id: textId });
-            writer.write({ type: "finish" });
-          },
-        });
+          const stream = createUIMessageStream({
+            execute: ({ writer }) => {
+              const responseMessageId = createId();
+              const textId = createId();
 
-        return createUIMessageStreamResponse({ stream });
+              writer.write({ type: "start", messageId: responseMessageId });
+              writer.write({ type: "text-start", id: textId });
+              writer.write({ type: "text-delta", id: textId, delta: cachedPayload.text });
+              writer.write({ type: "text-end", id: textId });
+              writer.write({ type: "finish" });
+            },
+          });
+
+          return createUIMessageStreamResponse({ stream });
+        }
       }
     } catch {
       // Fail open if Redis cache fails.
@@ -230,63 +308,119 @@ export async function POST(request: Request) {
     execute: async ({ writer }) => {
       const responseMessageId = createId();
       const textId = createId();
-      const client = createPerplexityClient();
 
       writer.write({ type: "start", messageId: responseMessageId });
       writer.write({ type: "text-start", id: textId });
 
-      const requestBody: Responses.ResponseCreateParamsStreaming = isPresetModel(safeModel)
-        ? {
-            preset: safeModel,
-            input: agentInput,
-            instructions,
-            stream: true,
-          }
-        : {
-            model: safeModel,
-            input: agentInput,
-            instructions,
-            stream: true,
-            tools: [{ type: "web_search" }, { type: "fetch_url" }],
-          };
-
-      const eventStream = await client.responses.create(requestBody);
-
       let assistantText = "";
       let completedResponse: unknown;
+      let hasWrittenTextDelta = false;
 
-      for await (const event of eventStream as unknown as AsyncIterable<unknown>) {
-        const eventRecord = asRecord(event);
-        if (eventRecord?.type === "response.output_text.delta") {
-          const outputText = asRecord(eventRecord.output_text);
-          const delta =
-            (typeof eventRecord.delta === "string" && eventRecord.delta) ||
-            (typeof outputText?.delta === "string" && outputText.delta) ||
-            "";
+      try {
+        const client = createPerplexityClient();
+        const requestBodyBase = isPresetModel(safeModel)
+          ? {
+              preset: safeModel,
+              input: agentInput,
+              instructions,
+            }
+          : {
+              model: safeModel,
+              input: agentInput,
+              instructions,
+              tools: [{ type: "web_search" }, { type: "fetch_url" }],
+            };
 
-          if (delta) {
-            assistantText += delta;
-            writer.write({ type: "text-delta", id: textId, delta });
+        const requestBody: Responses.ResponseCreateParamsStreaming = {
+          ...requestBodyBase,
+          stream: true,
+        } as Responses.ResponseCreateParamsStreaming;
+
+        const eventStream = await client.responses.create(requestBody);
+        let streamEventCount = 0;
+
+        for await (const event of eventStream as unknown as AsyncIterable<unknown>) {
+          streamEventCount += 1;
+          const eventRecord = asRecord(event);
+          if (eventRecord?.type === "response.output_text.delta") {
+            const outputText = asRecord(eventRecord.output_text);
+            const delta =
+              (typeof eventRecord.delta === "string" && eventRecord.delta) ||
+              (typeof outputText?.delta === "string" && outputText.delta) ||
+              "";
+
+            if (delta) {
+              assistantText += delta;
+              writer.write({ type: "text-delta", id: textId, delta });
+              hasWrittenTextDelta = true;
+            }
+            continue;
           }
-          continue;
+
+          if (eventRecord?.type === "response.output_text.done") {
+            const outputText = asRecord(eventRecord.output_text);
+            const doneText =
+              (typeof eventRecord.text === "string" && eventRecord.text) ||
+              (typeof outputText?.text === "string" && outputText.text) ||
+              (typeof eventRecord.delta === "string" && eventRecord.delta) ||
+              "";
+
+            if (doneText) {
+              assistantText += doneText;
+              writer.write({ type: "text-delta", id: textId, delta: doneText });
+              hasWrittenTextDelta = true;
+            }
+            continue;
+          }
+
+          if (eventRecord?.type === "response.completed") {
+            completedResponse = eventRecord.response ?? event;
+            continue;
+          }
+
+          if (eventRecord?.type === "response.failed") {
+            const errorRecord = asRecord(eventRecord.error);
+            throw new Error(
+              typeof errorRecord?.message === "string" ? errorRecord.message : "Agent API request failed",
+            );
+          }
         }
 
-        if (eventRecord?.type === "response.completed") {
-          completedResponse = eventRecord.response ?? event;
-          continue;
-        }
-
-        if (eventRecord?.type === "response.failed") {
-          const errorRecord = asRecord(eventRecord.error);
-          throw new Error(
-            typeof errorRecord?.message === "string" ? errorRecord.message : "Agent API request failed",
+        if (streamEventCount === 0 || (!assistantText && !completedResponse)) {
+          const nonStreamingResponse = await client.responses.create(
+            requestBodyBase as Responses.ResponseCreateParamsNonStreaming,
           );
+
+          completedResponse = nonStreamingResponse;
+          if (!assistantText) {
+            assistantText = extractAssistantTextFromCompletedResponse(nonStreamingResponse);
+          }
         }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Agent API request failed";
+        assistantText = `Model request failed: ${message}`;
+        writer.write({ type: "text-delta", id: textId, delta: assistantText });
+        hasWrittenTextDelta = true;
+      }
+
+      if (!assistantText) {
+        assistantText = extractAssistantTextFromCompletedResponse(completedResponse);
+      }
+
+      if (!assistantText) {
+        assistantText = EMPTY_RESPONSE_FALLBACK_TEXT;
+        writer.write({ type: "text-delta", id: textId, delta: assistantText });
+        hasWrittenTextDelta = true;
+      }
+
+      if (!hasWrittenTextDelta && assistantText) {
+        writer.write({ type: "text-delta", id: textId, delta: assistantText });
+        hasWrittenTextDelta = true;
       }
 
       const citations = extractCitationsFromResponse(completedResponse);
 
-      if (redis && assistantText) {
+      if (redis && assistantText && assistantText !== EMPTY_RESPONSE_FALLBACK_TEXT) {
         try {
           const payload: CachedChatPayload = {
             text: assistantText,

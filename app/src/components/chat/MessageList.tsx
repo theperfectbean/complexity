@@ -66,35 +66,35 @@ export function MessageList({ messages, emptyLabel, onRelatedQuestionClick }: Me
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-5 pb-4">
       {messages.map((message) => {
         const urlsFromCitations = (message.citations ?? []).map((citation) => citation.url).filter(Boolean) as string[];
         const urls = message.role === "assistant" ? (urlsFromCitations.length > 0 ? urlsFromCitations : extractUrls(message.content)) : [];
         const relatedQuestions = message.role === "assistant" ? extractRelatedQuestions(message.content) : [];
+        const isUser = message.role === "user";
 
         return (
-          <article key={message.id} className="space-y-1 rounded-lg border p-3">
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-xs uppercase tracking-wide text-zinc-500">{message.role}</p>
-              {message.role === "assistant" ? (
-                <button
-                  type="button"
-                  className="rounded-md border px-2 py-0.5 text-xs"
-                  onClick={() => void copyMessage(message.id, message.content)}
-                >
-                  {copiedId === message.id ? "Copied" : "Copy"}
-                </button>
-              ) : null}
-            </div>
-            {urls.length > 0 ? <SourceCarousel urls={urls} /> : null}
-            {message.role === "assistant" ? (
-              <MarkdownRenderer content={message.content} />
+          <article key={message.id} className={isUser ? "flex justify-end" : "space-y-2"}>
+            {isUser ? (
+              <p className="max-w-[80%] whitespace-pre-wrap rounded-2xl bg-zinc-900 px-4 py-2 text-sm text-white">
+                {message.content}
+              </p>
             ) : (
-              <p className="whitespace-pre-wrap text-sm">{message.content}</p>
+              <div className="space-y-2">
+                <div className="flex items-center justify-end">
+                  <button
+                    type="button"
+                    className="rounded-md border px-2 py-0.5 text-xs"
+                    onClick={() => void copyMessage(message.id, message.content)}
+                  >
+                    {copiedId === message.id ? "Copied" : "Copy"}
+                  </button>
+                </div>
+                {urls.length > 0 ? <SourceCarousel urls={urls} /> : null}
+                <MarkdownRenderer content={message.content} />
+                <RelatedQuestions questions={relatedQuestions} onSelect={onRelatedQuestionClick} />
+              </div>
             )}
-            {message.role === "assistant" ? (
-              <RelatedQuestions questions={relatedQuestions} onSelect={onRelatedQuestionClick} />
-            ) : null}
           </article>
         );
       })}

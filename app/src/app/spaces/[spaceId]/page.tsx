@@ -11,7 +11,6 @@ import { useSession } from "next-auth/react";
 
 import { FollowUpInput } from "@/components/chat/FollowUpInput";
 import { ChatMessageItem, MessageList } from "@/components/chat/MessageList";
-import { AppShell } from "@/components/layout/AppShell";
 import { DocumentList, SpaceDocument } from "@/components/spaces/DocumentList";
 import { FileUploader } from "@/components/spaces/FileUploader";
 import { EmptyState } from "@/components/shared/EmptyState";
@@ -145,7 +144,16 @@ export default function SpaceDetailPage() {
     }
 
     try {
-      await sendMessage({ text: prompt });
+      await sendMessage(
+        { text: prompt },
+        {
+          body: {
+            threadId: activeThreadId,
+            model,
+            spaceId,
+          },
+        },
+      );
     } catch {
       toast.error("Failed to send message");
     }
@@ -161,72 +169,70 @@ export default function SpaceDetailPage() {
   }
 
   return (
-    <AppShell>
-      <main className="mx-auto max-w-6xl p-6">
-        <h1 className="text-2xl font-semibold">{space ? space.name : `Space ${spaceId}`}</h1>
-        <p className="mt-2 text-sm text-zinc-500">Upload docs and chat with this space as context.</p>
+    <main className="mx-auto max-w-6xl p-6">
+      <h1 className="text-2xl font-semibold">{space ? space.name : `Space ${spaceId}`}</h1>
+      <p className="mt-2 text-sm text-zinc-500">Upload docs and chat with this space as context.</p>
 
-        <div className="mt-6 grid gap-6 lg:grid-cols-[1fr,1.4fr]">
-          <section className="space-y-4">
-            <FileUploader
-              spaceId={spaceId}
-              onUploaded={() => {
-                void loadDocuments();
-                toast.success("Document uploaded");
-              }}
+      <div className="mt-6 grid gap-6 lg:grid-cols-[1fr,1.4fr]">
+        <section className="space-y-4">
+          <FileUploader
+            spaceId={spaceId}
+            onUploaded={() => {
+              void loadDocuments();
+              toast.success("Document uploaded");
+            }}
+          />
+          <div className="rounded-lg border p-4">
+            <h2 className="mb-3 text-sm font-semibold">Documents</h2>
+            {docsLoading ? (
+              <LoadingSkeleton lines={3} />
+            ) : documents.length === 0 ? (
+              <EmptyState title="No documents yet" description="Upload PDF, DOCX, TXT, or MD files to build context." />
+            ) : (
+              <DocumentList documents={documents} />
+            )}
+          </div>
+        </section>
+
+        <section className="flex min-h-[520px] flex-col rounded-lg border p-4">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <h2 className="text-sm font-semibold">Space chat</h2>
+            <select
+              className="rounded-md border bg-transparent px-3 py-2 text-sm"
+              value={model}
+              onChange={(event) => setModel(event.target.value)}
+            >
+              {Object.entries(groupedModels).map(([category, options]) => (
+                <optgroup key={category} label={category}>
+                  {options.map((option) => (
+                    <option key={option.id} value={option.id}>
+                      {option.label}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex-1 overflow-y-auto rounded-md border p-3">
+            <MessageList
+              messages={chatItems}
+              emptyLabel="Ask a question about your uploaded documents."
+              onRelatedQuestionClick={(question) => setPrompt(question)}
             />
-            <div className="rounded-lg border p-4">
-              <h2 className="mb-3 text-sm font-semibold">Documents</h2>
-              {docsLoading ? (
-                <LoadingSkeleton lines={3} />
-              ) : documents.length === 0 ? (
-                <EmptyState title="No documents yet" description="Upload PDF, DOCX, TXT, or MD files to build context." />
-              ) : (
-                <DocumentList documents={documents} />
-              )}
-            </div>
-          </section>
+          </div>
 
-          <section className="flex min-h-[520px] flex-col rounded-lg border p-4">
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <h2 className="text-sm font-semibold">Space chat</h2>
-              <select
-                className="rounded-md border bg-transparent px-3 py-2 text-sm"
-                value={model}
-                onChange={(event) => setModel(event.target.value)}
-              >
-                {Object.entries(groupedModels).map(([category, options]) => (
-                  <optgroup key={category} label={category}>
-                    {options.map((option) => (
-                      <option key={option.id} value={option.id}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </optgroup>
-                ))}
-              </select>
-            </div>
-
-            <div className="flex-1 overflow-y-auto rounded-md border p-3">
-              <MessageList
-                messages={chatItems}
-                emptyLabel="Ask a question about your uploaded documents."
-                onRelatedQuestionClick={(question) => setPrompt(question)}
-              />
-            </div>
-
-            <form onSubmit={onSubmit}>
-              <FollowUpInput
-                value={prompt}
-                onChange={setPrompt}
-                placeholder="Ask this space"
-                submitLabel={chatStatus === "streaming" ? "Thinking..." : "Send"}
-                disabled={chatStatus === "streaming"}
-              />
-            </form>
-          </section>
-        </div>
-      </main>
-    </AppShell>
+          <form onSubmit={onSubmit}>
+            <FollowUpInput
+              value={prompt}
+              onChange={setPrompt}
+              placeholder="Ask this space"
+              submitLabel={chatStatus === "streaming" ? "Thinking..." : "Send"}
+              disabled={chatStatus === "streaming"}
+            />
+          </form>
+        </section>
+      </div>
+    </main>
   );
 }

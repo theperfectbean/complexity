@@ -4,7 +4,7 @@ import { motion } from "motion/react";
 import { signOut, useSession } from "next-auth/react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { BookOpen, ChevronLeft, ChevronRight, Home, Layers, LogOut } from "lucide-react";
+import { BookOpen, ChevronLeft, ChevronRight, Home, Layers, LogOut, Trash2 } from "lucide-react";
 
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
 import { cn } from "@/lib/utils";
@@ -16,14 +16,15 @@ type Thread = {
 };
 
 type SidebarProps = {
-  collapsed: boolean;
-  onToggle: () => void;
+  collapsed?: boolean;
+  onToggle?: () => void;
   onNavigate?: () => void;
 };
 
-export function Sidebar({ collapsed, onToggle, onNavigate }: SidebarProps) {
+export function Sidebar({ collapsed = false, onToggle, onNavigate }: SidebarProps) {
   const { data: session } = useSession();
   const [threads, setThreads] = useState<Thread[]>([]);
+  const [deletingThreadId, setDeletingThreadId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!session?.user) {
@@ -56,23 +57,42 @@ export function Sidebar({ collapsed, onToggle, onNavigate }: SidebarProps) {
     { href: "/spaces", label: "Spaces", icon: Layers },
   ];
 
+  async function handleDeleteThread(threadId: string) {
+    setDeletingThreadId(threadId);
+    try {
+      const response = await fetch(`/api/threads/${threadId}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        return;
+      }
+
+      setThreads((current) => current.filter((thread) => thread.id !== threadId));
+    } finally {
+      setDeletingThreadId(null);
+    }
+  }
+
   return (
     <motion.aside
-      className="flex h-screen flex-col border-r border-zinc-200 bg-white"
+      className="flex h-screen w-full flex-col border-r border-zinc-200 bg-white"
       initial={false}
-      animate={{ width: collapsed ? 84 : 280 }}
+      animate={{ width: "100%" }}
       transition={{ duration: 0.2, ease: "easeInOut" }}
     >
       <div className={cn("flex items-center border-b border-zinc-200 px-3 py-3", collapsed ? "justify-center" : "justify-between")}>
         {!collapsed && <h2 className="text-sm font-semibold">Complexity</h2>}
-        <button
-          type="button"
-          className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-zinc-200 text-zinc-600 hover:bg-zinc-100"
-          onClick={onToggle}
-          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-        >
-          {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
-        </button>
+        {onToggle ? (
+          <button
+            type="button"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-zinc-200 text-zinc-600 hover:bg-zinc-100"
+            onClick={onToggle}
+            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          >
+            {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+          </button>
+        ) : null}
       </div>
 
       <nav className="space-y-1 px-2 py-3 text-sm">
@@ -104,15 +124,25 @@ export function Sidebar({ collapsed, onToggle, onNavigate }: SidebarProps) {
               <p className="px-2 py-1 text-xs text-zinc-500">No threads yet</p>
             ) : (
               threads.map((thread) => (
-                <Link
-                  key={thread.id}
-                  className="block truncate rounded-lg px-2 py-1.5 text-sm text-zinc-700 hover:bg-zinc-100"
-                  href={`/search/${thread.id}`}
-                  title={thread.title}
-                  onClick={onNavigate}
-                >
-                  {thread.title}
-                </Link>
+                <div key={thread.id} className="group flex items-center gap-1 rounded-lg hover:bg-zinc-100">
+                  <Link
+                    className="block min-w-0 flex-1 truncate px-2 py-1.5 text-sm text-zinc-700"
+                    href={`/search/${thread.id}`}
+                    title={thread.title}
+                    onClick={onNavigate}
+                  >
+                    {thread.title}
+                  </Link>
+                  <button
+                    type="button"
+                    aria-label={`Delete ${thread.title}`}
+                    className="mr-1 inline-flex h-7 w-7 items-center justify-center rounded-md text-zinc-500 hover:bg-zinc-200 hover:text-zinc-700"
+                    onClick={() => void handleDeleteThread(thread.id)}
+                    disabled={deletingThreadId === thread.id}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
               ))
             )}
           </div>

@@ -5,19 +5,20 @@ import { Menu } from "lucide-react";
 
 import { MobileNav } from "@/components/layout/MobileNav";
 import { Sidebar } from "@/components/layout/Sidebar";
+import { cn } from "@/lib/utils";
 
 type AppShellProps = {
   children: ReactNode;
+  contentClassName?: string;
 };
 
-export function AppShell({ children }: AppShellProps) {
-  const [collapsed, setCollapsed] = useState(false);
+export function AppShell({ children, contentClassName }: AppShellProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
     <div className="flex min-h-screen bg-zinc-50 text-foreground">
-      <div className="hidden md:block">
-        <Sidebar collapsed={collapsed} onToggle={() => setCollapsed((value) => !value)} />
+      <div className="hidden w-[260px] shrink-0 md:block">
+        <Sidebar collapsed={false} />
       </div>
 
       <MobileNav open={mobileOpen} onClose={() => setMobileOpen(false)} />
@@ -34,7 +35,7 @@ export function AppShell({ children }: AppShellProps) {
           </button>
           <p className="text-sm font-semibold">Complexity</p>
         </header>
-        <div className="min-w-0 flex-1">{children}</div>
+        <div className={cn("min-w-0 flex-1", contentClassName)}>{children}</div>
       </div>
     </div>
   );

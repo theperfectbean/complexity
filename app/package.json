@@ -10,6 +10,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "test:smoke-models": "RUN_AGENT_SMOKE=1 vitest run src/test/agent-smoke.test.ts --reporter=verbose",
+    "test:smoke-route": "RUN_LIVE_CHAT_ROUTE=1 vitest run src/test/live-chat-route.test.ts --reporter=verbose",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate"
   },

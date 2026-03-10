@@ -48,6 +48,60 @@ Run full local quality gate:
 npm test && npm run lint
 ```
 
+## Live Agent Smoke Tests (All Models)
+
+Use this to run a real provider-backed smoke pass across every model/preset listed in `app/src/lib/models.ts`.
+
+Run from `app/`:
+
+```bash
+npm run test:smoke-models
+```
+
+What it validates:
+
+- Every configured model/preset returns a non-empty response.
+- Per-model response latency is captured.
+
+Artifacts/output:
+
+- Console table with `model`, `ok`, and `durationMs`.
+- JSON report at `app/artifacts/agent-smoke-results.json`.
+
+Notes:
+
+- Requires `PERPLEXITY_API_KEY` in environment.
+- This suite performs live external API calls and is intentionally opt-in (not run by default CI).
+
+## Live Chat Route Smoke Test (/api/chat)
+
+Use this to run one real end-to-end route probe through `POST /api/chat` with:
+
+- model: `anthropic/claude-haiku-4-5`
+- query: `what is a vector database?`
+
+Run from `app/`:
+
+```bash
+npm run test:smoke-route
+```
+
+What it validates:
+
+- Route path returns a successful streaming response.
+- Assistant output is persisted and non-empty.
+- End-to-end route latency is captured.
+
+Artifacts/output:
+
+- Console logs with duration and response preview.
+- JSON report at `app/artifacts/live-chat-route-results.json`.
+
+Notes:
+
+- Requires `PERPLEXITY_API_KEY` and reachable DB/Redis settings.
+- If running from host (not docker network), set `DATABASE_URL` host to `localhost`.
+
 ## Test Inventory
 
 ### Unit/Component Tests
