@@ -54,24 +54,28 @@ export function CreateSpaceDialog({ onCreated }: CreateSpaceDialogProps) {
   }
 
   return (
-    <form onSubmit={onSubmit} className="rounded-xl border p-4">
+    <form onSubmit={onSubmit} className="rounded-lg border bg-card p-4 shadow-2xs">
       <h2 className="text-sm font-semibold">Create space</h2>
       <div className="mt-3 space-y-2">
         <input
-          className="w-full rounded-md border bg-transparent px-3 py-2 text-sm"
+          className="w-full rounded-md border bg-background px-3 py-2 text-sm"
           placeholder="Space name"
           value={name}
           onChange={(event) => setName(event.target.value)}
         />
         <textarea
-          className="w-full rounded-md border bg-transparent px-3 py-2 text-sm"
+          className="w-full rounded-md border bg-background px-3 py-2 text-sm"
           placeholder="Description (optional)"
           value={description}
           onChange={(event) => setDescription(event.target.value)}
         />
       </div>
-      {error ? <p className="mt-2 text-xs text-rose-600">{error}</p> : null}
-      <button type="submit" disabled={submitting} className="mt-3 rounded-md border px-3 py-2 text-sm">
+      {error ? <p className="mt-2 text-xs text-destructive">{error}</p> : null}
+      <button
+        type="submit"
+        disabled={submitting}
+        className="mt-3 rounded-md bg-primary px-3 py-2 text-sm text-primary-foreground disabled:opacity-60"
+      >
         {submitting ? "Creating..." : "Create"}
       </button>
     </form>

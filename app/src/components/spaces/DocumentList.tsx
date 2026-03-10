@@ -29,13 +29,13 @@ export function DocumentList({ documents, loading }: DocumentListProps) {
   }
 
   if (documents.length === 0) {
-    return <p className="rounded-md border p-3 text-sm text-muted-foreground">No documents uploaded yet.</p>;
+    return <p className="rounded-lg border bg-card p-3 text-sm text-muted-foreground">No documents uploaded yet.</p>;
   }
 
   return (
     <div className="space-y-2">
       {documents.map((document) => (
-        <article key={document.id} className="rounded-md border p-3">
+        <article key={document.id} className="rounded-lg border bg-card p-3 shadow-2xs">
           <div className="flex items-center justify-between gap-3">
             <p className="truncate text-sm font-medium">{document.filename}</p>
             <ProcessingBadge status={document.status} />

@@ -170,8 +170,8 @@ export default function SpaceDetailPage() {
 
   return (
     <main className="mx-auto max-w-6xl p-6">
-      <h1 className="text-2xl font-semibold">{space ? space.name : `Space ${spaceId}`}</h1>
-      <p className="mt-2 text-sm text-zinc-500">Upload docs and chat with this space as context.</p>
+      <h1 className="font-[var(--font-accent)] text-2xl font-semibold">{space ? space.name : `Space ${spaceId}`}</h1>
+      <p className="mt-2 text-sm text-muted-foreground">Upload docs and chat with this space as context.</p>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[1fr,1.4fr]">
         <section className="space-y-4">
@@ -182,7 +182,7 @@ export default function SpaceDetailPage() {
               toast.success("Document uploaded");
             }}
           />
-          <div className="rounded-lg border p-4">
+          <div className="rounded-lg border bg-card p-4 shadow-2xs">
             <h2 className="mb-3 text-sm font-semibold">Documents</h2>
             {docsLoading ? (
               <LoadingSkeleton lines={3} />
@@ -194,14 +194,10 @@ export default function SpaceDetailPage() {
           </div>
         </section>
 
-        <section className="flex min-h-[520px] flex-col rounded-lg border p-4">
+        <section className="flex min-h-[520px] flex-col rounded-lg border bg-card p-4 shadow-2xs">
           <div className="mb-3 flex items-center justify-between gap-3">
             <h2 className="text-sm font-semibold">Space chat</h2>
-            <select
-              className="rounded-md border bg-transparent px-3 py-2 text-sm"
-              value={model}
-              onChange={(event) => setModel(event.target.value)}
-            >
+            <select className="rounded-md border bg-background px-3 py-2 text-sm" value={model} onChange={(event) => setModel(event.target.value)}>
               {Object.entries(groupedModels).map(([category, options]) => (
                 <optgroup key={category} label={category}>
                   {options.map((option) => (
@@ -214,7 +210,7 @@ export default function SpaceDetailPage() {
             </select>
           </div>
 
-          <div className="flex-1 overflow-y-auto rounded-md border p-3">
+          <div className="flex-1 overflow-y-auto rounded-md border bg-background p-3">
             <MessageList
               messages={chatItems}
               emptyLabel="Ask a question about your uploaded documents."

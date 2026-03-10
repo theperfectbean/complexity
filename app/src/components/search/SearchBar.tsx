@@ -7,6 +7,7 @@ import { useMemo } from "react";
 import TextareaAutosize from "react-textarea-autosize";
 
 import { MODELS, getDefaultModel } from "@/lib/models";
+import { cn } from "@/lib/utils";
 
 type SearchModelOption = {
   id: string;
@@ -54,7 +55,14 @@ export function SearchBar({
   const activeModelLabel = modelOptions.find((item) => item.id === model)?.label ?? model;
 
   return (
-    <motion.div layoutId={layoutId} layout className="rounded-2xl bg-white p-3 shadow-md">
+    <motion.div
+      layoutId={layoutId}
+      layout
+      className={cn(
+        "rounded-xl border bg-card p-3 shadow-sm transition-shadow",
+        "focus-within:border-primary/40 focus-within:ring-2 focus-within:ring-ring/20 focus-within:shadow",
+      )}
+    >
       <div className="flex items-end gap-2">
         <TextareaAutosize
           minRows={compact ? 1 : 2}
@@ -68,17 +76,17 @@ export function SearchBar({
             }
           }}
           placeholder={placeholder}
-          className="max-h-52 flex-1 resize-none bg-transparent px-2 py-2 text-sm outline-none"
+          className="max-h-52 flex-1 resize-none bg-transparent px-2 py-2 text-sm outline-none placeholder:text-muted-foreground"
         />
       </div>
 
-      <div className="mt-2 flex items-center justify-between gap-2 border-t border-zinc-100 pt-2">
+      <div className="mt-2 flex items-center justify-between gap-2 border-t pt-2">
         <div className="flex items-center gap-2">
           <DropdownMenu.Root>
             <DropdownMenu.Trigger asChild>
               <button
                 type="button"
-                className="inline-flex items-center gap-1 rounded-full border border-zinc-200 px-3 py-1.5 text-xs text-zinc-700 hover:bg-zinc-50"
+                className="inline-flex items-center gap-1 rounded-full border bg-muted/40 px-3 py-1.5 text-xs text-foreground hover:bg-accent"
                 aria-label="Select model"
               >
                 <span className="max-w-32 truncate">{activeModelLabel}</span>
@@ -88,16 +96,16 @@ export function SearchBar({
             <DropdownMenu.Portal>
               <DropdownMenu.Content
                 sideOffset={8}
-                className="z-50 max-h-72 min-w-56 overflow-y-auto rounded-xl border border-zinc-200 bg-white p-1 shadow-md"
+                className="z-50 max-h-72 min-w-56 overflow-y-auto rounded-xl border bg-popover p-1 shadow-md"
               >
                 {Object.entries(groupedModels).map(([category, options]) => (
                   <div key={category} className="py-1">
-                    <p className="px-2 pb-1 text-[11px] font-medium uppercase tracking-wide text-zinc-500">{category}</p>
+                    <p className="px-2 pb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{category}</p>
                     {options.map((option) => (
                       <DropdownMenu.Item
                         key={option.id}
                         onSelect={() => onModelChange?.(option.id)}
-                        className="cursor-pointer rounded-lg px-2 py-1.5 text-sm text-zinc-700 outline-none hover:bg-zinc-100"
+                        className="cursor-pointer rounded-lg px-2 py-1.5 text-sm outline-none hover:bg-accent"
                       >
                         {option.label}
                       </DropdownMenu.Item>
@@ -110,7 +118,7 @@ export function SearchBar({
 
           <button
             type="button"
-            className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-zinc-200 text-zinc-600 hover:bg-zinc-50"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-full border bg-card text-muted-foreground hover:bg-accent"
             aria-label="Attach file"
             onClick={onAttachClick}
           >
@@ -120,7 +128,7 @@ export function SearchBar({
 
         <button
           type="submit"
-          className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-zinc-900 text-white transition-opacity disabled:opacity-50"
+          className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-primary text-primary-foreground transition-all hover:scale-[1.02] disabled:opacity-50"
           disabled={disabled}
           aria-label={submitLabel}
         >

@@ -185,18 +185,28 @@ export default function ThreadPage() {
   }
 
   return (
-    <main className="mx-auto flex h-full min-h-screen w-full max-w-4xl flex-col px-4 py-6">
-      <header className="mb-4 flex items-center justify-between">
-        <h1 className="text-xl font-semibold">{threadTitle}</h1>
+    <main className="relative mx-auto flex h-full min-h-screen w-full max-w-4xl flex-col px-4 py-6">
+      <div className="pointer-events-none absolute inset-x-0 top-10 -z-10 flex justify-center">
+        <div className="h-56 w-56 rounded-full bg-primary/10 blur-3xl" />
+      </div>
+
+      <header className="mb-4 flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="truncate font-[var(--font-accent)] text-xl font-semibold tracking-tight">{threadTitle}</h1>
+          <p className="mt-1 text-xs text-muted-foreground">{mergedMessages.length} messages in this thread</p>
+        </div>
+        <span className="shrink-0 rounded-full border border-primary/20 bg-primary/10 px-2.5 py-1 text-xs text-primary">
+          {model}
+        </span>
       </header>
 
       {chatErrorMessage ? (
-        <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">
+        <div className="mb-3 rounded-lg border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">
           {chatErrorMessage}
         </div>
       ) : null}
 
-      <section className="flex-1 overflow-y-auto">
+      <section className="flex-1 overflow-y-auto rounded-xl border bg-card p-4 shadow-2xs">
         {loadingHistory ? (
           <p className="text-sm text-muted-foreground">Loading thread...</p>
         ) : (

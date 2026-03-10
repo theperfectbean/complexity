@@ -14,7 +14,7 @@ export function RelatedQuestions({ questions, onSelect }: RelatedQuestionsProps)
         <button
           key={question}
           type="button"
-          className="rounded-full border px-3 py-1 text-xs hover:bg-muted/40"
+          className="rounded-full border border-primary/20 bg-primary/5 px-3 py-1 text-xs text-primary transition-colors hover:bg-primary/15"
           onClick={() => onSelect?.(question)}
         >
           {question}

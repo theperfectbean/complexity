@@ -1,5 +1,6 @@
 "use client";
 
+import { Copy } from "lucide-react";
 import { useState } from "react";
 
 import { RelatedQuestions } from "@/components/chat/RelatedQuestions";
@@ -76,17 +77,32 @@ export function MessageList({ messages, emptyLabel, onRelatedQuestionClick }: Me
         return (
           <article key={message.id} className={isUser ? "flex justify-end" : "space-y-2"}>
             {isUser ? (
-              <p className="max-w-[80%] whitespace-pre-wrap rounded-2xl bg-zinc-900 px-4 py-2 text-sm text-white">
+              <p className="max-w-[85%] whitespace-pre-wrap rounded-xl bg-primary px-4 py-2 text-sm text-primary-foreground shadow-2xs">
                 {message.content}
               </p>
             ) : (
               <div className="space-y-2">
-                <div className="flex items-center justify-end">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="inline-flex items-center gap-2 text-xs text-muted-foreground">
+                    {urls.slice(0, 4).map((url, index) => (
+                      <a
+                        key={url}
+                        href={url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex h-5 min-w-5 items-center justify-center rounded-full border bg-card px-1.5 hover:bg-accent"
+                        title={url}
+                      >
+                        {index + 1}
+                      </a>
+                    ))}
+                  </div>
                   <button
                     type="button"
-                    className="rounded-md border px-2 py-0.5 text-xs"
+                    className="inline-flex items-center gap-1 rounded-md border bg-card px-2 py-1 text-xs hover:bg-accent"
                     onClick={() => void copyMessage(message.id, message.content)}
                   >
+                    <Copy className="h-3.5 w-3.5" />
                     {copiedId === message.id ? "Copied" : "Copy"}
                   </button>
                 </div>

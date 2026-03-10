@@ -44,16 +44,20 @@ export function FileUploader({ spaceId, onUploaded }: FileUploaderProps) {
   }
 
   return (
-    <form onSubmit={onSubmit} className="space-y-3 rounded-lg border p-4">
+    <form onSubmit={onSubmit} className="space-y-3 rounded-lg border bg-card p-4 shadow-2xs">
       <h3 className="text-sm font-semibold">Upload document</h3>
       <input
         type="file"
         accept=".pdf,.docx,.txt,.md"
         onChange={(event) => setFile(event.target.files?.[0] ?? null)}
-        className="w-full rounded-md border px-3 py-2 text-sm"
+        className="w-full rounded-md border bg-background px-3 py-2 text-sm"
       />
-      {error ? <p className="text-xs text-rose-600">{error}</p> : null}
-      <button type="submit" disabled={!file || uploading} className="rounded-md border px-3 py-2 text-sm">
+      {error ? <p className="text-xs text-destructive">{error}</p> : null}
+      <button
+        type="submit"
+        disabled={!file || uploading}
+        className="rounded-md bg-primary px-3 py-2 text-sm text-primary-foreground disabled:opacity-60"
+      >
         {uploading ? "Uploading..." : "Upload"}
       </button>
     </form>

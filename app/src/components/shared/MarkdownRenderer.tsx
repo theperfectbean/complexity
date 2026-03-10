@@ -8,7 +8,7 @@ type MarkdownRendererProps = {
 
 export function MarkdownRenderer({ content }: MarkdownRendererProps) {
   return (
-    <div className="prose prose-sm max-w-none dark:prose-invert prose-pre:rounded-lg prose-pre:border prose-pre:bg-muted/30">
+    <div className="markdown-body max-w-none">
       <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]}>
         {content}
       </ReactMarkdown>

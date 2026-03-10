@@ -17,7 +17,7 @@ export function SourceCarousel({ urls }: SourceCarouselProps) {
 
   return (
     <div className="mb-3 flex gap-2 overflow-x-auto pb-1">
-      {urls.map((url) => {
+      {urls.map((url, index) => {
         const domain = toDomain(url);
         return (
           <a
@@ -25,9 +25,9 @@ export function SourceCarousel({ urls }: SourceCarouselProps) {
             href={url}
             target="_blank"
             rel="noreferrer"
-            className="min-w-52 rounded-md border p-2 hover:bg-muted/40"
+            className="min-w-56 rounded-lg border bg-card p-2 shadow-2xs transition-colors hover:bg-accent"
           >
-            <p className="truncate text-xs text-muted-foreground">{domain}</p>
+            <p className="text-[11px] text-muted-foreground">[{index + 1}] {domain}</p>
             <p className="mt-1 line-clamp-2 text-sm">{url}</p>
           </a>
         );

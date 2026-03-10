@@ -103,12 +103,12 @@ export default function LibraryPage() {
 
   return (
     <main className="mx-auto max-w-5xl p-6">
-      <h1 className="text-2xl font-semibold">Library</h1>
-      <p className="mt-2 text-sm text-zinc-500">Search and manage your recent threads.</p>
+      <h1 className="font-[var(--font-accent)] text-2xl font-semibold">Library</h1>
+      <p className="mt-2 text-sm text-muted-foreground">Search and manage your recent threads.</p>
 
       <div className="mt-4">
         <input
-          className="w-full max-w-md rounded-md border bg-transparent px-3 py-2"
+          className="w-full max-w-md rounded-md border bg-card px-3 py-2"
           placeholder="Search by thread title"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
@@ -122,12 +122,8 @@ export default function LibraryPage() {
         ) : null}
 
         {filteredThreads.map((thread) => (
-          <article key={thread.id} className="flex items-center justify-between rounded-lg border p-3">
-            <button
-              type="button"
-              className="min-w-0 flex-1 text-left"
-              onClick={() => router.push(`/search/${thread.id}`)}
-            >
+          <article key={thread.id} className="flex items-center justify-between rounded-lg border bg-card p-3 shadow-2xs">
+            <button type="button" className="min-w-0 flex-1 text-left" onClick={() => router.push(`/search/${thread.id}`)}>
               <p className="truncate font-medium">{thread.title}</p>
               <p className="text-xs text-muted-foreground">
                 {thread.model} · {new Date(thread.updatedAt).toLocaleString()}
@@ -135,7 +131,7 @@ export default function LibraryPage() {
             </button>
             <button
               type="button"
-              className="ml-3 rounded-md border px-3 py-1 text-sm"
+              className="ml-3 rounded-md border border-destructive/20 bg-destructive/5 px-3 py-1 text-sm text-destructive"
               onClick={() => handleDelete(thread.id)}
               disabled={deletingId === thread.id}
             >
