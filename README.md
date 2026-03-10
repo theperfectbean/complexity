@@ -69,7 +69,7 @@ Self-hosted Perplexity-style AI search and RAG workspace.
 
 ### Test Suite Status
 - Framework: Vitest + React Testing Library
-- Current scope: 23 tests across component, utility, and API route integration-style coverage
+- Current scope: 54 tests across component, utility, and API route integration-style coverage
 - Coverage includes auth guards, ownership checks, validation errors, cache-hit/rate-limit paths, and upload success/failure flows
 
 ## Documentation Index
