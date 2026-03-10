@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 
 import { SearchBar } from "@/components/search/SearchBar";
-import { MODELS, getDefaultModel } from "@/lib/models";
+import { getDefaultModel } from "@/lib/models";
 
 export default function Home() {
   const { data: session, status } = useSession();
@@ -15,15 +15,6 @@ export default function Home() {
   const [model, setModel] = useState<string>(getDefaultModel());
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
-
-  const groupedModels = MODELS.reduce<Record<string, Array<(typeof MODELS)[number]>>>((accumulator, option) => {
-    const category = option.category;
-    if (!accumulator[category]) {
-      accumulator[category] = [];
-    }
-    accumulator[category].push(option);
-    return accumulator;
-  }, {});
 
   async function startThread(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -100,25 +91,10 @@ export default function Home() {
             submitLabel={loading ? "Starting..." : "Start"}
             disabled={loading}
             layoutId="searchbar"
+            model={model}
+            onModelChange={setModel}
           />
-          <div className="flex items-center justify-between">
-            <select
-              className="rounded-md border bg-transparent px-3 py-2 text-sm"
-              value={model}
-              onChange={(event) => setModel(event.target.value)}
-            >
-              {Object.entries(groupedModels).map(([category, options]) => (
-                <optgroup key={category} label={category}>
-                  {options.map((option) => (
-                    <option key={option.id} value={option.id}>
-                      {option.label}
-                    </option>
-                  ))}
-                </optgroup>
-              ))}
-            </select>
-            <span className="text-xs text-muted-foreground">Model applies to this new thread</span>
-          </div>
+          <span className="text-xs text-muted-foreground">Model applies to this new thread</span>
         </form>
       </div>
     </main>

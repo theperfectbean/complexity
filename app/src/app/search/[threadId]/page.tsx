@@ -9,7 +9,7 @@ import { toast } from "sonner";
 import { ChatCitation, ChatMessageItem, MessageList } from "@/components/chat/MessageList";
 import { AppShell } from "@/components/layout/AppShell";
 import { SearchBar } from "@/components/search/SearchBar";
-import { MODELS, getDefaultModel } from "@/lib/models";
+import { getDefaultModel } from "@/lib/models";
 
 type ThreadPayload = {
   thread: {
@@ -47,14 +47,6 @@ export default function ThreadPage() {
   const [threadTitle, setThreadTitle] = useState<string>(`Thread ${threadId.slice(0, 8)}`);
   const [historyMessages, setHistoryMessages] = useState<ChatMessageItem[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(true);
-  const groupedModels = MODELS.reduce<Record<string, Array<(typeof MODELS)[number]>>>((accumulator, option) => {
-    const category = option.category;
-    if (!accumulator[category]) {
-      accumulator[category] = [];
-    }
-    accumulator[category].push(option);
-    return accumulator;
-  }, {});
 
   const { messages, sendMessage, status, error } = useChat({
     transport: new DefaultChatTransport({
@@ -143,21 +135,6 @@ export default function ThreadPage() {
       <main className="mx-auto flex h-full min-h-screen w-full max-w-4xl flex-col px-4 py-6">
         <header className="mb-4 flex items-center justify-between">
           <h1 className="text-xl font-semibold">{threadTitle}</h1>
-          <select
-            className="rounded-md border bg-transparent px-3 py-2 text-sm"
-            value={model}
-            onChange={(event) => setModel(event.target.value)}
-          >
-            {Object.entries(groupedModels).map(([category, options]) => (
-              <optgroup key={category} label={category}>
-                {options.map((option) => (
-                  <option key={option.id} value={option.id}>
-                    {option.label}
-                  </option>
-                ))}
-              </optgroup>
-            ))}
-          </select>
         </header>
 
         <section className="flex-1 overflow-y-auto rounded-xl border p-4">
@@ -181,6 +158,8 @@ export default function ThreadPage() {
             disabled={status === "streaming"}
             layoutId="searchbar"
             compact
+            model={model}
+            onModelChange={setModel}
           />
         </form>
       </main>

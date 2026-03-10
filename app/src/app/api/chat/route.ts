@@ -2,6 +2,7 @@ import { createUIMessageStream, createUIMessageStreamResponse, UIMessage } from 
 import { and, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import type { Responses } from "@perplexity-ai/perplexity_ai/resources/responses";
 
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
@@ -216,9 +217,14 @@ export async function POST(request: Request) {
     }
   }
 
-  const agentInput = inputMessages
+  const agentInput: Responses.InputItem[] = inputMessages
     .map((message) => ({ role: message.role, content: extractTextFromMessage(message) }))
-    .filter((message) => message.content.length > 0);
+    .filter((message) => message.content.length > 0)
+    .map((message) => ({
+      type: "message",
+      role: message.role,
+      content: [{ type: "input_text", text: message.content }],
+    }));
 
   const stream = createUIMessageStream({
     execute: async ({ writer }) => {
@@ -229,7 +235,7 @@ export async function POST(request: Request) {
       writer.write({ type: "start", messageId: responseMessageId });
       writer.write({ type: "text-start", id: textId });
 
-      const requestBody = isPresetModel(safeModel)
+      const requestBody: Responses.ResponseCreateParamsStreaming = isPresetModel(safeModel)
         ? {
             preset: safeModel,
             input: agentInput,

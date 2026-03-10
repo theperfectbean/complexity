@@ -92,3 +92,5 @@ If running via Docker Compose, the app is published by the root compose file at:
 
 - `trustHost: true` is enabled in auth config for local host/port mapped Docker runs.
 - Chat route requires authenticated session; unauthenticated calls return `401`.
+- `package.json` includes an `overrides.esbuild` pin to mitigate an `npm audit` advisory pulled in via `drizzle-kit` → `@esbuild-kit/*`.
+- Remove this override only after `drizzle-kit` drops the vulnerable transitive chain and `npm audit` remains clean without it.

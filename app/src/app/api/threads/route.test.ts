@@ -1,0 +1,133 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("@/auth", () => ({
+  auth: vi.fn(),
+}));
+
+vi.mock("@/lib/db", () => ({
+  db: {
+    query: {
+      users: {
+        findFirst: vi.fn(),
+      },
+    },
+    insert: vi.fn(),
+    select: vi.fn(),
+  },
+}));
+
+vi.mock("@/lib/db/cuid", () => ({
+  createId: vi.fn(() => "thread-1"),
+}));
+
+import { auth } from "@/auth";
+import { db } from "@/lib/db";
+
+import { GET, POST } from "@/app/api/threads/route";
+
+function mockThreadSelect(result: unknown) {
+  const limit = vi.fn().mockResolvedValue(result);
+  const where = vi.fn(() => ({ limit }));
+  const from = vi.fn(() => ({ where }));
+  vi.mocked(db.select).mockReturnValue({ from } as never);
+}
+
+describe("/api/threads", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(auth).mockResolvedValue({ user: { email: "gary@example.com" } } as never);
+  });
+
+  describe("GET", () => {
+    it("returns 401 when unauthenticated", async () => {
+      vi.mocked(auth).mockResolvedValue(null as never);
+
+      const response = await GET();
+
+      expect(response.status).toBe(401);
+      await expect(response.json()).resolves.toEqual({ error: "Unauthorized" });
+    });
+
+    it("returns user threads", async () => {
+      vi.mocked(db.query.users.findFirst).mockResolvedValue({
+        threads: [{ id: "thread-1", title: "Thread 1" }],
+      } as never);
+
+      const response = await GET();
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual({
+        threads: [{ id: "thread-1", title: "Thread 1" }],
+      });
+    });
+  });
+
+  describe("POST", () => {
+    it("returns 401 when unauthenticated", async () => {
+      vi.mocked(auth).mockResolvedValue(null as never);
+
+      const request = new Request("http://localhost/api/threads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: "Hello", model: "pro-search" }),
+      });
+
+      const response = await POST(request);
+
+      expect(response.status).toBe(401);
+      await expect(response.json()).resolves.toEqual({ error: "Unauthorized" });
+    });
+
+    it("returns 404 when user does not exist", async () => {
+      vi.mocked(db.query.users.findFirst).mockResolvedValue(null as never);
+
+      const request = new Request("http://localhost/api/threads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: "Hello", model: "pro-search" }),
+      });
+
+      const response = await POST(request);
+
+      expect(response.status).toBe(404);
+      await expect(response.json()).resolves.toEqual({ error: "User not found" });
+    });
+
+    it("returns 400 for invalid payload", async () => {
+      vi.mocked(db.query.users.findFirst).mockResolvedValue({ id: "user-1" } as never);
+
+      const request = new Request("http://localhost/api/threads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: "", model: "pro-search" }),
+      });
+
+      const response = await POST(request);
+
+      expect(response.status).toBe(400);
+      await expect(response.json()).resolves.toEqual({ error: "Invalid payload" });
+    });
+
+    it("creates a new thread", async () => {
+      vi.mocked(db.query.users.findFirst).mockResolvedValue({ id: "user-1" } as never);
+
+      const values = vi.fn().mockResolvedValue(undefined);
+      vi.mocked(db.insert).mockReturnValue({ values } as never);
+      mockThreadSelect([{ id: "thread-1", title: "Hello", model: "pro-search", userId: "user-1" }]);
+
+      const request = new Request("http://localhost/api/threads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: "Hello", model: "pro-search" }),
+      });
+
+      const response = await POST(request);
+
+      expect(response.status).toBe(201);
+      await expect(response.json()).resolves.toEqual({
+        thread: { id: "thread-1", title: "Hello", model: "pro-search", userId: "user-1" },
+      });
+      expect(db.insert).toHaveBeenCalledTimes(1);
+    });
+  });
+});

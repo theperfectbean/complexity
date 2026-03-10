@@ -1,6 +1,7 @@
 "use client";
 
 import { ReactNode, useState } from "react";
+import { Menu } from "lucide-react";
 
 import { MobileNav } from "@/components/layout/MobileNav";
 import { Sidebar } from "@/components/layout/Sidebar";
@@ -14,21 +15,22 @@ export function AppShell({ children }: AppShellProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
-    <div className="flex min-h-screen bg-background text-foreground">
-      <div className={`${collapsed ? "w-16" : "w-72"} hidden transition-all md:block`}>
+    <div className="flex min-h-screen bg-zinc-50 text-foreground">
+      <div className="hidden md:block">
         <Sidebar collapsed={collapsed} onToggle={() => setCollapsed((value) => !value)} />
       </div>
 
       <MobileNav open={mobileOpen} onClose={() => setMobileOpen(false)} />
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex items-center justify-between border-b px-4 py-3 md:hidden">
+        <header className="flex items-center justify-between border-b border-zinc-200 bg-white px-4 py-3 md:hidden">
           <button
             type="button"
             onClick={() => setMobileOpen(true)}
-            className="rounded-md border px-3 py-2 text-sm"
+            className="inline-flex items-center justify-center rounded-full border border-zinc-200 bg-white p-2 text-zinc-700"
+            aria-label="Open menu"
           >
-            Menu
+            <Menu className="h-4 w-4" />
           </button>
           <p className="text-sm font-semibold">Complexity</p>
         </header>

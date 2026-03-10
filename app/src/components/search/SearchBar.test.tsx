@@ -1,11 +1,16 @@
-import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { SearchBar } from "@/components/search/SearchBar";
 
 describe("SearchBar", () => {
+  afterEach(() => {
+    cleanup();
+  });
+
   it("renders placeholder and updates value", () => {
     const onChange = vi.fn();
+    const onModelChange = vi.fn();
     render(
       <form>
         <SearchBar
@@ -13,6 +18,8 @@ describe("SearchBar", () => {
           onChange={onChange}
           placeholder="Ask anything"
           submitLabel="Send"
+          model="pro-search"
+          onModelChange={onModelChange}
         />
       </form>,
     );
@@ -20,6 +27,9 @@ describe("SearchBar", () => {
     const input = screen.getByPlaceholderText("Ask anything");
     fireEvent.change(input, { target: { value: "hello" } });
     expect(onChange).toHaveBeenCalledWith("hello");
+
+    expect(screen.getByRole("button", { name: "Select model" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Attach file" })).toBeInTheDocument();
   });
 
   it("disables submit button when disabled prop is true", () => {
@@ -36,5 +46,30 @@ describe("SearchBar", () => {
     );
 
     expect(screen.getByRole("button", { name: "Sending" })).toBeDisabled();
+  });
+
+  it("opens model dropdown and selects a model", async () => {
+    const onModelChange = vi.fn();
+    render(
+      <form>
+        <SearchBar
+          value="query"
+          onChange={() => {}}
+          placeholder="Ask anything"
+          submitLabel="Send"
+          model="model-a"
+          modelOptions={[
+            { id: "model-a", label: "Model A", category: "Presets" },
+            { id: "model-b", label: "Model B", category: "Presets" },
+          ]}
+          onModelChange={onModelChange}
+        />
+      </form>,
+    );
+
+    fireEvent.pointerDown(screen.getByRole("button", { name: "Select model" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Model B" }));
+
+    expect(onModelChange).toHaveBeenCalledWith("model-b");
   });
 });
