@@ -1,9 +1,11 @@
 FROM node:20-alpine AS base
 WORKDIR /app
+ENV NPM_CONFIG_UPDATE_NOTIFIER=false
+ENV NPM_CONFIG_FUND=false
 
 FROM base AS deps
 COPY package*.json ./
-RUN npm ci
+RUN npm ci --omit=dev
 
 FROM base AS builder
 COPY --from=deps /app/node_modules ./node_modules
@@ -14,9 +16,11 @@ FROM base AS runner
 ENV NODE_ENV=production
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
+ENV NEXT_TELEMETRY_DISABLED=1
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/package*.json ./
 COPY --from=builder /app/node_modules ./node_modules
+RUN npm prune --omit=dev
 EXPOSE 3000
 CMD ["npm", "run", "start"]
