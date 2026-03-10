@@ -2,6 +2,7 @@ FROM node:20-alpine AS base
 WORKDIR /app
 ENV NPM_CONFIG_UPDATE_NOTIFIER=false
 ENV NPM_CONFIG_FUND=false
+ENV NEXT_TELEMETRY_DISABLED=1
 
 FROM base AS deps
 COPY package*.json ./
@@ -16,11 +17,8 @@ FROM base AS runner
 ENV NODE_ENV=production
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
-ENV NEXT_TELEMETRY_DISABLED=1
-COPY --from=builder /app/.next ./.next
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/public ./public
-COPY --from=builder /app/package*.json ./
-COPY --from=builder /app/node_modules ./node_modules
-RUN npm prune --omit=dev
 EXPOSE 3000
-CMD ["npm", "run", "start"]
+CMD ["node", "server.js"]

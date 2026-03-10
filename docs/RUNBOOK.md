@@ -24,6 +24,32 @@ cp .env.example .env
 docker compose up --build
 ```
 
+## Faster Docker Builds (BuildKit + buildx)
+
+If you see `Docker Compose requires buildx plugin to be installed`, Compose is using the classic builder (slower, weaker caching).
+
+1. Install buildx plugin for your Docker distribution.
+2. Create/use a buildx builder:
+
+```bash
+docker buildx create --name complexity-builder --use
+docker buildx inspect --bootstrap
+```
+
+3. Build with BuildKit enabled:
+
+```bash
+DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose build app
+```
+
+The `app` service already includes local cache import/export in `docker-compose.yml`:
+
+- `cache_from: type=local,src=.docker-cache/app`
+- `cache_to: type=local,dest=.docker-cache/app,mode=min`
+
+`mode=min` is optimized for faster local incremental builds (lower cache export overhead).
+If you prefer maximal cache portability (typically CI), use `mode=max`.
+
 Default app URL:
 
 - `http://localhost:3002`

@@ -91,6 +91,16 @@ Self-hosted Perplexity-style AI search and RAG workspace.
 4. Open:
    - `http://localhost:3002`
 
+### Docker build performance
+
+If builds are slow and Compose prints `requires buildx plugin`, install buildx and run:
+
+```bash
+DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose build app
+```
+
+The Compose config includes local build cache settings for the `app` image to speed up incremental rebuilds.
+
 ## Notes
 - Host port is mapped to `3002` in compose.
 - Internal app runtime still reports `3000` inside container, which is expected.
