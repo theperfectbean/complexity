@@ -1,4 +1,4 @@
-import { createUIMessageStream, createUIMessageStreamResponse, UIMessage } from "ai";
+import { createUIMessageStream, createUIMessageStreamResponse, UIMessage, UIMessageChunk } from "ai";
 import { and, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -282,6 +282,16 @@ export async function POST(request: Request) {
               writer.write({ type: "start", messageId: responseMessageId });
               writer.write({ type: "text-start", id: textId });
               writer.write({ type: "text-delta", id: textId, delta: cachedPayload.text });
+
+              cachedPayload.citations.forEach((citation, index) => {
+                writer.write({
+                  type: "source-url",
+                  sourceId: `source-${index}`,
+                  url: citation.url,
+                  title: citation.title,
+                } as UIMessageChunk);
+              });
+
               writer.write({ type: "text-end", id: textId });
               writer.write({ type: "finish" });
             },
@@ -419,6 +429,15 @@ export async function POST(request: Request) {
       }
 
       const citations = extractCitationsFromResponse(completedResponse);
+
+      citations.forEach((citation, index) => {
+        writer.write({
+          type: "source-url",
+          sourceId: `source-${index}`,
+          url: citation.url,
+          title: citation.title,
+        } as UIMessageChunk);
+      });
 
       if (redis && assistantText && assistantText !== EMPTY_RESPONSE_FALLBACK_TEXT) {
         try {

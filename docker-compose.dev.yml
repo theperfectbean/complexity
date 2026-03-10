@@ -1,0 +1,15 @@
+services:
+  app:
+    # Use a glibc-based image to match most Linux hosts
+    image: node:20
+    volumes:
+      - ./app:/app
+    # Ensure variables matched from the base file are used
+    command: npm run dev
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+      - WATCHPACK_POLLING=true
+    ports:
+      - "127.0.0.1:3002:3000"
+    working_dir: /app

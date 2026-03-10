@@ -1,10 +1,10 @@
 "use client";
 
 import { motion } from "motion/react";
-import { BookOpen, ChevronLeft, ChevronRight, Command, Home, Layers, LogOut, Pin, Plus, Trash2 } from "lucide-react";
+import { BookOpen, ChevronLeft, ChevronRight, Command, Home, Layers, LogOut, Plus, Trash2 } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { KeyboardShortcutsDialog } from "@/components/layout/KeyboardShortcutsDialog";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
@@ -59,7 +59,7 @@ export function Sidebar({ collapsed = false, onToggle, onNavigate, onOpenCommand
     { href: "/spaces", label: "Spaces", icon: Layers },
   ];
 
-  const [pinnedThreads, recentThreads] = useMemo(() => [threads.slice(0, 3), threads.slice(3)], [threads]);
+  const recentThreads = threads;
   const shortcutLabel = typeof navigator !== "undefined" && navigator.platform.toLowerCase().includes("mac") ? "⌘K" : "Ctrl+K";
 
   async function handleDeleteThread(threadId: string) {
@@ -151,36 +151,6 @@ export function Sidebar({ collapsed = false, onToggle, onNavigate, onOpenCommand
             </span>
             <kbd className="rounded border border-sidebar-border bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">{shortcutLabel}</kbd>
           </button>
-
-          <div className="rounded-lg border border-sidebar-border/80 bg-card/70 p-2">
-            <p className="mb-2 inline-flex items-center gap-1 px-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              <Pin className="h-3 w-3" /> Pinned
-            </p>
-            <div className="space-y-1">
-              {pinnedThreads.length === 0 ? <p className="px-2 py-1 text-xs text-muted-foreground">No pinned threads yet</p> : null}
-              {pinnedThreads.map((thread) => (
-                <div key={thread.id} className="group flex items-center gap-1 rounded-lg hover:bg-sidebar-accent">
-                  <Link
-                    className="block min-w-0 flex-1 truncate px-2 py-1.5"
-                    href={`/search/${thread.id}`}
-                    title={thread.title}
-                    onClick={onNavigate}
-                  >
-                    {thread.title}
-                  </Link>
-                  <button
-                    type="button"
-                    aria-label={`Delete ${thread.title}`}
-                    className="mr-1 inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted"
-                    onClick={() => void handleDeleteThread(thread.id)}
-                    disabled={deletingThreadId === thread.id}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
 
           <div className="rounded-lg border border-sidebar-border/80 bg-card/70 p-2">
             <p className="mb-2 px-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Recent</p>

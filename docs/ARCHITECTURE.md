@@ -41,6 +41,16 @@ Browser -> Next.js app (app:3000)
 5. Similar chunks are fetched by cosine similarity and injected into instructions.
 6. Model response streams and is persisted like standard chat.
 
+## Streaming Protocol
+
+The application uses the AI SDK "v6" (SSE) protocol for real-time communication. 
+
+- **Text:** Streamed via `text-delta` chunks and accumulated in the client `parts` array.
+- **Citations:** Streamed via `source-url` chunks and parsed on the client to display source cards during the stream.
+- **Persistence:** Messages are saved to PostgreSQL once the server-side stream finishes or if a cached response is served.
+
+For details on the extraction logic and recent fixes, see [Streaming UI Fix](./STREAMING_FIX.md).
+
 ## Key Source Locations
 
 - Auth config: `app/src/auth.ts`

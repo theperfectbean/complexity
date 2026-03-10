@@ -1,6 +1,6 @@
 "use client";
 
-import { signOut, useSession } from "next-auth/react";
+import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
@@ -79,20 +79,7 @@ export default function Home() {
           <h1 className="font-[var(--font-accent)] text-2xl font-semibold">Complexity</h1>
           <p className="text-sm text-muted-foreground">Web-grounded AI search with private spaces</p>
         </div>
-        <div className="flex items-center gap-2">
-          <Link className="rounded-md border bg-card px-3 py-2 text-sm hover:bg-accent" href="/library">
-            Library
-          </Link>
-          <Link className="rounded-md border bg-card px-3 py-2 text-sm hover:bg-accent" href="/spaces">
-            Spaces
-          </Link>
-          <button
-            className="rounded-md border bg-card px-3 py-2 text-sm hover:bg-accent"
-            onClick={() => signOut({ callbackUrl: "/login" })}
-          >
-            Sign out
-          </button>
-        </div>
+
       </header>
 
       <div className="flex flex-1 items-center justify-center">
