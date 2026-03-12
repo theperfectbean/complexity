@@ -78,6 +78,8 @@ DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose build app
 
 ### Vercel AI SDK v6 Migration
 - **useChat Changes**: The `data` return property has been removed. Use the `onData` callback and local `useState` to capture custom stream parts.
+- **isDataUIMessageChunk Removal**: The `isDataUIMessageChunk` helper is no longer exported in v6. Use `part.type === 'data-json'` or `part.type.startsWith('data-')` to identify data chunks in the `onData` callback.
+- **Type Safety**: When using `onData`, define the state with `Record<string, unknown>[]` instead of `any[]` to satisfy strict linting rules.
 - **Transport Pattern**: API endpoints and dynamic request bodies must now be configured via `transport: new DefaultChatTransport({ api, body: () => ({ ... }) })`. The `body` must be a function to capture reactive state correctly.
 - **Custom Stream Parts**: Custom data chunks written via `writer.write` in the backend must now use `type: "data-json"` (or other `data-` prefixed types) to satisfy the `UIMessageChunk` discriminated union.
 
@@ -85,6 +87,7 @@ DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose build app
 - **Response Creation**: The `responses.create()` method now requires an explicit `stream: boolean` property.
 - **Input Structure**: The `input` array now expects items with an explicit `type: "message"` property.
 - **Custom Provider**: To use Perplexity with standard AI SDK tools like `streamText`, implement the `LanguageModelV3` interface from `@ai-sdk/provider`.
+- **Output Item Access**: The `OutputItem` in `ResponseCreateResponse` no longer has a top-level `text` property. Use the `output_text` convenience property on the response object for aggregated text results.
 
 ### Docker & Next.js (SWC)
 - **Binary Mismatch**: When using Alpine-based Docker images, ensure `@next/swc-linux-x64-musl` is installed. 

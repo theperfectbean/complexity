@@ -56,7 +56,7 @@ export function createPerplexityModel(modelId: string): LanguageModelV3 {
         stream: false,
       }) as ResponseCreateResponse;
 
-      const outputText = result.output?.[0]?.text || "";
+      const outputText = result.output_text || "";
 
       return {
         content: [{ type: "text", text: outputText }],
