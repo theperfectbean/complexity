@@ -15,7 +15,7 @@ type AppShellProps = {
 };
 
 export function AppShell({ children, contentClassName }: AppShellProps) {
-  const { data: session, status } = useSession();
+  const { status } = useSession();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [commandOpen, setCommandOpen] = useState(false);
 

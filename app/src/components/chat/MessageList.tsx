@@ -16,7 +16,7 @@ export type ChatCitation = {
 export type ChatThinkingPart = {
   callId: string;
   toolName: string;
-  input?: any;
+  input?: unknown;
   result?: string;
 };
 

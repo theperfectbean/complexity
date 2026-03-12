@@ -191,3 +191,30 @@ Optional stricter gate:
 cd app
 npm run test:coverage
 ```
+
+## Maintenance & Fixes
+
+### 2026-03-12: CI Restoration (Lint & Test Fixes)
+
+**Issue:** CI jobs were failing due to massive linting errors and 2 regression test failures in the chat route.
+
+**Findings:**
+1. **Linting Bloat:** The `playwright-report/` and `test-results/` directories were being scanned by ESLint, generating thousands of warnings and errors from generated/minified assets.
+2. **Strict Type Violations:** Many files contained `no-explicit-any` and `unused-vars` violations that triggered failures under strict CI rules.
+3. **Test Regressions in `POST /api/chat`:**
+   - **TypeError:** A missing mock for the second `db.select` call in `returns 400 for thread-role mismatch` caused a crash.
+   - **Logic Mismatch:** The test `returns 404 when requested role is not owned` expected a `404` error, but the code only logged a warning and continued.
+
+**Resolution:**
+1. **ESLint Config:** Updated `app/eslint.config.mjs` to ignore `playwright-report/**` and `test-results/**`.
+2. **Type Cleanup:** 
+   - Replaced `any` with `unknown` or specific interfaces in `route.ts`, `perplexity.ts`, `utils.ts`, and test files.
+   - Removed or prefixed unused variables (`_data`, `session`, etc.).
+   - Corrected `catch (error: any)` to `catch (error: unknown)`.
+3. **Route Logic & Test Fix:**
+   - Moved the role-mismatch check earlier in `POST /api/chat` to prevent unnecessary DB calls and fix the crash in the mismatch test.
+   - Updated the route to return `404` with `{"error": "Role not found"}` when a thread's associated role is missing/unowned, aligning the implementation with the test suite's expectations.
+
+**Verification:**
+- `npm run lint` now passes with 0 errors.
+- `npm test` passes with 64/64 tests successful.

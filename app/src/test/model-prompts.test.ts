@@ -54,14 +54,34 @@ promptDescribe("Model Prompt & Response Validation", () => {
     }
 
     const client = createPerplexityClient();
-    const allResults: any[] = [];
+    const allResults: {
+      modelId: string;
+      modelLabel: string;
+      cases: {
+        name: string;
+        prompt: string;
+        response?: string;
+        durationMs?: number;
+        passed: boolean;
+        missingKeywords?: string[];
+        error?: string;
+      }[];
+    }[] = [];
 
     for (const model of MODELS) {
       console.log(`\n--- Testing Model: ${model.label} (${model.id}) ---`);
       const modelResults = {
         modelId: model.id,
         modelLabel: model.label,
-        cases: [] as any[]
+        cases: [] as {
+          name: string;
+          prompt: string;
+          response?: string;
+          durationMs?: number;
+          passed: boolean;
+          missingKeywords?: string[];
+          error?: string;
+        }[]
       };
 
       for (const testCase of TEST_CASES) {
@@ -101,12 +121,13 @@ promptDescribe("Model Prompt & Response Validation", () => {
             passed,
             missingKeywords
           });
-        } catch (error: any) {
-          console.log(`[${testCase.name}] 💥 ERROR: ${error.message}`);
+        } catch (error: unknown) {
+          const message = error instanceof Error ? error.message : "Agent API request failed";
+          console.log(`[${testCase.name}] 💥 ERROR: ${message}`);
           modelResults.cases.push({
             name: testCase.name,
             prompt: testCase.prompt,
-            error: error.message,
+            error: message,
             passed: false
           });
         }
@@ -121,7 +142,7 @@ promptDescribe("Model Prompt & Response Validation", () => {
       JSON.stringify({ generatedAt: new Date().toISOString(), allResults }, null, 2)
     );
 
-    const totalFailed = allResults.reduce((acc, m) => acc + m.cases.filter((c: any) => !c.passed).length, 0);
+    const totalFailed = allResults.reduce((acc, m) => acc + m.cases.filter(c => !c.passed).length, 0);
     expect(totalFailed, `Total failed test cases: ${totalFailed}`).toBe(0);
   }, 1000 * 60 * 10); // 10 minute timeout
 });

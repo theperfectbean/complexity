@@ -41,8 +41,8 @@ function collectTextStrings(value: unknown): string[] {
     .filter(Boolean);
 }
 
-export function normalizeUIMessage(message: any, data?: any[]): ChatMessageItem {
-  const msg = message as unknown as Record<string, unknown>;
+export function normalizeUIMessage(message: unknown, _data?: unknown[]): ChatMessageItem {
+  const msg = message as Record<string, unknown>;
   let text = "";
 
   // 1. Check content property
@@ -94,7 +94,7 @@ export function normalizeUIMessage(message: any, data?: any[]): ChatMessageItem 
             title: (p.title as string) || (p.filename as string),
           });
         } else if (p.type === "data-call-start") {
-          const payload = p.data as any;
+          const payload = p.data as Record<string, unknown>;
           if (payload) {
             const existing = thinking.find((t) => t.callId === payload.callId);
             if (!existing) {
@@ -106,7 +106,7 @@ export function normalizeUIMessage(message: any, data?: any[]): ChatMessageItem 
             }
           }
         } else if (p.type === "data-call-result") {
-          const payload = p.data as any;
+          const payload = p.data as Record<string, unknown>;
           if (payload) {
             const existing = thinking.find((t) => t.callId === payload.callId);
             if (existing) {

@@ -16,7 +16,7 @@ import { getRedisClient } from "@/lib/redis";
 const schema = z.object({
   threadId: z.string().min(1),
   model: z.string().min(1),
-  messages: z.array(z.any()),
+  messages: z.array(z.unknown()),
   roleId: z.string().nullable().optional(),
 });
 
@@ -206,6 +206,11 @@ export async function POST(request: Request) {
   // Use the thread's roleId as the primary source of truth for RAG activation
   const activeRoleId = thread.roleId;
 
+  // Ensure client-requested role matches the thread's role (to prevent cross-role RAG leakage)
+  if (parsed.data.roleId && parsed.data.roleId !== activeRoleId) {
+    return NextResponse.json({ error: "Role mismatch for this thread" }, { status: 400 });
+  }
+
   const rolePromise = activeRoleId
     ? db
         .select({ id: roles.id, instructions: roles.instructions })
@@ -221,16 +226,9 @@ export async function POST(request: Request) {
   if (activeRoleId) {
     if (!ownedRole) {
       // Role associated with thread no longer exists or access lost
-      console.warn(`Thread ${thread.id} associated with missing role ${activeRoleId}`);
-    } else {
-      roleInstructions = ownedRole.instructions;
+      return NextResponse.json({ error: "Role not found" }, { status: 404 });
     }
-  }
-
-  // Optional: If the client explicitly requested a different role, 
-  // ensure it matches the thread's role (to prevent cross-role RAG leakage)
-  if (parsed.data.roleId && parsed.data.roleId !== activeRoleId) {
-    return NextResponse.json({ error: "Role mismatch for this thread" }, { status: 400 });
+    roleInstructions = ownedRole.instructions;
   }
 
   const lastMessage = inputMessages[inputMessages.length - 1];
@@ -343,7 +341,7 @@ export async function POST(request: Request) {
             toolName: "Retrieval",
             input: { query: userText },
           },
-        } as any);
+        } as UIMessageChunk);
 
         // Keep connection alive
         writer.write({
@@ -365,7 +363,7 @@ export async function POST(request: Request) {
               callId: "rag-search",
               result: `Found ${topChunks.length} relevant context chunks.`,
             },
-          } as any);
+          } as UIMessageChunk);
         } catch (error) {
           console.error("[RAG Error]", error);
           writer.write({
@@ -374,7 +372,7 @@ export async function POST(request: Request) {
               callId: "rag-search",
               result: "Search failed, continuing with web search only.",
             },
-          } as any);
+          } as UIMessageChunk);
         }
       }
 
@@ -398,7 +396,7 @@ export async function POST(request: Request) {
           toolName: "Thinking",
           input: { model: safeModel },
         },
-      } as any);
+      } as UIMessageChunk);
 
       try {
         const client = createPerplexityClient();
@@ -479,9 +477,10 @@ export async function POST(request: Request) {
               throw new Error(message || "Agent API request failed");
             }
           }
-        } catch (error: any) {
+        } catch (error: unknown) {
           // If the API throws a 400 immediately on the create() call, or we haven't written deltas yet, fallback.
-          if (!hasWrittenTextDelta && (error.message?.includes("400") || error.status === 400 || streamingFailed === false)) {
+          const err = error as { message?: string; status?: number };
+          if (!hasWrittenTextDelta && (err.message?.includes("400") || err.status === 400 || streamingFailed === false)) {
              console.log(`[Chat API] Streaming failed for ${safeModel}, falling back to non-streaming.`);
              streamingFailed = true;
           } else {
@@ -503,9 +502,10 @@ export async function POST(request: Request) {
             }
           }
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         // One final fallback attempt if the outer try block caught it (e.g. createPerplexityClient or initial create call failed)
-        if (!hasWrittenTextDelta && (error.message?.includes("400") || error.status === 400)) {
+        const err = error as { message?: string; status?: number };
+        if (!hasWrittenTextDelta && (err.message?.includes("400") || err.status === 400)) {
           console.log(`[Chat API] Outer catch streaming failed for ${safeModel}, falling back to non-streaming.`);
           try {
             const requestBodyBase = isPresetModel(safeModel)
@@ -531,7 +531,7 @@ export async function POST(request: Request) {
               writer.write({ type: "text-delta", id: textId, delta: assistantText });
               hasWrittenTextDelta = true;
             }
-          } catch (fallbackError: any) {
+          } catch (fallbackError: unknown) {
              const message = fallbackError instanceof Error ? fallbackError.message : "Agent API fallback request failed";
              assistantText = `Model request failed: ${message}`;
              writer.write({ type: "text-delta", id: textId, delta: assistantText });

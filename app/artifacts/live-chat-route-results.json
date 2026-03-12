@@ -1,0 +1,10 @@
+{
+  "generatedAt": "2026-03-10T23:27:32.547Z",
+  "route": "/api/chat",
+  "model": "anthropic/claude-haiku-4-5",
+  "query": "what is a vector database?",
+  "durationMs": 28,
+  "responseChars": 40,
+  "responsePreview": "Model request failed: Request timed out.",
+  "ok": true
+}

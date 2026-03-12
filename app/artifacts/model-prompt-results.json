@@ -1,0 +1,317 @@
+{
+  "generatedAt": "2026-03-11T23:27:10.554Z",
+  "allResults": [
+    {
+      "modelId": "fast-search",
+      "modelLabel": "Fast Search",
+      "cases": [
+        {
+          "name": "General Knowledge",
+          "prompt": "Who founded SpaceX and in what year?",
+          "response": "**Elon Musk founded SpaceX in 2002.**\n\nSpaceX (officially Space Exploration Technologies Corp.) was established by Elon Musk on May 6, 2002, in Hawthorne, California. Musk provided the initial funding of about $100 million from the sale of his stake in PayPal. This is confirmed by SpaceX's official history on their website (spacex.com), SEC filings, and Musk's autobiography *Elon Musk* by Walter Isaacson, as well as numerous reliable sources like Britannica, NASA records, and company timelines. No other founders are credited; Musk is the sole founder.",
+          "durationMs": 1960,
+          "passed": true,
+          "missingKeywords": []
+        },
+        {
+          "name": "Conciseness Check",
+          "prompt": "What is the capital of France? Answer in exactly one word.",
+          "response": "Paris",
+          "durationMs": 953,
+          "passed": true,
+          "missingKeywords": []
+        },
+        {
+          "name": "Technical/Reasoning",
+          "prompt": "Explain the difference between a SQL and NoSQL database in two sentences.",
+          "response": "SQL databases are relational systems that store data in structured tables with predefined schemas, using SQL for querying and enforcing ACID transactions to ensure data consistency and integrity. NoSQL databases are non-relational, offering flexible schemas to handle unstructured or semi-structured data (e.g., documents, graphs, or key-value pairs) and prioritizing scalability, high availability, and performance over strict consistency, often following BASE principles.",
+          "durationMs": 1751,
+          "passed": false,
+          "missingKeywords": [
+            "scaling"
+          ]
+        }
+      ]
+    },
+    {
+      "modelId": "pro-search",
+      "modelLabel": "Pro Search",
+      "cases": [
+        {
+          "name": "General Knowledge",
+          "prompt": "Who founded SpaceX and in what year?",
+          "response": "SpaceX was founded by Elon Musk in 2002.",
+          "durationMs": 1506,
+          "passed": true,
+          "missingKeywords": []
+        },
+        {
+          "name": "Conciseness Check",
+          "prompt": "What is the capital of France? Answer in exactly one word.",
+          "response": "Paris",
+          "durationMs": 1244,
+          "passed": true,
+          "missingKeywords": []
+        },
+        {
+          "name": "Technical/Reasoning",
+          "prompt": "Explain the difference between a SQL and NoSQL database in two sentences.",
+          "response": "SQL databases use structured, table-based schemas with predefined columns and support powerful relational queries using SQL, ensuring strong consistency and ACID transactions. NoSQL databases use flexible, schema-less or semi-structured models (like documents, key-value pairs, wide columns, or graphs), prioritizing scalability and performance, often with more relaxed consistency guarantees.",
+          "durationMs": 1364,
+          "passed": false,
+          "missingKeywords": [
+            "scaling"
+          ]
+        }
+      ]
+    },
+    {
+      "modelId": "perplexity/sonar",
+      "modelLabel": "Perplexity Sonar",
+      "cases": [
+        {
+          "name": "General Knowledge",
+          "prompt": "Who founded SpaceX and in what year?",
+          "response": "SpaceX was founded by **Elon Musk** in **2002**.",
+          "durationMs": 1982,
+          "passed": true,
+          "missingKeywords": []
+        },
+        {
+          "name": "Conciseness Check",
+          "prompt": "What is the capital of France? Answer in exactly one word.",
+          "response": "Paris",
+          "durationMs": 602,
+          "passed": true,
+          "missingKeywords": []
+        },
+        {
+          "name": "Technical/Reasoning",
+          "prompt": "Explain the difference between a SQL and NoSQL database in two sentences.",
+          "response": "A SQL database uses a structured, table‑based schema with predefined relationships and typically relies on SQL for querying, which ensures strong consistency and ACID transactions. A NoSQL database is schema‑flexible, often storing data as documents, key–value pairs, or graphs, and favors scalability and performance over strict relational structure.",
+          "durationMs": 2511,
+          "passed": false,
+          "missingKeywords": [
+            "scaling"
+          ]
+        }
+      ]
+    },
+    {
+      "modelId": "anthropic/claude-opus-4-6",
+      "modelLabel": "Claude Opus 4.6",
+      "cases": [
+        {
+          "name": "General Knowledge",
+          "prompt": "Who founded SpaceX and in what year?",
+          "response": "SpaceX was founded by **Elon Musk** in **2002**.",
+          "durationMs": 2036,
+          "passed": true,
+          "missingKeywords": []
+        },
+        {
+          "name": "Conciseness Check",
+          "prompt": "What is the capital of France? Answer in exactly one word.",
+          "response": "Paris",
+          "durationMs": 4292,
+          "passed": true,
+          "missingKeywords": []
+        },
+        {
+          "name": "Technical/Reasoning",
+          "prompt": "Explain the difference between a SQL and NoSQL database in two sentences.",
+          "response": "SQL databases are relational, storing data in structured tables with predefined schemas and using Structured Query Language (SQL) for defining and manipulating data, which makes them ideal for complex queries and transactional consistency. NoSQL databases are non-relational, offering flexible schemas and a variety of data models (such as document, key-value, graph, or column-family), which makes them well-suited for handling large volumes of unstructured or semi-structured data with high scalability and performance.",
+          "durationMs": 3584,
+          "passed": false,
+          "missingKeywords": [
+            "scaling"
+          ]
+        }
+      ]
+    },
+    {
+      "modelId": "anthropic/claude-sonnet-4-6",
+      "modelLabel": "Claude Sonnet 4.6",
+      "cases": [
+        {
+          "name": "General Knowledge",
+          "prompt": "Who founded SpaceX and in what year?",
+          "response": "**SpaceX** was founded by **Elon Musk** in **2002**. Formally incorporated on **March 14, 2002**, the company's full name is **Space Exploration Technologies Corporation**. Musk invested approximately **$100 million** of his own money — funds largely derived from the sale of PayPal — to launch the venture, with the core vision of reducing the costs of space travel and ultimately enabling a self-sustaining human colony on Mars.",
+          "durationMs": 7003,
+          "passed": true,
+          "missingKeywords": []
+        },
+        {
+          "name": "Conciseness Check",
+          "prompt": "What is the capital of France? Answer in exactly one word.",
+          "response": "Paris.",
+          "durationMs": 1538,
+          "passed": true,
+          "missingKeywords": []
+        },
+        {
+          "name": "Technical/Reasoning",
+          "prompt": "Explain the difference between a SQL and NoSQL database in two sentences.",
+          "response": "SQL databases are **relational**, storing data in structured tables with predefined schemas and using Structured Query Language (SQL) for querying, making them ideal for complex queries and data integrity (e.g., MySQL, PostgreSQL). NoSQL databases are **non-relational**, storing data in flexible formats such as documents, key-value pairs, or graphs without a fixed schema, making them better suited for unstructured data, horizontal scaling, and high-volume, fast-changing applications (e.g., MongoDB, Redis).",
+          "durationMs": 3304,
+          "passed": true,
+          "missingKeywords": []
+        }
+      ]
+    },
+    {
+      "modelId": "anthropic/claude-haiku-4-5",
+      "modelLabel": "Claude Haiku 4.5",
+      "cases": [
+        {
+          "name": "General Knowledge",
+          "prompt": "Who founded SpaceX and in what year?",
+          "response": "I can answer this question from my existing knowledge.\n\n**SpaceX was founded by Elon Musk in 2002.**\n\nElon Musk established Space Exploration Technologies Corp. (SpaceX) with the goal of reducing space transportation costs and enabling the colonization of Mars. The company has since become a major player in the commercial space industry, developing rockets like the Falcon 9 and the Starship, as well as operating the Starlink satellite internet constellation.",
+          "durationMs": 1631,
+          "passed": true,
+          "missingKeywords": []
+        },
+        {
+          "name": "Conciseness Check",
+          "prompt": "What is the capital of France? Answer in exactly one word.",
+          "response": "Paris",
+          "durationMs": 623,
+          "passed": true,
+          "missingKeywords": []
+        },
+        {
+          "name": "Technical/Reasoning",
+          "prompt": "Explain the difference between a SQL and NoSQL database in two sentences.",
+          "response": "# SQL vs NoSQL Databases\n\n**SQL (Relational) Databases** use structured tables with predefined schemas and SQL queries to manage data with ACID compliance, making them ideal for complex queries and transactions. **NoSQL Databases** use flexible, schema-less structures (like documents, key-value pairs, or graphs) and are optimized for scalability and handling unstructured data, trading some consistency guarantees for performance and flexibility.",
+          "durationMs": 2831,
+          "passed": false,
+          "missingKeywords": [
+            "scaling"
+          ]
+        }
+      ]
+    },
+    {
+      "modelId": "openai/gpt-5.2",
+      "modelLabel": "GPT-5.2",
+      "cases": [
+        {
+          "name": "General Knowledge",
+          "prompt": "Who founded SpaceX and in what year?",
+          "response": "SpaceX (Space Exploration Technologies Corp.) was founded by **Elon Musk** in **2002**.",
+          "durationMs": 1208,
+          "passed": true,
+          "missingKeywords": []
+        },
+        {
+          "name": "Conciseness Check",
+          "prompt": "What is the capital of France? Answer in exactly one word.",
+          "response": "Paris",
+          "durationMs": 860,
+          "passed": true,
+          "missingKeywords": []
+        },
+        {
+          "name": "Technical/Reasoning",
+          "prompt": "Explain the difference between a SQL and NoSQL database in two sentences.",
+          "response": "SQL databases are relational, store data in structured tables with a fixed schema, and use SQL with ACID transactions to enforce strong consistency and support complex joins.  \nNoSQL databases are non-relational, use flexible schemas (e.g., document, key-value, wide-column, or graph models), and are typically designed for horizontal scaling and high-throughput workloads, often with more tunable or eventual consistency.",
+          "durationMs": 2348,
+          "passed": true,
+          "missingKeywords": []
+        }
+      ]
+    },
+    {
+      "modelId": "google/gemini-3.1-pro-preview",
+      "modelLabel": "Gemini 3.1 Pro Preview",
+      "cases": [
+        {
+          "name": "General Knowledge",
+          "prompt": "Who founded SpaceX and in what year?",
+          "response": "SpaceX was founded by **Elon Musk** in **2002**.",
+          "durationMs": 3646,
+          "passed": true,
+          "missingKeywords": []
+        },
+        {
+          "name": "Conciseness Check",
+          "prompt": "What is the capital of France? Answer in exactly one word.",
+          "error": "400 {\"error\":{\"message\":\"invalid request\",\"type\":\"invalid_request\",\"code\":400}}",
+          "passed": false
+        },
+        {
+          "name": "Technical/Reasoning",
+          "prompt": "Explain the difference between a SQL and NoSQL database in two sentences.",
+          "response": "SQL databases are relational, table-based systems that require predefined schemas and are best suited for handling structured data with complex queries. In contrast, NoSQL databases are non-relational, flexible systems—such as document or key-value stores—that easily scale horizontally to manage unstructured or rapidly changing data.",
+          "durationMs": 7214,
+          "passed": false,
+          "missingKeywords": [
+            "scaling"
+          ]
+        }
+      ]
+    },
+    {
+      "modelId": "google/gemini-3-flash-preview",
+      "modelLabel": "Gemini 3 Flash Preview",
+      "cases": [
+        {
+          "name": "General Knowledge",
+          "prompt": "Who founded SpaceX and in what year?",
+          "response": "SpaceX was founded by **Elon Musk** in **2002**. \n\nWhile the company was officially incorporated on March 14, 2002, it considers **May 6, 2002**, to be its official founding date. Musk started the company (originally named Space Exploration Technologies Corp.) with the goal of reducing space transportation costs to eventually enable the colonization of Mars.",
+          "durationMs": 4520,
+          "passed": true,
+          "missingKeywords": []
+        },
+        {
+          "name": "Conciseness Check",
+          "prompt": "What is the capital of France? Answer in exactly one word.",
+          "response": "Paris",
+          "durationMs": 1950,
+          "passed": true,
+          "missingKeywords": []
+        },
+        {
+          "name": "Technical/Reasoning",
+          "prompt": "Explain the difference between a SQL and NoSQL database in two sentences.",
+          "response": "SQL databases use a structured, predefined schema and store data in tables, making them best suited for complex queries and relational data. In contrast, NoSQL databases provide flexible schemas and utilize various data models like documents or key-value pairs, which allows for easier horizontal scaling and handling of unstructured data.",
+          "durationMs": 4099,
+          "passed": true,
+          "missingKeywords": []
+        }
+      ]
+    },
+    {
+      "modelId": "xai/grok-4-1-fast-non-reasoning",
+      "modelLabel": "Grok 4.1 Fast",
+      "cases": [
+        {
+          "name": "General Knowledge",
+          "prompt": "Who founded SpaceX and in what year?",
+          "response": "**Elon Musk founded SpaceX in 2002.**\n\nSpaceX (officially Space Exploration Technologies Corp.) was incorporated by Elon Musk on May 6, 2002, in Hawthorne, California. Musk provided the initial funding of about $100 million from the sale of his stake in PayPal. This is confirmed by SpaceX's official history on their website (spacex.com), SEC filings, and Musk's autobiography *Elon Musk* by Walter Isaacson, as well as reliable sources like Britannica and NASA records. No other founders are credited; Musk is the sole founder.",
+          "durationMs": 2444,
+          "passed": true,
+          "missingKeywords": []
+        },
+        {
+          "name": "Conciseness Check",
+          "prompt": "What is the capital of France? Answer in exactly one word.",
+          "response": "Paris",
+          "durationMs": 497,
+          "passed": true,
+          "missingKeywords": []
+        },
+        {
+          "name": "Technical/Reasoning",
+          "prompt": "Explain the difference between a SQL and NoSQL database in two sentences.",
+          "response": "SQL databases are relational systems that store data in structured tables with predefined schemas, using SQL for querying and enforcing ACID transactions to ensure data consistency and integrity. NoSQL databases are non-relational, offering flexible schemas to handle unstructured or semi-structured data (e.g., documents, key-value pairs, graphs), prioritizing scalability, speed, and availability over strict consistency via BASE properties.",
+          "durationMs": 1786,
+          "passed": false,
+          "missingKeywords": [
+            "scaling"
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,4 +1,4 @@
-import { and, cosineDistance, desc, eq, sql } from "drizzle-orm";
+import { and, cosineDistance, eq } from "drizzle-orm";
 
 import { db } from "@/lib/db";
 import { chunks, documents } from "@/lib/db/schema";

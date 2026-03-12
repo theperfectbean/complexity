@@ -26,15 +26,16 @@ async function testWithSystemMessage() {
     },
   ];
   try {
-    const response = await client.responses.create({
+    await client.responses.create({
       model,
       input,
       instructions: "Be concise.",
       tools: [],
-    } as any);
+    } as unknown as { model: string; input: unknown[]; instructions: string; tools: unknown[] });
     console.log("Success with system message!");
-  } catch (error: any) {
-    console.error("Failed with system message:", error.message);
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error("Failed with system message:", message);
   }
 }
 
@@ -48,15 +49,16 @@ async function testWithoutSystemMessage() {
     },
   ];
   try {
-    const response = await client.responses.create({
+    await client.responses.create({
       model,
       input,
       instructions: "Be concise.",
       tools: [],
-    } as any);
+    } as unknown as { model: string; input: unknown[]; instructions: string; tools: unknown[] });
     console.log("Success without system message!");
-  } catch (error: any) {
-    console.error("Failed without system message:", error.message);
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error("Failed without system message:", message);
   }
 }
 

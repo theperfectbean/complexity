@@ -1,0 +1,196 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - complementary [ref=e4]:
+      - link "C Complexity" [ref=e6] [cursor=pointer]:
+        - /url: /
+        - generic [ref=e7]: C
+        - text: Complexity
+      - link "New search" [ref=e9] [cursor=pointer]:
+        - /url: /
+        - img [ref=e10]
+        - generic [ref=e11]: New search
+      - navigation [ref=e12]:
+        - link "Home" [ref=e13] [cursor=pointer]:
+          - /url: /
+          - img [ref=e14]
+          - generic [ref=e17]: Home
+        - link "Library" [ref=e18] [cursor=pointer]:
+          - /url: /library
+          - img [ref=e19]
+          - generic [ref=e21]: Library
+        - link "Roles" [ref=e22] [cursor=pointer]:
+          - /url: /roles
+          - img [ref=e23]
+          - generic [ref=e28]: Roles
+      - generic [ref=e29]:
+        - button "Search threads Ctrl+K" [ref=e30]:
+          - generic [ref=e31]:
+            - img [ref=e32]
+            - text: Search threads
+          - generic [ref=e34]: Ctrl+K
+        - generic [ref=e35]:
+          - paragraph [ref=e36]: Recent
+          - generic [ref=e37]:
+            - generic [ref=e38]:
+              - link "What is the capital of Japan? Answer in one word." [ref=e39] [cursor=pointer]:
+                - /url: /search/6eadf6226a1e467cb8f92a1cddc41c97
+              - button "Delete What is the capital of Japan? Answer in one word." [ref=e40]:
+                - img [ref=e41]
+            - generic [ref=e44]:
+              - link "What is the capital of Japan? Answer in one word." [ref=e45] [cursor=pointer]:
+                - /url: /search/bc2767c6cea9448cbb01dc46387cf06d
+              - button "Delete What is the capital of Japan? Answer in one word." [ref=e46]:
+                - img [ref=e47]
+            - generic [ref=e50]:
+              - link "What is the capital of Japan? Answer in one word." [ref=e51] [cursor=pointer]:
+                - /url: /search/d701d992afc84d6b8e9cf3425a8057dd
+              - button "Delete What is the capital of Japan? Answer in one word." [ref=e52]:
+                - img [ref=e53]
+            - generic [ref=e56]:
+              - link "What is the capital of Japan? Answer in one word." [ref=e57] [cursor=pointer]:
+                - /url: /search/b033678e98cb4744a579758805020e5f
+              - button "Delete What is the capital of Japan? Answer in one word." [ref=e58]:
+                - img [ref=e59]
+            - generic [ref=e62]:
+              - link "What is the capital of Japan? Answer in one word." [ref=e63] [cursor=pointer]:
+                - /url: /search/5c79db8e85c64d9ca53ea20184643919
+              - button "Delete What is the capital of Japan? Answer in one word." [ref=e64]:
+                - img [ref=e65]
+            - generic [ref=e68]:
+              - link "What is the capital of Japan? Answer in one word." [ref=e69] [cursor=pointer]:
+                - /url: /search/b6facff5da814a88859cbb7355a8c50d
+              - button "Delete What is the capital of Japan? Answer in one word." [ref=e70]:
+                - img [ref=e71]
+            - generic [ref=e74]:
+              - link "What is the capital of Japan? Answer in one word." [ref=e75] [cursor=pointer]:
+                - /url: /search/3359e17742a64820b244739bf7bcc15f
+              - button "Delete What is the capital of Japan? Answer in one word." [ref=e76]:
+                - img [ref=e77]
+            - generic [ref=e80]:
+              - link "What is the capital of Japan? Answer in one word." [ref=e81] [cursor=pointer]:
+                - /url: /search/4e1d0c1302924e39b096002c8e74f092
+              - button "Delete What is the capital of Japan? Answer in one word." [ref=e82]:
+                - img [ref=e83]
+            - generic [ref=e86]:
+              - link "What is the capital of Japan? Answer in one word." [ref=e87] [cursor=pointer]:
+                - /url: /search/bd95906b2b2f4594a03fa3b27aaf0017
+              - button "Delete What is the capital of Japan? Answer in one word." [ref=e88]:
+                - img [ref=e89]
+            - generic [ref=e92]:
+              - link "What is the capital of Japan? Answer in one word." [ref=e93] [cursor=pointer]:
+                - /url: /search/99247f0c39d641d99c52cca99d9620df
+              - button "Delete What is the capital of Japan? Answer in one word." [ref=e94]:
+                - img [ref=e95]
+            - generic [ref=e98]:
+              - link "What is the capital of Japan? Answer in one word." [ref=e99] [cursor=pointer]:
+                - /url: /search/c10029ead6a543e5b7990f55ca395d8c
+              - button "Delete What is the capital of Japan? Answer in one word." [ref=e100]:
+                - img [ref=e101]
+            - generic [ref=e104]:
+              - link "What is the capital of Japan? Answer in one word." [ref=e105] [cursor=pointer]:
+                - /url: /search/ddd127b25cf54836af685dc0873f6344
+              - button "Delete What is the capital of Japan? Answer in one word." [ref=e106]:
+                - img [ref=e107]
+            - generic [ref=e110]:
+              - link "What is the capital of Japan? Answer in one word." [ref=e111] [cursor=pointer]:
+                - /url: /search/e411c2156be44188af79f9fbd8268631
+              - button "Delete What is the capital of Japan? Answer in one word." [ref=e112]:
+                - img [ref=e113]
+            - generic [ref=e116]:
+              - link "What is the capital of Japan? Answer in one word." [ref=e117] [cursor=pointer]:
+                - /url: /search/f035a797fb50431d94034ba304406970
+              - button "Delete What is the capital of Japan? Answer in one word." [ref=e118]:
+                - img [ref=e119]
+            - generic [ref=e122]:
+              - link "What is the capital of Japan? Answer in one word." [ref=e123] [cursor=pointer]:
+                - /url: /search/52eb3bca05924c60878c233296271dc4
+              - button "Delete What is the capital of Japan? Answer in one word." [ref=e124]:
+                - img [ref=e125]
+            - generic [ref=e128]:
+              - link "What is the capital of Japan? Answer in one word." [ref=e129] [cursor=pointer]:
+                - /url: /search/9144f26ef7d943aca5e077c5f9184cc6
+              - button "Delete What is the capital of Japan? Answer in one word." [ref=e130]:
+                - img [ref=e131]
+            - generic [ref=e134]:
+              - link "What is the capital of Japan? Answer in one word." [ref=e135] [cursor=pointer]:
+                - /url: /search/90f2824a7df049e684dc92f906deb68d
+              - button "Delete What is the capital of Japan? Answer in one word." [ref=e136]:
+                - img [ref=e137]
+            - generic [ref=e140]:
+              - link "What is the capital of Japan? Answer in one word." [ref=e141] [cursor=pointer]:
+                - /url: /search/b45fa69c6a85467b8747b1af82d962e8
+              - button "Delete What is the capital of Japan? Answer in one word." [ref=e142]:
+                - img [ref=e143]
+            - generic [ref=e146]:
+              - link "What is the capital of Japan? Answer in one word." [ref=e147] [cursor=pointer]:
+                - /url: /search/26429cf48dae420297ba2d67b36fef9d
+              - button "Delete What is the capital of Japan? Answer in one word." [ref=e148]:
+                - img [ref=e149]
+            - generic [ref=e152]:
+              - link "What is the capital of Japan? Answer in one word." [ref=e153] [cursor=pointer]:
+                - /url: /search/078bbdf5d3ba4bbca8ad5e41b42a14ab
+              - button "Delete What is the capital of Japan? Answer in one word." [ref=e154]:
+                - img [ref=e155]
+            - generic [ref=e158]:
+              - link "What is the capital of Japan? Answer in one word." [ref=e159] [cursor=pointer]:
+                - /url: /search/c0316d2e3eff4a9499c16b429dd15f18
+              - button "Delete What is the capital of Japan? Answer in one word." [ref=e160]:
+                - img [ref=e161]
+            - generic [ref=e164]:
+              - link "What is the capital of Japan? Answer in one word." [ref=e165] [cursor=pointer]:
+                - /url: /search/e5a843cd11ad48a08117aa4d6332f950
+              - button "Delete What is the capital of Japan? Answer in one word." [ref=e166]:
+                - img [ref=e167]
+            - generic [ref=e170]:
+              - link "What is the capital of Japan? Answer in one word." [ref=e171] [cursor=pointer]:
+                - /url: /search/e4c64a393efe45e1a607c4efa099ee69
+              - button "Delete What is the capital of Japan? Answer in one word." [ref=e172]:
+                - img [ref=e173]
+            - generic [ref=e176]:
+              - link "What is the capital of Japan? Answer in one word." [ref=e177] [cursor=pointer]:
+                - /url: /search/8c939a131ca34d388752c9a8635d05ff
+              - button "Delete What is the capital of Japan? Answer in one word." [ref=e178]:
+                - img [ref=e179]
+      - generic [ref=e182]:
+        - paragraph [ref=e183]: manual@example.com
+        - generic [ref=e184]:
+          - generic [ref=e185]: Theme
+          - combobox "Theme" [ref=e186]:
+            - option "Light"
+            - option "Dark"
+            - option "System" [selected]
+        - button "Shortcuts" [ref=e187]:
+          - img [ref=e188]
+          - text: Shortcuts
+        - button "Sign out" [ref=e190]:
+          - img [ref=e191]
+          - text: Sign out
+    - main [ref=e196]:
+      - generic [ref=e198]:
+        - article [ref=e199]:
+          - paragraph [ref=e201]: What is the capital of Japan? Answer in one word.
+        - article [ref=e202]:
+          - generic [ref=e203]:
+            - paragraph [ref=e206]: "Model request failed: 400 {\"error\":{\"message\":\"invalid request\",\"type\":\"invalid_request\",\"code\":400}}"
+            - button "Copy" [ref=e208]:
+              - img [ref=e209]
+              - text: Copy
+      - generic [ref=e215]:
+        - textbox "Ask a follow-up..." [ref=e217]
+        - generic [ref=e218]:
+          - generic [ref=e219]:
+            - button "Select model" [ref=e220]:
+              - generic [ref=e221]: Gemini 3.1 Pro Preview
+              - img [ref=e222]
+            - button "Attach file" [ref=e224]:
+              - img [ref=e225]
+          - button "Send" [ref=e227]:
+            - img [ref=e228]
+  - region "Notifications alt+T"
+  - button "Open Next.js Dev Tools" [ref=e235] [cursor=pointer]:
+    - img [ref=e236]
+  - alert [ref=e239]
+```

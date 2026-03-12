@@ -22,7 +22,7 @@ export function createPerplexityModel(modelId: string): LanguageModelV1 {
     defaultObjectGenerationMode: undefined,
     modelId,
     doGenerate: async (options) => {
-      const input: any[] = options.prompt
+      const input: unknown[] = options.prompt
         .filter(m => m.role !== "system")
         .map(m => ({
           role: m.role,
@@ -33,24 +33,24 @@ export function createPerplexityModel(modelId: string): LanguageModelV1 {
         }));
 
       const instructions = options.prompt.find(m => m.role === "system")?.content[0]?.type === "text" 
-        ? (options.prompt.find(m => m.role === "system")?.content[0] as any).text 
+        ? (options.prompt.find(m => m.role === "system")?.content[0] as { text: string }).text 
         : undefined;
 
       const result = await client.responses.create({
         model: modelId,
         input,
         instructions,
-      } as any);
+      } as unknown as { model: string; input: unknown[]; instructions?: string });
 
       return {
-        text: (result as any).output?.[0]?.text || "",
+        text: (result as { output?: { text?: string }[] }).output?.[0]?.text || "",
         usage: { promptTokens: 0, completionTokens: 0 },
         finishReason: "stop",
         rawCall: { rawPrompt: options.prompt, rawResponse: result },
       };
     },
     doStream: async (options) => {
-      const input: any[] = options.prompt
+      const input: unknown[] = options.prompt
         .filter(m => m.role !== "system")
         .map(m => ({
           role: m.role,
@@ -61,7 +61,7 @@ export function createPerplexityModel(modelId: string): LanguageModelV1 {
         }));
 
       const instructions = options.prompt.find(m => m.role === "system")?.content[0]?.type === "text" 
-        ? (options.prompt.find(m => m.role === "system")?.content[0] as any).text 
+        ? (options.prompt.find(m => m.role === "system")?.content[0] as { text: string }).text 
         : undefined;
 
       const stream = await client.responses.create({
@@ -69,13 +69,17 @@ export function createPerplexityModel(modelId: string): LanguageModelV1 {
         input,
         instructions,
         stream: true,
-      } as any);
+      } as unknown as { model: string; input: unknown[]; instructions?: string; stream: true });
 
       return {
         stream: new ReadableStream({
           async start(controller) {
             try {
-              for await (const chunk of stream as any) {
+              for await (const chunk of stream as AsyncIterable<{
+                type: string;
+                delta?: string;
+                output_text?: { delta?: string };
+              }>) {
                 if (chunk.type === "response.output_text.delta") {
                   const delta = chunk.delta || chunk.output_text?.delta || "";
                   if (delta) {
