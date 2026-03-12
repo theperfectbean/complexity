@@ -67,6 +67,9 @@ export default function ThreadPage() {
   const initialQuery = searchParams.get("q")?.trim() ?? "";
   const [model, setModel] = useState<string>(getDefaultModel());
   const [roleId, setRoleId] = useState<string | null>(null);
+  const [webSearchEnabled, setWebSearchEnabled] = useState(() => {
+    return searchParams.get("web") !== "false";
+  });
   const [historyMessages, setHistoryMessages] = useState<ChatMessageItem[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(true);
   const hasSubmittedInitialQuery = useRef(false);
@@ -79,6 +82,7 @@ export default function ThreadPage() {
         threadId,
         model,
         roleId,
+        webSearch: webSearchEnabled,
       }),
     }),
     onData(part: UIMessageChunk) {
@@ -248,6 +252,8 @@ export default function ThreadPage() {
               compact
               model={model}
               onModelChange={setModel}
+              webSearchEnabled={webSearchEnabled}
+              onWebSearchChange={setWebSearchEnabled}
             />
           </div>
         </form>

@@ -1,7 +1,7 @@
 "use client";
 
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { ChevronDown, Paperclip, SendHorizontal } from "lucide-react";
+import { ChevronDown, Globe, Paperclip, SendHorizontal } from "lucide-react";
 import { motion } from "motion/react";
 import { useMemo } from "react";
 import TextareaAutosize from "react-textarea-autosize";
@@ -27,6 +27,8 @@ type SearchBarProps = {
   onModelChange?: (model: string) => void;
   modelOptions?: readonly SearchModelOption[];
   onAttachClick?: () => void;
+  webSearchEnabled?: boolean;
+  onWebSearchChange?: (enabled: boolean) => void;
 };
 
 export function SearchBar({
@@ -41,6 +43,8 @@ export function SearchBar({
   onModelChange,
   modelOptions = MODELS,
   onAttachClick,
+  webSearchEnabled = true,
+  onWebSearchChange,
 }: SearchBarProps) {
   const groupedModels = useMemo(() => {
     return modelOptions.reduce<Record<string, SearchModelOption[]>>((accumulator, option) => {
@@ -116,6 +120,21 @@ export function SearchBar({
               </DropdownMenu.Content>
             </DropdownMenu.Portal>
           </DropdownMenu.Root>
+
+          <button
+            type="button"
+            className={cn(
+              "inline-flex h-8 w-fit items-center gap-1.5 rounded-full border px-3 text-xs font-medium transition-colors",
+              webSearchEnabled
+                ? "border-primary/20 bg-primary/10 text-primary hover:bg-primary/20"
+                : "bg-card text-muted-foreground hover:bg-black/5 dark:hover:bg-white/5",
+            )}
+            aria-label="Toggle web search"
+            onClick={() => onWebSearchChange?.(!webSearchEnabled)}
+          >
+            <Globe className="h-3.5 w-3.5" />
+            <span>Search</span>
+          </button>
 
           <button
             type="button"

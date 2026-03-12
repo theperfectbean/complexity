@@ -19,6 +19,7 @@ const schema = z.object({
   model: z.string().min(1),
   messages: z.array(z.unknown()),
   roleId: z.string().nullable().optional(),
+  webSearch: z.boolean().optional().default(true),
 });
 
 type Citation = {
@@ -442,7 +443,7 @@ export async function POST(request: Request) {
               model: safeModel,
               input: agentInput,
               instructions: safeInstructions,
-              tools: [{ type: "web_search" }, { type: "fetch_url" }],
+              tools: parsed.data.webSearch ? [{ type: "web_search" }, { type: "fetch_url" }] : [],
             };
 
         const requestBody: Responses.ResponseCreateParamsStreaming = {

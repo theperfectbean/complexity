@@ -16,6 +16,7 @@ export default function Home() {
   const [model, setModel] = useState<string>(getDefaultModel());
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
+  const [webSearchEnabled, setWebSearchEnabled] = useState(true);
 
   async function startThread(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -40,7 +41,7 @@ export default function Home() {
       }
 
       const payload = (await response.json()) as { thread: { id: string } };
-      router.push(`/search/${payload.thread.id}?q=${encodeURIComponent(query.trim())}`);
+      router.push(`/search/${payload.thread.id}?q=${encodeURIComponent(query.trim())}&web=${webSearchEnabled}`);
     } catch (error) {
       setLoading(false);
       toast.error(error instanceof Error ? error.message : "An unexpected error occurred");
@@ -87,6 +88,8 @@ export default function Home() {
             onChange={setQuery}
             model={model}
             onModelChange={setModel}
+            webSearchEnabled={webSearchEnabled}
+            onWebSearchChange={setWebSearchEnabled}
             placeholder="Ask anything..."
             submitLabel={loading ? "Starting..." : "Start"}
             disabled={loading}
