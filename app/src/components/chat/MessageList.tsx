@@ -95,15 +95,9 @@ export function MessageList({ messages, emptyLabel, onRelatedQuestionClick, onRe
               </div>
             ) : (
               <div className="flex w-full flex-col">
-                {message.thinking && message.thinking.length > 0 && (
+                {message.thinking && message.thinking.length > 0 && (!message.content || message.content.trim() === "" || message.content === "\u200B") && (
                   <div className="mb-4 flex flex-col gap-2.5">
                     {message.thinking.map((part) => {
-                      const hasText = message.content && message.content !== "\u200B";
-                      
-                      // If we have a result and text is starting to stream, we can hide intermediate steps.
-                      // Once the response is complete (no longer actively streaming), we hide all thinking steps.
-                      if (part.result && hasText) return null;
-
                       return (
                         <div
                           key={part.callId}
