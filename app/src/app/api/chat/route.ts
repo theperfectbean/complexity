@@ -383,6 +383,10 @@ export async function POST(request: Request) {
         ? baseInstructions + `Use this local context if relevant:\n\n${ragContext}\n\nIf local context is insufficient, continue with normal web-grounded reasoning.`
         : baseInstructions + (activeRoleId ? "Provide concise, accurate, citation-backed answers." : "Provide a concise and accurate response.");
 
+      // Gemini 3.1 Pro fails with 400 if it receives a completely empty system message or no instructions
+      // ensure we always send an instruction payload, even if it's generic, or explicitly push it into the input.
+      const safeInstructions = instructions.trim() ? instructions : "Provide a concise and accurate response.";
+
       let assistantText = "";
       let completedResponse: unknown;
       let hasWrittenTextDelta = false;
@@ -402,12 +406,12 @@ export async function POST(request: Request) {
           ? {
               preset: safeModel,
               input: agentInput,
-              instructions,
+              instructions: safeInstructions,
             }
           : {
               model: safeModel,
               input: agentInput,
-              instructions,
+              instructions: safeInstructions,
               // Only add web search tools if within a role
               tools: activeRoleId ? [{ type: "web_search" }, { type: "fetch_url" }] : [],
             };
@@ -417,57 +421,76 @@ export async function POST(request: Request) {
           stream: true,
         } as Responses.ResponseCreateParamsStreaming;
 
-        const eventStream = await client.responses.create(requestBody);
         let streamEventCount = 0;
+        let streamingFailed = false;
 
-        for await (const event of eventStream as unknown as AsyncIterable<unknown>) {
-          streamEventCount += 1;
-          const eventRecord = asRecord(event);
-          if (eventRecord?.type === "response.output_text.delta") {
-            const outputText = asRecord(eventRecord.output_text);
-            const delta =
-              (typeof eventRecord.delta === "string" && eventRecord.delta) ||
-              (typeof outputText?.delta === "string" && outputText.delta) ||
-              "";
+        try {
+          // Wrap stream creation in a try-catch to immediately intercept HTTP 400s
+          // (which happens if the model doesn't support streaming, e.g. Gemini 3.1 Pro)
+          const eventStream = await client.responses.create(requestBody);
 
-            if (delta) {
-              assistantText += delta;
-              writer.write({ type: "text-delta", id: textId, delta });
-              hasWrittenTextDelta = true;
+          for await (const event of eventStream as unknown as AsyncIterable<unknown>) {
+            streamEventCount += 1;
+            const eventRecord = asRecord(event);
+            
+            if (eventRecord?.type === "response.output_text.delta") {
+              const outputText = asRecord(eventRecord.output_text);
+              const delta =
+                (typeof eventRecord.delta === "string" && eventRecord.delta) ||
+                (typeof outputText?.delta === "string" && outputText.delta) ||
+                "";
+
+              if (delta) {
+                assistantText += delta;
+                writer.write({ type: "text-delta", id: textId, delta });
+                hasWrittenTextDelta = true;
+              }
+              continue;
             }
-            continue;
-          }
 
-          if (eventRecord?.type === "response.output_text.done") {
-            const outputText = asRecord(eventRecord.output_text);
-            const doneText =
-              (typeof eventRecord.text === "string" && eventRecord.text) ||
-              (typeof outputText?.text === "string" && outputText.text) ||
-              (typeof eventRecord.delta === "string" && eventRecord.delta) ||
-              "";
+            if (eventRecord?.type === "response.output_text.done") {
+              const outputText = asRecord(eventRecord.output_text);
+              const doneText =
+                (typeof eventRecord.text === "string" && eventRecord.text) ||
+                (typeof outputText?.text === "string" && outputText.text) ||
+                (typeof eventRecord.delta === "string" && eventRecord.delta) ||
+                "";
 
-            if (doneText) {
-              assistantText += doneText;
-              writer.write({ type: "text-delta", id: textId, delta: doneText });
-              hasWrittenTextDelta = true;
+              if (doneText) {
+                assistantText += doneText;
+                writer.write({ type: "text-delta", id: textId, delta: doneText });
+                hasWrittenTextDelta = true;
+              }
+              continue;
             }
-            continue;
-          }
 
-          if (eventRecord?.type === "response.completed") {
-            completedResponse = eventRecord.response ?? event;
-            continue;
-          }
+            if (eventRecord?.type === "response.completed") {
+              completedResponse = eventRecord.response ?? event;
+              continue;
+            }
 
-          if (eventRecord?.type === "response.failed") {
-            const errorRecord = asRecord(eventRecord.error);
-            throw new Error(
-              typeof errorRecord?.message === "string" ? errorRecord.message : "Agent API request failed",
-            );
+            if (eventRecord?.type === "response.failed") {
+              const errorRecord = asRecord(eventRecord.error);
+              const message = typeof errorRecord?.message === "string" ? errorRecord.message : "";
+              if (!hasWrittenTextDelta) {
+                streamingFailed = true;
+                break;
+              }
+              throw new Error(message || "Agent API request failed");
+            }
+          }
+        } catch (error: any) {
+          // If the API throws a 400 immediately on the create() call, or we haven't written deltas yet, fallback.
+          if (!hasWrittenTextDelta && (error.message?.includes("400") || error.status === 400 || streamingFailed === false)) {
+             console.log(`[Chat API] Streaming failed for ${safeModel}, falling back to non-streaming.`);
+             streamingFailed = true;
+          } else {
+             throw error;
           }
         }
 
-        if (streamEventCount === 0 || (!assistantText && !completedResponse)) {
+        // --- FALLBACK TO NON-STREAMING ---
+        if (streamingFailed || streamEventCount === 0 || (!assistantText && !completedResponse)) {
           const nonStreamingResponse = await client.responses.create(
             requestBodyBase as Responses.ResponseCreateParamsNonStreaming,
           );
@@ -475,13 +498,51 @@ export async function POST(request: Request) {
           completedResponse = nonStreamingResponse;
           if (!assistantText) {
             assistantText = extractAssistantTextFromCompletedResponse(nonStreamingResponse);
+            if (assistantText) {
+              writer.write({ type: "text-delta", id: textId, delta: assistantText });
+            }
           }
         }
-      } catch (error) {
-        const message = error instanceof Error ? error.message : "Agent API request failed";
-        assistantText = `Model request failed: ${message}`;
-        writer.write({ type: "text-delta", id: textId, delta: assistantText });
-        hasWrittenTextDelta = true;
+      } catch (error: any) {
+        // One final fallback attempt if the outer try block caught it (e.g. createPerplexityClient or initial create call failed)
+        if (!hasWrittenTextDelta && (error.message?.includes("400") || error.status === 400)) {
+          console.log(`[Chat API] Outer catch streaming failed for ${safeModel}, falling back to non-streaming.`);
+          try {
+            const requestBodyBase = isPresetModel(safeModel)
+              ? {
+                  preset: safeModel,
+                  input: agentInput,
+                  instructions: safeInstructions,
+                }
+              : {
+                  model: safeModel,
+                  input: agentInput,
+                  instructions: safeInstructions,
+                  tools: activeRoleId ? [{ type: "web_search" }, { type: "fetch_url" }] : [],
+                };            
+            const client = createPerplexityClient();
+            const nonStreamingResponse = await client.responses.create(
+              requestBodyBase as Responses.ResponseCreateParamsNonStreaming,
+            );
+  
+            completedResponse = nonStreamingResponse;
+            assistantText = extractAssistantTextFromCompletedResponse(nonStreamingResponse);
+            if (assistantText) {
+              writer.write({ type: "text-delta", id: textId, delta: assistantText });
+              hasWrittenTextDelta = true;
+            }
+          } catch (fallbackError: any) {
+             const message = fallbackError instanceof Error ? fallbackError.message : "Agent API fallback request failed";
+             assistantText = `Model request failed: ${message}`;
+             writer.write({ type: "text-delta", id: textId, delta: assistantText });
+             hasWrittenTextDelta = true;
+          }
+        } else {
+          const message = error instanceof Error ? error.message : "Agent API request failed";
+          assistantText = `Model request failed: ${message}`;
+          writer.write({ type: "text-delta", id: textId, delta: assistantText });
+          hasWrittenTextDelta = true;
+        }
       }
 
       if (!assistantText) {
