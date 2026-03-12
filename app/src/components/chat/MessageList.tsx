@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Copy } from "lucide-react";
+import { Check, Copy, RotateCcw } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { useState } from "react";
 
@@ -33,6 +33,7 @@ type MessageListProps = {
   messages: ChatMessageItem[];
   emptyLabel: string;
   onRelatedQuestionClick?: (question: string) => void;
+  onRetry?: () => void;
 };
 
 const urlPattern = /(https?:\/\/[\w\-._~:/?#\[\]@!$&'()*+,;=%]+)/g;
@@ -58,7 +59,7 @@ function extractRelatedQuestions(text: string): string[] {
   return Array.from(new Set(sentenceCandidates)).slice(0, 3);
 }
 
-export function MessageList({ messages, emptyLabel, onRelatedQuestionClick }: MessageListProps) {
+export function MessageList({ messages, emptyLabel, onRelatedQuestionClick, onRetry }: MessageListProps) {
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   async function copyMessage(messageId: string, content: string) {
@@ -77,11 +78,12 @@ export function MessageList({ messages, emptyLabel, onRelatedQuestionClick }: Me
 
   return (
     <div className="space-y-5 pb-4">
-      {messages.map((message) => {
+      {messages.map((message, index) => {
         const urlsFromCitations = (message.citations ?? []).map((citation) => citation.url).filter(Boolean) as string[];
         const urls = message.role === "assistant" ? (urlsFromCitations.length > 0 ? urlsFromCitations : extractUrls(message.content)) : [];
         const relatedQuestions = message.role === "assistant" ? extractRelatedQuestions(message.content) : [];
         const isUser = message.role === "user";
+        const isLastAssistantMessage = !isUser && index === messages.length - 1;
 
         return (
           <article key={message.id} className={isUser ? "flex flex-col items-end py-4" : "group relative flex flex-col gap-0 pt-0 pb-8"}>
@@ -95,8 +97,7 @@ export function MessageList({ messages, emptyLabel, onRelatedQuestionClick }: Me
               <div className="flex w-full flex-col">
                 {message.thinking && message.thinking.length > 0 && (
                   <div className="mb-4 flex flex-col gap-2.5">
-                    {message.thinking.map((part, index) => {
-                      const isLast = index === (message.thinking?.length ?? 0) - 1;
+                    {message.thinking.map((part) => {
                       const hasText = message.content && message.content !== "\u200B";
                       
                       // If we have a result and text is starting to stream, we can hide intermediate steps.
@@ -168,6 +169,18 @@ export function MessageList({ messages, emptyLabel, onRelatedQuestionClick }: Me
                         </motion.span>
                       )}
                     </AnimatePresence>
+
+                    {isLastAssistantMessage && onRetry && (
+                      <motion.button
+                        whileTap={{ scale: 0.92 }}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-zinc-200 dark:hover:bg-zinc-800"
+                        onClick={onRetry}
+                        title="Retry"
+                      >
+                        <RotateCcw className="h-4 w-4 text-muted-foreground" />
+                      </motion.button>
+                    )}
+
                     <motion.button
                       whileTap={{ scale: 0.92 }}
                       className="inline-flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-zinc-200 dark:hover:bg-zinc-800"
