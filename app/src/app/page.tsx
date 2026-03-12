@@ -48,12 +48,12 @@ export default function Home() {
   }
 
   if (status === "loading") {
-    return <main className="mx-auto flex min-h-screen max-w-4xl items-center justify-center">Loading...</main>;
+    return <main className="mx-auto flex min-h-screen max-w-3xl items-center justify-center">Loading...</main>;
   }
 
   if (!session?.user) {
     return (
-      <main className="mx-auto flex min-h-screen w-full max-w-4xl flex-col items-center justify-center gap-4 px-6">
+      <main className="mx-auto flex min-h-screen w-full max-w-3xl flex-col items-center justify-center gap-4 px-6">
         <h1 className="font-[var(--font-accent)] text-4xl font-semibold tracking-tight">Complexity</h1>
         <p className="text-sm text-muted-foreground">Self-hosted Perplexity-style search and RAG workspace.</p>
         <div className="flex gap-3">
@@ -69,7 +69,7 @@ export default function Home() {
   }
 
   return (
-    <main className="relative mx-auto flex min-h-screen w-full max-w-4xl flex-col px-6 py-8">
+    <main className="relative mx-auto flex min-h-screen w-full max-w-3xl flex-col px-6 py-8">
       <div className="pointer-events-none absolute inset-x-0 top-20 -z-10 flex justify-center">
         <div className="h-64 w-64 rounded-full bg-primary/10 blur-3xl" />
       </div>

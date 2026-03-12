@@ -208,7 +208,7 @@ export default function ThreadPage() {
   }
 
   return (
-    <main className="relative mx-auto flex h-full min-h-screen w-full max-w-4xl flex-col px-6 pt-16 pb-24">
+    <main className="relative mx-auto flex h-full min-h-screen w-full max-w-3xl flex-col px-6 pt-16 pb-24">
 
       {chatErrorMessage ? (
         <div
