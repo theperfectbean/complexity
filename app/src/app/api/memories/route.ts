@@ -6,6 +6,7 @@ import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { memories, users } from "@/lib/db/schema";
 import { invalidateMemoryCache, MAX_MEMORIES } from "@/lib/memory";
+import { getEmbeddings } from "@/lib/rag";
 
 const createSchema = z.object({
   content: z.string().min(1).max(1000),
@@ -59,12 +60,21 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Memory limit reached" }, { status: 400 });
   }
 
+  let embedding: number[] | null = null;
+  try {
+    const [fetchedEmbedding] = await getEmbeddings([parsed.data.content.trim()]);
+    embedding = fetchedEmbedding;
+  } catch (error) {
+    console.error("[Memory] Failed to generate embedding:", error);
+  }
+
   const now = new Date();
   const id = crypto.randomUUID();
   await db.insert(memories).values({
     id,
     userId: user.id,
     content: parsed.data.content.trim(),
+    embedding,
     source: "manual",
     threadId: null,
     createdAt: now,

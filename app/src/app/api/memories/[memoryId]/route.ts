@@ -6,6 +6,7 @@ import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { memories, users } from "@/lib/db/schema";
 import { invalidateMemoryCache } from "@/lib/memory";
+import { getEmbeddings } from "@/lib/rag";
 
 const patchSchema = z.object({
   content: z.string().min(1).max(1000),
@@ -43,10 +44,19 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ me
     return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
   }
 
+  let embedding: number[] | null = null;
+  try {
+    const [fetchedEmbedding] = await getEmbeddings([parsed.data.content.trim()]);
+    embedding = fetchedEmbedding;
+  } catch (error) {
+    console.error("[Memory] Failed to generate embedding on update:", error);
+  }
+
   await db
     .update(memories)
     .set({
       content: parsed.data.content.trim(),
+      embedding,
       updatedAt: new Date(),
     })
     .where(eq(memories.id, memoryId));

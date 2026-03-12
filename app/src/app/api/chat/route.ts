@@ -406,7 +406,7 @@ export async function POST(request: Request) {
         }
       }
 
-      const memoryPrompt = thread.memoryEnabled ? await getMemoryPrompt(thread.userId) : "";
+      const memoryPrompt = thread.memoryEnabled ? await getMemoryPrompt(thread.userId, userText) : "";
       const memoryBlock = memoryPrompt ? `${memoryPrompt}\n\n` : "";
       const baseInstructions = memoryBlock + (roleInstructions ? roleInstructions + "\n\n" : "");
       const instructions = ragContext

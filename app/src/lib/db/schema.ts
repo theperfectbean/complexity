@@ -119,12 +119,16 @@ export const memories = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     content: text("content").notNull(),
+    embedding: vector("embedding", { dimensions: 384 }),
     source: varchar("source", { length: 20 }).notNull(),
     threadId: text("thread_id").references(() => threads.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (table) => [index("memories_user_created_idx").on(table.userId, table.createdAt)],
+  (table) => [
+    index("memories_user_created_idx").on(table.userId, table.createdAt),
+    index("memories_embedding_hnsw_idx").using("hnsw", table.embedding.op("vector_cosine_ops")),
+  ],
 );
 
 export const documents = pgTable("documents", {

@@ -23,7 +23,8 @@ import { GET, POST } from "@/app/api/memories/route";
 
 function mockSelectOnce(result: unknown) {
   const limit = vi.fn().mockResolvedValue(result);
-  const where = vi.fn(() => ({ limit }));
+  const orderBy = vi.fn().mockResolvedValue(result);
+  const where = vi.fn(() => ({ limit, orderBy }));
   const from = vi.fn(() => ({ where }));
   vi.mocked(db.select).mockReturnValueOnce({ from } as never);
 }
@@ -34,7 +35,8 @@ function mockSelectSequence(results: unknown[]) {
 
   for (const result of results) {
     const limit = vi.fn().mockResolvedValue(result);
-    const where = vi.fn(() => ({ limit }));
+    const orderBy = vi.fn().mockResolvedValue(result);
+    const where = vi.fn(() => ({ limit, orderBy }));
     const from = vi.fn(() => ({ where }));
     selectMock.mockReturnValueOnce({ from } as never);
   }

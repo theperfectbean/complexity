@@ -19,6 +19,130 @@ type Memory = {
   updatedAt: string;
 };
 
+function MemoryItem({
+  memory,
+  busyId,
+  onEdit,
+  onDelete,
+}: {
+  memory: Memory;
+  busyId: string | null;
+  onEdit: (memory: Memory, newContent: string) => Promise<void>;
+  onDelete: (memory: Memory) => Promise<void>;
+}) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editContent, setEditContent] = useState(memory.content);
+  const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
+
+  const handleSave = async () => {
+    const trimmed = editContent.trim();
+    if (trimmed && trimmed !== memory.content) {
+      await onEdit(memory, trimmed);
+    }
+    setIsEditing(false);
+  };
+
+  const isBusy = busyId === memory.id;
+
+  if (isEditing) {
+    return (
+      <article className="rounded-lg border bg-card p-4 shadow-2xs">
+        <textarea
+          className="h-20 w-full resize-none rounded-md border bg-background p-2 text-sm"
+          value={editContent}
+          onChange={(e) => setEditContent(e.target.value)}
+          disabled={isBusy}
+          autoFocus
+        />
+        <div className="mt-3 flex justify-end gap-2">
+          <button
+            type="button"
+            className="rounded-md px-3 py-1.5 text-xs text-muted-foreground hover:bg-accent"
+            onClick={() => {
+              setIsEditing(false);
+              setEditContent(memory.content);
+            }}
+            disabled={isBusy}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="rounded-md bg-primary px-3 py-1.5 text-xs text-primary-foreground hover:bg-primary/90"
+            onClick={() => void handleSave()}
+            disabled={isBusy || !editContent.trim()}
+          >
+            {isBusy ? "Saving..." : "Save"}
+          </button>
+        </div>
+      </article>
+    );
+  }
+
+  return (
+    <article className="rounded-lg border bg-card p-4 shadow-2xs">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="space-y-2 flex-1">
+          <p className="text-sm font-medium whitespace-pre-wrap">{memory.content}</p>
+          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+            <span
+              className={cn(
+                "rounded-full px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide",
+                memory.source === "auto" ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground",
+              )}
+            >
+              {memory.source}
+            </span>
+            <span>{new Date(memory.createdAt).toLocaleString()}</span>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          {isConfirmingDelete ? (
+            <>
+              <span className="text-xs text-muted-foreground">Sure?</span>
+              <button
+                type="button"
+                className="rounded-md border bg-background px-2 py-1 text-xs hover:bg-accent"
+                onClick={() => setIsConfirmingDelete(false)}
+                disabled={isBusy}
+              >
+                No
+              </button>
+              <button
+                type="button"
+                className="rounded-md border border-destructive/20 bg-destructive/10 px-2 py-1 text-xs font-medium text-destructive hover:bg-destructive/20"
+                onClick={() => void onDelete(memory)}
+                disabled={isBusy}
+              >
+                {isBusy ? "..." : "Yes, delete"}
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                type="button"
+                className="rounded-md border bg-background px-2 py-1 text-xs hover:bg-accent"
+                onClick={() => setIsEditing(true)}
+                disabled={isBusy}
+              >
+                Edit
+              </button>
+              <button
+                type="button"
+                className="rounded-md border border-destructive/20 bg-destructive/5 px-2 py-1 text-xs text-destructive hover:bg-destructive/10"
+                onClick={() => setIsConfirmingDelete(true)}
+                disabled={isBusy}
+              >
+                Delete
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    </article>
+  );
+}
+
 export default function MemorySettingsPage() {
   const { data: session, status } = useSession();
   const [memories, setMemories] = useState<Memory[]>([]);
@@ -28,6 +152,7 @@ export default function MemorySettingsPage() {
   const [newMemory, setNewMemory] = useState("");
   const [toggleBusy, setToggleBusy] = useState(false);
   const [createBusy, setCreateBusy] = useState(false);
+  const [isConfirmingClearAll, setIsConfirmingClearAll] = useState(false);
 
   useEffect(() => {
     if (status !== "authenticated") {
@@ -133,12 +258,7 @@ export default function MemorySettingsPage() {
     }
   }
 
-  async function handleEditMemory(memory: Memory) {
-    const nextContent = window.prompt("Edit memory", memory.content)?.trim();
-    if (!nextContent || nextContent === memory.content) {
-      return;
-    }
-
+  async function handleEditMemory(memory: Memory, nextContent: string) {
     setBusyId(memory.id);
     try {
       const response = await fetch(`/api/memories/${memory.id}`, {
@@ -164,11 +284,6 @@ export default function MemorySettingsPage() {
   }
 
   async function handleDeleteMemory(memory: Memory) {
-    const confirmed = window.confirm("Delete this memory?");
-    if (!confirmed) {
-      return;
-    }
-
     setBusyId(memory.id);
     try {
       const response = await fetch(`/api/memories/${memory.id}`, { method: "DELETE" });
@@ -184,14 +299,6 @@ export default function MemorySettingsPage() {
   }
 
   async function handleClearAll() {
-    if (memories.length === 0) {
-      return;
-    }
-    const confirmed = window.confirm("Clear all memories? This cannot be undone.");
-    if (!confirmed) {
-      return;
-    }
-
     setBusyId("clear");
     try {
       const response = await fetch("/api/memories/clear", { method: "DELETE" });
@@ -199,6 +306,7 @@ export default function MemorySettingsPage() {
         throw new Error("Failed to clear memories");
       }
       setMemories([]);
+      setIsConfirmingClearAll(false);
     } catch {
       toast.error("Failed to clear memories");
     } finally {
@@ -263,14 +371,36 @@ export default function MemorySettingsPage() {
             <p className="text-sm font-semibold">Stored memories</p>
             <p className="text-xs text-muted-foreground">{memories.length} total</p>
           </div>
-          <button
-            type="button"
-            className="rounded-md border border-destructive/20 bg-destructive/5 px-3 py-1.5 text-xs text-destructive hover:bg-destructive/10"
-            onClick={() => void handleClearAll()}
-            disabled={busyId === "clear"}
-          >
-            Clear all
-          </button>
+          {isConfirmingClearAll ? (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">Clear all?</span>
+              <button
+                type="button"
+                className="rounded-md border bg-background px-3 py-1.5 text-xs hover:bg-accent"
+                onClick={() => setIsConfirmingClearAll(false)}
+                disabled={busyId === "clear"}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="rounded-md border border-destructive/20 bg-destructive/10 px-3 py-1.5 text-xs font-medium text-destructive hover:bg-destructive/20"
+                onClick={() => void handleClearAll()}
+                disabled={busyId === "clear"}
+              >
+                {busyId === "clear" ? "Clearing..." : "Yes, clear"}
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              className="rounded-md border border-destructive/20 bg-destructive/5 px-3 py-1.5 text-xs text-destructive hover:bg-destructive/10"
+              onClick={() => setIsConfirmingClearAll(true)}
+              disabled={memories.length === 0 || busyId === "clear"}
+            >
+              Clear all
+            </button>
+          )}
         </div>
 
         {loading ? <LoadingSkeleton lines={4} /> : null}
@@ -280,42 +410,13 @@ export default function MemorySettingsPage() {
 
         <div className="space-y-3">
           {memories.map((memory) => (
-            <article key={memory.id} className="rounded-lg border bg-card p-4 shadow-2xs">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="space-y-2">
-                  <p className="text-sm font-medium">{memory.content}</p>
-                  <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                    <span
-                      className={cn(
-                        "rounded-full px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide",
-                        memory.source === "auto" ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground",
-                      )}
-                    >
-                      {memory.source}
-                    </span>
-                    <span>{new Date(memory.createdAt).toLocaleString()}</span>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    className="rounded-md border bg-background px-2 py-1 text-xs hover:bg-accent"
-                    onClick={() => void handleEditMemory(memory)}
-                    disabled={busyId === memory.id}
-                  >
-                    Edit
-                  </button>
-                  <button
-                    type="button"
-                    className="rounded-md border border-destructive/20 bg-destructive/5 px-2 py-1 text-xs text-destructive hover:bg-destructive/10"
-                    onClick={() => void handleDeleteMemory(memory)}
-                    disabled={busyId === memory.id}
-                  >
-                    Delete
-                  </button>
-                </div>
-              </div>
-            </article>
+            <MemoryItem
+              key={memory.id}
+              memory={memory}
+              busyId={busyId}
+              onEdit={handleEditMemory}
+              onDelete={handleDeleteMemory}
+            />
           ))}
         </div>
       </section>

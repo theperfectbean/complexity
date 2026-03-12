@@ -1,99 +1,98 @@
 {
-  "generatedAt": "2026-03-12T01:04:16.168Z",
+  "generatedAt": "2026-03-12T03:31:03.810Z",
   "totalModels": 10,
-  "successfulModels": 9,
-  "failedModels": 1,
+  "successfulModels": 10,
+  "failedModels": 0,
   "results": [
     {
       "modelId": "fast-search",
       "modelLabel": "Fast Search",
       "requestType": "preset",
       "ok": true,
-      "durationMs": 886,
-      "responseChars": 57,
-      "preview": "The model responded with this sentence on March 12, 2026."
+      "durationMs": 1142,
+      "responseChars": 39,
+      "preview": "The model responded with this sentence."
     },
     {
       "modelId": "pro-search",
       "modelLabel": "Pro Search",
       "requestType": "preset",
       "ok": true,
-      "durationMs": 1123,
-      "responseChars": 123,
-      "preview": "This sentence is the model’s response, demonstrating that the model has indeed generated and returned output to your que"
+      "durationMs": 1596,
+      "responseChars": 111,
+      "preview": "This sentence is the model’s response, demonstrating that the model has read your query and produced an output."
     },
     {
       "modelId": "perplexity/sonar",
       "modelLabel": "Perplexity Sonar",
       "requestType": "model",
       "ok": true,
-      "durationMs": 675,
-      "responseChars": 24,
-      "preview": "The model has responded."
+      "durationMs": 669,
+      "responseChars": 47,
+      "preview": "The model successfully responded to your query."
     },
     {
       "modelId": "anthropic/claude-opus-4-6",
       "modelLabel": "Claude Opus 4.6",
       "requestType": "model",
       "ok": true,
-      "durationMs": 2423,
-      "responseChars": 56,
-      "preview": "This response was generated on Thursday, March 12, 2026."
+      "durationMs": 2415,
+      "responseChars": 78,
+      "preview": "This is my response, confirming the model replied on Thursday, March 12, 2026."
     },
     {
       "modelId": "anthropic/claude-sonnet-4-6",
       "modelLabel": "Claude Sonnet 4.6",
       "requestType": "model",
       "ok": true,
-      "durationMs": 1594,
-      "responseChars": 65,
-      "preview": "The model has responded successfully on Thursday, March 12, 2026."
+      "durationMs": 1480,
+      "responseChars": 51,
+      "preview": "The model has successfully responded to your query."
     },
     {
       "modelId": "anthropic/claude-haiku-4-5",
       "modelLabel": "Claude Haiku 4.5",
       "requestType": "model",
       "ok": true,
-      "durationMs": 1918,
-      "responseChars": 95,
-      "preview": "I'm Claude, an AI assistant created by Anthropic, and I'm responding to your request right now."
+      "durationMs": 2127,
+      "responseChars": 59,
+      "preview": "I'm here and ready to help you with any questions you have!"
     },
     {
       "modelId": "openai/gpt-5.2",
       "modelLabel": "GPT-5.2",
       "requestType": "model",
       "ok": true,
-      "durationMs": 1381,
-      "responseChars": 83,
-      "preview": "This one-sentence reply proves the model responded to your query on March 12, 2026."
+      "durationMs": 1409,
+      "responseChars": 86,
+      "preview": "This single sentence demonstrates the model responded to your query on March 12, 2026."
     },
     {
       "modelId": "google/gemini-3.1-pro-preview",
       "modelLabel": "Gemini 3.1 Pro Preview",
       "requestType": "model",
-      "ok": false,
-      "durationMs": 288,
-      "responseChars": 0,
-      "preview": "",
-      "error": "400 {\"error\":{\"message\":\"invalid request\",\"type\":\"invalid_request\",\"code\":400}}"
+      "ok": true,
+      "durationMs": 5257,
+      "responseChars": 90,
+      "preview": "This sentence proves that the model has successfully processed your request and responded."
     },
     {
       "modelId": "google/gemini-3-flash-preview",
       "modelLabel": "Gemini 3 Flash Preview",
       "requestType": "model",
       "ok": true,
-      "durationMs": 2764,
-      "responseChars": 76,
-      "preview": "This sentence confirms that the model has successfully processed your query."
+      "durationMs": 2077,
+      "responseChars": 78,
+      "preview": "I have successfully processed your query and am providing this short response."
     },
     {
       "modelId": "xai/grok-4-1-fast-non-reasoning",
       "modelLabel": "Grok 4.1 Fast",
       "requestType": "model",
       "ok": true,
-      "durationMs": 1129,
-      "responseChars": 39,
-      "preview": "The model responded with this sentence."
+      "durationMs": 1140,
+      "responseChars": 45,
+      "preview": "The model responded with this short sentence."
     }
   ]
 }
