@@ -1,5 +1,6 @@
 import { relations } from "drizzle-orm";
 import {
+  boolean,
   index,
   integer,
   jsonb,
@@ -21,6 +22,7 @@ export const users = pgTable(
     passwordHash: text("password_hash").notNull(),
     name: varchar("name", { length: 100 }),
     image: text("image"),
+    memoryEnabled: boolean("memory_enabled").notNull().default(true),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -109,6 +111,22 @@ export const messages = pgTable(
   (table) => [index("messages_thread_created_idx").on(table.threadId, table.createdAt)],
 );
 
+export const memories = pgTable(
+  "memories",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    content: text("content").notNull(),
+    source: varchar("source", { length: 20 }).notNull(),
+    threadId: text("thread_id").references(() => threads.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("memories_user_created_idx").on(table.userId, table.createdAt)],
+);
+
 export const documents = pgTable("documents", {
   id: text("id").primaryKey(),
   filename: varchar("filename", { length: 255 }).notNull(),
@@ -146,6 +164,7 @@ export const chunks = pgTable(
 export const usersRelations = relations(users, ({ many }) => ({
   threads: many(threads),
   roles: many(roles),
+  memories: many(memories),
 }));
 
 export const threadsRelations = relations(threads, ({ one, many }) => ({
@@ -158,11 +177,23 @@ export const threadsRelations = relations(threads, ({ one, many }) => ({
     references: [roles.id],
   }),
   messages: many(messages),
+  memories: many(memories),
 }));
 
 export const messagesRelations = relations(messages, ({ one }) => ({
   thread: one(threads, {
     fields: [messages.threadId],
+    references: [threads.id],
+  }),
+}));
+
+export const memoriesRelations = relations(memories, ({ one }) => ({
+  user: one(users, {
+    fields: [memories.userId],
+    references: [users.id],
+  }),
+  thread: one(threads, {
+    fields: [memories.threadId],
     references: [threads.id],
   }),
 }));

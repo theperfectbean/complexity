@@ -20,6 +20,11 @@ vi.mock("@/lib/perplexity", () => ({
   createPerplexityClient: vi.fn(),
 }));
 
+vi.mock("@/lib/memory", () => ({
+  getMemoryPrompt: vi.fn().mockResolvedValue(""),
+  saveExtractedMemories: vi.fn().mockResolvedValue(0),
+}));
+
 vi.mock("@/lib/rag", () => ({
   getEmbeddings: vi.fn(),
   similaritySearch: vi.fn(),

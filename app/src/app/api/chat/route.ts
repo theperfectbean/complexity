@@ -9,6 +9,7 @@ import { db } from "@/lib/db";
 import { createId } from "@/lib/db/cuid";
 import { getDefaultModel, isPresetModel, isValidModelId } from "@/lib/models";
 import { messages, roles, threads, users } from "@/lib/db/schema";
+import { getMemoryPrompt, saveExtractedMemories } from "@/lib/memory";
 import { createPerplexityClient } from "@/lib/perplexity";
 import { getEmbeddings, similaritySearch } from "@/lib/rag";
 import { getRedisClient } from "@/lib/redis";
@@ -191,6 +192,7 @@ export async function POST(request: Request) {
       id: threads.id,
       userId: threads.userId,
       roleId: threads.roleId,
+      memoryEnabled: users.memoryEnabled,
     })
     .from(threads)
     .innerJoin(users, eq(threads.userId, users.id))
@@ -247,7 +249,7 @@ export async function POST(request: Request) {
   });
 
   const safeModel = isValidModelId(parsed.data.model) ? parsed.data.model : getDefaultModel();
-  const cacheKey = `cache:chat:${userEmail}:${safeModel}:${parsed.data.roleId ?? "none"}:${Buffer.from(userText).toString("base64")}`;
+  const cacheKey = `cache:chat:${userEmail}:${safeModel}:${parsed.data.roleId ?? "none"}:${thread.memoryEnabled ? "mem-on" : "mem-off"}:${Buffer.from(userText).toString("base64")}`;
 
   if (redis) {
     try {
@@ -279,6 +281,18 @@ export async function POST(request: Request) {
               updatedAt: new Date(),
             })
             .where(eq(threads.id, parsed.data.threadId));
+
+          if (thread.memoryEnabled) {
+            void saveExtractedMemories({
+              userId: thread.userId,
+              threadId: parsed.data.threadId,
+              userMessage: userText,
+              assistantMessage: cachedPayload.text,
+              conversationMessages: inputMessages.length + 1,
+            }).catch(() => {
+              // Ignore memory extraction failures.
+            });
+          }
 
           const stream = createUIMessageStream({
             execute: ({ writer }) => {
@@ -376,7 +390,9 @@ export async function POST(request: Request) {
         }
       }
 
-      const baseInstructions = roleInstructions ? roleInstructions + "\n\n" : "";
+      const memoryPrompt = thread.memoryEnabled ? await getMemoryPrompt(thread.userId) : "";
+      const memoryBlock = memoryPrompt ? `${memoryPrompt}\n\n` : "";
+      const baseInstructions = memoryBlock + (roleInstructions ? roleInstructions + "\n\n" : "");
       const instructions = ragContext
         ? baseInstructions + `Use this local context if relevant:\n\n${ragContext}\n\nIf local context is insufficient, continue with normal web-grounded reasoning.`
         : baseInstructions + (activeRoleId ? "Provide concise, accurate, citation-backed answers." : "Provide a concise and accurate response.");
@@ -599,6 +615,30 @@ export async function POST(request: Request) {
           updatedAt: new Date(),
         })
         .where(eq(threads.id, parsed.data.threadId));
+
+      if (thread.memoryEnabled) {
+        const memoryPromise = saveExtractedMemories({
+          userId: thread.userId,
+          threadId: parsed.data.threadId,
+          userMessage: userText,
+          assistantMessage: assistantText,
+          conversationMessages: inputMessages.length + 1,
+        });
+
+        void memoryPromise
+          .then((count) => {
+            if (count > 0) {
+              try {
+                writer.write({ type: "data", data: { kind: "memory-saved", count } } as UIMessageChunk);
+              } catch {
+                // Ignore stream write errors.
+              }
+            }
+          })
+          .catch(() => {
+            // Ignore memory extraction failures.
+          });
+      }
 
       writer.write({ type: "text-end", id: textId });
       writer.write({ type: "finish" });

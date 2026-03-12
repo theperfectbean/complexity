@@ -156,6 +156,17 @@ export default function ThreadPage() {
     }
   }, [error]);
 
+  useEffect(() => {
+    if (!data || data.length === 0) {
+      return;
+    }
+
+    const last = data[data.length - 1] as { kind?: string; count?: number };
+    if (last?.kind === "memory-saved") {
+      toast.success(last.count && last.count > 1 ? `Memory saved (${last.count})` : "Memory saved");
+    }
+  }, [data]);
+
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
     const currentPrompt = prompt.trim();

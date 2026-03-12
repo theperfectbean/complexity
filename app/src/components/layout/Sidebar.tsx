@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "motion/react";
-import { BookOpen, ChevronLeft, ChevronRight, Command, Home, Users, LogOut, Plus, Trash2 } from "lucide-react";
+import { BookOpen, Brain, ChevronLeft, ChevronRight, Command, Home, Users, LogOut, Plus, Trash2 } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -57,6 +57,7 @@ export function Sidebar({ collapsed = false, onToggle, onNavigate, onOpenCommand
     { href: "/", label: "Home", icon: Home },
     { href: "/library", label: "Library", icon: BookOpen },
     { href: "/roles", label: "Roles", icon: Users },
+    { href: "/settings/memory", label: "Memory", icon: Brain },
   ];
 
   const recentThreads = threads;

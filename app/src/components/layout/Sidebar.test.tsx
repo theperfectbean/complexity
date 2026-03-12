@@ -35,6 +35,7 @@ describe("Sidebar", () => {
     expect(screen.getByText("Home")).toBeInTheDocument();
     expect(screen.getByText("Library")).toBeInTheDocument();
     expect(screen.getByText("Roles")).toBeInTheDocument();
+    expect(screen.getByText("Memory")).toBeInTheDocument();
 
     await waitFor(() => expect(screen.getByText("First thread")).toBeInTheDocument());
   });
