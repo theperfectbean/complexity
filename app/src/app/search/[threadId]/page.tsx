@@ -1,7 +1,7 @@
 "use client";
 
 import { useChat } from "@ai-sdk/react";
-import { DefaultChatTransport } from "ai";
+import { DefaultChatTransport, isDataUIMessageChunk, UIMessageChunk } from "ai";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -71,7 +71,7 @@ export default function ThreadPage() {
   const [loadingHistory, setLoadingHistory] = useState(true);
   const hasSubmittedInitialQuery = useRef(false);
 
-  const [data, setData] = useState<any[]>([]);
+  const [data, setData] = useState<UIMessageChunk["data"][]>([]);
   const { messages, sendMessage, status, error } = useChat({
     transport: new DefaultChatTransport({
       api: "/api/chat",
@@ -81,9 +81,9 @@ export default function ThreadPage() {
         roleId,
       }),
     }),
-    onData(part) {
-      if (part.type.startsWith("data-")) {
-        setData((prev) => [...prev, (part as any).data]);
+    onData(part: UIMessageChunk) {
+      if (isDataUIMessageChunk(part)) {
+        setData((prev) => [...prev, part.data]);
       }
     },
   });

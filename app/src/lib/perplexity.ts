@@ -1,5 +1,6 @@
 import Perplexity from "@perplexity-ai/perplexity_ai";
 import { LanguageModelV3, LanguageModelV3CallOptions, LanguageModelV3GenerateResult, LanguageModelV3StreamResult } from "@ai-sdk/provider";
+import { ResponseStreamChunk, ResponseCreateResponse } from "@perplexity-ai/perplexity_ai/resources/responses";
 
 export function createPerplexityClient() {
   const apiKey = process.env.PERPLEXITY_API_KEY;
@@ -53,9 +54,9 @@ export function createPerplexityModel(modelId: string): LanguageModelV3 {
         input,
         instructions,
         stream: false,
-      });
+      }) as ResponseCreateResponse;
 
-      const outputText = (result as any).output?.[0]?.text || "";
+      const outputText = result.output?.[0]?.text || "";
 
       return {
         content: [{ type: "text", text: outputText }],
@@ -104,13 +105,14 @@ export function createPerplexityModel(modelId: string): LanguageModelV3 {
             try {
               controller.enqueue({ type: "stream-start", warnings: [] });
               for await (const chunk of stream) {
-                if (chunk.type === "response.output_text.delta") {
-                  const delta = (chunk as any).delta || (chunk as any).output_text?.delta || "";
-                  if (delta) {
+                const streamChunk = chunk as ResponseStreamChunk;
+                if (streamChunk.type === "response.output_text.delta") {
+                  const deltaPart = streamChunk as ResponseStreamChunk.TextDeltaEvent;
+                  if (deltaPart.delta) {
                     controller.enqueue({
                       type: "text-delta",
                       id: "msg-1",
-                      delta: delta
+                      delta: deltaPart.delta
                     });
                   }
                 }

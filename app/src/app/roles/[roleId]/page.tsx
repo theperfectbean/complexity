@@ -1,6 +1,6 @@
 "use client";
 
-import { DefaultChatTransport } from "ai";
+import { DefaultChatTransport, isDataUIMessageChunk, UIMessageChunk } from "ai";
 import { useChat } from "@ai-sdk/react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -90,7 +90,7 @@ export default function RoleDetailPage() {
     void loadDocuments();
   }, [loadDocuments, status]);
 
-  const [data, setData] = useState<any[]>([]);
+  const [data, setData] = useState<UIMessageChunk["data"][]>([]);
   const { messages, sendMessage, status: chatStatus, error } = useChat({
     transport: new DefaultChatTransport({
       api: "/api/chat",
@@ -100,9 +100,9 @@ export default function RoleDetailPage() {
         roleId,
       }),
     }),
-    onData(part) {
-      if (part.type.startsWith("data-")) {
-        setData((prev) => [...prev, (part as any).data]);
+    onData(part: UIMessageChunk) {
+      if (isDataUIMessageChunk(part)) {
+        setData((prev) => [...prev, part.data]);
       }
     },
   });

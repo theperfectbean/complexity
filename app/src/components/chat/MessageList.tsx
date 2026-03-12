@@ -7,7 +7,6 @@ import { useState } from "react";
 import { RelatedQuestions } from "@/components/chat/RelatedQuestions";
 import { SourceCarousel } from "@/components/chat/SourceCarousel";
 import { MarkdownRenderer } from "@/components/shared/MarkdownRenderer";
-import { cn } from "@/lib/utils";
 
 export type ChatCitation = {
   url?: string;

@@ -73,3 +73,19 @@ DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose build app
   - Text is extracted, chunked, and sent to the embedder service.
   - Vectors (384 dimensions) are stored in Postgres using the HNSW cosine index.
   - Similarity search is executed via Drizzle queries when chatting within a Space.
+
+## Key Findings & Implementation Notes
+
+### Vercel AI SDK v6 Migration
+- **useChat Changes**: The `data` return property has been removed. Use the `onData` callback and local `useState` to capture custom stream parts.
+- **Transport Pattern**: API endpoints and dynamic request bodies must now be configured via `transport: new DefaultChatTransport({ api, body: () => ({ ... }) })`. The `body` must be a function to capture reactive state correctly.
+- **Custom Stream Parts**: Custom data chunks written via `writer.write` in the backend must now use `type: "data-json"` (or other `data-` prefixed types) to satisfy the `UIMessageChunk` discriminated union.
+
+### Perplexity SDK v0.26 Upgrade
+- **Response Creation**: The `responses.create()` method now requires an explicit `stream: boolean` property.
+- **Input Structure**: The `input` array now expects items with an explicit `type: "message"` property.
+- **Custom Provider**: To use Perplexity with standard AI SDK tools like `streamText`, implement the `LanguageModelV3` interface from `@ai-sdk/provider`.
+
+### Docker & Next.js (SWC)
+- **Binary Mismatch**: When using Alpine-based Docker images, ensure `@next/swc-linux-x64-musl` is installed. 
+- **Volume Isolation**: To prevent host-to-container binary conflicts (glibc vs musl), use a named volume for `node_modules` in `docker-compose.dev.yml` (e.g., `- node_modules:/app/node_modules`).

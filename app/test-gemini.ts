@@ -1,5 +1,6 @@
 
 import Perplexity from "@perplexity-ai/perplexity_ai";
+import { ResponseCreateParamsNonStreaming } from "@perplexity-ai/perplexity_ai/resources/responses";
 
 const apiKey = process.env.PERPLEXITY_API_KEY;
 if (!apiKey) {
@@ -28,7 +29,7 @@ async function testWithSystemMessage() {
   try {
     await client.responses.create({
       model,
-      input: input as any,
+      input: input as ResponseCreateParamsNonStreaming["input"],
       instructions: "Be concise.",
       stream: false,
     });
@@ -51,7 +52,7 @@ async function testWithoutSystemMessage() {
   try {
     await client.responses.create({
       model,
-      input: input as any,
+      input: input as ResponseCreateParamsNonStreaming["input"],
       instructions: "Be concise.",
       stream: false,
     });
