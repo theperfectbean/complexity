@@ -72,7 +72,7 @@ export default function ThreadPage() {
   const hasSubmittedInitialQuery = useRef(false);
 
   const [data, setData] = useState<Record<string, unknown>[]>([]);
-  const { messages, sendMessage, reload, status, error } = useChat({
+  const { messages, sendMessage, regenerate, status, error } = useChat({
     transport: new DefaultChatTransport({
       api: "/api/chat",
       body: () => ({
@@ -230,7 +230,7 @@ export default function ThreadPage() {
             messages={mergedMessages}
             emptyLabel="Start this thread with your first question."
             onRelatedQuestionClick={(question) => setPrompt(question)}
-            onRetry={() => void reload()}
+            onRetry={() => void regenerate()}
           />
         )}
       </div>
