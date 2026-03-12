@@ -94,44 +94,53 @@ export function MessageList({ messages, emptyLabel, onRelatedQuestionClick }: Me
               <div className="flex w-full flex-col">
                 {message.thinking && message.thinking.length > 0 && (
                   <div className="mb-4 flex flex-col gap-2.5">
-                    {message.thinking.map((part) => (
-                      <div
-                        key={part.callId}
-                        className="flex items-center gap-2.5 text-sm text-muted-foreground/80 transition-all animate-in fade-in slide-in-from-left-2"
-                      >
-                        {!part.result ? (
-                          <div className="flex h-4 w-4 items-center justify-center">
-                            <div className="h-3 w-3 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-                          </div>
-                        ) : (
-                          <div className="flex h-4 w-4 items-center justify-center text-primary">
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              width="16"
-                              height="16"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2.5"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              className="h-3.5 w-3.5"
-                            >
-                              <polyline points="20 6 9 17 4 12" />
-                            </svg>
-                          </div>
-                        )}
-                        <span className="font-medium">
-                          {part.toolName}
-                          {part.result ? "" : "..."}
-                        </span>
-                        {part.result && (
-                          <span className="text-[0.8rem] opacity-60">
-                             — {part.result}
+                    {message.thinking.map((part, index) => {
+                      const isLast = index === (message.thinking?.length ?? 0) - 1;
+                      const hasText = message.content && message.content !== "\u200B";
+                      
+                      // If we have a result and text is starting to stream, we can hide intermediate steps
+                      // but keep the very last step visible as a "status" indicator.
+                      if (part.result && !isLast && hasText) return null;
+
+                      return (
+                        <div
+                          key={part.callId}
+                          className="flex items-center gap-2.5 text-sm text-muted-foreground/80 transition-all animate-in fade-in slide-in-from-left-2"
+                        >
+                          {!part.result ? (
+                            <div className="flex h-4 w-4 items-center justify-center">
+                              <div className="h-3 w-3 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                            </div>
+                          ) : (
+                            <div className="flex h-4 w-4 items-center justify-center text-emerald-500">
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                width="16"
+                                height="16"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="3"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                className="h-3 w-3"
+                              >
+                                <polyline points="20 6 9 17 4 12" />
+                              </svg>
+                            </div>
+                          )}
+                          <span className="font-medium">
+                            {part.toolName}
+                            {part.result ? "" : "..."}
                           </span>
-                        )}
-                      </div>
-                    ))}
+                          {part.result && (
+                            <span className="text-[0.8rem] opacity-60">
+                               — {part.result}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
 
