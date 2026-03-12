@@ -163,7 +163,7 @@ export function MessageList({ messages, emptyLabel, onRelatedQuestionClick }: Me
                     )}
                     <button
                       type="button"
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-muted active:scale-90"
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-full transition-colors copy-button-highlight active:scale-90"
                       onClick={() => void copyMessage(message.id, message.content)}
                       title="Copy message"
                     >
