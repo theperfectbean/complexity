@@ -153,10 +153,10 @@ export function MessageList({ messages, emptyLabel, onRelatedQuestionClick }: Me
                   <MarkdownRenderer content={message.content} />
                 </div>
 
-                <div className="mt-4 flex items-center justify-start opacity-0 transition-opacity group-hover:opacity-100">
+                <div className="mt-4 flex items-center justify-start">
                   <button
                     type="button"
-                    className="inline-flex h-7 items-center gap-1.5 rounded-lg border bg-card px-2.5 text-[10px] font-medium transition-colors hover:bg-accent"
+                    className="inline-flex h-7 items-center gap-1.5 rounded-lg border bg-card px-2.5 text-[10px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground active:scale-95"
                     onClick={() => void copyMessage(message.id, message.content)}
                   >
                     <Copy className="h-2.5 w-2.5" />
