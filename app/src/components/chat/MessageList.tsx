@@ -95,7 +95,7 @@ export function MessageList({ messages, emptyLabel, onRelatedQuestionClick, onRe
               </div>
             ) : (
               <div className="flex w-full flex-col">
-                {message.thinking && message.thinking.length > 0 && (!message.content || message.content.trim() === "" || message.content === "\u200B") && (
+                {message.thinking && message.thinking.length > 0 && (!message.content || message.content.trim().length < 5 || message.content === "\u200B") && (
                   <div className="mb-4 flex flex-col gap-2.5">
                     {message.thinking.map((part) => {
                       return (

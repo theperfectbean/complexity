@@ -425,7 +425,7 @@ export async function POST(request: Request) {
         type: "data-call-start",
         data: {
           callId: "model-gen",
-          toolName: "Thinking",
+          toolName: "Reasoning",
           input: { model: safeModel },
         },
       } as UIMessageChunk);
@@ -462,7 +462,115 @@ export async function POST(request: Request) {
             streamEventCount += 1;
             const eventRecord = asRecord(event);
             
+            if (eventRecord?.type === "response.reasoning.started") {
+              writer.write({
+                type: "data-call-start",
+                data: {
+                  callId: "reasoning",
+                  toolName: "Searching",
+                  input: eventRecord.thought ? { thought: eventRecord.thought } : {},
+                },
+              } as UIMessageChunk);
+              continue;
+            }
+
+            if (eventRecord?.type === "response.reasoning.search_queries") {
+              const queries = (eventRecord as any).queries as string[];
+              writer.write({
+                type: "data-call-result",
+                data: {
+                  callId: "reasoning",
+                  result: `Searching for: ${queries.join(", ")}`,
+                },
+              } as UIMessageChunk);
+              continue;
+            }
+
+            if (eventRecord?.type === "response.reasoning.search_results") {
+              writer.write({
+                type: "data-call-result",
+                data: {
+                  callId: "reasoning",
+                  result: "Retrieved search results.",
+                },
+              } as UIMessageChunk);
+              continue;
+            }
+
+            if (eventRecord?.type === "response.reasoning.fetch_url_queries") {
+              const urls = (eventRecord as any).urls as string[];
+              writer.write({
+                type: "data-call-start",
+                data: {
+                  callId: "fetching",
+                  toolName: "Reading",
+                  input: { urls },
+                },
+              } as UIMessageChunk);
+              continue;
+            }
+
+            if (eventRecord?.type === "response.reasoning.fetch_url_results") {
+              writer.write({
+                type: "data-call-result",
+                data: {
+                  callId: "fetching",
+                  result: "Finished reading URLs.",
+                },
+              } as UIMessageChunk);
+              continue;
+            }
+
+            if (eventRecord?.type === "response.reasoning.stopped") {
+              writer.write({
+                type: "data-call-result",
+                data: {
+                  callId: "reasoning",
+                  result: "Reasoning complete.",
+                },
+              } as UIMessageChunk);
+              continue;
+            }
+
+            if (eventRecord?.type === "response.output_item.added") {
+              const item = asRecord(eventRecord.item);
+              if (item?.type === "function_call") {
+                writer.write({
+                  type: "data-call-start",
+                  data: {
+                    callId: (item.id as string) || `tool-${Date.now()}`,
+                    toolName: (item.name as string) || "Tool",
+                    input: item.arguments,
+                  },
+                } as UIMessageChunk);
+              }
+              continue;
+            }
+
+            if (eventRecord?.type === "response.output_item.done") {
+              const item = asRecord(eventRecord.item);
+              if (item?.type === "function_call") {
+                writer.write({
+                  type: "data-call-result",
+                  data: {
+                    callId: (item.id as string) || `tool-${Date.now()}`,
+                    result: "Completed.",
+                  },
+                } as UIMessageChunk);
+              }
+              continue;
+            }
+
             if (eventRecord?.type === "response.output_text.delta") {
+              if (!hasWrittenTextDelta) {
+                writer.write({
+                  type: "data-call-result",
+                  data: {
+                    callId: "model-gen",
+                    result: "Finished reasoning.",
+                  },
+                } as UIMessageChunk);
+              }
               const outputText = asRecord(eventRecord.output_text);
               const delta =
                 (typeof eventRecord.delta === "string" && eventRecord.delta) ||
@@ -529,6 +637,13 @@ export async function POST(request: Request) {
           if (!assistantText) {
             assistantText = extractAssistantTextFromCompletedResponse(nonStreamingResponse);
             if (assistantText) {
+              writer.write({
+                type: "data-call-result",
+                data: {
+                  callId: "model-gen",
+                  result: "Finished reasoning.",
+                },
+              } as UIMessageChunk);
               writer.write({ type: "text-delta", id: textId, delta: assistantText });
             }
           }
@@ -559,6 +674,13 @@ export async function POST(request: Request) {
             completedResponse = nonStreamingResponse;
             assistantText = extractAssistantTextFromCompletedResponse(nonStreamingResponse);
             if (assistantText) {
+              writer.write({
+                type: "data-call-result",
+                data: {
+                  callId: "model-gen",
+                  result: "Finished reasoning.",
+                },
+              } as UIMessageChunk);
               writer.write({ type: "text-delta", id: textId, delta: assistantText });
               hasWrittenTextDelta = true;
             }
