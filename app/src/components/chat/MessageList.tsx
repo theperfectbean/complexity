@@ -169,9 +169,8 @@ export function MessageList({ messages, emptyLabel, onRelatedQuestionClick }: Me
                       )}
                     </AnimatePresence>
                     <motion.button
-                      whileHover={{ backgroundColor: "rgba(161, 161, 170, 0.15)" }}
                       whileTap={{ scale: 0.92 }}
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-full transition-colors"
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-zinc-200 dark:hover:bg-zinc-800"
                       onClick={() => void copyMessage(message.id, message.content)}
                       title="Copy message"
                     >
