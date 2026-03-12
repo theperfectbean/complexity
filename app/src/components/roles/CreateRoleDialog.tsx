@@ -2,20 +2,22 @@
 
 import { FormEvent, useState } from "react";
 
-type Space = {
+type Role = {
   id: string;
   name: string;
   description?: string | null;
+  instructions?: string | null;
   updatedAt: string;
 };
 
-type CreateSpaceDialogProps = {
-  onCreated: (space: Space) => void;
+type CreateRoleDialogProps = {
+  onCreated: (role: Role) => void;
 };
 
-export function CreateSpaceDialog({ onCreated }: CreateSpaceDialogProps) {
+export function CreateRoleDialog({ onCreated }: CreateRoleDialogProps) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [instructions, setInstructions] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -29,25 +31,27 @@ export function CreateSpaceDialog({ onCreated }: CreateSpaceDialogProps) {
     setError(null);
 
     try {
-      const response = await fetch("/api/spaces", {
+      const response = await fetch("/api/roles", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: name.trim(),
           description: description.trim() || undefined,
+          instructions: instructions.trim() || undefined,
         }),
       });
 
       if (!response.ok) {
         const payload = (await response.json().catch(() => null)) as { error?: string } | null;
-        setError(payload?.error ?? "Failed to create space");
+        setError(payload?.error ?? "Failed to create role");
         return;
       }
 
-      const payload = (await response.json()) as { space: Space };
-      onCreated(payload.space);
+      const payload = (await response.json()) as { role: Role };
+      onCreated(payload.role);
       setName("");
       setDescription("");
+      setInstructions("");
     } finally {
       setSubmitting(false);
     }
@@ -55,11 +59,11 @@ export function CreateSpaceDialog({ onCreated }: CreateSpaceDialogProps) {
 
   return (
     <form onSubmit={onSubmit} className="rounded-lg border bg-card p-4 shadow-2xs">
-      <h2 className="text-sm font-semibold">Create space</h2>
+      <h2 className="text-sm font-semibold">Create role</h2>
       <div className="mt-3 space-y-2">
         <input
           className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-          placeholder="Space name"
+          placeholder="Role name (e.g., Diabetes Assistant)"
           value={name}
           onChange={(event) => setName(event.target.value)}
         />
@@ -68,6 +72,12 @@ export function CreateSpaceDialog({ onCreated }: CreateSpaceDialogProps) {
           placeholder="Description (optional)"
           value={description}
           onChange={(event) => setDescription(event.target.value)}
+        />
+        <textarea
+          className="w-full min-h-[80px] rounded-md border bg-background px-3 py-2 text-sm"
+          placeholder="Instructions (System Prompt) - Describe the persona"
+          value={instructions}
+          onChange={(event) => setInstructions(event.target.value)}
         />
       </div>
       {error ? <p className="mt-2 text-xs text-destructive">{error}</p> : null}

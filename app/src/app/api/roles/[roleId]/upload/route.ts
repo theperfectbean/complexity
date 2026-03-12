@@ -4,30 +4,30 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { createId } from "@/lib/db/cuid";
-import { chunks, documents, spaces, users } from "@/lib/db/schema";
+import { chunks, documents, roles, users } from "@/lib/db/schema";
 import { extractTextFromFile, isAllowedDocument } from "@/lib/documents";
 import { chunkText, getEmbeddings } from "@/lib/rag";
 
 const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
-export async function POST(request: Request, { params }: { params: Promise<{ spaceId: string }> }) {
+export async function POST(request: Request, { params }: { params: Promise<{ roleId: string }> }) {
   const session = await auth();
   const userEmail = session?.user?.email;
   if (!userEmail) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { spaceId } = await params;
+  const { roleId } = await params;
 
-  const [space] = await db
-    .select({ id: spaces.id })
-    .from(spaces)
-    .innerJoin(users, eq(spaces.userId, users.id))
-    .where(and(eq(spaces.id, spaceId), eq(users.email, userEmail)))
+  const [role] = await db
+    .select({ id: roles.id })
+    .from(roles)
+    .innerJoin(users, eq(roles.userId, users.id))
+    .where(and(eq(roles.id, roleId), eq(users.email, userEmail)))
     .limit(1);
 
-  if (!space) {
-    return NextResponse.json({ error: "Space not found" }, { status: 404 });
+  if (!role) {
+    return NextResponse.json({ error: "Role not found" }, { status: 404 });
   }
 
   const formData = await request.formData();
@@ -52,7 +52,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ spa
     filename: file.name,
     mimeType: file.type || "application/octet-stream",
     sizeBytes: file.size,
-    spaceId,
+    roleId,
     status: "processing",
   });
 
@@ -69,7 +69,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ spa
       splitChunks.map((content, index) => ({
         id: createId(),
         documentId,
-        spaceId,
+        roleId,
         content,
         embedding: embeddings[index],
         chunkIndex: index,

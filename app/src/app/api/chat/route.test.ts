@@ -133,10 +133,9 @@ describe("POST /api/chat", () => {
     await expect(response.json()).resolves.toEqual({ error: "Thread not found" });
   });
 
-  it("returns 400 for thread-space mismatch", async () => {
+  it("returns 400 for thread-role mismatch", async () => {
     mockSelectResults([
-      [{ id: "thread-1", userId: "user-1", spaceId: "space-a" }],
-      [{ id: "space-b" }],
+      [{ id: "thread-1", userId: "user-1", roleId: "role-a" }],
     ]);
 
     const request = new Request("http://localhost/api/chat", {
@@ -144,7 +143,7 @@ describe("POST /api/chat", () => {
       body: JSON.stringify({
         threadId: "thread-1",
         model: "pro-search",
-        spaceId: "space-b",
+        roleId: "role-b",
         messages: [{ role: "user", parts: [{ type: "text", text: "hello" }] }],
       }),
       headers: { "Content-Type": "application/json" },
@@ -152,11 +151,11 @@ describe("POST /api/chat", () => {
 
     const response = await POST(request);
     expect(response.status).toBe(400);
-    await expect(response.json()).resolves.toEqual({ error: "Thread does not belong to this space" });
+    await expect(response.json()).resolves.toEqual({ error: "Role mismatch for this thread" });
   });
 
   it("serves cached response when redis cache hit exists", async () => {
-    mockSelectResult([{ id: "thread-1", userId: "user-1", spaceId: null }]);
+    mockSelectResults([[{ id: "thread-1", userId: "user-1", roleId: null }]]);
     mockMutationChains();
 
     vi.mocked(getRedisClient).mockReturnValue({
@@ -212,9 +211,9 @@ describe("POST /api/chat", () => {
     await expect(response.json()).resolves.toEqual({ error: "Thread not found" });
   });
 
-  it("returns 404 when requested space is not owned", async () => {
+  it("returns 404 when requested role is not owned", async () => {
     mockSelectResults([
-      [{ id: "thread-1", userId: "user-1", spaceId: null }],
+      [{ id: "thread-1", userId: "user-1", roleId: "space-1" }],
       [],
     ]);
 
@@ -223,7 +222,7 @@ describe("POST /api/chat", () => {
       body: JSON.stringify({
         threadId: "thread-1",
         model: "pro-search",
-        spaceId: "space-1",
+        roleId: "space-1",
         messages: [{ role: "user", parts: [{ type: "text", text: "hello" }] }],
       }),
       headers: { "Content-Type": "application/json" },
@@ -231,11 +230,11 @@ describe("POST /api/chat", () => {
 
     const response = await POST(request);
     expect(response.status).toBe(404);
-    await expect(response.json()).resolves.toEqual({ error: "Space not found" });
+    await expect(response.json()).resolves.toEqual({ error: "Role not found" });
   });
 
   it("streams and persists assistant text from response.completed fallback", async () => {
-    mockSelectResult([{ id: "thread-1", userId: "user-1", spaceId: null }]);
+    mockSelectResults([[{ id: "thread-1", userId: "user-1", roleId: null }]]);
     const { values } = mockMutationChains();
 
     async function* eventStream() {
@@ -282,7 +281,7 @@ describe("POST /api/chat", () => {
   });
 
   it("streams and persists assistant text from response.output_text.done events", async () => {
-    mockSelectResult([{ id: "thread-1", userId: "user-1", spaceId: null }]);
+    mockSelectResults([[{ id: "thread-1", userId: "user-1", roleId: null }]]);
     const { values } = mockMutationChains();
 
     async function* eventStream() {
@@ -330,7 +329,7 @@ describe("POST /api/chat", () => {
   });
 
   it("falls back to non-stream response when stream yields zero events", async () => {
-    mockSelectResult([{ id: "thread-1", userId: "user-1", spaceId: null }]);
+    mockSelectResults([[{ id: "thread-1", userId: "user-1", roleId: null }]]);
     const { values } = mockMutationChains();
 
     async function* emptyStream() {
@@ -381,7 +380,7 @@ describe("POST /api/chat", () => {
   });
 
   it("ignores cached fallback placeholder and clears cache entry", async () => {
-    mockSelectResult([{ id: "thread-1", userId: "user-1", spaceId: null }]);
+    mockSelectResults([[{ id: "thread-1", userId: "user-1", roleId: null }]]);
     const { values } = mockMutationChains();
 
     async function* eventStream() {
@@ -434,7 +433,7 @@ describe("POST /api/chat", () => {
   });
 
   it("returns visible assistant fallback when provider request throws", async () => {
-    mockSelectResult([{ id: "thread-1", userId: "user-1", spaceId: null }]);
+    mockSelectResults([[{ id: "thread-1", userId: "user-1", roleId: null }]]);
     const { values } = mockMutationChains();
 
     vi.mocked(createPerplexityClient).mockImplementation(() => {

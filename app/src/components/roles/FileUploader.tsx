@@ -3,11 +3,11 @@
 import { FormEvent, useState } from "react";
 
 type FileUploaderProps = {
-  spaceId: string;
+  roleId: string;
   onUploaded: () => void;
 };
 
-export function FileUploader({ spaceId, onUploaded }: FileUploaderProps) {
+export function FileUploader({ roleId, onUploaded }: FileUploaderProps) {
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -25,7 +25,7 @@ export function FileUploader({ spaceId, onUploaded }: FileUploaderProps) {
       const body = new FormData();
       body.append("file", file);
 
-      const response = await fetch(`/api/spaces/${spaceId}/upload`, {
+      const response = await fetch(`/api/roles/${roleId}/upload`, {
         method: "POST",
         body,
       });

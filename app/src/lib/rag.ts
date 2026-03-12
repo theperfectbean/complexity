@@ -43,19 +43,19 @@ export async function getEmbeddings(texts: string[]) {
   return payload.embeddings;
 }
 
-export async function similaritySearch(spaceId: string, queryEmbedding: number[], limit = 8) {
-  const distance = cosineDistance(chunks.embedding, queryEmbedding);
-  const similarity = sql<number>`1 - ${distance}`;
+export async function similaritySearch(roleId: string, embedding: number[], limit = 5) {
+  const distance = cosineDistance(chunks.embedding, embedding);
 
   return db
     .select({
       id: chunks.id,
       content: chunks.content,
-      similarity,
+      distance,
     })
     .from(chunks)
     .innerJoin(documents, eq(chunks.documentId, documents.id))
-    .where(and(eq(chunks.spaceId, spaceId), eq(documents.status, "ready")))
-    .orderBy((row) => desc(row.similarity))
+    .where(and(eq(chunks.roleId, roleId), eq(documents.status, "ready")))
+    .orderBy(distance)
     .limit(limit);
 }
+

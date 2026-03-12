@@ -1,6 +1,6 @@
-import { ProcessingBadge } from "@/components/spaces/ProcessingBadge";
+import { ProcessingBadge } from "@/components/roles/ProcessingBadge";
 
-export type SpaceDocument = {
+export type RoleDocument = {
   id: string;
   filename: string;
   status: string;
@@ -9,7 +9,7 @@ export type SpaceDocument = {
 };
 
 type DocumentListProps = {
-  documents: SpaceDocument[];
+  documents: RoleDocument[];
   loading?: boolean;
 };
 

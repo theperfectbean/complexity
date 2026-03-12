@@ -13,11 +13,19 @@ export type ChatCitation = {
   snippet?: string;
 };
 
+export type ChatThinkingPart = {
+  callId: string;
+  toolName: string;
+  input?: any;
+  result?: string;
+};
+
 export type ChatMessageItem = {
   id: string;
   role: string;
   content: string;
   citations?: ChatCitation[];
+  thinking?: ChatThinkingPart[];
 };
 
 type MessageListProps = {
@@ -75,40 +83,83 @@ export function MessageList({ messages, emptyLabel, onRelatedQuestionClick }: Me
         const isUser = message.role === "user";
 
         return (
-          <article key={message.id} className={isUser ? "flex justify-end" : "space-y-2"}>
+          <article key={message.id} className={isUser ? "flex flex-col items-end py-4" : "group relative flex flex-col gap-0 pt-0 pb-8"}>
             {isUser ? (
-              <p className="max-w-[85%] whitespace-pre-wrap rounded-xl bg-primary px-4 py-2 text-sm text-primary-foreground shadow-2xs">
-                {message.content}
-              </p>
+              <div className="w-fit max-w-[85%] md:max-w-[70%] rounded-[20px] bg-[#f4f4f4] px-5 py-3 text-left dark:bg-[#202020]">
+                <p className="whitespace-pre-wrap text-[0.9375rem] font-medium leading-[1.6] text-foreground">
+                  {message.content}
+                </p>
+              </div>
             ) : (
-              <div className="space-y-2">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="inline-flex items-center gap-2 text-xs text-muted-foreground">
-                    {urls.slice(0, 4).map((url, index) => (
-                      <a
-                        key={url}
-                        href={url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex h-5 min-w-5 items-center justify-center rounded-full border bg-card px-1.5 hover:bg-accent"
-                        title={url}
+              <div className="flex w-full flex-col">
+                {message.thinking && message.thinking.length > 0 && (
+                  <div className="mb-4 flex flex-col gap-2.5">
+                    {message.thinking.map((part) => (
+                      <div
+                        key={part.callId}
+                        className="flex items-center gap-2.5 text-sm text-muted-foreground/80 transition-all animate-in fade-in slide-in-from-left-2"
                       >
-                        {index + 1}
-                      </a>
+                        {!part.result ? (
+                          <div className="flex h-4 w-4 items-center justify-center">
+                            <div className="h-3 w-3 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                          </div>
+                        ) : (
+                          <div className="flex h-4 w-4 items-center justify-center text-primary">
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              width="16"
+                              height="16"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2.5"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              className="h-3.5 w-3.5"
+                            >
+                              <polyline points="20 6 9 17 4 12" />
+                            </svg>
+                          </div>
+                        )}
+                        <span className="font-medium">
+                          {part.toolName}
+                          {part.result ? "" : "..."}
+                        </span>
+                        {part.result && (
+                          <span className="text-[0.8rem] opacity-60">
+                             — {part.result}
+                          </span>
+                        )}
+                      </div>
                     ))}
                   </div>
+                )}
+
+                <div className="max-w-none break-words">
+                  {urls.length > 0 ? (
+                    <div className="my-6">
+                      <SourceCarousel urls={urls} />
+                    </div>
+                  ) : null}
+                  <MarkdownRenderer content={message.content} />
+                </div>
+
+                <div className="mt-4 flex items-center justify-start opacity-0 transition-opacity group-hover:opacity-100">
                   <button
                     type="button"
-                    className="inline-flex items-center gap-1 rounded-md border bg-card px-2 py-1 text-xs hover:bg-accent"
+                    className="inline-flex h-7 items-center gap-1.5 rounded-lg border bg-card px-2.5 text-[10px] font-medium transition-colors hover:bg-accent"
                     onClick={() => void copyMessage(message.id, message.content)}
                   >
-                    <Copy className="h-3.5 w-3.5" />
+                    <Copy className="h-2.5 w-2.5" />
                     {copiedId === message.id ? "Copied" : "Copy"}
                   </button>
                 </div>
-                {urls.length > 0 ? <SourceCarousel urls={urls} /> : null}
-                <MarkdownRenderer content={message.content} />
-                <RelatedQuestions questions={relatedQuestions} onSelect={onRelatedQuestionClick} />
+
+                {relatedQuestions.length > 0 && (
+                  <div className="mt-12 border-t pt-8">
+                    <RelatedQuestions questions={relatedQuestions} onSelect={onRelatedQuestionClick} />
+                  </div>
+                )}
               </div>
             )}
           </article>

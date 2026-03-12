@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-type SpaceCardProps = {
+type RoleCardProps = {
   id: string;
   name: string;
   description?: string | null;
@@ -10,10 +10,10 @@ type SpaceCardProps = {
   busy?: boolean;
 };
 
-export function SpaceCard({ id, name, description, updatedAt, onRename, onDelete, busy }: SpaceCardProps) {
+export function RoleCard({ id, name, description, updatedAt, onRename, onDelete, busy }: RoleCardProps) {
   return (
     <article className="rounded-lg border bg-card p-4 shadow-2xs">
-      <Link href={`/spaces/${id}`} className="block rounded-md p-1 transition-colors hover:bg-accent/50">
+      <Link href={`/roles/${id}`} className="block rounded-md p-1 transition-colors hover:bg-accent/50">
         <p className="font-medium tracking-tight">{name}</p>
         <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{description || "No description"}</p>
         <p className="mt-2 text-xs text-muted-foreground">Updated {new Date(updatedAt).toLocaleString()}</p>

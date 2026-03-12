@@ -8,13 +8,6 @@ import { FormEvent, useState } from "react";
 import { SearchBar } from "@/components/search/SearchBar";
 import { getDefaultModel } from "@/lib/models";
 
-const promptIdeas = [
-  "Compare top open-source RAG frameworks in 2026",
-  "Summarize this week in AI chip manufacturing",
-  "Build a migration checklist for monolith to services",
-  "Find tradeoffs between Redis and Postgres caching",
-];
-
 export default function Home() {
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -74,21 +67,14 @@ export default function Home() {
       <div className="pointer-events-none absolute inset-x-0 top-20 -z-10 flex justify-center">
         <div className="h-64 w-64 rounded-full bg-primary/10 blur-3xl" />
       </div>
-      <header className="mb-12 flex items-center justify-between">
-        <div>
-          <h1 className="font-[var(--font-accent)] text-2xl font-semibold">Complexity</h1>
-          <p className="text-sm text-muted-foreground">Web-grounded AI search with private spaces</p>
-        </div>
-
-      </header>
 
       <div className="flex flex-1 items-center justify-center">
         <form onSubmit={startThread} className="w-full max-w-3xl space-y-3">
-          <div className="mb-4 space-y-2 text-center">
-            <p className="font-[var(--font-accent)] text-4xl font-semibold tracking-tight sm:text-5xl">
-              Ask, explore, and verify.
-            </p>
-            <p className="text-sm text-muted-foreground">Scira-inspired search surface for private and web-grounded answers.</p>
+          <div className="mb-8 space-y-2 text-center">
+            <h1 className="font-[var(--font-accent)] text-4xl font-semibold tracking-tight sm:text-5xl">
+              Complexity
+            </h1>
+            <p className="text-lg text-muted-foreground">Web-grounded AI search with roles</p>
           </div>
           <SearchBar
             value={query}
@@ -101,18 +87,6 @@ export default function Home() {
             onModelChange={setModel}
           />
           <span className="text-xs text-muted-foreground">Model applies to this new thread</span>
-          <div className="flex flex-wrap gap-2 pt-2">
-            {promptIdeas.map((idea) => (
-              <button
-                key={idea}
-                type="button"
-                onClick={() => setQuery(idea)}
-                className="rounded-full border border-primary/20 bg-primary/5 px-3 py-1 text-xs text-primary hover:bg-primary/10"
-              >
-                {idea}
-              </button>
-            ))}
-          </div>
         </form>
       </div>
     </main>

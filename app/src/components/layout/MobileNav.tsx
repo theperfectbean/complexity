@@ -1,6 +1,6 @@
 "use client";
 
-import { Command, Home, Library, Layers, LogOut } from "lucide-react";
+import { Command, Home, Library, Users, LogOut } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
 import Link from "next/link";
 import { Drawer } from "vaul";
@@ -35,9 +35,9 @@ export function MobileNav({ open, onClose, onOpenCommandPalette }: MobileNavProp
               <Library className="h-4 w-4" />
               Library
             </Link>
-            <Link className="flex items-center gap-2 rounded-lg border bg-card px-3 py-2 hover:bg-accent" href="/spaces" onClick={onClose}>
-              <Layers className="h-4 w-4" />
-              Spaces
+            <Link className="flex items-center gap-2 rounded-lg border bg-card px-3 py-2 hover:bg-accent" href="/roles" onClick={onClose}>
+              <Users className="h-4 w-4" />
+              Roles
             </Link>
             <button
               type="button"

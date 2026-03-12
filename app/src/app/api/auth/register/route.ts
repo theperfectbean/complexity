@@ -1,4 +1,4 @@
-import bcrypt from "bcryptjs";
+import * as bcrypt from "bcrypt-ts";
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -14,6 +14,7 @@ const schema = z.object({
 });
 
 export async function POST(request: Request) {
+  console.log("[Registration] Received POST request");
   const payload = await request.json();
   const parsed = schema.safeParse(payload);
 
@@ -28,14 +29,22 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Email already exists" }, { status: 409 });
   }
 
-  const passwordHash = await bcrypt.hash(parsed.data.password, 12);
+  try {
+    console.log("[Registration] Hashing password...");
+    const passwordHash = await bcrypt.hash(parsed.data.password, 12);
 
-  await db.insert(users).values({
-    id: createId(),
-    email,
-    passwordHash,
-    name: parsed.data.name,
-  });
+    console.log("[Registration] Inserting user into DB...");
+    await db.insert(users).values({
+      id: createId(),
+      email,
+      passwordHash,
+      name: parsed.data.name,
+    });
 
-  return NextResponse.json({ ok: true });
+    console.log("[Registration] Success.");
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    console.error("[Registration Error]", error);
+    return NextResponse.json({ error: "Registration failed", details: error instanceof Error ? error.message : String(error) }, { status: 500 });
+  }
 }

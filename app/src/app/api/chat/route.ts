@@ -8,7 +8,7 @@ import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { createId } from "@/lib/db/cuid";
 import { getDefaultModel, isPresetModel, isValidModelId } from "@/lib/models";
-import { messages, spaces, threads, users } from "@/lib/db/schema";
+import { messages, roles, threads, users } from "@/lib/db/schema";
 import { createPerplexityClient } from "@/lib/perplexity";
 import { getEmbeddings, similaritySearch } from "@/lib/rag";
 import { getRedisClient } from "@/lib/redis";
@@ -17,7 +17,7 @@ const schema = z.object({
   threadId: z.string().min(1),
   model: z.string().min(1),
   messages: z.array(z.any()),
-  spaceId: z.string().optional(),
+  roleId: z.string().nullable().optional(),
 });
 
 type Citation = {
@@ -186,36 +186,51 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Messages required" }, { status: 400 });
   }
 
-  const [thread] = await db
+  const threadPromise = db
     .select({
       id: threads.id,
       userId: threads.userId,
-      spaceId: threads.spaceId,
+      roleId: threads.roleId,
     })
     .from(threads)
     .innerJoin(users, eq(threads.userId, users.id))
     .where(and(eq(threads.id, parsed.data.threadId), eq(users.email, userEmail)))
     .limit(1);
 
+  const [[thread]] = await Promise.all([threadPromise]);
+
   if (!thread) {
     return NextResponse.json({ error: "Thread not found" }, { status: 404 });
   }
 
-  if (parsed.data.spaceId) {
-    const [ownedSpace] = await db
-      .select({ id: spaces.id })
-      .from(spaces)
-      .innerJoin(users, eq(spaces.userId, users.id))
-      .where(and(eq(spaces.id, parsed.data.spaceId), eq(users.email, userEmail)))
-      .limit(1);
+  // Use the thread's roleId as the primary source of truth for RAG activation
+  const activeRoleId = thread.roleId;
 
-    if (!ownedSpace) {
-      return NextResponse.json({ error: "Space not found" }, { status: 404 });
-    }
+  const rolePromise = activeRoleId
+    ? db
+        .select({ id: roles.id, instructions: roles.instructions })
+        .from(roles)
+        .innerJoin(users, eq(roles.userId, users.id))
+        .where(and(eq(roles.id, activeRoleId), eq(users.email, userEmail)))
+        .limit(1)
+    : Promise.resolve([]);
 
-    if (thread.spaceId && thread.spaceId !== parsed.data.spaceId) {
-      return NextResponse.json({ error: "Thread does not belong to this space" }, { status: 400 });
+  const [ownedRole] = await rolePromise;
+
+  let roleInstructions: string | null = null;
+  if (activeRoleId) {
+    if (!ownedRole) {
+      // Role associated with thread no longer exists or access lost
+      console.warn(`Thread ${thread.id} associated with missing role ${activeRoleId}`);
+    } else {
+      roleInstructions = ownedRole.instructions;
     }
+  }
+
+  // Optional: If the client explicitly requested a different role, 
+  // ensure it matches the thread's role (to prevent cross-role RAG leakage)
+  if (parsed.data.roleId && parsed.data.roleId !== activeRoleId) {
+    return NextResponse.json({ error: "Role mismatch for this thread" }, { status: 400 });
   }
 
   const lastMessage = inputMessages[inputMessages.length - 1];
@@ -225,28 +240,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Message text required" }, { status: 400 });
   }
 
-  await db.insert(messages).values({
+  // Start persisting user message in background
+  const persistUserMessage = db.insert(messages).values({
     id: createId(),
     threadId: parsed.data.threadId,
     role: "user",
     content: userText,
   });
 
-  let ragContext = "";
-  if (parsed.data.spaceId) {
-    const [embedding] = await getEmbeddings([userText]);
-    const topChunks = await similaritySearch(parsed.data.spaceId, embedding, 8);
-    if (topChunks.length > 0) {
-      ragContext = topChunks.map((chunk, index) => `(${index + 1}) ${chunk.content}`).join("\n\n");
-    }
-  }
-
-  const instructions = ragContext
-    ? `Use this local context if relevant:\n\n${ragContext}\n\nIf local context is insufficient, continue with normal web-grounded reasoning.`
-    : "Provide concise, accurate, citation-backed answers.";
-
   const safeModel = isValidModelId(parsed.data.model) ? parsed.data.model : getDefaultModel();
-  const cacheKey = `cache:chat:${userEmail}:${safeModel}:${parsed.data.spaceId ?? "none"}:${Buffer.from(userText).toString("base64")}`;
+  const cacheKey = `cache:chat:${userEmail}:${safeModel}:${parsed.data.roleId ?? "none"}:${Buffer.from(userText).toString("base64")}`;
 
   if (redis) {
     try {
@@ -257,6 +260,11 @@ export async function POST(request: Request) {
         if (cachedPayload.text.trim() === EMPTY_RESPONSE_FALLBACK_TEXT) {
           await redis.del(cacheKey);
         } else {
+          // Await user message persistence before finishing cached response if needed, 
+          // but we can just let it run.
+          await persistUserMessage;
+
+          // Cache hit: Persist assistant message and update thread model
           await db.insert(messages).values({
             id: createId(),
             threadId: parsed.data.threadId,
@@ -316,15 +324,77 @@ export async function POST(request: Request) {
 
   const stream = createUIMessageStream({
     execute: async ({ writer }) => {
+      // Ensure user message is persisted
+      await persistUserMessage;
       const responseMessageId = createId();
       const textId = createId();
 
+      // Start the UI stream IMMEDIATELY
       writer.write({ type: "start", messageId: responseMessageId });
       writer.write({ type: "text-start", id: textId });
+
+      let ragContext = "";
+      // ONLY perform RAG if the thread is associated with a role
+      if (activeRoleId) {
+        writer.write({
+          type: "data-call-start",
+          data: {
+            callId: "rag-search",
+            toolName: "Retrieval",
+            input: { query: userText },
+          },
+        } as any);
+
+        // Keep connection alive
+        writer.write({
+          type: "text-delta",
+          id: textId,
+          delta: "",
+        });
+
+        try {
+          const [embedding] = await getEmbeddings([userText]);
+          const topChunks = await similaritySearch(activeRoleId, embedding, 8);
+          if (topChunks.length > 0) {
+            ragContext = topChunks.map((chunk, index) => `(${index + 1}) ${chunk.content}`).join("\n\n");
+          }
+
+          writer.write({
+            type: "data-call-result",
+            data: {
+              callId: "rag-search",
+              result: `Found ${topChunks.length} relevant context chunks.`,
+            },
+          } as any);
+        } catch (error) {
+          console.error("[RAG Error]", error);
+          writer.write({
+            type: "data-call-result",
+            data: {
+              callId: "rag-search",
+              result: "Search failed, continuing with web search only.",
+            },
+          } as any);
+        }
+      }
+
+      const baseInstructions = roleInstructions ? roleInstructions + "\n\n" : "";
+      const instructions = ragContext
+        ? baseInstructions + `Use this local context if relevant:\n\n${ragContext}\n\nIf local context is insufficient, continue with normal web-grounded reasoning.`
+        : baseInstructions + (activeRoleId ? "Provide concise, accurate, citation-backed answers." : "Provide a concise and accurate response.");
 
       let assistantText = "";
       let completedResponse: unknown;
       let hasWrittenTextDelta = false;
+
+      writer.write({
+        type: "data-call-start",
+        data: {
+          callId: "model-gen",
+          toolName: "Thinking",
+          input: { model: safeModel },
+        },
+      } as any);
 
       try {
         const client = createPerplexityClient();
@@ -338,7 +408,8 @@ export async function POST(request: Request) {
               model: safeModel,
               input: agentInput,
               instructions,
-              tools: [{ type: "web_search" }, { type: "fetch_url" }],
+              // Only add web search tools if within a role
+              tools: activeRoleId ? [{ type: "web_search" }, { type: "fetch_url" }] : [],
             };
 
         const requestBody: Responses.ResponseCreateParamsStreaming = {
@@ -452,7 +523,7 @@ export async function POST(request: Request) {
       }
 
       await db.insert(messages).values({
-        id: createId(),
+        id: responseMessageId,
         threadId: parsed.data.threadId,
         role: "assistant",
         content: assistantText,

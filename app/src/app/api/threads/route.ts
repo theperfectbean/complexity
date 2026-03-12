@@ -11,7 +11,7 @@ import { getDefaultModel } from "@/lib/models";
 const createSchema = z.object({
   title: z.string().min(1).max(200),
   model: z.string().min(1).max(50).default(getDefaultModel()),
-  spaceId: z.string().optional(),
+  roleId: z.string().optional(),
 });
 
 export async function GET() {
@@ -60,7 +60,7 @@ export async function POST(request: Request) {
     title: parsed.data.title,
     model: parsed.data.model,
     userId: user.id,
-    spaceId: parsed.data.spaceId,
+    roleId: parsed.data.roleId,
   });
 
   const [thread] = await db.select().from(threads).where(eq(threads.id, id)).limit(1);

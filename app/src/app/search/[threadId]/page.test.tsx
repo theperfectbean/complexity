@@ -56,7 +56,7 @@ describe("ThreadPage", () => {
     const user = userEvent.setup();
     await user.click(await screen.findByRole("button", { name: "Select model" }));
     await user.click(await screen.findByRole("menuitem", { name: "GPT-5.2" }));
-    await user.type(screen.getByPlaceholderText("Ask anything"), "hello model");
+    await user.type(screen.getByPlaceholderText("Ask a follow-up..."), "hello model");
     await user.click(screen.getByRole("button", { name: "Send" }));
 
     await waitFor(() => {

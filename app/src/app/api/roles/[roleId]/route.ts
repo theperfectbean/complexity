@@ -4,52 +4,53 @@ import { z } from "zod";
 
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
-import { spaces, users } from "@/lib/db/schema";
+import { roles, users } from "@/lib/db/schema";
 
 const patchSchema = z.object({
   name: z.string().min(1).max(100).optional(),
   description: z.string().max(1000).optional().nullable(),
+  instructions: z.string().max(5000).optional().nullable(),
 });
 
-async function getUserAndSpace(spaceId: string, email: string) {
+async function getUserAndRole(roleId: string, email: string) {
   const [row] = await db
     .select({
       userId: users.id,
-      space: spaces,
+      role: roles,
     })
     .from(users)
-    .innerJoin(spaces, eq(spaces.userId, users.id))
-    .where(and(eq(users.email, email), eq(spaces.id, spaceId)))
+    .innerJoin(roles, eq(roles.userId, users.id))
+    .where(and(eq(users.email, email), eq(roles.id, roleId)))
     .limit(1);
 
   return row;
 }
 
-export async function GET(_: Request, { params }: { params: Promise<{ spaceId: string }> }) {
+export async function GET(_: Request, { params }: { params: Promise<{ roleId: string }> }) {
   const session = await auth();
   const userEmail = session?.user?.email;
   if (!userEmail) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { spaceId } = await params;
-  const row = await getUserAndSpace(spaceId, userEmail);
+  const { roleId } = await params;
+  const row = await getUserAndRole(roleId, userEmail);
   if (!row) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  return NextResponse.json({ space: row.space });
+  return NextResponse.json({ role: row.role });
 }
 
-export async function PATCH(request: Request, { params }: { params: Promise<{ spaceId: string }> }) {
+export async function PATCH(request: Request, { params }: { params: Promise<{ roleId: string }> }) {
   const session = await auth();
   const userEmail = session?.user?.email;
   if (!userEmail) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { spaceId } = await params;
-  const row = await getUserAndSpace(spaceId, userEmail);
+  const { roleId } = await params;
+  const row = await getUserAndRole(roleId, userEmail);
   if (!row) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
@@ -60,29 +61,30 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ sp
   }
 
   await db
-    .update(spaces)
+    .update(roles)
     .set({
-      name: parsed.data.name ?? row.space.name,
-      description: parsed.data.description ?? row.space.description,
+      name: parsed.data.name ?? row.role.name,
+      description: parsed.data.description ?? row.role.description,
+      instructions: parsed.data.instructions !== undefined ? parsed.data.instructions : row.role.instructions,
     })
-    .where(eq(spaces.id, spaceId));
+    .where(eq(roles.id, roleId));
 
   return NextResponse.json({ ok: true });
 }
 
-export async function DELETE(_: Request, { params }: { params: Promise<{ spaceId: string }> }) {
+export async function DELETE(_: Request, { params }: { params: Promise<{ roleId: string }> }) {
   const session = await auth();
   const userEmail = session?.user?.email;
   if (!userEmail) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { spaceId } = await params;
-  const row = await getUserAndSpace(spaceId, userEmail);
+  const { roleId } = await params;
+  const row = await getUserAndRole(roleId, userEmail);
   if (!row) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  await db.delete(spaces).where(eq(spaces.id, spaceId));
+  await db.delete(roles).where(eq(roles.id, roleId));
   return NextResponse.json({ ok: true });
 }

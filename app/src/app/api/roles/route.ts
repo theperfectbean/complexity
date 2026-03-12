@@ -5,11 +5,12 @@ import { z } from "zod";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { createId } from "@/lib/db/cuid";
-import { spaces, users } from "@/lib/db/schema";
+import { roles, users } from "@/lib/db/schema";
 
 const createSchema = z.object({
   name: z.string().min(1).max(100),
   description: z.string().max(1000).optional(),
+  instructions: z.string().max(5000).optional(),
 });
 
 export async function GET() {
@@ -26,11 +27,11 @@ export async function GET() {
 
   const rows = await db
     .select()
-    .from(spaces)
-    .where(eq(spaces.userId, user.id))
-    .orderBy(desc(spaces.updatedAt));
+    .from(roles)
+    .where(eq(roles.userId, user.id))
+    .orderBy(desc(roles.updatedAt));
 
-  return NextResponse.json({ spaces: rows });
+  return NextResponse.json({ roles: rows });
 }
 
 export async function POST(request: Request) {
@@ -51,13 +52,14 @@ export async function POST(request: Request) {
   }
 
   const id = createId();
-  await db.insert(spaces).values({
+  await db.insert(roles).values({
     id,
     name: parsed.data.name,
     description: parsed.data.description,
+    instructions: parsed.data.instructions,
     userId: user.id,
   });
 
-  const [space] = await db.select().from(spaces).where(eq(spaces.id, id)).limit(1);
-  return NextResponse.json({ space }, { status: 201 });
+  const [role] = await db.select().from(roles).where(eq(roles.id, id)).limit(1);
+  return NextResponse.json({ role }, { status: 201 });
 }

@@ -1,7 +1,6 @@
 "use client";
 
 import { useChat } from "@ai-sdk/react";
-import { DefaultChatTransport } from "ai";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useState } from "react";
@@ -11,23 +10,25 @@ import { useSession } from "next-auth/react";
 
 import { FollowUpInput } from "@/components/chat/FollowUpInput";
 import { ChatMessageItem, MessageList } from "@/components/chat/MessageList";
-import { DocumentList, SpaceDocument } from "@/components/spaces/DocumentList";
-import { FileUploader } from "@/components/spaces/FileUploader";
+import { DocumentList, RoleDocument } from "@/components/roles/DocumentList";
+import { FileUploader } from "@/components/roles/FileUploader";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { LoadingSkeleton } from "@/components/shared/LoadingSkeleton";
 import { MODELS, getDefaultModel } from "@/lib/models";
+import { normalizeUIMessage } from "@/lib/utils";
 
-type Space = {
+type Role = {
   id: string;
   name: string;
   description?: string | null;
+  instructions?: string | null;
 };
 
-export default function SpaceDetailPage() {
+export default function RoleDetailPage() {
   const { data: session, status } = useSession();
-  const { spaceId } = useParams<{ spaceId: string }>();
-  const [space, setSpace] = useState<Space | null>(null);
-  const [documents, setDocuments] = useState<SpaceDocument[]>([]);
+  const { roleId } = useParams<{ roleId: string }>();
+  const [role, setRole] = useState<Role | null>(null);
+  const [documents, setDocuments] = useState<RoleDocument[]>([]);
   const [docsLoading, setDocsLoading] = useState(true);
   const [model, setModel] = useState<string>(getDefaultModel());
   const [threadId, setThreadId] = useState<string | null>(null);
@@ -44,18 +45,18 @@ export default function SpaceDetailPage() {
   const loadDocuments = useCallback(async () => {
     setDocsLoading(true);
     try {
-      const response = await fetch(`/api/spaces/${spaceId}/documents`);
+      const response = await fetch(`/api/roles/${roleId}/documents`);
       if (!response.ok) {
         setDocuments([]);
         return;
       }
 
-      const payload = (await response.json()) as { documents: SpaceDocument[] };
+      const payload = (await response.json()) as { documents: RoleDocument[] };
       setDocuments(payload.documents);
     } finally {
       setDocsLoading(false);
     }
-  }, [spaceId]);
+  }, [roleId]);
 
   useEffect(() => {
     if (status !== "authenticated") {
@@ -63,23 +64,23 @@ export default function SpaceDetailPage() {
     }
 
     let active = true;
-    fetch(`/api/spaces/${spaceId}`)
-      .then((response) => (response.ok ? response.json() : Promise.reject(new Error("Failed to load space"))))
-      .then((payload: { space: Space }) => {
+    fetch(`/api/roles/${roleId}`)
+      .then((response) => (response.ok ? response.json() : Promise.reject(new Error("Failed to load role"))))
+      .then((payload: { role: Role }) => {
         if (active) {
-          setSpace(payload.space);
+          setRole(payload.role);
         }
       })
       .catch(() => {
         if (active) {
-          setSpace(null);
+          setRole(null);
         }
       });
 
     return () => {
       active = false;
     };
-  }, [spaceId, status]);
+  }, [roleId, status]);
 
   useEffect(() => {
     if (status !== "authenticated") {
@@ -88,25 +89,16 @@ export default function SpaceDetailPage() {
     void loadDocuments();
   }, [loadDocuments, status]);
 
-  const { messages, sendMessage, status: chatStatus, error } = useChat({
-    transport: new DefaultChatTransport({
-      api: "/api/chat",
-      body: () => ({
-        threadId: threadId ?? "",
-        model,
-        spaceId,
-      }),
-    }),
+  const { messages, sendMessage, status: chatStatus, error, data } = useChat({
+    api: "/api/chat",
+    body: {
+      threadId: threadId ?? "",
+      model,
+      roleId,
+    },
   });
 
-  const chatItems: ChatMessageItem[] = messages.map((message) => ({
-    id: message.id,
-    role: message.role,
-    content: message.parts
-      .filter((part) => part.type === "text")
-      .map((part) => (part.type === "text" ? part.text : ""))
-      .join("\n"),
-  }));
+  const chatItems: ChatMessageItem[] = messages.map((message) => normalizeUIMessage(message, data));
 
   useEffect(() => {
     if (error) {
@@ -129,7 +121,7 @@ export default function SpaceDetailPage() {
         body: JSON.stringify({
           title: prompt.slice(0, 80),
           model,
-          spaceId,
+          roleId,
         }),
       });
 
@@ -150,7 +142,7 @@ export default function SpaceDetailPage() {
           body: {
             threadId: activeThreadId,
             model,
-            spaceId,
+            roleId,
           },
         },
       );
@@ -163,20 +155,20 @@ export default function SpaceDetailPage() {
   if (!session?.user) {
     return (
       <main className="mx-auto max-w-5xl p-6">
-        Sign in to access this space. <Link href="/login" className="underline">Go to login</Link>
+        Sign in to access this role. <Link href="/login" className="underline">Go to login</Link>
       </main>
     );
   }
 
   return (
     <main className="mx-auto max-w-6xl p-6">
-      <h1 className="font-[var(--font-accent)] text-2xl font-semibold">{space ? space.name : `Space ${spaceId}`}</h1>
-      <p className="mt-2 text-sm text-muted-foreground">Upload docs and chat with this space as context.</p>
+      <h1 className="font-[var(--font-accent)] text-2xl font-semibold">{role ? role.name : `Role ${roleId}`}</h1>
+      <p className="mt-2 text-sm text-muted-foreground">Upload docs and chat with this role persona as context.</p>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[1fr,1.4fr]">
         <section className="space-y-4">
           <FileUploader
-            spaceId={spaceId}
+            roleId={roleId}
             onUploaded={() => {
               void loadDocuments();
               toast.success("Document uploaded");
@@ -196,7 +188,7 @@ export default function SpaceDetailPage() {
 
         <section className="flex min-h-[520px] flex-col rounded-lg border bg-card p-4 shadow-2xs">
           <div className="mb-3 flex items-center justify-between gap-3">
-            <h2 className="text-sm font-semibold">Space chat</h2>
+            <h2 className="text-sm font-semibold">Role chat</h2>
             <select className="rounded-md border bg-background px-3 py-2 text-sm" value={model} onChange={(event) => setModel(event.target.value)}>
               {Object.entries(groupedModels).map(([category, options]) => (
                 <optgroup key={category} label={category}>
@@ -213,7 +205,7 @@ export default function SpaceDetailPage() {
           <div className="flex-1 overflow-y-auto rounded-md border bg-background p-3">
             <MessageList
               messages={chatItems}
-              emptyLabel="Ask a question about your uploaded documents."
+              emptyLabel="Ask a question about your uploaded documents or the role's expertise."
               onRelatedQuestionClick={(question) => setPrompt(question)}
             />
           </div>
@@ -222,7 +214,7 @@ export default function SpaceDetailPage() {
             <FollowUpInput
               value={prompt}
               onChange={setPrompt}
-              placeholder="Ask this space"
+              placeholder="Ask this role"
               submitLabel={chatStatus === "streaming" ? "Thinking..." : "Send"}
               disabled={chatStatus === "streaming"}
             />

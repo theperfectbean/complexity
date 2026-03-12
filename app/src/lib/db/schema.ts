@@ -65,10 +65,11 @@ export const verificationTokens = pgTable(
   (table) => [primaryKey({ columns: [table.identifier, table.token] })],
 );
 
-export const spaces = pgTable("spaces", {
+export const roles = pgTable("spaces", {
   id: text("id").primaryKey(),
   name: varchar("name", { length: 100 }).notNull(),
   description: text("description"),
+  instructions: text("instructions"),
   userId: text("user_id")
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
@@ -84,7 +85,7 @@ export const threads = pgTable(
     userId: text("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    spaceId: text("space_id").references(() => spaces.id, { onDelete: "set null" }),
+    roleId: text("space_id").references(() => roles.id, { onDelete: "set null" }),
     model: varchar("model", { length: 50 }).notNull().default("perplexity/sonar"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
@@ -113,9 +114,9 @@ export const documents = pgTable("documents", {
   filename: varchar("filename", { length: 255 }).notNull(),
   mimeType: varchar("mime_type", { length: 100 }).notNull(),
   sizeBytes: integer("size_bytes").notNull(),
-  spaceId: text("space_id")
+  roleId: text("space_id")
     .notNull()
-    .references(() => spaces.id, { onDelete: "cascade" }),
+    .references(() => roles.id, { onDelete: "cascade" }),
   status: varchar("status", { length: 20 }).notNull().default("processing"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -127,9 +128,9 @@ export const chunks = pgTable(
     documentId: text("document_id")
       .notNull()
       .references(() => documents.id, { onDelete: "cascade" }),
-    spaceId: text("space_id")
+    roleId: text("space_id")
       .notNull()
-      .references(() => spaces.id, { onDelete: "cascade" }),
+      .references(() => roles.id, { onDelete: "cascade" }),
     content: text("content").notNull(),
     embedding: vector("embedding", { dimensions: 384 }).notNull(),
     chunkIndex: integer("chunk_index").notNull(),
@@ -137,14 +138,14 @@ export const chunks = pgTable(
   },
   (table) => [
     index("chunks_doc_idx").on(table.documentId),
-    index("chunks_space_idx").on(table.spaceId),
+    index("chunks_space_idx").on(table.roleId),
     index("chunks_embedding_hnsw_idx").using("hnsw", table.embedding.op("vector_cosine_ops")),
   ],
 );
 
 export const usersRelations = relations(users, ({ many }) => ({
   threads: many(threads),
-  spaces: many(spaces),
+  roles: many(roles),
 }));
 
 export const threadsRelations = relations(threads, ({ one, many }) => ({
@@ -152,9 +153,9 @@ export const threadsRelations = relations(threads, ({ one, many }) => ({
     fields: [threads.userId],
     references: [users.id],
   }),
-  space: one(spaces, {
-    fields: [threads.spaceId],
-    references: [spaces.id],
+  role: one(roles, {
+    fields: [threads.roleId],
+    references: [roles.id],
   }),
   messages: many(messages),
 }));
@@ -166,9 +167,9 @@ export const messagesRelations = relations(messages, ({ one }) => ({
   }),
 }));
 
-export const spacesRelations = relations(spaces, ({ one, many }) => ({
+export const rolesRelations = relations(roles, ({ one, many }) => ({
   user: one(users, {
-    fields: [spaces.userId],
+    fields: [roles.userId],
     references: [users.id],
   }),
   documents: many(documents),
@@ -176,9 +177,9 @@ export const spacesRelations = relations(spaces, ({ one, many }) => ({
 }));
 
 export const documentsRelations = relations(documents, ({ one, many }) => ({
-  space: one(spaces, {
-    fields: [documents.spaceId],
-    references: [spaces.id],
+  role: one(roles, {
+    fields: [documents.roleId],
+    references: [roles.id],
   }),
   chunks: many(chunks),
 }));
@@ -188,8 +189,8 @@ export const chunksRelations = relations(chunks, ({ one }) => ({
     fields: [chunks.documentId],
     references: [documents.id],
   }),
-  space: one(spaces, {
-    fields: [chunks.spaceId],
-    references: [spaces.id],
+  role: one(roles, {
+    fields: [chunks.roleId],
+    references: [roles.id],
   }),
 }));

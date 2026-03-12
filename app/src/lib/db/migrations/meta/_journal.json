@@ -15,6 +15,13 @@
       "when": 0,
       "tag": "0001_agent_api_models",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1773184872006,
+      "tag": "0002_tranquil_major_mapleleaf",
+      "breakpoints": true
     }
   ]
 }

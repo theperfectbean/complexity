@@ -12,13 +12,13 @@ vi.mock("@/lib/db", () => ({
 }));
 
 vi.mock("@/lib/db/cuid", () => ({
-  createId: vi.fn(() => "space-1"),
+  createId: vi.fn(() => "role-1"),
 }));
 
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
 
-import { GET, POST } from "@/app/api/spaces/route";
+import { GET, POST } from "@/app/api/roles/route";
 
 function mockSelectSingleOnce(result: unknown) {
   const limit = vi.fn().mockResolvedValue(result);
@@ -34,7 +34,7 @@ function mockSelectManyOnce(result: unknown) {
   vi.mocked(db.select).mockReturnValueOnce({ from } as never);
 }
 
-describe("/api/spaces", () => {
+describe("/api/roles", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(auth).mockResolvedValue({ user: { email: "gary@example.com" } } as never);
@@ -59,14 +59,14 @@ describe("/api/spaces", () => {
       await expect(response.json()).resolves.toEqual({ error: "User not found" });
     });
 
-    it("returns user spaces", async () => {
+    it("returns user roles", async () => {
       mockSelectSingleOnce([{ id: "user-1" }]);
-      mockSelectManyOnce([{ id: "space-1", name: "Personal" }]);
+      mockSelectManyOnce([{ id: "role-1", name: "Personal" }]);
 
       const response = await GET();
 
       expect(response.status).toBe(200);
-      await expect(response.json()).resolves.toEqual({ spaces: [{ id: "space-1", name: "Personal" }] });
+      await expect(response.json()).resolves.toEqual({ roles: [{ id: "role-1", name: "Personal" }] });
     });
   });
 
@@ -75,7 +75,7 @@ describe("/api/spaces", () => {
       mockSelectSingleOnce([{ id: "user-1" }]);
 
       const response = await POST(
-        new Request("http://localhost/api/spaces", {
+        new Request("http://localhost/api/roles", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ name: "" }),
@@ -86,14 +86,14 @@ describe("/api/spaces", () => {
       await expect(response.json()).resolves.toEqual({ error: "Invalid payload" });
     });
 
-    it("creates a space", async () => {
+    it("creates a role", async () => {
       mockSelectSingleOnce([{ id: "user-1" }]);
       const values = vi.fn().mockResolvedValue(undefined);
       vi.mocked(db.insert).mockReturnValue({ values } as never);
-      mockSelectSingleOnce([{ id: "space-1", name: "Research", userId: "user-1" }]);
+      mockSelectSingleOnce([{ id: "role-1", name: "Research", userId: "user-1" }]);
 
       const response = await POST(
-        new Request("http://localhost/api/spaces", {
+        new Request("http://localhost/api/roles", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ name: "Research", description: "Docs" }),
@@ -102,7 +102,7 @@ describe("/api/spaces", () => {
 
       expect(response.status).toBe(201);
       await expect(response.json()).resolves.toEqual({
-        space: { id: "space-1", name: "Research", userId: "user-1" },
+        role: { id: "role-1", name: "Research", userId: "user-1" },
       });
       expect(db.insert).toHaveBeenCalledTimes(1);
     });

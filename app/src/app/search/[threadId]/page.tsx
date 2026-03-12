@@ -1,7 +1,6 @@
 "use client";
 
 import { useChat } from "@ai-sdk/react";
-import { DefaultChatTransport } from "ai";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -10,11 +9,14 @@ import { ChatCitation, ChatMessageItem, MessageList } from "@/components/chat/Me
 import { SearchBar } from "@/components/search/SearchBar";
 import { getDefaultModel } from "@/lib/models";
 
+import { normalizeUIMessage } from "@/lib/utils";
+
 type ThreadPayload = {
   thread: {
     id: string;
     title: string;
     model: string;
+    roleId: string | null;
   };
   messages: Array<{
     id: string;
@@ -23,41 +25,6 @@ type ThreadPayload = {
     citations: unknown;
   }>;
 };
-
-function asRecord(value: unknown): Record<string, unknown> | null {
-  if (typeof value !== "object" || value === null) {
-    return null;
-  }
-  return value as Record<string, unknown>;
-}
-
-function collectTextStrings(value: unknown): string[] {
-  if (typeof value === "string") {
-    const trimmed = value.trim();
-    return trimmed ? [trimmed] : [];
-  }
-
-  if (Array.isArray(value)) {
-    return value.flatMap((item) => collectTextStrings(item));
-  }
-
-  const record = asRecord(value);
-  if (!record) {
-    return [];
-  }
-
-  const directText = ["text", "output_text", "input_text"]
-    .flatMap((key) => collectTextStrings(record[key]))
-    .filter(Boolean);
-
-  if (directText.length > 0) {
-    return directText;
-  }
-
-  return ["content", "parts", "data"]
-    .flatMap((key) => collectTextStrings(record[key]))
-    .filter(Boolean);
-}
 
 function getChatErrorMessage(error: Error | undefined): string {
   if (!error?.message) {
@@ -98,15 +65,13 @@ export default function ThreadPage() {
   const threadId = params.threadId;
   const initialQuery = searchParams.get("q")?.trim() ?? "";
   const [model, setModel] = useState<string>(getDefaultModel());
-  const [threadTitle, setThreadTitle] = useState<string>(`Thread ${threadId.slice(0, 8)}`);
+  const [roleId, setRoleId] = useState<string | null>(null);
   const [historyMessages, setHistoryMessages] = useState<ChatMessageItem[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(true);
   const hasSubmittedInitialQuery = useRef(false);
 
-  const { messages, sendMessage, status, error } = useChat({
-    transport: new DefaultChatTransport({
-      api: "/api/chat",
-    }),
+  const { messages, sendMessage, status, error, data } = useChat({
+    api: "/api/chat",
   });
   const [prompt, setPrompt] = useState("");
 
@@ -120,8 +85,8 @@ export default function ThreadPage() {
           return;
         }
 
-        setThreadTitle(payload.thread.title || `Thread ${threadId.slice(0, 8)}`);
         setModel(payload.thread.model || getDefaultModel());
+        setRoleId(payload.thread.roleId);
         setHistoryMessages(
           payload.messages.map((message) => ({
             id: message.id,
@@ -148,71 +113,8 @@ export default function ThreadPage() {
   }, [threadId]);
 
   const liveMessages = useMemo<ChatMessageItem[]>(
-    () =>
-      messages.map((message) => {
-        const msg = message as unknown as Record<string, unknown>;
-        let text = "";
-
-        // 1. Check content property (standard for many AI SDK versions)
-        if (typeof msg.content === "string" && msg.content.length > 0) {
-          text = msg.content;
-        }
-
-        // 2. Try parts (SSE / UI Messages protocol)
-        if (!text.trim() && Array.isArray(msg.parts) && msg.parts.length > 0) {
-          text = msg.parts
-            .map((part: unknown) => {
-              if (typeof part === "object" && part !== null) {
-                const p = part as Record<string, unknown>;
-                // TextUIPart has .text, UIMessageChunk has .delta or .textDelta
-                return (p.text as string) || (p.textDelta as string) || (p.delta as string) || "";
-              }
-              return typeof part === "string" ? part : "";
-            })
-            .join("");
-        }
-
-        // 3. Fallback to exhaustive search in content (handles arrays of objects)
-        if (!text.trim() && msg.content) {
-          const collected = collectTextStrings(msg.content);
-          if (collected.length > 0) {
-            text = Array.from(new Set(collected)).join("\n");
-          }
-        }
-
-        // 4. Final fallback to top-level properties just in case
-        if (!text.trim()) {
-          text = (msg.text as string) || (msg.delta as string) || "";
-        }
-
-        const citations: ChatCitation[] = [];
-        if (Array.isArray(msg.parts)) {
-          msg.parts.forEach((part: unknown) => {
-            if (part && typeof part === "object") {
-              const p = part as Record<string, unknown>;
-              if (p.type === "source-url") {
-                citations.push({
-                  url: p.url as string,
-                  title: p.title as string,
-                });
-              } else if (p.type === "source-document") {
-                citations.push({
-                  url: p.sourceId as string, // Fallback for document ID
-                  title: (p.title as string) || (p.filename as string),
-                });
-              }
-            }
-          });
-        }
-
-        return {
-          id: message.id,
-          role: message.role,
-          content: text || "\u200B",
-          citations: citations.length > 0 ? citations : undefined,
-        };
-      }),
-    [messages],
+    () => messages.map((message) => normalizeUIMessage(message, data)),
+    [messages, data],
   );
 
   const mergedMessages = [...historyMessages, ...liveMessages];
@@ -236,6 +138,7 @@ export default function ThreadPage() {
         body: {
           threadId,
           model,
+          roleId,
         },
       },
     )
@@ -245,7 +148,7 @@ export default function ThreadPage() {
       .catch(() => {
         toast.error("Failed to send initial query");
       });
-  }, [initialQuery, loadingHistory, mergedMessages.length, model, router, sendMessage, threadId]);
+  }, [initialQuery, loadingHistory, mergedMessages.length, model, roleId, router, sendMessage, threadId]);
 
   useEffect(() => {
     if (error) {
@@ -255,50 +158,48 @@ export default function ThreadPage() {
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
-    if (!prompt.trim()) {
+    const currentPrompt = prompt.trim();
+    if (!currentPrompt) {
       return;
     }
+
+    setPrompt("");
+
     try {
       await sendMessage(
-        { text: prompt },
+        { text: currentPrompt },
         {
           body: {
             threadId,
             model,
+            roleId,
           },
         },
       );
     } catch {
       toast.error("Failed to send message");
+      setPrompt(currentPrompt);
     }
-    setPrompt("");
   }
 
   return (
-    <main className="relative mx-auto flex h-full min-h-screen w-full max-w-4xl flex-col px-4 py-6">
-      <div className="pointer-events-none absolute inset-x-0 top-10 -z-10 flex justify-center">
-        <div className="h-56 w-56 rounded-full bg-primary/10 blur-3xl" />
-      </div>
-
-      <header className="mb-4 flex items-center justify-between gap-3">
-        <div className="min-w-0">
-          <h1 className="truncate font-[var(--font-accent)] text-xl font-semibold tracking-tight">{threadTitle}</h1>
-          <p className="mt-1 text-xs text-muted-foreground">{mergedMessages.length} messages in this thread</p>
-        </div>
-        <span className="shrink-0 rounded-full border border-primary/20 bg-primary/10 px-2.5 py-1 text-xs text-primary">
-          {model}
-        </span>
-      </header>
+    <main className="relative mx-auto flex h-full min-h-screen w-full max-w-4xl flex-col px-6 pt-16 pb-24">
 
       {chatErrorMessage ? (
-        <div className="mb-3 rounded-lg border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">
+        <div
+          className="mb-6 rounded-xl border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive"
+          role="alert"
+        >
           {chatErrorMessage}
         </div>
       ) : null}
 
-      <section className="flex-1 overflow-y-auto rounded-xl border bg-card p-4 shadow-2xs">
+      <div className="flex-1 space-y-12">
         {loadingHistory ? (
-          <p className="text-sm text-muted-foreground">Loading thread...</p>
+          <div className="flex items-center gap-2 text-sm text-muted-foreground/60">
+            <div className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary" />
+            Loading conversation...
+          </div>
         ) : (
           <MessageList
             messages={mergedMessages}
@@ -306,21 +207,25 @@ export default function ThreadPage() {
             onRelatedQuestionClick={(question) => setPrompt(question)}
           />
         )}
-      </section>
+      </div>
 
-      <form onSubmit={onSubmit} className="mt-3">
-        <SearchBar
-          value={prompt}
-          onChange={setPrompt}
-          placeholder="Ask anything"
-          submitLabel={status === "streaming" ? "Thinking..." : "Send"}
-          disabled={status === "streaming"}
-          layoutId="searchbar"
-          compact
-          model={model}
-          onModelChange={setModel}
-        />
-      </form>
+      <div className="fixed inset-x-0 bottom-0 z-20 bg-gradient-to-t from-background via-background/95 to-transparent pb-6 pt-10">
+        <form onSubmit={onSubmit} className="mx-auto max-w-3xl px-4">
+          <div className="rounded-2xl border bg-card/50 p-1 shadow-lg backdrop-blur-md transition-shadow focus-within:shadow-xl focus-within:ring-1 focus-within:ring-primary/20">
+            <SearchBar
+              value={prompt}
+              onChange={setPrompt}
+              placeholder="Ask a follow-up..."
+              submitLabel={status === "streaming" ? "Thinking..." : "Send"}
+              disabled={status === "streaming"}
+              layoutId="searchbar"
+              compact
+              model={model}
+              onModelChange={setModel}
+            />
+          </div>
+        </form>
+      </div>
     </main>
   );
 }

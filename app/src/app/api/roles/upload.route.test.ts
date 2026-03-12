@@ -27,9 +27,9 @@ import { db } from "@/lib/db";
 import { chunkText, getEmbeddings } from "@/lib/rag";
 import { extractTextFromFile, isAllowedDocument } from "@/lib/documents";
 
-import { POST } from "@/app/api/spaces/[spaceId]/upload/route";
+import { POST } from "@/app/api/roles/[roleId]/upload/route";
 
-function mockOwnedSpace(result: unknown) {
+function mockOwnedRole(result: unknown) {
   const limit = vi.fn().mockResolvedValue(result);
   const where = vi.fn(() => ({ limit }));
   const innerJoin = vi.fn(() => ({ where }));
@@ -37,7 +37,7 @@ function mockOwnedSpace(result: unknown) {
   vi.mocked(db.select).mockReturnValue({ from } as never);
 }
 
-describe("POST /api/spaces/[spaceId]/upload", () => {
+describe("POST /api/roles/[roleId]/upload", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(auth).mockResolvedValue({ user: { email: "gary@example.com" } } as never);
@@ -56,44 +56,44 @@ describe("POST /api/spaces/[spaceId]/upload", () => {
   it("returns 401 when unauthenticated", async () => {
     vi.mocked(auth).mockResolvedValue(null as never);
 
-    const request = new Request("http://localhost/api/spaces/space-1/upload", {
+    const request = new Request("http://localhost/api/roles/role-1/upload", {
       method: "POST",
       body: new FormData(),
     });
 
-    const response = await POST(request, { params: Promise.resolve({ spaceId: "space-1" }) });
+    const response = await POST(request, { params: Promise.resolve({ roleId: "role-1" }) });
     expect(response.status).toBe(401);
     await expect(response.json()).resolves.toEqual({ error: "Unauthorized" });
   });
 
-  it("returns 404 when space is not owned by user", async () => {
-    mockOwnedSpace([]);
+  it("returns 404 when role is not owned by user", async () => {
+    mockOwnedRole([]);
 
-    const request = new Request("http://localhost/api/spaces/space-1/upload", {
+    const request = new Request("http://localhost/api/roles/role-1/upload", {
       method: "POST",
       body: new FormData(),
     });
 
-    const response = await POST(request, { params: Promise.resolve({ spaceId: "space-1" }) });
+    const response = await POST(request, { params: Promise.resolve({ roleId: "role-1" }) });
     expect(response.status).toBe(404);
-    await expect(response.json()).resolves.toEqual({ error: "Space not found" });
+    await expect(response.json()).resolves.toEqual({ error: "Role not found" });
   });
 
   it("returns 400 when file is missing", async () => {
-    mockOwnedSpace([{ id: "space-1" }]);
+    mockOwnedRole([{ id: "role-1" }]);
 
-    const request = new Request("http://localhost/api/spaces/space-1/upload", {
+    const request = new Request("http://localhost/api/roles/role-1/upload", {
       method: "POST",
       body: new FormData(),
     });
 
-    const response = await POST(request, { params: Promise.resolve({ spaceId: "space-1" }) });
+    const response = await POST(request, { params: Promise.resolve({ roleId: "role-1" }) });
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toEqual({ error: "Missing file" });
   });
 
   it("returns 400 for unsupported file type", async () => {
-    mockOwnedSpace([{ id: "space-1" }]);
+    mockOwnedRole([{ id: "role-1" }]);
     vi.mocked(isAllowedDocument).mockReturnValue(false);
 
     const request = {
@@ -102,13 +102,13 @@ describe("POST /api/spaces/[spaceId]/upload", () => {
       }),
     } as unknown as Request;
 
-    const response = await POST(request, { params: Promise.resolve({ spaceId: "space-1" }) });
+    const response = await POST(request, { params: Promise.resolve({ roleId: "role-1" }) });
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toEqual({ error: "Only pdf/docx/txt/md are allowed" });
   });
 
   it("returns ready status for successful upload processing", async () => {
-    mockOwnedSpace([{ id: "space-1" }]);
+    mockOwnedRole([{ id: "role-1" }]);
     mockMutationChains();
     vi.mocked(isAllowedDocument).mockReturnValue(true);
     vi.mocked(extractTextFromFile).mockResolvedValue("hello world");
@@ -124,7 +124,7 @@ describe("POST /api/spaces/[spaceId]/upload", () => {
       }),
     } as unknown as Request;
 
-    const response = await POST(request, { params: Promise.resolve({ spaceId: "space-1" }) });
+    const response = await POST(request, { params: Promise.resolve({ roleId: "role-1" }) });
     expect(response.status).toBe(200);
 
     const payload = (await response.json()) as { status: string; chunkCount: number; documentId: string };
@@ -136,7 +136,7 @@ describe("POST /api/spaces/[spaceId]/upload", () => {
   });
 
   it("returns 400 for oversized file", async () => {
-    mockOwnedSpace([{ id: "space-1" }]);
+    mockOwnedRole([{ id: "role-1" }]);
     vi.mocked(isAllowedDocument).mockReturnValue(true);
 
     const oversizedFile = new File(["hello"], "big.pdf", { type: "application/pdf" });
@@ -148,13 +148,13 @@ describe("POST /api/spaces/[spaceId]/upload", () => {
       }),
     } as unknown as Request;
 
-    const response = await POST(request, { params: Promise.resolve({ spaceId: "space-1" }) });
+    const response = await POST(request, { params: Promise.resolve({ roleId: "role-1" }) });
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toEqual({ error: "File exceeds 20MB limit" });
   });
 
   it("marks document failed when extraction throws", async () => {
-    mockOwnedSpace([{ id: "space-1" }]);
+    mockOwnedRole([{ id: "role-1" }]);
     vi.mocked(isAllowedDocument).mockReturnValue(true);
     vi.mocked(extractTextFromFile).mockRejectedValue(new Error("parse failed"));
 
@@ -170,7 +170,7 @@ describe("POST /api/spaces/[spaceId]/upload", () => {
       }),
     } as unknown as Request;
 
-    const response = await POST(request, { params: Promise.resolve({ spaceId: "space-1" }) });
+    const response = await POST(request, { params: Promise.resolve({ roleId: "role-1" }) });
     expect(response.status).toBe(500);
     await expect(response.json()).resolves.toEqual({ error: "parse failed" });
     expect(db.update).toHaveBeenCalled();
