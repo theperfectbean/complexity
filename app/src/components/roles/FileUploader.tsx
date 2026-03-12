@@ -1,26 +1,23 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { ChangeEvent, useRef, useState } from "react";
+import { Plus, Loader2 } from "lucide-react";
 
 type FileUploaderProps = {
   roleId: string;
   onUploaded: () => void;
+  variant?: "button" | "full";
 };
 
-export function FileUploader({ roleId, onUploaded }: FileUploaderProps) {
-  const [file, setFile] = useState<File | null>(null);
+export function FileUploader({ roleId, onUploaded, variant = "button" }: FileUploaderProps) {
   const [uploading, setUploading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  async function onSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!file || uploading) {
-      return;
-    }
+  async function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
 
     setUploading(true);
-    setError(null);
-
     try {
       const body = new FormData();
       body.append("file", file);
@@ -31,35 +28,71 @@ export function FileUploader({ roleId, onUploaded }: FileUploaderProps) {
       });
 
       if (!response.ok) {
-        const payload = (await response.json().catch(() => null)) as { error?: string } | null;
-        setError(payload?.error ?? "Upload failed");
-        return;
+        throw new Error("Upload failed");
       }
 
-      setFile(null);
       onUploaded();
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    } catch (error) {
+      console.error(error);
     } finally {
       setUploading(false);
     }
   }
 
+  if (variant === "button") {
+    return (
+      <div className="inline-flex">
+        <input
+          type="file"
+          ref={fileInputRef}
+          className="hidden"
+          accept=".pdf,.docx,.txt,.md"
+          onChange={handleFileChange}
+          disabled={uploading}
+        />
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={uploading}
+          className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground/60 transition-colors hover:bg-muted/60 hover:text-foreground disabled:opacity-50"
+          aria-label="Upload file"
+        >
+          {uploading ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Plus className="h-5 w-5" />
+          )}
+        </button>
+      </div>
+    );
+  }
+
   return (
-    <form onSubmit={onSubmit} className="space-y-3 rounded-lg border bg-card p-4 shadow-2xs">
-      <h3 className="text-sm font-semibold">Upload document</h3>
+    <div className="group relative flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-border/40 bg-muted/20 p-8 transition-colors hover:border-border/60 hover:bg-muted/40">
       <input
         type="file"
+        ref={fileInputRef}
+        className="absolute inset-0 cursor-pointer opacity-0"
         accept=".pdf,.docx,.txt,.md"
-        onChange={(event) => setFile(event.target.files?.[0] ?? null)}
-        className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+        onChange={handleFileChange}
+        disabled={uploading}
       />
-      {error ? <p className="text-xs text-destructive">{error}</p> : null}
-      <button
-        type="submit"
-        disabled={!file || uploading}
-        className="rounded-md bg-primary px-3 py-2 text-sm text-primary-foreground disabled:opacity-60"
-      >
-        {uploading ? "Uploading..." : "Upload"}
-      </button>
-    </form>
+      <div className="flex flex-col items-center gap-3 text-center">
+        {uploading ? (
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        ) : (
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-background shadow-sm transition-transform group-hover:scale-110">
+            <Plus className="h-6 w-6 text-muted-foreground" />
+          </div>
+        )}
+        <div className="space-y-1">
+          <p className="text-sm font-medium">Click or drag to upload</p>
+          <p className="text-xs text-muted-foreground">PDF, DOCX, TXT, or MD up to 20MB</p>
+        </div>
+      </div>
+    </div>
   );
 }
