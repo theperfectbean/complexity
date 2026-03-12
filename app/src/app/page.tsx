@@ -85,14 +85,15 @@ export default function Home() {
           <SearchBar
             value={query}
             onChange={setQuery}
+            model={model}
+            onModelChange={setModel}
             placeholder="Ask anything..."
             submitLabel={loading ? "Starting..." : "Start"}
             disabled={loading}
-            layoutId="searchbar"
-            model={model}
-            onModelChange={setModel}
           />
-          <span className="text-xs text-muted-foreground">Model applies to this new thread</span>
+          <div className="text-center">
+            <span className="text-xs text-muted-foreground">Model applies to this new thread</span>
+          </div>
         </form>
       </div>
     </main>
