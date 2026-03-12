@@ -24,6 +24,20 @@ cp .env.example .env
 docker compose up --build
 ```
 
+*(Note: In development, `docker-compose.dev.yml` is often used to mount a named volume for `node_modules` to prevent host pollution and resolve SWC binary mismatch issues between host and container).*
+
+### Database Migrations
+If you encounter a `500` error or "failed to start thread" noting `relation "users" does not exist`, you need to apply database migrations.
+
+You can run them manually using:
+```bash
+docker exec complexity-app npm run db:migrate
+```
+Or from the host (if `DATABASE_URL` is set to localhost):
+```bash
+cd app && npm run db:migrate
+```
+
 ## Faster Docker Builds (BuildKit + buildx)
 
 If you see `Docker Compose requires buildx plugin to be installed`, Compose is using the classic builder (slower, weaker caching).

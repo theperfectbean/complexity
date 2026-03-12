@@ -43,13 +43,15 @@ Browser -> Next.js app (app:3000)
 
 ## Streaming Protocol
 
-The application uses the AI SDK "v6" (SSE) protocol for real-time communication. 
+The application uses the AI SDK "v6" (SSE) protocol for real-time communication.
 
 - **Text:** Streamed via `text-delta` chunks and accumulated in the client `parts` array.
 - **Citations:** Streamed via `source-url` chunks and parsed on the client to display source cards during the stream.
+- **Custom Data:** The frontend `useChat` utilizes `DefaultChatTransport` and local data state instead of the legacy `data` property. The backend writes custom stream chunks (e.g., memory events) using the `data-json` type to satisfy the `UIMessageChunk` discriminated union.
+- **Provider:** The Perplexity integration implements the `LanguageModelV3` interface from `@ai-sdk/provider`, supporting explicit `stream: boolean` parameters and properly typed `input` arrays (`type: 'message'`) required by the v0.26 SDK.
 - **Persistence:** Messages are saved to PostgreSQL once the server-side stream finishes or if a cached response is served.
 
-For details on the extraction logic and recent fixes, see [Streaming UI Fix](./STREAMING_FIX.md).
+For details on the extraction logic and earlier fixes, see [Streaming UI Fix](./STREAMING_FIX.md).
 
 ## Key Source Locations
 
@@ -61,6 +63,7 @@ For details on the extraction logic and recent fixes, see [Streaming UI Fix](./S
 - Embedding extraction/parsing: `app/src/lib/documents.ts`
 - DB schema: `app/src/lib/db/schema.ts`
 - Embedder service: `embedder/main.py`
+- Playwright E2E Tests: `app/e2e/**`
 
 ## Database Model Summary
 
@@ -69,6 +72,7 @@ Primary entities:
 - `users`
 - `threads`
 - `messages`
+- `memories` (persisted user preferences)
 - `spaces`
 - `documents`
 - `chunks`
@@ -82,6 +86,7 @@ Major routes:
 - `/` — landing + new search
 - `/search/[threadId]` — thread chat
 - `/library` — thread management
+- `/settings/memory` — memory management
 - `/spaces` — space management
 - `/spaces/[spaceId]` — upload + space-scoped chat
 
@@ -89,4 +94,4 @@ Reusable UI includes:
 
 - `AppShell` with sidebar/mobile nav
 - `SearchBar` with shared `layoutId` motion transition
-- `MessageList` with markdown, source cards, copy action, and related questions
+- `MessageList` with markdown, source cards, related questions, advanced thinking step visualizations (auto-hiding intermediate steps, checkmark completion), and Framer Motion-enhanced copy buttons (morphing icons, bounce animations).

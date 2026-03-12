@@ -47,13 +47,14 @@ Self-hosted Perplexity-style AI search and RAG workspace.
   - `/search/[threadId]`
   - `/spaces`, `/spaces/[spaceId]`
   - `/library`
-- Chat UI uses AI SDK v6 transport (`DefaultChatTransport`) and model selection grouped by category
+  - `/settings/memory`
+- Chat UI uses AI SDK v6 transport (`DefaultChatTransport`) and features enhanced Framer Motion animations (for copy buttons, layout transitions, and thinking states).
 
 ### Refactor Note: Perplexity SDK → Agent API
 - **What changed**
   - Chat backend moved from provider-style model resolution to direct Agent API calls.
-  - Perplexity client is now initialized via `@perplexity-ai/perplexity_ai` in [app/src/lib/perplexity.ts](app/src/lib/perplexity.ts).
-  - Chat streaming now processes Agent API response events in [app/src/app/api/chat/route.ts](app/src/app/api/chat/route.ts).
+  - Perplexity client is now initialized via `@perplexity-ai/perplexity_ai` implementing `LanguageModelV3` in [app/src/lib/perplexity.ts](app/src/lib/perplexity.ts).
+  - Chat streaming now processes Agent API response events via `data-json` chunk types.
 - **Modeling changes**
   - Default thread model changed from Sonar-style IDs to Agent preset IDs (default: `pro-search`).
   - Model defaults are reflected in schema + migrations (`0001_agent_api_models.sql`).
@@ -65,12 +66,11 @@ Self-hosted Perplexity-style AI search and RAG workspace.
 ### Validation Completed
 - `npm run lint` passes in [app](app)
 - `npm run build` passes in [app](app)
-- `npm test` passes in [app](app)
+- `npm test` and `npx playwright test` pass in [app](app)
 
 ### Test Suite Status
-- Framework: Vitest + React Testing Library
-- Current scope: 54 tests across component, utility, and API route integration-style coverage
-- Coverage includes auth guards, ownership checks, validation errors, cache-hit/rate-limit paths, and upload success/failure flows
+- Frameworks: Vitest + React Testing Library (Unit/Integration) and Playwright (E2E)
+- Current scope: 64 unit/integration tests and 4 E2E test files covering auth guards, ownership checks, validation errors, cache-hit/rate-limit paths, and UI interactions.
 
 ## Documentation Index
 

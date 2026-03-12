@@ -43,7 +43,7 @@ DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose build app
   - `docs/`: Extensive documentation including architecture, API references, runbooks, and testing guides.
 
 - **Testing:**
-  - The project uses Vitest and React Testing Library.
+  - The project uses Vitest and React Testing Library for unit/integration, and Playwright for E2E testing.
   - Run tests from within the `app` directory:
     ```bash
     cd app
@@ -51,6 +51,7 @@ DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose build app
     npm run test:coverage
     npm run test:smoke-models
     npm run test:smoke-route
+    npx playwright test
     ```
 
 - **Linting:**

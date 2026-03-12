@@ -180,12 +180,11 @@ The settings page uses the browser's native `window.prompt()` for editing. Funct
 | Settings UI | Done | Toggle, list, add, edit, delete, clear all |
 | Navigation | Done | Sidebar + MobileNav |
 | Chat toast | Done | Watches data stream for memory-saved events |
-| **Migration** | **Missing** | Must run `drizzle-kit generate` + `migrate` |
+| **Migration** | **Done** | `drizzle-kit generate` + `migrate` has been run |
 | **Tests** | **Missing** | No memory-specific integration tests |
 | **Stream race condition** | **Bug** | memory-saved event may fire after stream close |
 
 ### Blockers Before Ship
 
-1. Generate and apply the Drizzle migration.
-2. Fix or explicitly accept the stream race condition for the toast.
-3. Add test coverage for the memory API endpoints.
+1. Fix or explicitly accept the stream race condition for the toast.
+2. Add test coverage for the memory API endpoints.

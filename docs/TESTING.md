@@ -4,11 +4,13 @@ This project uses **Vitest** + **React Testing Library** for automated testing i
 
 ## Snapshot (Current State)
 
-- Test framework: `vitest` (`jsdom` environment)
+- Unit/Integration Framework: `vitest` (`jsdom` environment)
 - Assertion DOM helpers: `@testing-library/jest-dom`
 - Component interaction utilities: `@testing-library/react`, `@testing-library/user-event`
-- Current suite size: **54 tests across 10 files**
-- Quality gate: `npm test && npm run lint`
+- E2E Testing Framework: `@playwright/test`
+- Current unit suite size: **64 tests across 10+ files**
+- Current E2E suite size: **4 test files covering auth, smoke, models, and UI interactions (like copy hover)**
+- Quality gate: `npm test && npm run lint && npx playwright test`
 
 ## Test Stack and Configuration
 
@@ -20,32 +22,40 @@ Primary test dependencies:
 - `@testing-library/react`
 - `@testing-library/jest-dom`
 - `@testing-library/user-event`
+- `@playwright/test`
 
 Config and setup files:
 
 - `app/vitest.config.ts`
 - `app/src/test/setup.ts`
+- `app/playwright.config.ts`
 
 Key config behavior:
 
-- Test environment is browser-like (`jsdom`).
+- Vitest environment is browser-like (`jsdom`).
 - Path alias `@` resolves to `app/src`.
 - Coverage uses V8 provider with text/html reporters.
+- Playwright uses Chromium, Firefox, and WebKit for E2E tests.
 
 ## Commands
 
 Run from `app/`:
 
 ```bash
+# Unit & Integration Tests
 npm test
 npm run test:watch
 npm run test:coverage
+
+# E2E Tests (Playwright)
+npx playwright test
+npx playwright test --ui
 ```
 
 Run full local quality gate:
 
 ```bash
-npm test && npm run lint
+npm test && npm run lint && npx playwright test
 ```
 
 ## Live Agent Smoke Tests (All Models)
