@@ -16,7 +16,7 @@ export function RelatedQuestions({ questions, onSelect }: RelatedQuestionsProps)
           <button
             key={question}
             type="button"
-            className="group flex items-center justify-between rounded-xl border bg-card/50 px-4 py-3 text-left text-[14px] font-medium transition-all hover:bg-accent hover:shadow-sm"
+            className="group flex items-center justify-between rounded-xl border bg-card/50 px-4 py-3 text-left text-[14px] font-medium transition-all hover:bg-black/5 dark:hover:bg-white/5 hover:shadow-sm"
             onClick={() => onSelect?.(question)}
           >
             <span className="flex-1 truncate">{question}</span>

@@ -25,7 +25,7 @@ export function SourceCarousel({ urls }: SourceCarouselProps) {
             href={url}
             target="_blank"
             rel="noreferrer"
-            className="flex min-w-[240px] flex-col justify-between rounded-xl border bg-card/40 p-3 shadow-sm transition-all hover:bg-accent hover:shadow-md"
+            className="flex min-w-[240px] flex-col justify-between rounded-xl border bg-card/40 p-3 shadow-sm transition-all hover:bg-black/5 dark:hover:bg-white/5 hover:shadow-md"
           >
             <p className="line-clamp-2 text-[13px] font-medium leading-snug">{url}</p>
             <div className="mt-3 flex items-center gap-1.5 border-t pt-2">

@@ -87,7 +87,7 @@ export function SearchBar({
             <DropdownMenu.Trigger asChild>
               <button
                 type="button"
-                className="inline-flex items-center gap-1 rounded-full border bg-muted/40 px-3 py-1.5 text-xs text-foreground hover:bg-accent"
+                className="inline-flex items-center gap-1 rounded-full border bg-muted/40 px-3 py-1.5 text-xs text-foreground hover:bg-black/5 dark:hover:bg-white/5"
                 aria-label="Select model"
               >
                 <span className="max-w-32 truncate">{activeModelLabel}</span>
@@ -106,7 +106,7 @@ export function SearchBar({
                       <DropdownMenu.Item
                         key={option.id}
                         onSelect={() => onModelChange?.(option.id)}
-                        className="cursor-pointer rounded-lg px-2 py-1.5 text-sm outline-none hover:bg-accent"
+                        className="cursor-pointer rounded-lg px-2 py-1.5 text-sm outline-none hover:bg-black/5 dark:hover:bg-white/5"
                       >
                         {option.label}
                       </DropdownMenu.Item>
@@ -119,7 +119,7 @@ export function SearchBar({
 
           <button
             type="button"
-            className="inline-flex h-8 w-8 items-center justify-center rounded-full border bg-card text-muted-foreground hover:bg-accent"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-full border bg-card text-muted-foreground hover:bg-black/5 dark:hover:bg-white/5"
             aria-label="Attach file"
             onClick={onAttachClick}
           >

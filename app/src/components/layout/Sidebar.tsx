@@ -94,7 +94,7 @@ export function Sidebar({ collapsed = false, onToggle, onNavigate, onOpenCommand
         {onToggle ? (
           <button
             type="button"
-            className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-sidebar-border bg-card text-muted-foreground hover:bg-sidebar-accent"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-sidebar-border bg-card text-muted-foreground hover:bg-black/5 dark:hover:bg-white/5"
             onClick={onToggle}
             aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
@@ -125,7 +125,7 @@ export function Sidebar({ collapsed = false, onToggle, onNavigate, onOpenCommand
             <Link
               key={item.href}
               className={cn(
-                "flex items-center rounded-lg px-3 py-2 text-sidebar-foreground transition-colors hover:bg-sidebar-accent",
+                "flex items-center rounded-lg px-3 py-2 text-sidebar-foreground transition-colors hover:bg-black/5 dark:hover:bg-white/5",
                 collapsed ? "justify-center" : "gap-3",
               )}
               href={item.href}
@@ -143,7 +143,7 @@ export function Sidebar({ collapsed = false, onToggle, onNavigate, onOpenCommand
         <section className="min-h-0 flex-1 space-y-4 overflow-y-auto px-2 pb-2 text-sm scrollbar-thin">
           <button
             type="button"
-            className="flex w-full items-center justify-between rounded-lg border border-sidebar-border bg-card px-2.5 py-2 text-left hover:bg-sidebar-accent"
+            className="flex w-full items-center justify-between rounded-lg border border-sidebar-border bg-card px-2.5 py-2 text-left hover:bg-black/5 dark:hover:bg-white/5"
             onClick={onOpenCommandPalette}
           >
             <span className="inline-flex items-center gap-2">
@@ -158,7 +158,7 @@ export function Sidebar({ collapsed = false, onToggle, onNavigate, onOpenCommand
             <div className="space-y-1">
               {recentThreads.length === 0 ? <p className="px-2 py-1 text-xs text-muted-foreground">No recent threads</p> : null}
               {recentThreads.map((thread) => (
-                <div key={thread.id} className="group flex items-center gap-1 rounded-lg hover:bg-sidebar-accent">
+                <div key={thread.id} className="group flex items-center gap-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/5">
                   <Link
                     className="block min-w-0 flex-1 truncate px-2 py-1.5"
                     href={`/search/${thread.id}`}
@@ -170,7 +170,7 @@ export function Sidebar({ collapsed = false, onToggle, onNavigate, onOpenCommand
                   <button
                     type="button"
                     aria-label={`Delete ${thread.title}`}
-                    className="mr-1 inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted"
+                    className="mr-1 inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-black/10 dark:hover:bg-white/10"
                     onClick={() => void handleDeleteThread(thread.id)}
                     disabled={deletingThreadId === thread.id}
                   >
@@ -191,7 +191,7 @@ export function Sidebar({ collapsed = false, onToggle, onNavigate, onOpenCommand
         <button
           type="button"
           className={cn(
-            "inline-flex items-center rounded-lg border border-sidebar-border bg-card text-sm text-sidebar-foreground hover:bg-sidebar-accent",
+            "inline-flex items-center rounded-lg border border-sidebar-border bg-card text-sm text-sidebar-foreground hover:bg-black/5 dark:hover:bg-white/5",
             collapsed ? "h-9 w-9 justify-center" : "w-full justify-center gap-2 px-3 py-2",
           )}
           onClick={() => signOut({ callbackUrl: "/" })}

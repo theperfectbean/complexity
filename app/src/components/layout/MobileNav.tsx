@@ -27,25 +27,25 @@ export function MobileNav({ open, onClose, onOpenCommandPalette }: MobileNavProp
           </div>
 
           <nav className="mt-5 space-y-2 text-sm">
-            <Link className="flex items-center gap-2 rounded-lg border bg-card px-3 py-2 hover:bg-accent" href="/" onClick={onClose}>
+            <Link className="flex items-center gap-2 rounded-lg border bg-card px-3 py-2 hover:bg-black/5 dark:hover:bg-white/5" href="/" onClick={onClose}>
               <Home className="h-4 w-4" />
               New search
             </Link>
-            <Link className="flex items-center gap-2 rounded-lg border bg-card px-3 py-2 hover:bg-accent" href="/library" onClick={onClose}>
+            <Link className="flex items-center gap-2 rounded-lg border bg-card px-3 py-2 hover:bg-black/5 dark:hover:bg-white/5" href="/library" onClick={onClose}>
               <Library className="h-4 w-4" />
               Library
             </Link>
-            <Link className="flex items-center gap-2 rounded-lg border bg-card px-3 py-2 hover:bg-accent" href="/roles" onClick={onClose}>
+            <Link className="flex items-center gap-2 rounded-lg border bg-card px-3 py-2 hover:bg-black/5 dark:hover:bg-white/5" href="/roles" onClick={onClose}>
               <Users className="h-4 w-4" />
               Roles
             </Link>
-            <Link className="flex items-center gap-2 rounded-lg border bg-card px-3 py-2 hover:bg-accent" href="/settings/memory" onClick={onClose}>
+            <Link className="flex items-center gap-2 rounded-lg border bg-card px-3 py-2 hover:bg-black/5 dark:hover:bg-white/5" href="/settings/memory" onClick={onClose}>
               <Brain className="h-4 w-4" />
               Memory
             </Link>
             <button
               type="button"
-              className="flex w-full items-center gap-2 rounded-lg border bg-card px-3 py-2 text-left hover:bg-accent"
+              className="flex w-full items-center gap-2 rounded-lg border bg-card px-3 py-2 text-left hover:bg-black/5 dark:hover:bg-white/5"
               onClick={() => {
                 onOpenCommandPalette?.();
                 onClose();
@@ -61,7 +61,7 @@ export function MobileNav({ open, onClose, onOpenCommandPalette }: MobileNavProp
             <ThemeToggle />
             <button
               type="button"
-              className="inline-flex w-full items-center justify-center gap-2 rounded-lg border bg-card px-3 py-2 text-sm hover:bg-accent"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-lg border bg-card px-3 py-2 text-sm hover:bg-black/5 dark:hover:bg-white/5"
               onClick={() => signOut({ callbackUrl: "/" })}
             >
               <LogOut className="h-4 w-4" />

@@ -16,7 +16,7 @@ export function KeyboardShortcutsDialog() {
       <Dialog.Trigger asChild>
         <button
           type="button"
-          className="inline-flex w-full items-center justify-center gap-2 rounded-lg border bg-card px-3 py-2 text-sm hover:bg-accent"
+          className="inline-flex w-full items-center justify-center gap-2 rounded-lg border bg-card px-3 py-2 text-sm hover:bg-black/5 dark:hover:bg-white/5"
         >
           <Keyboard className="h-4 w-4" />
           Shortcuts
@@ -40,7 +40,7 @@ export function KeyboardShortcutsDialog() {
           </div>
 
           <Dialog.Close asChild>
-            <button type="button" className="mt-4 rounded-md border px-3 py-2 text-sm hover:bg-accent">
+            <button type="button" className="mt-4 rounded-md border px-3 py-2 text-sm hover:bg-black/5 dark:hover:bg-white/5">
               Close
             </button>
           </Dialog.Close>
