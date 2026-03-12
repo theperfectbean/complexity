@@ -153,15 +153,22 @@ export function MessageList({ messages, emptyLabel, onRelatedQuestionClick }: Me
                   <MarkdownRenderer content={message.content} />
                 </div>
 
-                <div className="mt-4 flex items-center justify-start">
-                  <button
-                    type="button"
-                    className="inline-flex h-7 items-center gap-1.5 rounded-lg border bg-card px-2.5 text-[10px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground active:scale-95"
-                    onClick={() => void copyMessage(message.id, message.content)}
-                  >
-                    <Copy className="h-2.5 w-2.5" />
-                    {copiedId === message.id ? "Copied" : "Copy"}
-                  </button>
+                <div className="mt-4 flex items-center justify-end">
+                  <div className="flex items-center gap-2">
+                    {copiedId === message.id && (
+                      <span className="text-[10px] font-medium text-emerald-500 animate-in fade-in slide-in-from-right-1">
+                        Copied
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-muted active:scale-90"
+                      onClick={() => void copyMessage(message.id, message.content)}
+                      title="Copy message"
+                    >
+                      <Copy className={cn("h-4 w-4 transition-colors", copiedId === message.id ? "text-emerald-500" : "text-muted-foreground")} />
+                    </button>
+                  </div>
                 </div>
 
                 {relatedQuestions.length > 0 && (
