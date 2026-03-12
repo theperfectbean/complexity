@@ -231,7 +231,12 @@ npm run test:coverage
   - `anthropic/claude-haiku-4-5` (~$0.0080 / request)
 
 **Decision:**
-Switch to `google/gemini-3.1-pro-preview`. While 25% more expensive than the "Flash" models, it provides significantly better reasoning for RAG tasks and complex instructions, while still being ~40% cheaper than the previous Sonar default.
+Switch to `google/gemini-3.1-pro-preview`. 
+
+**Performance & Cost Analysis:**
+- **Cost:** ~$0.0099 / request (~40% cheaper than Sonar).
+- **Latency (Smoke Test):** ~5.2s (Sonar: ~0.7s, Flash: ~2.1s).
+- **Rationale:** While significantly slower than Sonar, the 3.1 Pro model provides superior reasoning and a massive context window for complex RAG tasks that simpler models struggle with. For a "Complexity" search experience, reasoning quality and cost-efficiency take precedence over raw speed for the default setting.
 
 **Resolution:**
 - Updated `getDefaultModel()` in `app/src/lib/models.ts` to return `google/gemini-3.1-pro-preview`.
