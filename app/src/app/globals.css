@@ -161,12 +161,6 @@
   @apply rounded-lg border bg-card shadow-sm;
 }
 
-@layer components {
-  .copy-button-highlight {
-    @apply hover:bg-black/5 dark:hover:bg-white/10;
-  }
-}
-
 /* Markdown Content Styles - Visual Parity Refinement */
 div.markdown-body {
   font-size: 1.0625rem !important;
