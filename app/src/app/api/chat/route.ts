@@ -30,6 +30,7 @@ type Citation = {
 const CHAT_RATE_LIMIT_PER_MINUTE = 20;
 const CHAT_CACHE_TTL_SECONDS = 60 * 60;
 const EMPTY_RESPONSE_FALLBACK_TEXT = "I couldn't generate a response. Please try again.";
+const MEMORY_EVENT_TIMEOUT_MS = 1200;
 
 type CachedChatPayload = {
   text: string;
@@ -282,20 +283,8 @@ export async function POST(request: Request) {
             })
             .where(eq(threads.id, parsed.data.threadId));
 
-          if (thread.memoryEnabled) {
-            void saveExtractedMemories({
-              userId: thread.userId,
-              threadId: parsed.data.threadId,
-              userMessage: userText,
-              assistantMessage: cachedPayload.text,
-              conversationMessages: inputMessages.length + 1,
-            }).catch(() => {
-              // Ignore memory extraction failures.
-            });
-          }
-
           const stream = createUIMessageStream({
-            execute: ({ writer }) => {
+            execute: async ({ writer }) => {
               const responseMessageId = createId();
               const textId = createId();
 
@@ -311,6 +300,33 @@ export async function POST(request: Request) {
                   title: citation.title,
                 } as UIMessageChunk);
               });
+
+              if (thread.memoryEnabled) {
+                const memoryPromise = saveExtractedMemories({
+                  userId: thread.userId,
+                  threadId: parsed.data.threadId,
+                  userMessage: userText,
+                  assistantMessage: cachedPayload.text,
+                  conversationMessages: inputMessages.length + 1,
+                });
+
+                try {
+                  const memoryCount = await Promise.race([
+                    memoryPromise,
+                    new Promise<null>((resolve) => setTimeout(() => resolve(null), MEMORY_EVENT_TIMEOUT_MS)),
+                  ]);
+
+                  if (typeof memoryCount === "number" && memoryCount > 0) {
+                    writer.write({ type: "data", data: { kind: "memory-saved", count: memoryCount } } as UIMessageChunk);
+                  }
+                } catch {
+                  // Ignore memory extraction failures.
+                } finally {
+                  void memoryPromise.catch(() => {
+                    // Ignore memory extraction failures.
+                  });
+                }
+              }
 
               writer.write({ type: "text-end", id: textId });
               writer.write({ type: "finish" });
@@ -625,19 +641,22 @@ export async function POST(request: Request) {
           conversationMessages: inputMessages.length + 1,
         });
 
-        void memoryPromise
-          .then((count) => {
-            if (count > 0) {
-              try {
-                writer.write({ type: "data", data: { kind: "memory-saved", count } } as UIMessageChunk);
-              } catch {
-                // Ignore stream write errors.
-              }
-            }
-          })
-          .catch(() => {
+        try {
+          const memoryCount = await Promise.race([
+            memoryPromise,
+            new Promise<null>((resolve) => setTimeout(() => resolve(null), MEMORY_EVENT_TIMEOUT_MS)),
+          ]);
+
+          if (typeof memoryCount === "number" && memoryCount > 0) {
+            writer.write({ type: "data", data: { kind: "memory-saved", count: memoryCount } } as UIMessageChunk);
+          }
+        } catch {
+          // Ignore memory extraction failures.
+        } finally {
+          void memoryPromise.catch(() => {
             // Ignore memory extraction failures.
           });
+        }
       }
 
       writer.write({ type: "text-end", id: textId });
