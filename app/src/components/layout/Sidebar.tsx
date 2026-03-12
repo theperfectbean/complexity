@@ -194,7 +194,7 @@ export function Sidebar({ collapsed = false, onToggle, onNavigate, onOpenCommand
             "inline-flex items-center rounded-lg border border-sidebar-border bg-card text-sm text-sidebar-foreground hover:bg-sidebar-accent",
             collapsed ? "h-9 w-9 justify-center" : "w-full justify-center gap-2 px-3 py-2",
           )}
-          onClick={() => signOut({ callbackUrl: "/login" })}
+          onClick={() => signOut({ callbackUrl: "/" })}
           aria-label="Sign out"
           title={collapsed ? "Sign out" : undefined}
         >
