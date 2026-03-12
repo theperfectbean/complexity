@@ -1,6 +1,7 @@
 "use client";
 
 import { useChat } from "@ai-sdk/react";
+import { DefaultChatTransport } from "ai";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -70,8 +71,21 @@ export default function ThreadPage() {
   const [loadingHistory, setLoadingHistory] = useState(true);
   const hasSubmittedInitialQuery = useRef(false);
 
-  const { messages, sendMessage, status, error, data } = useChat({
-    api: "/api/chat",
+  const [data, setData] = useState<any[]>([]);
+  const { messages, sendMessage, status, error } = useChat({
+    transport: new DefaultChatTransport({
+      api: "/api/chat",
+      body: () => ({
+        threadId,
+        model,
+        roleId,
+      }),
+    }),
+    onData(part) {
+      if (part.type.startsWith("data-")) {
+        setData((prev) => [...prev, (part as any).data]);
+      }
+    },
   });
   const [prompt, setPrompt] = useState("");
 

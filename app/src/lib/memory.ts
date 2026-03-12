@@ -213,7 +213,8 @@ export async function extractMemories({
       "Given the conversation and existing memories, extract NEW user facts and IDENTIFY outdated ones. " +
       "Only include durable preferences, personal details, work context, or recurring needs. " +
       "Return a JSON object with two keys: `added` (array of strings for new facts) and `deleted_ids` (array of strings for IDs of existing memories that are now outdated or contradicted). Return { \"added\": [], \"deleted_ids\": [] } if nothing new/changed. Do not include duplicates or trivial facts.",
-  } as unknown as { model: string; input: unknown[]; instructions: string });
+    stream: false,
+  });
 
   const raw = extractAssistantText(response);
   const parsed = extractJsonObject(raw) ?? {};

@@ -317,7 +317,7 @@ export async function POST(request: Request) {
                   ]);
 
                   if (typeof memoryCount === "number" && memoryCount > 0) {
-                    writer.write({ type: "data", data: { kind: "memory-saved", count: memoryCount } } as UIMessageChunk);
+                    writer.write({ type: "data-json", data: { kind: "memory-saved", count: memoryCount } } as UIMessageChunk);
                   }
                 } catch {
                   // Ignore memory extraction failures.
@@ -648,7 +648,7 @@ export async function POST(request: Request) {
           ]);
 
           if (typeof memoryCount === "number" && memoryCount > 0) {
-            writer.write({ type: "data", data: { kind: "memory-saved", count: memoryCount } } as UIMessageChunk);
+            writer.write({ type: "data-json", data: { kind: "memory-saved", count: memoryCount } } as UIMessageChunk);
           }
         } catch {
           // Ignore memory extraction failures.

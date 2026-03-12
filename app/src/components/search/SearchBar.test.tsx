@@ -1,3 +1,4 @@
+import { FormEvent } from "react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -74,7 +75,7 @@ describe("SearchBar", () => {
   });
 
   it("submits on Enter and keeps newline on Shift+Enter", () => {
-    const onSubmit = vi.fn((event: Event) => event.preventDefault());
+    const onSubmit = vi.fn((event: FormEvent<HTMLFormElement>) => event.preventDefault());
 
     render(
       <form onSubmit={onSubmit}>

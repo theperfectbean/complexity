@@ -1,5 +1,6 @@
 "use client";
 
+import { DefaultChatTransport } from "ai";
 import { useChat } from "@ai-sdk/react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
@@ -89,12 +90,20 @@ export default function RoleDetailPage() {
     void loadDocuments();
   }, [loadDocuments, status]);
 
-  const { messages, sendMessage, status: chatStatus, error, data } = useChat({
-    api: "/api/chat",
-    body: {
-      threadId: threadId ?? "",
-      model,
-      roleId,
+  const [data, setData] = useState<any[]>([]);
+  const { messages, sendMessage, status: chatStatus, error } = useChat({
+    transport: new DefaultChatTransport({
+      api: "/api/chat",
+      body: () => ({
+        threadId: threadId ?? "",
+        model,
+        roleId,
+      }),
+    }),
+    onData(part) {
+      if (part.type.startsWith("data-")) {
+        setData((prev) => [...prev, (part as any).data]);
+      }
     },
   });
 

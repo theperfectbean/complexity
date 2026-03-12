@@ -1,5 +1,5 @@
 import Perplexity from "@perplexity-ai/perplexity_ai";
-import { LanguageModelV1 } from "ai";
+import { LanguageModelV3, LanguageModelV3CallOptions, LanguageModelV3GenerateResult, LanguageModelV3StreamResult } from "@ai-sdk/provider";
 
 export function createPerplexityClient() {
   const apiKey = process.env.PERPLEXITY_API_KEY;
@@ -11,88 +11,118 @@ export function createPerplexityClient() {
 }
 
 /**
- * Creates a standard AI SDK LanguageModelV1 for Perplexity.
+ * Creates a standard AI SDK LanguageModelV3 for Perplexity.
  * This allows using standard streamText() and other higher-level tools.
  */
-export function createPerplexityModel(modelId: string): LanguageModelV1 {
+export function createPerplexityModel(modelId: string): LanguageModelV3 {
   const client = createPerplexityClient();
   
   return {
-    specificationVersion: "v1",
-    defaultObjectGenerationMode: undefined,
+    specificationVersion: "v3",
+    provider: "perplexity",
     modelId,
-    doGenerate: async (options) => {
-      const input: unknown[] = options.prompt
+    supportedUrls: {},
+    doGenerate: async (options: LanguageModelV3CallOptions): Promise<LanguageModelV3GenerateResult> => {
+      const input = options.prompt
         .filter(m => m.role !== "system")
-        .map(m => ({
-          role: m.role,
-          content: m.content.map(c => {
-            if (c.type === "text") return { type: "input_text", text: c.text };
-            return c;
-          })
-        }));
+        .map(m => {
+          if (m.role === "user" || m.role === "assistant") {
+            return {
+              type: "message" as const,
+              role: m.role,
+              content: m.content.map(c => {
+                if (c.type === "text") return { type: "input_text" as const, text: c.text };
+                // Handle other parts if needed
+                return { type: "input_text" as const, text: "" };
+              })
+            };
+          }
+          // Default fallback for unexpected roles or tool roles
+          return {
+            type: "message" as const,
+            role: "user" as const,
+            content: [{ type: "input_text" as const, text: "" }]
+          };
+        });
 
-      const instructions = options.prompt.find(m => m.role === "system")?.content[0]?.type === "text" 
-        ? (options.prompt.find(m => m.role === "system")?.content[0] as { text: string }).text 
-        : undefined;
+      const systemMessage = options.prompt.find(m => m.role === "system");
+      const instructions = typeof systemMessage?.content === "string" ? systemMessage.content : undefined;
 
       const result = await client.responses.create({
         model: modelId,
         input,
         instructions,
-      } as unknown as { model: string; input: unknown[]; instructions?: string });
+        stream: false,
+      });
+
+      const outputText = (result as any).output?.[0]?.text || "";
 
       return {
-        text: (result as { output?: { text?: string }[] }).output?.[0]?.text || "",
-        usage: { promptTokens: 0, completionTokens: 0 },
-        finishReason: "stop",
-        rawCall: { rawPrompt: options.prompt, rawResponse: result },
+        content: [{ type: "text", text: outputText }],
+        usage: { 
+          inputTokens: { total: 0, noCache: undefined, cacheRead: undefined, cacheWrite: undefined },
+          outputTokens: { total: 0, text: undefined, reasoning: undefined }
+        },
+        finishReason: { unified: "stop", raw: "stop" },
+        warnings: [],
       };
     },
-    doStream: async (options) => {
-      const input: unknown[] = options.prompt
+    doStream: async (options: LanguageModelV3CallOptions): Promise<LanguageModelV3StreamResult> => {
+      const input = options.prompt
         .filter(m => m.role !== "system")
-        .map(m => ({
-          role: m.role,
-          content: m.content.map(c => {
-            if (c.type === "text") return { type: "input_text", text: c.text };
-            return c;
-          })
-        }));
+        .map(m => {
+          if (m.role === "user" || m.role === "assistant") {
+            return {
+              type: "message" as const,
+              role: m.role,
+              content: m.content.map(c => {
+                if (c.type === "text") return { type: "input_text" as const, text: c.text };
+                return { type: "input_text" as const, text: "" };
+              })
+            };
+          }
+          return {
+            type: "message" as const,
+            role: "user" as const,
+            content: [{ type: "input_text" as const, text: "" }]
+          };
+        });
 
-      const instructions = options.prompt.find(m => m.role === "system")?.content[0]?.type === "text" 
-        ? (options.prompt.find(m => m.role === "system")?.content[0] as { text: string }).text 
-        : undefined;
+      const systemMessage = options.prompt.find(m => m.role === "system");
+      const instructions = typeof systemMessage?.content === "string" ? systemMessage.content : undefined;
 
       const stream = await client.responses.create({
         model: modelId,
         input,
         instructions,
         stream: true,
-      } as unknown as { model: string; input: unknown[]; instructions?: string; stream: true });
+      });
 
       return {
         stream: new ReadableStream({
           async start(controller) {
             try {
-              for await (const chunk of stream as AsyncIterable<{
-                type: string;
-                delta?: string;
-                output_text?: { delta?: string };
-              }>) {
+              controller.enqueue({ type: "stream-start", warnings: [] });
+              for await (const chunk of stream) {
                 if (chunk.type === "response.output_text.delta") {
-                  const delta = chunk.delta || chunk.output_text?.delta || "";
+                  const delta = (chunk as any).delta || (chunk as any).output_text?.delta || "";
                   if (delta) {
                     controller.enqueue({
                       type: "text-delta",
-                      textDelta: delta
+                      id: "msg-1",
+                      delta: delta
                     });
                   }
-                } else if (chunk.type === "response.completed") {
-                  // Final result might contain full text, but we've been streaming deltas.
-                  // Just close.
                 }
               }
+              controller.enqueue({ 
+                type: "finish", 
+                finishReason: { unified: "stop", raw: "stop" }, 
+                usage: { 
+                  inputTokens: { total: 0, noCache: undefined, cacheRead: undefined, cacheWrite: undefined },
+                  outputTokens: { total: 0, text: undefined, reasoning: undefined }
+                } 
+              });
               controller.close();
             } catch (e) {
               console.error("[Perplexity Stream Error]", e);
@@ -100,8 +130,6 @@ export function createPerplexityModel(modelId: string): LanguageModelV1 {
             }
           }
         }),
-        usage: Promise.resolve({ promptTokens: 0, completionTokens: 0 }),
-        rawCall: { rawPrompt: options.prompt, rawResponse: {} },
       };
     }
   };

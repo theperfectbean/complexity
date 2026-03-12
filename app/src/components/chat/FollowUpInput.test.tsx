@@ -1,3 +1,4 @@
+import { FormEvent } from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
@@ -5,7 +6,7 @@ import { FollowUpInput } from "@/components/chat/FollowUpInput";
 
 describe("FollowUpInput", () => {
   it("submits on Enter and keeps newline on Shift+Enter", () => {
-    const onSubmit = vi.fn((event: Event) => event.preventDefault());
+    const onSubmit = vi.fn((event: FormEvent<HTMLFormElement>) => event.preventDefault());
 
     render(
       <form onSubmit={onSubmit}>

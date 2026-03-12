@@ -28,10 +28,10 @@ async function testWithSystemMessage() {
   try {
     await client.responses.create({
       model,
-      input,
+      input: input as any,
       instructions: "Be concise.",
-      tools: [],
-    } as unknown as { model: string; input: unknown[]; instructions: string; tools: unknown[] });
+      stream: false,
+    });
     console.log("Success with system message!");
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
@@ -51,10 +51,10 @@ async function testWithoutSystemMessage() {
   try {
     await client.responses.create({
       model,
-      input,
+      input: input as any,
       instructions: "Be concise.",
-      tools: [],
-    } as unknown as { model: string; input: unknown[]; instructions: string; tools: unknown[] });
+      stream: false,
+    });
     console.log("Success without system message!");
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
