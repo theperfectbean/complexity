@@ -12,36 +12,43 @@ type RoleCardProps = {
 
 export function RoleCard({ id, name, description, updatedAt, onRename, onDelete, busy }: RoleCardProps) {
   return (
-    <article className="rounded-lg border bg-card p-4 shadow-2xs">
-      <Link href={`/roles/${id}`} className="block rounded-md p-1 transition-colors hover:bg-black/5 dark:hover:bg-white/5">
-        <p className="font-medium tracking-tight">{name}</p>
-        <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{description || "No description"}</p>
-        <p className="mt-2 text-xs text-muted-foreground">Updated {new Date(updatedAt).toLocaleString()}</p>
-      </Link>
-      {(onRename || onDelete) && (
-        <div className="mt-3 flex items-center gap-2">
-          {onRename ? (
-            <button
-              type="button"
-              className="rounded-md border bg-card px-2 py-1 text-xs hover:bg-black/5 dark:hover:bg-white/5"
-              onClick={onRename}
-              disabled={busy}
-            >
-              Rename
-            </button>
-          ) : null}
-          {onDelete ? (
-            <button
-              type="button"
-              className="rounded-md border border-destructive/20 bg-destructive/5 px-2 py-1 text-xs text-destructive hover:bg-destructive/10"
-              onClick={onDelete}
-              disabled={busy}
-            >
-              Delete
-            </button>
-          ) : null}
-        </div>
-      )}
+    <article className="group relative flex min-h-[140px] flex-col justify-between overflow-hidden rounded-2xl border border-border/60 bg-background p-5 transition-colors hover:bg-muted/30">
+      <Link href={`/roles/${id}`} className="absolute inset-0 z-10" aria-label={`View role ${name}`} />
+      <div>
+        <h3 className="font-medium text-foreground">{name}</h3>
+        {description && (
+          <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">{description}</p>
+        )}
+      </div>
+      <div className="mt-6 flex items-center justify-between">
+        <p className="text-[13px] text-muted-foreground">
+          Updated {new Date(updatedAt).toLocaleDateString()}
+        </p>
+        {(onRename || onDelete) && (
+          <div className="z-20 flex opacity-0 transition-opacity group-hover:opacity-100">
+            {onRename ? (
+              <button
+                type="button"
+                className="px-2 py-1 text-xs text-muted-foreground hover:text-foreground disabled:opacity-50"
+                onClick={onRename}
+                disabled={busy}
+              >
+                Rename
+              </button>
+            ) : null}
+            {onDelete ? (
+              <button
+                type="button"
+                className="px-2 py-1 text-xs text-muted-foreground hover:text-destructive disabled:opacity-50"
+                onClick={onDelete}
+                disabled={busy}
+              >
+                Delete
+              </button>
+            ) : null}
+          </div>
+        )}
+      </div>
     </article>
   );
 }

@@ -10,11 +10,14 @@ type Role = {
   updatedAt: string;
 };
 
-type CreateRoleDialogProps = {
-  onCreated: (role: Role) => void;
+type RoleCreateFormProps = {
+  onCreated?: (role: Role) => void;
+  onCancel?: () => void;
+  submitLabel?: string;
+  showHeading?: boolean;
 };
 
-export function CreateRoleDialog({ onCreated }: CreateRoleDialogProps) {
+export function RoleCreateForm({ onCreated, onCancel, submitLabel = "Create role", showHeading = true }: RoleCreateFormProps) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [instructions, setInstructions] = useState("");
@@ -48,7 +51,7 @@ export function CreateRoleDialog({ onCreated }: CreateRoleDialogProps) {
       }
 
       const payload = (await response.json()) as { role: Role };
-      onCreated(payload.role);
+      onCreated?.(payload.role);
       setName("");
       setDescription("");
       setInstructions("");
@@ -58,36 +61,64 @@ export function CreateRoleDialog({ onCreated }: CreateRoleDialogProps) {
   }
 
   return (
-    <form onSubmit={onSubmit} className="rounded-lg border bg-card p-4 shadow-2xs">
-      <h2 className="text-sm font-semibold">Create role</h2>
-      <div className="mt-3 space-y-2">
-        <input
-          className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-          placeholder="Role name (e.g., Diabetes Assistant)"
-          value={name}
-          onChange={(event) => setName(event.target.value)}
-        />
-        <textarea
-          className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-          placeholder="Description (optional)"
-          value={description}
-          onChange={(event) => setDescription(event.target.value)}
-        />
-        <textarea
-          className="w-full min-h-[80px] rounded-md border bg-background px-3 py-2 text-sm"
-          placeholder="Instructions (System Prompt) - Describe the persona"
-          value={instructions}
-          onChange={(event) => setInstructions(event.target.value)}
-        />
+    <form onSubmit={onSubmit} className="w-full">
+      {showHeading ? <h2 className="text-sm font-semibold text-muted-foreground">Create role</h2> : null}
+      <div className="mt-4 space-y-4">
+        <div className="space-y-2">
+          <label className="text-base font-medium">What are you working on?</label>
+          <input
+            className="w-full rounded-xl border border-border/70 bg-background px-4 py-3 text-base outline-none transition-colors hover:border-border focus:border-primary/50 focus:ring-4 focus:ring-primary/10"
+            placeholder="Name your role"
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+          />
+        </div>
+        <div className="space-y-2">
+          <label className="text-base font-medium">What are you trying to achieve?</label>
+          <textarea
+            className="w-full min-h-[140px] rounded-xl border border-border/70 bg-background px-4 py-3 text-base outline-none transition-colors hover:border-border focus:border-primary/50 focus:ring-4 focus:ring-primary/10"
+            placeholder="Describe your role, goals, subject, etc..."
+            value={description}
+            onChange={(event) => setDescription(event.target.value)}
+          />
+        </div>
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-muted-foreground">Instructions (optional)</label>
+          <textarea
+            className="w-full min-h-[120px] rounded-xl border border-border/70 bg-background px-4 py-3 text-sm text-muted-foreground outline-none transition-colors hover:border-border focus:border-primary/50 focus:ring-4 focus:ring-primary/10"
+            placeholder="Describe the persona or system prompt"
+            value={instructions}
+            onChange={(event) => setInstructions(event.target.value)}
+          />
+        </div>
       </div>
-      {error ? <p className="mt-2 text-xs text-destructive">{error}</p> : null}
-      <button
-        type="submit"
-        disabled={submitting}
-        className="mt-3 rounded-md bg-primary px-3 py-2 text-sm text-primary-foreground disabled:opacity-60"
-      >
-        {submitting ? "Creating..." : "Create"}
-      </button>
+      {error ? <p className="mt-3 text-xs text-destructive">{error}</p> : null}
+      <div className="mt-8 flex items-center justify-end gap-3">
+        {onCancel ? (
+          <button
+            type="button"
+            onClick={onCancel}
+            className="rounded-full border border-border/60 bg-background px-5 py-2.5 text-sm font-medium text-foreground hover:bg-muted/30"
+          >
+            Cancel
+          </button>
+        ) : null}
+        <button
+          type="submit"
+          disabled={submitting || !name.trim()}
+          className="rounded-full bg-foreground px-5 py-2.5 text-sm font-medium text-background disabled:opacity-60"
+        >
+          {submitting ? "Creating..." : submitLabel}
+        </button>
+      </div>
     </form>
   );
+}
+
+type CreateRoleDialogProps = {
+  onCreated: (role: Role) => void;
+};
+
+export function CreateRoleDialog({ onCreated }: CreateRoleDialogProps) {
+  return <RoleCreateForm onCreated={onCreated} />;
 }

@@ -1,22 +1,18 @@
 "use client";
 
-import { DefaultChatTransport, UIMessageChunk } from "ai";
-import { useChat } from "@ai-sdk/react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { MoreHorizontal } from "lucide-react";
 import { toast } from "sonner";
 
 import { useSession } from "next-auth/react";
 
-import { FollowUpInput } from "@/components/chat/FollowUpInput";
-import { ChatMessageItem, MessageList } from "@/components/chat/MessageList";
 import { DocumentList, RoleDocument } from "@/components/roles/DocumentList";
 import { FileUploader } from "@/components/roles/FileUploader";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { LoadingSkeleton } from "@/components/shared/LoadingSkeleton";
 import { MODELS, getDefaultModel } from "@/lib/models";
-import { normalizeUIMessage } from "@/lib/utils";
 
 type Role = {
   id: string;
@@ -25,23 +21,39 @@ type Role = {
   instructions?: string | null;
 };
 
+type Thread = {
+  id: string;
+  title: string;
+  updatedAt: string;
+};
+
 export default function RoleDetailPage() {
   const { data: session, status } = useSession();
   const { roleId } = useParams<{ roleId: string }>();
+  const router = useRouter();
   const [role, setRole] = useState<Role | null>(null);
   const [documents, setDocuments] = useState<RoleDocument[]>([]);
   const [docsLoading, setDocsLoading] = useState(true);
+  const [threads, setThreads] = useState<Thread[]>([]);
+  const [threadsLoading, setThreadsLoading] = useState(true);
+  const [memoryEnabled, setMemoryEnabled] = useState<boolean | null>(null);
   const [model, setModel] = useState<string>(getDefaultModel());
-  const [threadId, setThreadId] = useState<string | null>(null);
   const [prompt, setPrompt] = useState("");
-  const groupedModels = MODELS.reduce<Record<string, Array<(typeof MODELS)[number]>>>((accumulator, option) => {
-    const category = option.category;
-    if (!accumulator[category]) {
-      accumulator[category] = [];
-    }
-    accumulator[category].push(option);
-    return accumulator;
-  }, {});
+  const [creatingThread, setCreatingThread] = useState(false);
+  const [editingInstructions, setEditingInstructions] = useState(false);
+  const [instructionsDraft, setInstructionsDraft] = useState("");
+  const [savingInstructions, setSavingInstructions] = useState(false);
+
+  const groupedModels = useMemo<Record<string, Array<(typeof MODELS)[number]>>>(() => {
+    return MODELS.reduce<Record<string, Array<(typeof MODELS)[number]>>>((accumulator, option) => {
+      const category = option.category;
+      if (!accumulator[category]) {
+        accumulator[category] = [];
+      }
+      accumulator[category].push(option);
+      return accumulator;
+    }, {});
+  }, []);
 
   const loadDocuments = useCallback(async () => {
     setDocsLoading(true);
@@ -59,6 +71,21 @@ export default function RoleDetailPage() {
     }
   }, [roleId]);
 
+  const loadThreads = useCallback(async () => {
+    setThreadsLoading(true);
+    try {
+      const response = await fetch(`/api/threads?roleId=${roleId}`);
+      if (!response.ok) {
+        setThreads([]);
+        return;
+      }
+      const payload = (await response.json()) as { threads: Thread[] };
+      setThreads(payload.threads ?? []);
+    } finally {
+      setThreadsLoading(false);
+    }
+  }, [roleId]);
+
   useEffect(() => {
     if (status !== "authenticated") {
       return;
@@ -70,6 +97,7 @@ export default function RoleDetailPage() {
       .then((payload: { role: Role }) => {
         if (active) {
           setRole(payload.role);
+          setInstructionsDraft(payload.role.instructions ?? "");
         }
       })
       .catch(() => {
@@ -88,88 +116,91 @@ export default function RoleDetailPage() {
       return;
     }
     void loadDocuments();
-  }, [loadDocuments, status]);
-
-  const [data, setData] = useState<Record<string, unknown>[]>([]);
-  const { messages, sendMessage, status: chatStatus, error } = useChat({
-    transport: new DefaultChatTransport({
-      api: "/api/chat",
-      body: () => ({
-        threadId: threadId ?? "",
-        model,
-        roleId,
-      }),
-    }),
-    onData(part: UIMessageChunk) {
-      if (part.type === "data-json") {
-        setData((prev) => [...prev, part.data as Record<string, unknown>]);
-      }
-    },
-  });
-
-  const chatItems: ChatMessageItem[] = messages.map((message) => normalizeUIMessage(message));
+    void loadThreads();
+  }, [loadDocuments, loadThreads, status]);
 
   useEffect(() => {
-    if (error) {
-      toast.error(error.message || "Chat request failed");
-    }
-  }, [error]);
-
-  useEffect(() => {
-    if (!data || data.length === 0) {
+    if (status !== "authenticated") {
       return;
     }
 
-    const last = data[data.length - 1] as { kind?: string; count?: number };
-    if (last?.kind === "memory-saved") {
-      toast.success(last.count && last.count > 1 ? `Memory saved (${last.count})` : "Memory saved");
-    }
-  }, [data]);
+    let active = true;
+    fetch("/api/settings")
+      .then((response) => (response.ok ? response.json() : Promise.reject(new Error("Failed to load settings"))))
+      .then((payload: { memoryEnabled: boolean }) => {
+        if (active) {
+          setMemoryEnabled(payload.memoryEnabled);
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setMemoryEnabled(null);
+        }
+      });
 
-  async function onSubmit(event: FormEvent<HTMLFormElement>) {
+    return () => {
+      active = false;
+    };
+  }, [status]);
+
+  async function onStartChat(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!prompt.trim()) {
+    const currentPrompt = prompt.trim();
+    if (!currentPrompt || creatingThread) {
       return;
     }
 
-    let activeThreadId = threadId;
-
-    if (!activeThreadId) {
-      const createResponse = await fetch("/api/threads", {
+    setCreatingThread(true);
+    try {
+      const response = await fetch("/api/threads", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          title: prompt.slice(0, 80),
+          title: currentPrompt.slice(0, 80),
           model,
           roleId,
         }),
       });
 
-      if (!createResponse.ok) {
-        toast.error("Failed to create thread");
+      if (!response.ok) {
+        toast.error("Failed to start chat");
         return;
       }
 
-      const created = (await createResponse.json()) as { thread: { id: string } };
-      activeThreadId = created.thread.id;
-      setThreadId(activeThreadId);
+      const payload = (await response.json()) as { thread: { id: string } };
+      setPrompt("");
+      router.push(`/search/${payload.thread.id}?q=${encodeURIComponent(currentPrompt)}`);
+    } finally {
+      setCreatingThread(false);
+    }
+  }
+
+  async function saveInstructions() {
+    if (savingInstructions) {
+      return;
     }
 
+    setSavingInstructions(true);
     try {
-      await sendMessage(
-        { text: prompt },
-        {
-          body: {
-            threadId: activeThreadId,
-            model,
-            roleId,
-          },
-        },
-      );
-    } catch {
-      toast.error("Failed to send message");
+      const response = await fetch(`/api/roles/${roleId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          instructions: instructionsDraft.trim() ? instructionsDraft.trim() : null,
+        }),
+      });
+
+      if (!response.ok) {
+        toast.error("Failed to update instructions");
+        return;
+      }
+
+      setRole((current) => (current ? { ...current, instructions: instructionsDraft.trim() || null } : current));
+      setEditingInstructions(false);
+      toast.success("Instructions updated");
+    } finally {
+      setSavingInstructions(false);
     }
-    setPrompt("");
   }
 
   if (!session?.user) {
@@ -181,65 +212,195 @@ export default function RoleDetailPage() {
   }
 
   return (
-    <main className="mx-auto max-w-6xl p-6">
-      <h1 className="font-[var(--font-accent)] text-2xl font-semibold">{role ? role.name : `Role ${roleId}`}</h1>
-      <p className="mt-2 text-sm text-muted-foreground">Upload docs and chat with this role persona as context.</p>
+    <main className="mx-auto w-full max-w-6xl px-6 py-10">
+      <Link href="/roles" className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground">
+        ← All roles
+      </Link>
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-[1fr,1.4fr]">
-        <section className="space-y-4">
-          <FileUploader
-            roleId={roleId}
-            onUploaded={() => {
-              void loadDocuments();
-              toast.success("Document uploaded");
-            }}
-          />
-          <div className="rounded-lg border bg-card p-4 shadow-2xs">
-            <h2 className="mb-3 text-sm font-semibold">Documents</h2>
-            {docsLoading ? (
-              <LoadingSkeleton lines={3} />
-            ) : documents.length === 0 ? (
-              <EmptyState title="No documents yet" description="Upload PDF, DOCX, TXT, or MD files to build context." />
-            ) : (
-              <DocumentList documents={documents} />
-            )}
-          </div>
-        </section>
+      <div className="mt-6 flex items-center justify-between gap-4">
+        <h1 className="font-[var(--font-accent)] text-3xl font-medium">{role ? role.name : `Role ${roleId}`}</h1>
+        <button
+          type="button"
+          className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-border/60 bg-background text-muted-foreground hover:bg-muted/40"
+          aria-label="Role actions"
+        >
+          <MoreHorizontal className="h-4 w-4" />
+        </button>
+      </div>
 
-        <section className="flex min-h-[520px] flex-col rounded-lg border bg-card p-4 shadow-2xs">
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <h2 className="text-sm font-semibold">Role chat</h2>
-            <select className="rounded-md border bg-background px-3 py-2 text-sm" value={model} onChange={(event) => setModel(event.target.value)}>
-              {Object.entries(groupedModels).map(([category, options]) => (
-                <optgroup key={category} label={category}>
-                  {options.map((option) => (
-                    <option key={option.id} value={option.id}>
-                      {option.label}
-                    </option>
-                  ))}
-                </optgroup>
-              ))}
-            </select>
-          </div>
-
-          <div className="flex-1 overflow-y-auto rounded-md border bg-background p-3">
-            <MessageList
-              messages={chatItems}
-              emptyLabel="Ask a question about your uploaded documents or the role's expertise."
-              onRelatedQuestionClick={(question) => setPrompt(question)}
-            />
-          </div>
-
-          <form onSubmit={onSubmit}>
-            <FollowUpInput
+      <div className="mt-10 grid gap-12 lg:grid-cols-[1fr,320px] xl:grid-cols-[1fr,380px]">
+        <section className="min-w-0">
+          <form onSubmit={onStartChat} className="relative flex min-h-[140px] flex-col rounded-3xl border border-border/70 bg-card p-4 transition-shadow focus-within:border-primary/40 focus-within:ring-4 focus-within:ring-primary/10">
+            <textarea
+              className="w-full flex-1 resize-none bg-transparent px-2 py-2 text-lg outline-none placeholder:text-muted-foreground/60"
+              placeholder="Type / for commands"
               value={prompt}
-              onChange={setPrompt}
-              placeholder="Ask this role"
-              submitLabel={chatStatus === "streaming" ? "Thinking..." : "Send"}
-              disabled={chatStatus === "streaming"}
+              onChange={(event) => setPrompt(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && !event.shiftKey) {
+                  event.preventDefault();
+                  event.currentTarget.form?.requestSubmit();
+                }
+              }}
             />
+            <div className="mt-4 flex items-center justify-between gap-3">
+              <button
+                type="button"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground hover:bg-muted/50"
+                aria-label="Add attachment"
+              >
+                <span className="text-xl leading-none">+</span>
+              </button>
+              
+              <div className="flex items-center gap-2">
+                <select
+                  className="rounded-full border border-border/60 bg-background px-4 py-2 text-sm font-medium focus:outline-none"
+                  value={model}
+                  onChange={(event) => setModel(event.target.value)}
+                >
+                  {Object.entries(groupedModels).map(([category, options]) => (
+                    <optgroup key={category} label={category}>
+                      {options.map((option) => (
+                        <option key={option.id} value={option.id}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
+                <button
+                  type="submit"
+                  disabled={creatingThread || !prompt.trim()}
+                  className="rounded-full bg-foreground px-5 py-2 text-sm font-medium text-background disabled:opacity-60"
+                >
+                  {creatingThread ? "..." : "Start"}
+                </button>
+              </div>
+            </div>
           </form>
+
+          <div className="mt-12">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-medium text-muted-foreground">Recent chats</h2>
+              <button
+                type="button"
+                onClick={() => void loadThreads()}
+                className="text-xs text-muted-foreground hover:text-foreground"
+              >
+                Refresh
+              </button>
+            </div>
+            
+            <div className="mt-4 divide-y divide-border/40 border-t border-border/40">
+              {threadsLoading ? (
+                <div className="py-4"><LoadingSkeleton lines={2} /></div>
+              ) : null}
+              {!threadsLoading && threads.length === 0 ? (
+                <div className="py-8"><EmptyState title="No chats yet" description="Start a chat to create your first role thread." /></div>
+              ) : null}
+              {threads.map((thread) => (
+                <Link
+                  key={thread.id}
+                  href={`/search/${thread.id}`}
+                  className="block py-4 transition-colors hover:bg-muted/10"
+                >
+                  <p className="font-medium text-foreground">{thread.title}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">Last message {new Date(thread.updatedAt).toLocaleDateString()}</p>
+                </Link>
+              ))}
+            </div>
+          </div>
         </section>
+
+        <aside className="space-y-8">
+          <section className="rounded-2xl border border-border/60 bg-card p-5">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-base font-medium">Memory</h2>
+              <span className="rounded-full border border-border/60 bg-background px-3 py-1 text-xs text-muted-foreground">
+                {memoryEnabled === null ? "Loading" : memoryEnabled ? "Only you" : "Disabled"}
+              </span>
+            </div>
+            <p className="mt-3 text-sm text-muted-foreground">
+              Manage memory preferences in settings.
+            </p>
+            <Link href="/settings/memory" className="mt-3 inline-block text-sm text-muted-foreground hover:text-foreground">
+              Open memory settings
+            </Link>
+          </section>
+
+          <section className="rounded-2xl border border-border/60 bg-card p-5">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-base font-medium">Instructions</h2>
+              {!editingInstructions ? (
+                <button
+                  type="button"
+                  onClick={() => setEditingInstructions(true)}
+                  className="text-sm text-muted-foreground hover:text-foreground"
+                >
+                  Edit
+                </button>
+              ) : null}
+            </div>
+            {editingInstructions ? (
+              <div className="mt-4 space-y-3">
+                <textarea
+                  className="min-h-[140px] w-full rounded-xl border border-border/70 bg-background px-3 py-2 text-sm focus:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/10"
+                  value={instructionsDraft}
+                  onChange={(event) => setInstructionsDraft(event.target.value)}
+                />
+                <div className="flex items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setInstructionsDraft(role?.instructions ?? "");
+                      setEditingInstructions(false);
+                    }}
+                    className="rounded-full border border-border/60 bg-background px-4 py-1.5 text-xs font-medium text-foreground hover:bg-muted/30"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void saveInstructions()}
+                    disabled={savingInstructions}
+                    className="rounded-full bg-foreground px-4 py-1.5 text-xs font-medium text-background disabled:opacity-60"
+                  >
+                    {savingInstructions ? "Saving..." : "Save"}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <p className="mt-3 line-clamp-4 whitespace-pre-line text-sm text-muted-foreground">
+                {role?.instructions?.trim() ? role.instructions : "No instructions yet."}
+              </p>
+            )}
+          </section>
+
+          <section className="rounded-2xl border border-border/60 bg-card p-5">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-base font-medium">Files</h2>
+              <span className="text-sm text-muted-foreground">
+                {documents.length} files
+              </span>
+            </div>
+            <div className="mt-5 space-y-4">
+              <FileUploader
+                roleId={roleId}
+                onUploaded={() => {
+                  void loadDocuments();
+                  toast.success("Document uploaded");
+                }}
+              />
+              {docsLoading ? (
+                <LoadingSkeleton lines={3} />
+              ) : documents.length === 0 ? (
+                <EmptyState title="No files" description="Upload PDFs, DOCX, TXT to build context." />
+              ) : (
+                <DocumentList documents={documents} />
+              )}
+            </div>
+          </section>
+        </aside>
       </div>
     </main>
   );
