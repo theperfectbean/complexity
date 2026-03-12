@@ -113,8 +113,8 @@ export default function ThreadPage() {
   }, [threadId]);
 
   const liveMessages = useMemo<ChatMessageItem[]>(
-    () => messages.map((message) => normalizeUIMessage(message, data)),
-    [messages, data],
+    () => messages.map((message) => normalizeUIMessage(message)),
+    [messages],
   );
 
   const mergedMessages = [...historyMessages, ...liveMessages];

@@ -56,37 +56,6 @@ function extractJsonObject(text: string): Record<string, unknown> | null {
   return null;
 }
 
-function extractJsonArray(text: string): string[] | null {
-  const trimmed = text.trim();
-  if (!trimmed) {
-    return null;
-  }
-
-  try {
-    const parsed = JSON.parse(trimmed);
-    if (Array.isArray(parsed)) {
-      return parsed.filter((item): item is string => typeof item === "string");
-    }
-  } catch {
-    // Try to locate a JSON array inside a larger response.
-  }
-
-  const start = trimmed.indexOf("[");
-  const end = trimmed.lastIndexOf("]");
-  if (start >= 0 && end > start) {
-    try {
-      const parsed = JSON.parse(trimmed.slice(start, end + 1));
-      if (Array.isArray(parsed)) {
-        return parsed.filter((item): item is string => typeof item === "string");
-      }
-    } catch {
-      // ignore parse errors
-    }
-  }
-
-  return null;
-}
-
 function collectTextStrings(value: unknown): string[] {
   if (typeof value === "string") {
     const trimmed = value.trim();

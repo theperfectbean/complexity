@@ -4,6 +4,7 @@ import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
+import { toast } from "sonner";
 
 import { SearchBar } from "@/components/search/SearchBar";
 import { getDefaultModel } from "@/lib/models";
@@ -23,22 +24,27 @@ export default function Home() {
     }
 
     setLoading(true);
-    const response = await fetch("/api/threads", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        title: query.slice(0, 80),
-        model,
-      }),
-    });
+    try {
+      const response = await fetch("/api/threads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: query.slice(0, 80),
+          model,
+        }),
+      });
 
-    if (!response.ok) {
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || "Failed to start thread");
+      }
+
+      const payload = (await response.json()) as { thread: { id: string } };
+      router.push(`/search/${payload.thread.id}?q=${encodeURIComponent(query.trim())}`);
+    } catch (error) {
       setLoading(false);
-      return;
+      toast.error(error instanceof Error ? error.message : "An unexpected error occurred");
     }
-
-    const payload = (await response.json()) as { thread: { id: string } };
-    router.push(`/search/${payload.thread.id}?q=${encodeURIComponent(query.trim())}`);
   }
 
   if (status === "loading") {

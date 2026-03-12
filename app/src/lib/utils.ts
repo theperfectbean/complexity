@@ -41,7 +41,7 @@ function collectTextStrings(value: unknown): string[] {
     .filter(Boolean);
 }
 
-export function normalizeUIMessage(message: unknown, _data?: unknown[]): ChatMessageItem {
+export function normalizeUIMessage(message: unknown): ChatMessageItem {
   const msg = message as Record<string, unknown>;
   let text = "";
 

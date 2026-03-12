@@ -98,7 +98,7 @@ export default function RoleDetailPage() {
     },
   });
 
-  const chatItems: ChatMessageItem[] = messages.map((message) => normalizeUIMessage(message, data));
+  const chatItems: ChatMessageItem[] = messages.map((message) => normalizeUIMessage(message));
 
   useEffect(() => {
     if (error) {
