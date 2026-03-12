@@ -1,6 +1,7 @@
 "use client";
 
-import { Copy } from "lucide-react";
+import { Check, Copy } from "lucide-react";
+import { motion, AnimatePresence } from "motion/react";
 import { useState } from "react";
 
 import { RelatedQuestions } from "@/components/chat/RelatedQuestions";
@@ -65,7 +66,7 @@ export function MessageList({ messages, emptyLabel, onRelatedQuestionClick }: Me
     try {
       await navigator.clipboard.writeText(content);
       setCopiedId(messageId);
-      setTimeout(() => setCopiedId((current) => (current === messageId ? null : current)), 1200);
+      setTimeout(() => setCopiedId((current) => (current === messageId ? null : current)), 2000);
     } catch {
       setCopiedId(null);
     }
@@ -156,19 +157,49 @@ export function MessageList({ messages, emptyLabel, onRelatedQuestionClick }: Me
 
                 <div className="mt-4 flex items-center justify-end">
                   <div className="flex items-center gap-2">
-                    {copiedId === message.id && (
-                      <span className="text-[10px] font-medium text-emerald-500 animate-in fade-in slide-in-from-right-1">
-                        Copied
-                      </span>
-                    )}
-                    <button
-                      type="button"
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-zinc-200/60 dark:hover:bg-zinc-800/60 active:scale-90"
+                    <AnimatePresence>
+                      {copiedId === message.id && (
+                        <motion.span
+                          initial={{ opacity: 0, x: 5 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          exit={{ opacity: 0, x: 5 }}
+                          className="text-[10px] font-medium text-emerald-500"
+                        >
+                          Copied
+                        </motion.span>
+                      )}
+                    </AnimatePresence>
+                    <motion.button
+                      whileHover={{ backgroundColor: "rgba(161, 161, 170, 0.15)" }}
+                      whileTap={{ scale: 0.92 }}
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-full transition-colors"
                       onClick={() => void copyMessage(message.id, message.content)}
                       title="Copy message"
                     >
-                      <Copy className={cn("h-4 w-4 transition-colors", copiedId === message.id ? "text-emerald-500" : "text-muted-foreground")} />
-                    </button>
+                      <AnimatePresence mode="wait" initial={false}>
+                        {copiedId === message.id ? (
+                          <motion.div
+                            key="check"
+                            initial={{ scale: 0.5, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.5, opacity: 0 }}
+                            transition={{ duration: 0.15 }}
+                          >
+                            <Check className="h-4 w-4 text-emerald-500" strokeWidth={2.5} />
+                          </motion.div>
+                        ) : (
+                          <motion.div
+                            key="copy"
+                            initial={{ scale: 0.5, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.5, opacity: 0 }}
+                            transition={{ duration: 0.15 }}
+                          >
+                            <Copy className="h-4 w-4 text-muted-foreground" />
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </motion.button>
                   </div>
                 </div>
 
