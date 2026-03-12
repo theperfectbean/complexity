@@ -99,9 +99,9 @@ export function MessageList({ messages, emptyLabel, onRelatedQuestionClick }: Me
                       const isLast = index === (message.thinking?.length ?? 0) - 1;
                       const hasText = message.content && message.content !== "\u200B";
                       
-                      // If we have a result and text is starting to stream, we can hide intermediate steps
-                      // but keep the very last step visible as a "status" indicator.
-                      if (part.result && !isLast && hasText) return null;
+                      // If we have a result and text is starting to stream, we can hide intermediate steps.
+                      // Once the response is complete (no longer actively streaming), we hide all thinking steps.
+                      if (part.result && hasText) return null;
 
                       return (
                         <div
