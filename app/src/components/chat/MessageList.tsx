@@ -173,7 +173,7 @@ export function MessageList({ messages, emptyLabel, onRelatedQuestionClick, onRe
                     {isLastAssistantMessage && onRetry && (
                       <motion.button
                         whileTap={{ scale: 0.92 }}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-accent"
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-zinc-200/80 dark:hover:bg-zinc-800/80"
                         onClick={onRetry}
                         title="Retry"
                       >
@@ -183,7 +183,7 @@ export function MessageList({ messages, emptyLabel, onRelatedQuestionClick, onRe
 
                     <motion.button
                       whileTap={{ scale: 0.92 }}
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-accent"
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-zinc-200/80 dark:hover:bg-zinc-800/80"
                       onClick={() => void copyMessage(message.id, message.content)}
                       title="Copy message"
                     >
