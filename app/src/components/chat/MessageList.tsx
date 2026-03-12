@@ -165,18 +165,16 @@ export function MessageList({ messages, emptyLabel, onRelatedQuestionClick, onRe
                     </AnimatePresence>
 
                     {isLastAssistantMessage && onRetry && (
-                      <motion.button
-                        whileTap={{ scale: 0.92 }}
+                      <button
                         className="inline-flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-black/10 dark:hover:bg-white/10"
                         onClick={onRetry}
                         title="Retry"
                       >
                         <RotateCcw className="h-4 w-4 text-muted-foreground" />
-                      </motion.button>
+                      </button>
                     )}
 
-                    <motion.button
-                      whileTap={{ scale: 0.92 }}
+                    <button
                       className="inline-flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-black/10 dark:hover:bg-white/10"
                       onClick={() => void copyMessage(message.id, message.content)}
                       title="Copy message"
@@ -204,7 +202,7 @@ export function MessageList({ messages, emptyLabel, onRelatedQuestionClick, onRe
                           </motion.div>
                         )}
                       </AnimatePresence>
-                    </motion.button>
+                    </button>
                   </div>
                 </div>
 

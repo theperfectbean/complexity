@@ -239,8 +239,8 @@ export default function ThreadPage() {
         )}
       </div>
 
-      <div className="fixed inset-x-0 bottom-0 z-20 bg-gradient-to-t from-background via-background/95 to-transparent pb-6 pt-10">
-        <form onSubmit={onSubmit} className="mx-auto max-w-3xl px-4">
+      <div className="fixed inset-x-0 bottom-0 z-20 pointer-events-none bg-gradient-to-t from-background via-background/95 to-transparent pb-6 pt-10">
+        <form onSubmit={onSubmit} className="mx-auto max-w-3xl px-4 pointer-events-auto">
           <div className="rounded-2xl border bg-card/50 p-1 shadow-lg backdrop-blur-md transition-shadow focus-within:shadow-xl focus-within:ring-1 focus-within:ring-primary/20">
             <SearchBar
               value={prompt}
