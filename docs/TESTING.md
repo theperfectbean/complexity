@@ -218,3 +218,21 @@ npm run test:coverage
 **Verification:**
 - `npm run lint` now passes with 0 errors.
 - `npm test` passes with 64/64 tests successful.
+
+### 2026-03-12: Default Model Optimization
+
+**Inquiry:** Determine the best model for the system default based on cost-benefit analysis.
+
+**Analysis:**
+- **Current Default:** `perplexity/sonar` (~$0.0163 / request)
+- **Top Contenders:**
+  - `google/gemini-3.1-pro-preview` (~$0.0099 / request) - **Winner**
+  - `google/gemini-3-flash-preview` (~$0.0077 / request)
+  - `anthropic/claude-haiku-4-5` (~$0.0080 / request)
+
+**Decision:**
+Switch to `google/gemini-3.1-pro-preview`. While 25% more expensive than the "Flash" models, it provides significantly better reasoning for RAG tasks and complex instructions, while still being ~40% cheaper than the previous Sonar default.
+
+**Resolution:**
+- Updated `getDefaultModel()` in `app/src/lib/models.ts` to return `google/gemini-3.1-pro-preview`.
+- Verified that API routes correctly ingest the new default via `getDefaultModel()` helper.

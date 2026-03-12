@@ -55,5 +55,5 @@ export function isPresetModel(model: string): boolean {
 }
 
 export function getDefaultModel(): ModelId {
-  return "perplexity/sonar";
+  return "google/gemini-3.1-pro-preview";
 }
