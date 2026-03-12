@@ -55,5 +55,5 @@ export function isPresetModel(model: string): boolean {
 }
 
 export function getDefaultModel(): ModelId {
-  return "google/gemini-3.1-pro-preview";
+  return "anthropic/claude-haiku-4-5";
 }

@@ -224,20 +224,15 @@ npm run test:coverage
 **Inquiry:** Determine the best model for the system default based on cost-benefit analysis.
 
 **Analysis:**
-- **Current Default:** `perplexity/sonar` (~$0.0163 / request)
+- **Current Default (Legacy):** `perplexity/sonar` (~$0.0163 / request, ~0.7s)
 - **Top Contenders:**
-  - `google/gemini-3.1-pro-preview` (~$0.0099 / request) - **Winner**
-  - `google/gemini-3-flash-preview` (~$0.0077 / request)
-  - `anthropic/claude-haiku-4-5` (~$0.0080 / request)
+  - `anthropic/claude-haiku-4-5` (~$0.0080 / request, ~1.7s) - **Final Winner**
+  - `google/gemini-3-flash-preview` (~$0.0077 / request, ~2.1s)
+  - `google/gemini-3.1-pro-preview` (~$0.0099 / request, ~5.2s) - *Rejected on latency*
 
 **Decision:**
-Switch to `google/gemini-3.1-pro-preview`. 
-
-**Performance & Cost Analysis:**
-- **Cost:** ~$0.0099 / request (~40% cheaper than Sonar).
-- **Latency (Smoke Test):** ~5.2s (Sonar: ~0.7s, Flash: ~2.1s).
-- **Rationale:** While significantly slower than Sonar, the 3.1 Pro model provides superior reasoning and a massive context window for complex RAG tasks that simpler models struggle with. For a "Complexity" search experience, reasoning quality and cost-efficiency take precedence over raw speed for the default setting.
+Switch to `anthropic/claude-haiku-4-5`. It offers a **50% cost reduction** compared to Sonar while maintaining a "snappy" response time for a search interface (~1.7-2.1s). While Gemini 3.1 Pro offered better reasoning, its 5.2s latency was deemed unacceptable for a default experience.
 
 **Resolution:**
-- Updated `getDefaultModel()` in `app/src/lib/models.ts` to return `google/gemini-3.1-pro-preview`.
+- Updated `getDefaultModel()` in `app/src/lib/models.ts` to return `anthropic/claude-haiku-4-5`.
 - Verified that API routes correctly ingest the new default via `getDefaultModel()` helper.
