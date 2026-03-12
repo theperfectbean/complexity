@@ -54,6 +54,6 @@ describe("Sidebar", () => {
     render(<Sidebar collapsed={false} onToggle={() => {}} />);
 
     fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
-    expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/login" });
+    expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/" });
   });
 });

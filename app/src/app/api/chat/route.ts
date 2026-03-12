@@ -442,8 +442,7 @@ export async function POST(request: Request) {
               model: safeModel,
               input: agentInput,
               instructions: safeInstructions,
-              // Only add web search tools if within a role
-              tools: activeRoleId ? [{ type: "web_search" }, { type: "fetch_url" }] : [],
+              tools: [{ type: "web_search" }, { type: "fetch_url" }],
             };
 
         const requestBody: Responses.ResponseCreateParamsStreaming = {
@@ -550,7 +549,7 @@ export async function POST(request: Request) {
                   model: safeModel,
                   input: agentInput,
                   instructions: safeInstructions,
-                  tools: activeRoleId ? [{ type: "web_search" }, { type: "fetch_url" }] : [],
+                  tools: [{ type: "web_search" }, { type: "fetch_url" }],
                 };            
             const client = createPerplexityClient();
             const nonStreamingResponse = await client.responses.create(
