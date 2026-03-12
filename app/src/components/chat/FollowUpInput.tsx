@@ -31,7 +31,7 @@ export function FollowUpInput({
             }
           }}
           placeholder={placeholder}
-          className="max-h-52 flex-1 resize-none bg-transparent px-2 py-2 text-sm outline-none placeholder:text-muted-foreground"
+          className="max-h-52 flex-1 resize-none bg-transparent px-2 py-2 text-base outline-none placeholder:text-muted-foreground"
         />
         <button
           type="submit"
