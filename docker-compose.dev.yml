@@ -4,6 +4,7 @@ services:
     image: node:20
     volumes:
       - ./app:/app
+      - node_modules:/app/node_modules
     # Ensure variables matched from the base file are used
     command: npm run dev
     environment:
@@ -13,3 +14,6 @@ services:
     ports:
       - "127.0.0.1:3002:3000"
     working_dir: /app
+
+volumes:
+  node_modules:
