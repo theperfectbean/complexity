@@ -150,4 +150,4 @@ DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose build app
 - **API Routes**:
   - `POST /api/auth/forgot-password`: Generates a random reset token, stores it in `verification_tokens` table, and logs the reset link to the server console (SMTP not yet configured).
   - `POST /api/auth/reset-password`: Verifies the token, updates the hashed password in the `users` table, and deletes the used token.
-- **Public Access**: Updated `middleware.ts` to allow unauthenticated access to the password reset flow.
+- **Public Access**: Updated `proxy.ts` to allow unauthenticated access to the password reset flow.
