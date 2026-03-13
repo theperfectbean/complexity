@@ -2,10 +2,19 @@ import mammoth from "mammoth";
 import { PDFParse } from "pdf-parse";
 
 export async function extractTextFromFile(file: File) {
-  const mimeType = file.type;
   const buffer = Buffer.from(await file.arrayBuffer());
+  return extractTextFromBuffer(buffer, file.name, file.type);
+}
 
-  if (mimeType === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")) {
+export async function extractTextFromDataUrl(dataUrl: string, name: string, contentType: string) {
+  const base64 = dataUrl.split(",")[1];
+  if (!base64) return "";
+  const buffer = Buffer.from(base64, "base64");
+  return extractTextFromBuffer(buffer, name, contentType);
+}
+
+async function extractTextFromBuffer(buffer: Buffer, name: string, contentType: string) {
+  if (contentType === "application/pdf" || name.toLowerCase().endsWith(".pdf")) {
     const parser = new PDFParse({ data: buffer });
     const result = await parser.getText();
     await parser.destroy();
@@ -13,8 +22,8 @@ export async function extractTextFromFile(file: File) {
   }
 
   if (
-    mimeType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
-    file.name.toLowerCase().endsWith(".docx")
+    contentType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+    name.toLowerCase().endsWith(".docx")
   ) {
     const result = await mammoth.extractRawText({ buffer });
     return result.value;

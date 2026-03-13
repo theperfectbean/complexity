@@ -11,6 +11,7 @@ import { getDefaultModel, isPresetModel, isValidModelId } from "@/lib/models";
 import { messages, roles, threads, users } from "@/lib/db/schema";
 import { getMemoryPrompt, saveExtractedMemories } from "@/lib/memory";
 import { createPerplexityClient } from "@/lib/perplexity";
+import { extractTextFromDataUrl } from "@/lib/documents";
 import { getEmbeddings, similaritySearch } from "@/lib/rag";
 import { getRedisClient } from "@/lib/redis";
 
@@ -39,7 +40,7 @@ type CachedChatPayload = {
   citations: Citation[];
 };
 
-function extractTextFromMessage(message: UIMessage): string {
+async function extractTextFromMessage(message: UIMessage): Promise<string> {
   const partsText =
     message.parts
       ?.filter((part) => part.type === "text")
@@ -82,13 +83,25 @@ function extractTextFromMessage(message: UIMessage): string {
   // Handle experimental_attachments if present
   const messageRecord = asRecord(message);
   if (messageRecord && Array.isArray(messageRecord.experimental_attachments)) {
-    const attachmentsInfo = messageRecord.experimental_attachments
-      .map((a: unknown) => {
+    const attachmentsContents = await Promise.all(
+      messageRecord.experimental_attachments.map(async (a: unknown) => {
         const att = asRecord(a);
-        return att ? `[Attached File: ${att.name || "unnamed"} (${att.contentType || "unknown type"})]` : "";
+        if (!att || !att.url || typeof att.url !== "string" || !att.url.startsWith("data:")) return "";
+        
+        // Skip images as they are handled as a separate part in agentInput
+        if (att.contentType?.startsWith("image/")) return "";
+
+        try {
+          const content = await extractTextFromDataUrl(att.url, String(att.name || ""), String(att.contentType || ""));
+          return `--- START ATTACHED FILE: ${att.name || "unnamed"} ---\n${content}\n--- END ATTACHED FILE: ${att.name || "unnamed"} ---`;
+        } catch (e) {
+          console.error("[Chat API] Error extracting attachment content:", e);
+          return `[Error extracting file: ${att.name || "unnamed"}]`;
+        }
       })
-      .filter(Boolean)
-      .join("\n");
+    );
+
+    const attachmentsInfo = attachmentsContents.filter(Boolean).join("\n\n");
 
     if (attachmentsInfo) {
       finalText = finalText ? `${finalText}\n\n${attachmentsInfo}` : attachmentsInfo;
@@ -267,8 +280,7 @@ export async function POST(request: Request) {
   }
 
   const lastMessage = inputMessages[inputMessages.length - 1];
-  const userText = extractTextFromMessage(lastMessage);
-
+  const userText = await extractTextFromMessage(lastMessage);
   if (!userText) {
     return NextResponse.json({ error: "Message text required" }, { status: 400 });
   }
@@ -375,9 +387,9 @@ export async function POST(request: Request) {
     }
   }
 
-  const agentInput: Responses.InputItem[] = inputMessages
-    .map((message) => {
-      const text = extractTextFromMessage(message);
+  const agentInput: Responses.InputItem[] = (await Promise.all(inputMessages
+    .map(async (message) => {
+      const text = await extractTextFromMessage(message);
       const content: any[] = [{ type: "input_text", text }];
 
       const messageRecord = asRecord(message);
@@ -400,9 +412,12 @@ export async function POST(request: Request) {
         type: "message",
         role: message.role as "user" | "assistant",
         content,
-      };
-    })
-    .filter((message) => message.content.length > 0);
+      } as Responses.InputItem;
+    })))
+    .filter((message) => {
+       const textContent = (message.content as any[]).find(c => c.type === 'input_text')?.text || '';
+       return textContent.length > 0 || (message.content as any[]).some(c => c.type === 'input_image');
+    });
 
   const stream = createUIMessageStream({
     execute: async ({ writer }) => {

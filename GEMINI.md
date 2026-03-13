@@ -131,6 +131,6 @@ DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose build app
 
 ### UI & UX Improvements
 - **SearchBar Attachment Button**: The "Attach file" button in the `SearchBar` has been fully implemented. It supports attaching multiple files (PDF, DOCX, TXT, MD, Images). Attached files are displayed as visual chips directly inside the `SearchBar` container with a remove option. 
-- **Intact File Passing**: File attachments are passed "intact" to the LLM via the Vercel AI SDK's `experimental_attachments` feature. The backend handles extracting text descriptions for files and mapping image attachments to `input_image` parts for the Perplexity Agent API, ensuring the model has full context of the attached files.
+- **Intact File Passing**: File attachments are passed "intact" to the LLM via the Vercel AI SDK's `experimental_attachments` feature. The backend handles real-time content extraction from data URLs (PDF, DOCX, TXT, MD) and embeds the full text content directly into the LLM prompt. Image attachments are mapped to native `input_image` parts for the Perplexity Agent API, ensuring the model has full visibility of all attached data.
 - **Auto-Scroll & Rendering Performance**: (Previously implemented) Wrapped `MarkdownRenderer` in `React.memo`, optimized auto-scrolling with `requestAnimationFrame` and "smart" scroll-snapping, and disabled Framer Motion layout projections during active streams to ensure a buttery-smooth UI.
 
