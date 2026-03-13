@@ -83,7 +83,7 @@ function ThreadChat({
   const hasSubmittedInitialQuery = useRef(false);
 
   const [data, setData] = useState<Record<string, unknown>[]>([]);
-  const { messages, sendMessage, regenerate, status, error } = useChat({
+  const { messages, setMessages, sendMessage, regenerate, status, error } = useChat({
     initialMessages: initialHistory.map((msg) => ({
       id: msg.id,
       role: msg.role as "user" | "assistant" | "system",
