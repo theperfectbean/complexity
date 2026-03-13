@@ -61,7 +61,7 @@ export function SearchBar({
   return (
     <motion.div
       layoutId={layoutId}
-      layout
+      layout={disabled ? false : true}
       className={cn(
         "rounded-xl border bg-card p-3 shadow-sm transition-shadow",
         "focus-within:border-primary/40 focus-within:ring-2 focus-within:ring-ring/20 focus-within:shadow",

@@ -69,7 +69,8 @@ export function MessageList({ messages, emptyLabel, onRelatedQuestionClick, onRe
   // Auto-scroll to bottom when messages or their content change
   useEffect(() => {
     if (messages.length > 0) {
-      bottomRef.current?.scrollIntoView({ block: "end" });
+      // Use window.scrollTo instead of scrollIntoView to prevent fixed footer jumping
+      window.scrollTo({ top: document.documentElement.scrollHeight });
     }
   }, [messages, lastMessageContent, lastMessageThinkingLength]);
 
