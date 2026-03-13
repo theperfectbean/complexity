@@ -1,12 +1,13 @@
 "use client";
 
-import { Check, Copy, RotateCcw } from "lucide-react";
+import { Check, Copy, RotateCcw, ArrowDown, Globe, Search, Brain, Database } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 
 import { RelatedQuestions } from "@/components/chat/RelatedQuestions";
 import { SourceCarousel } from "@/components/chat/SourceCarousel";
 import { MarkdownRenderer } from "@/components/shared/MarkdownRenderer";
+import { cn } from "@/lib/utils";
 
 export type ChatCitation = {
   url?: string;
@@ -34,6 +35,7 @@ type MessageListProps = {
   emptyLabel: string;
   onRelatedQuestionClick?: (question: string) => void;
   onRetry?: () => void;
+  isStreaming?: boolean;
 };
 
 const urlPattern = /(https?:\/\/[\w\-._~:/?#\[\]@!$&'()*+,;=%]+)/g;
@@ -59,15 +61,43 @@ function extractRelatedQuestions(text: string): string[] {
   return Array.from(new Set(sentenceCandidates)).slice(0, 3);
 }
 
-export function MessageList({ messages, emptyLabel, onRelatedQuestionClick, onRetry }: MessageListProps) {
+function StatusIcon({ name, active }: { name: string; active?: boolean }) {
+  const iconProps = { className: cn("h-3.5 w-3.5 transition-colors", active ? "text-primary animate-pulse" : "text-emerald-500") };
+  
+  if (name.toLowerCase().includes("search")) return <Globe {...iconProps} />;
+  if (name.toLowerCase().includes("retrieval") || name.toLowerCase().includes("document")) return <Database {...iconProps} />;
+  if (name.toLowerCase().includes("reasoning") || name.toLowerCase().includes("thinking")) return <Brain {...iconProps} />;
+  
+  return <Search {...iconProps} />;
+}
+
+export function MessageList({ messages, emptyLabel, onRelatedQuestionClick, onRetry, isStreaming }: MessageListProps) {
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [showScrollButton, setShowScrollButton] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const hasAutoScrolledRef = useRef(false);
 
   const lastMessageContent = messages[messages.length - 1]?.content;
   const lastMessageThinkingLength = messages[messages.length - 1]?.thinking?.length;
 
-  // Auto-scroll to bottom on first load of existing messages, then only if user is near bottom
+  const scrollToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {
+    window.scrollTo({
+      top: document.documentElement.scrollHeight,
+      behavior,
+    });
+  }, []);
+
+  const handleScroll = useCallback(() => {
+    const isAtBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 200;
+    setShowScrollButton(!isAtBottom && (isStreaming ?? false));
+  }, [isStreaming]);
+
+  useEffect(() => {
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [handleScroll]);
+
+  // Auto-scroll to bottom
   useEffect(() => {
     if (messages.length === 0) {
       hasAutoScrolledRef.current = false;
@@ -76,21 +106,16 @@ export function MessageList({ messages, emptyLabel, onRelatedQuestionClick, onRe
 
     if (!hasAutoScrolledRef.current) {
       hasAutoScrolledRef.current = true;
-      requestAnimationFrame(() => {
-        window.scrollTo({ top: document.documentElement.scrollHeight });
-      });
+      requestAnimationFrame(() => scrollToBottom("auto"));
       return;
     }
 
-    // Only auto-scroll if the user is already near the bottom
     const isNearBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 150;
 
     if (isNearBottom) {
-      requestAnimationFrame(() => {
-        window.scrollTo({ top: document.documentElement.scrollHeight });
-      });
+      requestAnimationFrame(() => scrollToBottom("auto"));
     }
-  }, [messages, lastMessageContent, lastMessageThinkingLength]);
+  }, [messages, lastMessageContent, lastMessageThinkingLength, scrollToBottom]);
 
   async function copyMessage(messageId: string, content: string) {
     try {
@@ -107,7 +132,21 @@ export function MessageList({ messages, emptyLabel, onRelatedQuestionClick, onRe
   }
 
   return (
-    <div className="space-y-5 pb-4">
+    <div className="relative space-y-6 pb-4">
+      <AnimatePresence>
+        {showScrollButton && (
+          <motion.button
+            initial={{ opacity: 0, y: 10, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 10, scale: 0.9 }}
+            onClick={() => scrollToBottom("smooth")}
+            className="fixed bottom-32 left-1/2 z-50 flex h-10 w-10 -translate-x-1/2 items-center justify-center rounded-full border bg-background shadow-lg transition-transform active:scale-95 md:bottom-36"
+          >
+            <ArrowDown className="h-4 w-4 text-foreground" />
+          </motion.button>
+        )}
+      </AnimatePresence>
+
       {messages.map((message, index) => {
         const urlsFromCitations = (message.citations ?? []).map((citation) => citation.url).filter(Boolean) as string[];
         const urls = message.role === "assistant" ? (urlsFromCitations.length > 0 ? urlsFromCitations : extractUrls(message.content)) : [];
@@ -116,9 +155,14 @@ export function MessageList({ messages, emptyLabel, onRelatedQuestionClick, onRe
         const isLastAssistantMessage = !isUser && index === messages.length - 1;
 
         return (
-          <article key={message.id} className={isUser ? "flex flex-col items-end py-4" : "group relative flex flex-col gap-0 pt-0 pb-8"}>
+          <motion.article 
+            key={message.id} 
+            initial={isStreaming && index === messages.length - 1 ? { opacity: 0, y: 5 } : false}
+            animate={{ opacity: 1, y: 0 }}
+            className={isUser ? "flex flex-col items-end py-2" : "group relative flex flex-col gap-0 pt-2 pb-10"}
+          >
             {isUser ? (
-              <div className="w-fit max-w-[85%] md:max-w-[70%] rounded-[20px] bg-[#f4f4f4] px-5 py-3 text-left dark:bg-[#202020]">
+              <div className="w-fit max-w-[85%] rounded-2xl bg-muted/60 px-5 py-3.5 text-left md:max-w-[75%]">
                 <p className="whitespace-pre-wrap text-[0.9375rem] font-medium leading-[1.6] text-foreground">
                   {message.content}
                 </p>
@@ -126,45 +170,43 @@ export function MessageList({ messages, emptyLabel, onRelatedQuestionClick, onRe
             ) : (
               <div className="flex w-full flex-col">
                 {message.thinking && message.thinking.length > 0 && (!message.content || message.content.trim().length < 5 || message.content === "\u200B") && (
-                  <div className="mb-4 flex flex-col gap-2.5">
+                  <div className="mb-6 flex flex-col gap-3">
                     {message.thinking.map((part) => {
+                      const isActive = !part.result;
                       return (
-                        <div
+                        <motion.div
                           key={part.callId}
-                          className="flex items-center gap-2.5 text-sm text-muted-foreground/80 transition-all animate-in fade-in slide-in-from-left-2"
+                          initial={{ opacity: 0, x: -5 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          className="flex items-center gap-3 text-[13px] text-muted-foreground/90"
                         >
-                          {!part.result ? (
-                            <div className="flex h-4 w-4 items-center justify-center">
-                              <div className="h-3 w-3 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-                            </div>
-                          ) : (
-                            <div className="flex h-4 w-4 items-center justify-center text-emerald-500">
-                              <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                width="16"
-                                height="16"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="3"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                className="h-3 w-3"
-                              >
-                                <polyline points="20 6 9 17 4 12" />
-                              </svg>
-                            </div>
-                          )}
-                          <span className="font-medium">
-                            {part.toolName}
-                            {part.result ? "" : "..."}
-                          </span>
-                          {part.result && (
-                            <span className="text-[0.8rem] opacity-60">
-                               — {part.result}
+                          <div className={cn(
+                            "flex h-6 w-6 items-center justify-center rounded-full border bg-background/50 shadow-sm transition-all",
+                            isActive ? "border-primary/20 bg-primary/5" : "border-emerald-500/20 bg-emerald-500/5"
+                          )}>
+                            {isActive ? (
+                              <div className="h-2 w-2 animate-pulse rounded-full bg-primary" />
+                            ) : (
+                              <StatusIcon name={part.toolName} />
+                            )}
+                          </div>
+                          
+                          <div className="flex flex-col">
+                            <span className={cn("font-medium transition-colors", isActive ? "text-foreground" : "text-muted-foreground")}>
+                              {part.toolName}{isActive ? "..." : ""}
                             </span>
-                          )}
-                        </div>
+                            {isActive && part.input && typeof part.input === "object" && "query" in (part.input as Record<string, unknown>) && typeof (part.input as Record<string, unknown>).query === "string" ? (
+                              <span className="text-[11px] opacity-60 line-clamp-1">
+                                Searching for: {(part.input as Record<string, string>).query}
+                              </span>
+                            ) : null}
+                            {part.result && (
+                              <span className="text-[11px] opacity-60">
+                                {part.result}
+                              </span>
+                            )}
+                          </div>
+                        </motion.div>
                       );
                     })}
                   </div>
@@ -179,20 +221,10 @@ export function MessageList({ messages, emptyLabel, onRelatedQuestionClick, onRe
                   <MarkdownRenderer content={message.content} />
                 </div>
 
-                <div className="mt-4 flex items-center justify-end">
-                  <div className="flex items-center gap-2">
-                    {isLastAssistantMessage && onRetry && (
-                      <button
-                        className="inline-flex h-7 w-7 items-center justify-center rounded-lg transition-colors hover:bg-black/5 dark:hover:bg-white/5 active:scale-95"
-                        onClick={onRetry}
-                        title="Retry"
-                      >
-                        <RotateCcw className="h-3.5 w-3.5 text-muted-foreground/70" strokeWidth={1.5} />
-                      </button>
-                    )}
-
+                <div className="mt-4 flex items-center justify-start opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+                  <div className="flex items-center gap-1.5">
                     <button
-                      className="relative inline-flex h-7 w-7 items-center justify-center rounded-lg transition-colors hover:bg-black/5 dark:hover:bg-white/5 active:scale-95"
+                      className="relative inline-flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-black/5 dark:hover:bg-white/5 active:scale-95"
                       onClick={() => void copyMessage(message.id, message.content)}
                       title="Copy message"
                     >
@@ -205,7 +237,7 @@ export function MessageList({ messages, emptyLabel, onRelatedQuestionClick, onRe
                             exit={{ scale: 0.8, opacity: 0 }}
                             transition={{ duration: 0.1 }}
                           >
-                            <Check className="h-3.5 w-3.5 text-emerald-500" strokeWidth={2} />
+                            <Check className="h-4 w-4 text-emerald-500" strokeWidth={2} />
                           </motion.div>
                         ) : (
                           <motion.div
@@ -215,22 +247,32 @@ export function MessageList({ messages, emptyLabel, onRelatedQuestionClick, onRe
                             exit={{ scale: 0.8, opacity: 0 }}
                             transition={{ duration: 0.1 }}
                           >
-                            <Copy className="h-3.5 w-3.5 text-muted-foreground/70" strokeWidth={1.5} />
+                            <Copy className="h-3.5 w-3.5 text-muted-foreground/60" strokeWidth={1.5} />
                           </motion.div>
                         )}
                       </AnimatePresence>
                     </button>
+
+                    {isLastAssistantMessage && onRetry && (
+                      <button
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-black/5 dark:hover:bg-white/5 active:scale-95"
+                        onClick={onRetry}
+                        title="Retry"
+                      >
+                        <RotateCcw className="h-3.5 w-3.5 text-muted-foreground/60" strokeWidth={1.5} />
+                      </button>
+                    )}
                   </div>
                 </div>
 
                 {relatedQuestions.length > 0 && (
-                  <div className="mt-12 border-t pt-8">
+                  <div className="mt-12 border-t border-border/40 pt-8">
                     <RelatedQuestions questions={relatedQuestions} onSelect={onRelatedQuestionClick} />
                   </div>
                 )}
               </div>
             )}
-          </article>
+          </motion.article>
         );
       })}
       <div ref={bottomRef} className="h-px w-full scroll-mt-40" />

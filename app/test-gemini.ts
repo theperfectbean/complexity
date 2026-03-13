@@ -12,7 +12,7 @@ const client = new Perplexity({ apiKey });
 const model = "google/gemini-3.1-pro-preview";
 const prompt = "What is the capital of France? Answer in exactly one word.";
 
-async function runCase({ label, stream, includeSystem, includeTools }) {
+async function runCase({ label, stream, includeSystem, includeTools }: { label: string; stream: boolean; includeSystem: boolean; includeTools: boolean }) {
   console.log(`--- ${label} ---`);
   const input = [];
   if (includeSystem) {
@@ -35,7 +35,7 @@ async function runCase({ label, stream, includeSystem, includeTools }) {
       instructions: "Be concise.",
       stream,
       ...(includeTools ? { tools: [{ type: "web_search" }, { type: "fetch_url" }] } : {}),
-    };
+    } as any;
 
     const result = await client.responses.create(request);
     const outputText = typeof result?.output_text === "string" ? result.output_text : "";

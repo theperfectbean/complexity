@@ -1,7 +1,7 @@
 "use client";
 
 import { useChat } from "@ai-sdk/react";
-import { DefaultChatTransport, UIMessageChunk } from "ai";
+import { DefaultChatTransport, UIMessageChunk, UIMessage } from "ai";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -85,11 +85,18 @@ function ThreadChat({
   const [data, setData] = useState<Record<string, unknown>[]>([]);
   const [attachments, setAttachments] = useState<File[]>([]);
   const { messages, setMessages, sendMessage, regenerate, status, error } = useChat({
-    initialMessages: initialHistory.map((msg) => ({
-      id: msg.id,
-      role: msg.role as "user" | "assistant" | "system",
-      content: msg.content,
-    })),
+    messages: initialHistory.map((msg) => {
+      const uiMsg = {
+        id: msg.id,
+        role: msg.role as "user" | "assistant" | "system",
+        content: msg.content,
+        parts: [{ type: "text", text: msg.content }],
+      };
+      if (msg.citations && msg.citations.length > 0) {
+        (uiMsg as Record<string, unknown>).citations = msg.citations;
+      }
+      return uiMsg as unknown as UIMessage;
+    }),
     transport: new DefaultChatTransport({
       api: "/api/chat",
       body: () => ({
@@ -227,6 +234,7 @@ function ThreadChat({
       <div className="flex-1 space-y-12">
         <MessageList
           messages={mergedMessages}
+          isStreaming={status === "streaming"}
           emptyLabel="Start this thread with your first question."
           onRelatedQuestionClick={(question) => setPrompt(question)}
           onRetry={() => {
@@ -236,11 +244,18 @@ function ThreadChat({
             // Ensure the internal state has all messages (initial + live)
             // so that regenerate can find the messageId and its predecessors.
             setMessages(
-              mergedMessages.map((m) => ({
-                id: m.id,
-                role: m.role as "user" | "assistant" | "system",
-                content: m.content,
-              })),
+              mergedMessages.map((m) => {
+                const uiMsg = {
+                  id: m.id,
+                  role: m.role as "user" | "assistant" | "system",
+                  content: m.content,
+                  parts: [{ type: "text", text: m.content }],
+                };
+                if (m.citations && m.citations.length > 0) {
+                  (uiMsg as Record<string, unknown>).citations = m.citations;
+                }
+                return uiMsg as unknown as UIMessage;
+              }),
             );
 
             void regenerate({ messageId: lastMessage.id });

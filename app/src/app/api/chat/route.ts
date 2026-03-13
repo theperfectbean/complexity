@@ -54,7 +54,7 @@ function collectFileParts(message: UIMessage): FilePart[] {
 
   if (Array.isArray(message.parts)) {
     message.parts.forEach((part) => {
-      if (part && typeof part === "object" && (part as any).type === "file") {
+      if (part && typeof part === "object" && "type" in part && part.type === "file") {
         const partRecord = part as Record<string, unknown>;
         const url = typeof partRecord.url === "string" ? partRecord.url : "";
         if (url) {
@@ -442,7 +442,7 @@ export async function POST(request: Request) {
   const agentInput: Responses.InputItem[] = (await Promise.all(inputMessages
     .map(async (message) => {
       const text = await extractTextFromMessage(message);
-      const content: any[] = [{ type: "input_text", text }];
+      const content: Record<string, unknown>[] = [{ type: "input_text", text }];
 
       const fileParts = collectFileParts(message);
       fileParts.forEach((att) => {
@@ -456,15 +456,18 @@ export async function POST(request: Request) {
         // Add other attachment types here if supported by the Perplexity API
       });
 
-      return {
+      return ({
         type: "message",
         role: message.role as "user" | "assistant",
         content,
-      } as Responses.InputItem;
+      } as unknown) as Responses.InputItem;
     })))
     .filter((message) => {
-       const textContent = (message.content as any[]).find(c => c.type === 'input_text')?.text || '';
-       return textContent.length > 0 || (message.content as any[]).some(c => c.type === 'input_image');
+       const msg = message as unknown as Record<string, unknown>;
+       if (!Array.isArray(msg.content)) return false;
+       const contentArray = msg.content as Record<string, unknown>[];
+       const textContent = (contentArray.find(c => c.type === 'input_text')?.text as string) || '';
+       return textContent.length > 0 || contentArray.some(c => c.type === 'input_image');
     });
 
   const stream = createUIMessageStream({
@@ -557,9 +560,10 @@ export async function POST(request: Request) {
 
       console.log(`[Chat API] Calling Perplexity API... (${Date.now() - startTime}ms)`);
 
+      const forceStreamingOnly = safeModel === "google/gemini-3.1-pro-preview";
+
       try {
         const client = createPerplexityClient();
-        const forceStreamingOnly = safeModel === "google/gemini-3.1-pro-preview";
         const requestBodyBase = isPresetModel(safeModel)
           ? {
               preset: safeModel,
@@ -637,10 +641,11 @@ export async function POST(request: Request) {
             if (eventRecord?.type === "response.reasoning.search_queries") {
               const queries = (eventRecord as Record<string, unknown>).queries as string[];
               writer.write({
-                type: "data-call-result",
+                type: "data-call-start",
                 data: {
                   callId: "reasoning",
-                  result: `Searching for: ${queries.join(", ")}`,
+                  toolName: "Searching",
+                  input: { query: queries.join(", ") },
                 },
               } as UIMessageChunk);
               continue;

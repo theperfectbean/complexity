@@ -97,7 +97,10 @@ export function normalizeUIMessage(message: unknown): ChatMessageItem {
           const payload = p.data as Record<string, unknown>;
           if (payload) {
             const existing = thinking.find((t) => t.callId === payload.callId);
-            if (!existing) {
+            if (existing) {
+              existing.input = payload.input;
+              if (payload.toolName) existing.toolName = payload.toolName as string;
+            } else {
               thinking.push({
                 callId: payload.callId as string,
                 toolName: payload.toolName as string,

@@ -81,8 +81,8 @@ export function SearchBar({
       layout={!compact}
       data-testid={dataTestId}
       className={cn(
-        "flex flex-col rounded-xl border bg-card p-3 shadow-sm transition-shadow",
-        "focus-within:border-primary/40 focus-within:ring-2 focus-within:ring-ring/20 focus-within:shadow",
+        "flex flex-col rounded-[22px] border bg-card p-2 shadow-md transition-all duration-200",
+        "focus-within:border-primary/30 focus-within:ring-4 focus-within:ring-primary/5 focus-within:shadow-lg",
       )}
     >
       <input
@@ -95,31 +95,33 @@ export function SearchBar({
       />
       
       {attachments.length > 0 && (
-        <div className="flex flex-wrap gap-2 pb-2 px-2" data-testid="attachments-container">
+        <div className="flex flex-wrap gap-2 pb-1.5 px-2" data-testid="attachments-container">
           {attachments.map((file, index) => (
-            <div 
+            <motion.div 
               key={`${file.name}-${index}`} 
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
               data-testid="file-chip"
-              className="flex items-center gap-1.5 rounded-md bg-muted/50 pl-2 pr-1 py-1 text-xs text-muted-foreground border border-border/50 max-w-[150px]"
+              className="group flex items-center gap-1.5 rounded-xl bg-muted/40 pl-2.5 pr-1.5 py-1.5 text-[11px] text-muted-foreground border border-border/40 max-w-[160px] transition-colors hover:bg-muted/60"
             >
-              <FileText className="h-3 w-3 shrink-0" />
+              <FileText className="h-3 w-3 shrink-0 text-primary/60" />
               <span className="truncate font-medium">{file.name}</span>
               <button
                 type="button"
                 onClick={() => onRemoveAttachment?.(index)}
-                className="ml-auto inline-flex h-4 w-4 items-center justify-center rounded-full hover:bg-black/10 dark:hover:bg-white/10 shrink-0"
+                className="ml-1 inline-flex h-4 w-4 items-center justify-center rounded-full hover:bg-foreground/10 shrink-0 transition-colors"
               >
                 <X className="h-3 w-3" />
               </button>
-            </div>
+            </motion.div>
           ))}
         </div>
       )}
 
-      <div className="flex items-end gap-2">
+      <div className="flex items-end gap-2 px-2">
         <TextareaAutosize
           minRows={compact ? 1 : 2}
-          maxRows={8}
+          maxRows={12}
           value={value}
           onChange={(event) => onChange(event.target.value)}
           onKeyDown={(event) => {
@@ -130,36 +132,39 @@ export function SearchBar({
           }}
           disabled={disabled}
           placeholder={placeholder}
-          className="flex-1 resize-none bg-transparent px-2 py-2 text-base outline-none placeholder:text-muted-foreground disabled:opacity-50"
+          className="flex-1 resize-none bg-transparent py-2.5 text-[15px] outline-none placeholder:text-muted-foreground/60 disabled:opacity-50 leading-relaxed"
         />
       </div>
 
-      <div className="mt-2 flex items-center justify-between gap-2 border-t pt-2">
-        <div className="flex items-center gap-2">
+      <div className="mt-1 flex items-center justify-between gap-2 px-1 pb-1">
+        <div className="flex items-center gap-1.5">
           <DropdownMenu.Root>
             <DropdownMenu.Trigger asChild>
               <button
                 type="button"
-                className="inline-flex items-center gap-1 rounded-full border bg-muted/40 px-3 py-1.5 text-xs text-foreground hover:bg-black/5 dark:hover:bg-white/5"
+                className="inline-flex h-8 items-center gap-1.5 rounded-xl bg-transparent px-2.5 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
                 aria-label="Select model"
               >
                 <span className="max-w-32 truncate">{activeModelLabel}</span>
-                <ChevronDown className="h-3.5 w-3.5" />
+                <ChevronDown className="h-3.5 w-3.5 opacity-50" />
               </button>
             </DropdownMenu.Trigger>
             <DropdownMenu.Portal>
               <DropdownMenu.Content
                 sideOffset={8}
-                className="z-50 max-h-72 min-w-56 overflow-y-auto rounded-xl border bg-popover p-1 shadow-md"
+                className="z-50 max-h-80 min-w-64 overflow-y-auto rounded-2xl border bg-popover/95 p-1.5 shadow-xl backdrop-blur-sm animate-in fade-in zoom-in-95"
               >
                 {Object.entries(groupedModels).map(([category, options]) => (
                   <div key={category} className="py-1">
-                    <p className="px-2 pb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{category}</p>
+                    <p className="px-3 pb-1.5 pt-1 text-[11px] font-bold uppercase tracking-wider text-muted-foreground/50">{category}</p>
                     {options.map((option) => (
                       <DropdownMenu.Item
                         key={option.id}
                         onSelect={() => onModelChange?.(option.id)}
-                        className="cursor-pointer rounded-lg px-2 py-1.5 text-sm outline-none hover:bg-black/5 dark:hover:bg-white/5"
+                        className={cn(
+                          "flex cursor-pointer items-center rounded-lg px-3 py-2 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground",
+                          model === option.id && "bg-primary/5 text-primary font-medium"
+                        )}
                       >
                         {option.label}
                       </DropdownMenu.Item>
@@ -170,24 +175,26 @@ export function SearchBar({
             </DropdownMenu.Portal>
           </DropdownMenu.Root>
 
+          <div className="h-4 w-px bg-border/40 mx-0.5" />
+
           <button
             type="button"
             className={cn(
-              "inline-flex h-8 w-fit items-center gap-1.5 rounded-full border px-3 text-xs font-medium transition-colors",
+              "inline-flex h-8 w-fit items-center gap-1.5 rounded-xl px-2.5 text-[13px] font-medium transition-all",
               webSearchEnabled
-                ? "border-primary/20 bg-primary/10 text-primary hover:bg-primary/20"
-                : "bg-card text-muted-foreground hover:bg-black/5 dark:hover:bg-white/5",
+                ? "text-primary hover:bg-primary/10"
+                : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
             )}
             aria-label="Toggle web search"
             onClick={() => onWebSearchChange?.(!webSearchEnabled)}
           >
-            <Globe className="h-3.5 w-3.5" />
+            <Globe className={cn("h-4 w-4", webSearchEnabled ? "text-primary" : "opacity-60")} />
             <span>Search</span>
           </button>
 
           <button
             type="button"
-            className="inline-flex h-8 w-8 items-center justify-center rounded-full border bg-card text-muted-foreground hover:bg-black/5 dark:hover:bg-white/5"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
             aria-label="Attach file"
             onClick={handleAttachClick}
           >
@@ -197,8 +204,11 @@ export function SearchBar({
 
         <button
           type="submit"
-          className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-primary text-primary-foreground transition-all hover:scale-[1.02] disabled:opacity-50"
-          disabled={disabled}
+          className={cn(
+            "inline-flex h-8 w-8 items-center justify-center rounded-xl bg-primary text-primary-foreground transition-all active:scale-95 disabled:opacity-30",
+            !value.trim() && attachments.length === 0 && "bg-muted text-muted-foreground"
+          )}
+          disabled={disabled || (!value.trim() && attachments.length === 0)}
           aria-label={submitLabel}
         >
           <SendHorizontal className="h-4 w-4" />

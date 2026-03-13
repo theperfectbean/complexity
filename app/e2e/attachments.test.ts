@@ -121,9 +121,9 @@ test.describe("SearchBar Attachment Button", () => {
     await expect(lastArticle).toBeVisible();
   });
 
-  test("sending ONLY an attachment (no text)", async ({ page }) => {
+  test("sending ONLY a PDF attachment (no text)", async ({ page }) => {
     // 1. Navigate to thread
-    await page.getByPlaceholder("Ask anything...").fill("Initial query");
+    await page.getByPlaceholder("Ask anything...").fill("PDF test");
     await page.getByPlaceholder("Ask anything...").press("Enter");
     await expect(page).toHaveURL(/\/search\//, { timeout: 15000 });
     await page.waitForLoadState('networkidle');
@@ -131,19 +131,22 @@ test.describe("SearchBar Attachment Button", () => {
     // 2. Wait for initial response
     await expect(page.getByRole("button", { name: "Copy message" })).toBeVisible({ timeout: 30000 });
 
-    // 3. Attach a file
+    // 3. Attach a PDF
     const fileChooserPromise = page.waitForEvent('filechooser');
     const threadSearchBar = page.getByTestId("thread-searchbar");
     await threadSearchBar.getByRole("button", { name: "Attach file" }).click();
     const fileChooser = await fileChooserPromise;
 
+    // Use a valid-ish PDF header buffer
+    const pdfBuffer = Buffer.from('%PDF-1.4\n1 0 obj\n<< /Title (Test) >>\nendobj\ntrailer\n<< /Root 1 0 R >>\n%%EOF');
+
     await fileChooser.setFiles([{
-      name: 'only-attachment.txt',
-      mimeType: 'text/plain',
-      buffer: Buffer.from('this is the only content')
+      name: 'test.pdf',
+      mimeType: 'application/pdf',
+      buffer: pdfBuffer
     }]);
 
-    await expect(threadSearchBar.getByTestId("file-chip").filter({ hasText: "only-attachment.txt" })).toBeVisible({ timeout: 15000 });
+    await expect(threadSearchBar.getByTestId("file-chip").filter({ hasText: "test.pdf" })).toBeVisible({ timeout: 15000 });
 
     // 4. Send the message WITHOUT filling any text
     const input = threadSearchBar.getByPlaceholder("Ask a follow-up...");
@@ -151,7 +154,7 @@ test.describe("SearchBar Attachment Button", () => {
 
     // 5. Verify no 400 error appears and chip is gone
     await expect(page.getByText("Message text required")).toBeHidden();
-    await expect(threadSearchBar.getByTestId("file-chip").filter({ hasText: "only-attachment.txt" })).toBeHidden();
+    await expect(threadSearchBar.getByTestId("file-chip").filter({ hasText: "test.pdf" })).toBeHidden();
     
     // 6. Verify the LLM starts responding
     const lastArticle = page.locator('article').last();
