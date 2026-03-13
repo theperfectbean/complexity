@@ -111,6 +111,12 @@ function ThreadChat({
     [messages],
   );
 
+  const mergedMessages = useMemo(() => {
+    const liveIds = new Set(liveMessages.map((m) => m.id));
+    const uniqueHistory = initialHistory.filter((m) => !liveIds.has(m.id));
+    return [...uniqueHistory, ...liveMessages];
+  }, [initialHistory, liveMessages]);
+
   const chatErrorMessage = getChatErrorMessage(error);
 
   useEffect(() => {
@@ -199,7 +205,7 @@ function ThreadChat({
 
       <div className="flex-1 space-y-12">
         <MessageList
-          messages={liveMessages}
+          messages={mergedMessages}
           emptyLabel="Start this thread with your first question."
           onRelatedQuestionClick={(question) => setPrompt(question)}
           onRetry={() => void regenerate()}
