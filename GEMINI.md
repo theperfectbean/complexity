@@ -114,6 +114,9 @@ DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose build app
 - **Volume Isolation**: To prevent host-to-container binary conflicts (glibc vs musl), use a named volume for `node_modules` in `docker-compose.dev.yml` (e.g., `- node_modules:/app/node_modules`).
 
 ### Anthropic vs. Perplexity Benchmarking (2026-03-13)
-- **Model Access**: Successfully benchmarked **Claude Sonnet 4.6** (released Feb 2026) using both direct Anthropic and Perplexity Agent APIs. Both providers correctly identify `claude-sonnet-4-6` or its prefixed alias.
-- **Latency Findings**: Direct Anthropic access (using `@ai-sdk/anthropic`) for Sonnet 4.6 demonstrated a significantly lower **TTFT of ~1.3s**, compared to Perplexity's **TTFT of ~7.1s**. Total durations were comparable at ~6.8s and ~7.1s respectively.
+- **Model Access**: Successfully benchmarked **Claude Sonnet 4.6** and **Claude Haiku 4.5** (latest models as of March 2026).
+- **Latency Findings**: 
+  - **Sonnet 4.6**: Direct Anthropic TTFT of **~1.3s**, Perplexity TTFT of **~7.1s**. 
+  - **Haiku 4.5**: Direct Anthropic TTFT of **~0.6s**, Perplexity TTFT of **~3.4s**.
+  - Direct access consistently provides a significantly faster Time to First Token (TTFT).
 - **Library Integration**: Added `@ai-sdk/anthropic` and `ANTHROPIC_API_KEY` to `env.ts` to support direct comparisons and future multi-provider routing.
