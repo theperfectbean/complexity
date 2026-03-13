@@ -62,21 +62,33 @@ function extractRelatedQuestions(text: string): string[] {
 export function MessageList({ messages, emptyLabel, onRelatedQuestionClick, onRetry }: MessageListProps) {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const hasAutoScrolledRef = useRef(false);
 
   const lastMessageContent = messages[messages.length - 1]?.content;
   const lastMessageThinkingLength = messages[messages.length - 1]?.thinking?.length;
 
-  // Auto-scroll to bottom when messages or their content change
+  // Auto-scroll to bottom on first load of existing messages, then only if user is near bottom
   useEffect(() => {
-    if (messages.length > 0) {
-      // Only auto-scroll if the user is already near the bottom
-      const isNearBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 150;
-      
-      if (isNearBottom) {
-        requestAnimationFrame(() => {
-          window.scrollTo({ top: document.documentElement.scrollHeight });
-        });
-      }
+    if (messages.length === 0) {
+      hasAutoScrolledRef.current = false;
+      return;
+    }
+
+    if (!hasAutoScrolledRef.current) {
+      hasAutoScrolledRef.current = true;
+      requestAnimationFrame(() => {
+        window.scrollTo({ top: document.documentElement.scrollHeight });
+      });
+      return;
+    }
+
+    // Only auto-scroll if the user is already near the bottom
+    const isNearBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 150;
+
+    if (isNearBottom) {
+      requestAnimationFrame(() => {
+        window.scrollTo({ top: document.documentElement.scrollHeight });
+      });
     }
   }, [messages, lastMessageContent, lastMessageThinkingLength]);
 

@@ -178,10 +178,27 @@ function ThreadChat({
     setAttachments([]);
 
     try {
+      const fileParts = await Promise.all(
+        currentAttachments.map(
+          (file) =>
+            new Promise<{ type: "file"; url: string; mediaType: string; filename: string }>((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onload = () => resolve({ type: "file", url: String(reader.result || ""), mediaType: file.type, filename: file.name });
+              reader.onerror = () => reject(new Error("Failed to read file"));
+              reader.readAsDataURL(file);
+            }),
+        ),
+      );
+
+      const parts: Array<{ type: "text"; text: string } | { type: "file"; url: string; mediaType: string; filename: string }> = [];
+      if (currentPrompt) {
+        parts.push({ type: "text", text: currentPrompt });
+      }
+      parts.push(...fileParts);
+
       await sendMessage(
-        { text: currentPrompt },
+        { parts },
         {
-          experimental_attachments: currentAttachments,
           body: {
             threadId,
             model,

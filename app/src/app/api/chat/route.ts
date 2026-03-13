@@ -40,6 +40,52 @@ type CachedChatPayload = {
   citations: Citation[];
 };
 
+type FilePart = {
+  url: string;
+  mediaType?: string;
+  filename?: string;
+  name?: string;
+  contentType?: string;
+};
+
+function collectFileParts(message: UIMessage): FilePart[] {
+  const fileParts: FilePart[] = [];
+  const messageRecord = asRecord(message);
+
+  if (Array.isArray(message.parts)) {
+    message.parts.forEach((part) => {
+      if (part && typeof part === "object" && (part as any).type === "file") {
+        const partRecord = part as Record<string, unknown>;
+        const url = typeof partRecord.url === "string" ? partRecord.url : "";
+        if (url) {
+          fileParts.push({
+            url,
+            mediaType: typeof partRecord.mediaType === "string" ? partRecord.mediaType : undefined,
+            filename: typeof partRecord.filename === "string" ? partRecord.filename : undefined,
+          });
+        }
+      }
+    });
+  }
+
+  const attachments = messageRecord?.attachments || messageRecord?.experimental_attachments;
+  if (Array.isArray(attachments)) {
+    attachments.forEach((a: unknown) => {
+      const att = asRecord(a);
+      if (!att || typeof att.url !== "string") return;
+      fileParts.push({
+        url: att.url,
+        mediaType: typeof att.mediaType === "string" ? att.mediaType : undefined,
+        filename: typeof att.filename === "string" ? att.filename : undefined,
+        name: typeof att.name === "string" ? att.name : undefined,
+        contentType: typeof att.contentType === "string" ? att.contentType : undefined,
+      });
+    });
+  }
+
+  return fileParts;
+}
+
 async function extractTextFromMessage(message: UIMessage): Promise<string> {
   const partsText =
     message.parts
@@ -80,26 +126,29 @@ async function extractTextFromMessage(message: UIMessage): Promise<string> {
     }
   }
 
-  // Handle attachments if present (support both stable and experimental property names)
-  const messageRecord = asRecord(message);
-  const attachments = messageRecord?.attachments || messageRecord?.experimental_attachments;
-  
+  // Handle attachments or file parts if present (support both stable and experimental property names)
+  const fileParts = collectFileParts(message);
+
   let attachmentsInfo = "";
-  if (Array.isArray(attachments)) {
+  if (fileParts.length > 0) {
     const attachmentsContents = await Promise.all(
-      attachments.map(async (a: unknown) => {
-        const att = asRecord(a);
-        if (!att || !att.url || typeof att.url !== "string" || !att.url.startsWith("data:")) return "";
-        
-        // Skip images as they are handled as a separate part in agentInput
-        if (att.contentType?.startsWith("image/")) return "";
+      fileParts.map(async (att) => {
+        if (!att.url || !att.url.startsWith("data:")) return "";
+
+        const name = att.filename || att.name || "unnamed";
+        const mediaType = att.mediaType || att.contentType || "";
+
+        // Even for images, we want to know we have an attachment so we don't trigger "text required" errors.
+        if (mediaType.startsWith("image/")) {
+          return `[Attached Image: ${name}]`;
+        }
 
         try {
-          const content = await extractTextFromDataUrl(att.url, String(att.name || ""), String(att.contentType || ""));
-          return `--- START ATTACHED FILE: ${att.name || "unnamed"} ---\n${content}\n--- END ATTACHED FILE: ${att.name || "unnamed"} ---`;
+          const content = await extractTextFromDataUrl(att.url, String(name), String(mediaType));
+          return `--- START ATTACHED FILE: ${name} ---\n${content}\n--- END ATTACHED FILE: ${name} ---`;
         } catch (e) {
           console.error("[Chat API] Error extracting attachment content:", e);
-          return `[Error extracting file: ${att.name || "unnamed"}]`;
+          return `[Error extracting file: ${name}]`;
         }
       })
     );
@@ -109,13 +158,6 @@ async function extractTextFromMessage(message: UIMessage): Promise<string> {
     if (attachmentsInfo) {
       finalText = finalText ? `${finalText}\n\n${attachmentsInfo}` : attachmentsInfo;
     }
-  }
-
-  // If we have NO text but we HAVE attachments (e.g. just an image), return a placeholder
-  // to satisfy DB notNull constraints and give the LLM/RAG a minimal context.
-  if (!finalText.trim() && Array.isArray(attachments) && attachments.length > 0) {
-    const firstAtt = asRecord(attachments[0]);
-    return `[Attached: ${firstAtt?.name || "File"}]`;
   }
 
   return finalText;
@@ -402,23 +444,17 @@ export async function POST(request: Request) {
       const text = await extractTextFromMessage(message);
       const content: any[] = [{ type: "input_text", text }];
 
-      const messageRecord = asRecord(message);
-      const attachments = messageRecord?.attachments || messageRecord?.experimental_attachments;
-      
-      if (Array.isArray(attachments)) {
-        attachments.forEach((a: unknown) => {
-          const att = asRecord(a);
-          if (att && typeof att.url === "string" && att.url.startsWith("data:")) {
-            if (att.contentType?.startsWith("image/")) {
-              content.push({
-                type: "input_image",
-                image: att.url,
-              });
-            }
-            // Add other attachment types here if supported by the Perplexity API
-          }
-        });
-      }
+      const fileParts = collectFileParts(message);
+      fileParts.forEach((att) => {
+        const mediaType = att.mediaType || att.contentType || "";
+        if (att.url && att.url.startsWith("data:") && mediaType.startsWith("image/")) {
+          content.push({
+            type: "input_image",
+            image: att.url,
+          });
+        }
+        // Add other attachment types here if supported by the Perplexity API
+      });
 
       return {
         type: "message",
