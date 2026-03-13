@@ -214,7 +214,7 @@ export default function RoleDetailPage() {
   }
 
   return (
-    <main className="mx-auto w-full max-w-6xl px-6 py-10">
+    <main className="mx-auto w-full max-w-none px-6 py-10">
       <Link href="/roles" className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground">
         ← All roles
       </Link>
@@ -230,7 +230,7 @@ export default function RoleDetailPage() {
         </button>
       </div>
 
-      <div className="mt-10 grid gap-16 lg:grid-cols-[1fr,300px] xl:grid-cols-[1fr,360px]">
+      <div className="mt-10 grid gap-12 md:grid-cols-[1fr_280px] lg:gap-16 lg:grid-cols-[1fr_300px] xl:grid-cols-[1fr_360px]">
         <section className="min-w-0">
           <form onSubmit={onStartChat} className="relative flex min-h-[140px] flex-col rounded-3xl border border-border/70 bg-card p-4 transition-shadow focus-within:border-primary/40 focus-within:ring-4 focus-within:ring-primary/10">
             <textarea
