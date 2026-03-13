@@ -24,6 +24,9 @@ export default defineConfig({
     trace: "on-first-retry",
     video: "on",
     screenshot: "on",
+    launchOptions: {
+      args: ["--no-sandbox"],
+    },
   },
 
   /* Configure projects for major browsers */

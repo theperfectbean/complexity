@@ -151,3 +151,5 @@ DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose build app
   - `POST /api/auth/forgot-password`: Generates a random reset token, stores it in `verification_tokens` table, and logs the reset link to the server console (SMTP not yet configured).
   - `POST /api/auth/reset-password`: Verifies the token, updates the hashed password in the `users` table, and deletes the used token.
 - **Public Access**: Updated `proxy.ts` to allow unauthenticated access to the password reset flow.
+
+- **Nodemailer in Docker**: When adding `nodemailer` to the project, ensured it was installed inside the Docker container by running `npm install` via `docker compose exec` and updated the `Dockerfile` with `--legacy-peer-deps` to resolve peer dependency conflicts with `next-auth`.

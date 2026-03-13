@@ -91,6 +91,81 @@
   color-scheme: dark;
 }
 
+/* Midnight Theme */
+.midnight-light {
+  --primary: oklch(0.5857 0.16 260.66);
+  --ring: oklch(0.5857 0.16 260.66);
+}
+.midnight-dark {
+  --background: oklch(0.1306 0.0326 264.4);
+  --card: oklch(0.155 0.03 264.4);
+  --popover: oklch(0.155 0.03 264.4);
+  --primary: oklch(0.7181 0.12 260.66);
+  --ring: oklch(0.7181 0.12 260.66);
+  --border: oklch(0.25 0.04 264.4);
+  color-scheme: dark;
+}
+
+/* Forest Theme */
+.forest-light {
+  --primary: oklch(0.5225 0.12 154.55);
+  --ring: oklch(0.5225 0.12 154.55);
+}
+.forest-dark {
+  --background: oklch(0.1416 0.0201 161.46);
+  --card: oklch(0.165 0.02 161.46);
+  --popover: oklch(0.165 0.02 161.46);
+  --primary: oklch(0.68 0.11 154.55);
+  --ring: oklch(0.68 0.11 154.55);
+  --border: oklch(0.24 0.03 161.46);
+  color-scheme: dark;
+}
+
+/* Slate Theme */
+.slate-light {
+  --primary: oklch(0.4431 0.02 240);
+  --ring: oklch(0.4431 0.02 240);
+}
+.slate-dark {
+  --background: oklch(0.1299 0.01 264.4);
+  --card: oklch(0.15 0.01 264.4);
+  --popover: oklch(0.15 0.01 264.4);
+  --primary: oklch(0.75 0.01 264.4);
+  --ring: oklch(0.75 0.01 264.4);
+  --border: oklch(0.24 0.01 264.4);
+  color-scheme: dark;
+}
+
+/* Pink Theme */
+.pink-light {
+  --primary: oklch(0.6568 0.196 328.62);
+  --ring: oklch(0.6568 0.196 328.62);
+}
+.pink-dark {
+  --background: oklch(0.1377 0.022 328.62);
+  --card: oklch(0.16 0.02 328.62);
+  --popover: oklch(0.16 0.02 328.62);
+  --primary: oklch(0.7417 0.14 328.62);
+  --ring: oklch(0.7417 0.14 328.62);
+  --border: oklch(0.24 0.03 328.62);
+  color-scheme: dark;
+}
+
+/* Purple Theme */
+.purple-light {
+  --primary: oklch(0.5408 0.22 284.12);
+  --ring: oklch(0.5408 0.22 284.12);
+}
+.purple-dark {
+  --background: oklch(0.1332 0.03 284.12);
+  --card: oklch(0.16 0.03 284.12);
+  --popover: oklch(0.16 0.03 284.12);
+  --primary: oklch(0.72 0.16 284.12);
+  --ring: oklch(0.72 0.16 284.12);
+  --border: oklch(0.25 0.04 284.12);
+  color-scheme: dark;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);

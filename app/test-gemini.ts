@@ -39,7 +39,13 @@ async function runCase({ label, stream, includeSystem, includeTools }: { label: 
     };
 
     const result = await client.responses.create(request);
-    const outputText = typeof result?.output_text === "string" ? result.output_text : "";
+    
+    // Type guard for non-streaming response
+    let outputText = "";
+    if (result && "output_text" in result && typeof result.output_text === "string") {
+      outputText = result.output_text;
+    }
+    
     console.log("Success");
     if (outputText) {
       console.log("Output:", outputText);

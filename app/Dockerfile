@@ -6,12 +6,13 @@ ENV NEXT_TELEMETRY_DISABLED=1
 
 FROM base AS deps
 COPY package*.json ./
-RUN npm ci --omit=dev && \
-    npm install @next/swc-linux-x64-musl --no-save
+RUN npm ci --omit=dev --legacy-peer-deps && \
+    npm install @next/swc-linux-x64-musl --no-save --legacy-peer-deps
 
 FROM base AS builder
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+ENV SKIP_ENV_VALIDATION=true
 RUN npm run build
 
 FROM base AS runner
