@@ -11,7 +11,6 @@ import {
   LogOut, 
   Plus, 
   Trash2,
-  Settings,
   ChevronsUpDown,
   Keyboard,
   Moon
@@ -109,7 +108,6 @@ export function Sidebar({ collapsed = false, onToggle, onNavigate }: SidebarProp
     { href: "/", label: "Home", icon: Home },
     { href: "/library", label: "Library", icon: BookOpen },
     { href: "/roles", label: "Roles", icon: Users },
-    { href: "/settings/memory", label: "Memory", icon: Brain },
   ];
 
   const recentThreads = threads;
@@ -312,6 +310,17 @@ export function Sidebar({ collapsed = false, onToggle, onNavigate }: SidebarProp
                   Shortcuts
                 </DropdownMenu.Item>
               } />
+
+              <DropdownMenu.Item asChild>
+                <Link 
+                  href="/settings/memory"
+                  className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm outline-none hover:bg-black/5 dark:hover:bg-white/5 focus:bg-black/5 dark:focus:bg-white/5"
+                  onClick={onNavigate}
+                >
+                  <Brain className="h-4 w-4 text-muted-foreground" />
+                  Memories
+                </Link>
+              </DropdownMenu.Item>
 
               <DropdownMenu.Separator className="my-1 h-px bg-sidebar-border" />
               
