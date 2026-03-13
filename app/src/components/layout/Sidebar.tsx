@@ -260,6 +260,7 @@ export function Sidebar({ collapsed = false, onToggle, onNavigate }: SidebarProp
           <DropdownMenu.Trigger asChild>
             <button
               type="button"
+              aria-label="Account menu"
               className={cn(
                 "flex items-center gap-3 rounded-xl p-2 text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5 focus:outline-none",
                 collapsed ? "w-10 h-10 justify-center px-0" : "w-full"

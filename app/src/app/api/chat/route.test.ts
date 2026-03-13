@@ -74,6 +74,7 @@ describe("POST /api/chat", () => {
     vi.clearAllMocks();
     vi.mocked(getRedisClient).mockReturnValue(null);
     vi.mocked(auth).mockResolvedValue({ user: { email: "gary@example.com" } } as never);
+    global.fetch = vi.fn();
   });
 
   it("returns 401 when unauthenticated", async () => {
@@ -242,24 +243,32 @@ describe("POST /api/chat", () => {
     mockSelectResults([[{ id: "thread-1", userId: "user-1", roleId: null }]]);
     const { values } = mockMutationChains();
 
-    async function* eventStream() {
-      yield {
-        type: "response.completed",
-        response: {
-          output: [
-            {
-              content: [{ text: "fallback answer from completed response" }],
-            },
-          ],
-        },
-      };
-    }
-
-    vi.mocked(createPerplexityClient).mockReturnValue({
-      responses: {
-        create: vi.fn().mockResolvedValue(eventStream()),
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(
+          encoder.encode(
+            `data: ${JSON.stringify({
+              type: "response.completed",
+              response: {
+                output: [
+                  {
+                    content: [{ text: "fallback answer from completed response" }],
+                  },
+                ],
+              },
+            })}\n\n`,
+          ),
+        );
+        controller.close();
       },
-    } as never);
+    });
+
+    vi.mocked(global.fetch).mockResolvedValue({
+      ok: true,
+      status: 200,
+      body: stream,
+    } as Response);
 
     const request = new Request("http://localhost/api/chat", {
       method: "POST",
@@ -289,25 +298,34 @@ describe("POST /api/chat", () => {
     mockSelectResults([[{ id: "thread-1", userId: "user-1", roleId: null }]]);
     const { values } = mockMutationChains();
 
-    async function* eventStream() {
-      yield {
-        type: "response.output_text.done",
-        text: "done event answer",
-      };
-
-      yield {
-        type: "response.completed",
-        response: {
-          output: [],
-        },
-      };
-    }
-
-    vi.mocked(createPerplexityClient).mockReturnValue({
-      responses: {
-        create: vi.fn().mockResolvedValue(eventStream()),
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(
+          encoder.encode(
+            `data: ${JSON.stringify({
+              type: "response.output_text.done",
+              text: "done event answer",
+            })}\n\n`,
+          ),
+        );
+        controller.enqueue(
+          encoder.encode(
+            `data: ${JSON.stringify({
+              type: "response.completed",
+              response: { output: [] },
+            })}\n\n`,
+          ),
+        );
+        controller.close();
       },
-    } as never);
+    });
+
+    vi.mocked(global.fetch).mockResolvedValue({
+      ok: true,
+      status: 200,
+      body: stream,
+    } as Response);
 
     const request = new Request("http://localhost/api/chat", {
       method: "POST",
@@ -337,27 +355,34 @@ describe("POST /api/chat", () => {
     mockSelectResults([[{ id: "thread-1", userId: "user-1", roleId: null }]]);
     const { values } = mockMutationChains();
 
-    async function* emptyStream() {
-      return;
-    }
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(encoder.encode(""));
+        controller.close();
+      },
+    });
 
-    const create = vi
-      .fn()
-      .mockResolvedValueOnce(emptyStream())
-      .mockResolvedValueOnce({
-        output_text: "non-stream fallback answer",
-        output: [
-          {
-            content: [{ type: "output_text", text: "non-stream fallback answer" }],
-          },
-        ],
-      });
+    const create = vi.fn().mockResolvedValue({
+      output_text: "non-stream fallback answer",
+      output: [
+        {
+          content: [{ type: "output_text", text: "non-stream fallback answer" }],
+        },
+      ],
+    });
 
     vi.mocked(createPerplexityClient).mockReturnValue({
       responses: {
         create,
       },
     } as never);
+
+    vi.mocked(global.fetch).mockResolvedValue({
+      ok: true,
+      status: 200,
+      body: stream,
+    } as Response);
 
     const request = new Request("http://localhost/api/chat", {
       method: "POST",
@@ -374,7 +399,7 @@ describe("POST /api/chat", () => {
 
     const streamText = await response.text();
 
-    expect(create).toHaveBeenCalledTimes(2);
+    expect(create).toHaveBeenCalledTimes(1);
     expect(streamText).toContain("non-stream fallback answer");
     expect(values.mock.calls[1]?.[0]).toEqual(
       expect.objectContaining({
@@ -388,18 +413,26 @@ describe("POST /api/chat", () => {
     mockSelectResults([[{ id: "thread-1", userId: "user-1", roleId: null }]]);
     const { values } = mockMutationChains();
 
-    async function* eventStream() {
-      yield {
-        type: "response.output_text.done",
-        text: "fresh provider answer",
-      };
-    }
-
-    vi.mocked(createPerplexityClient).mockReturnValue({
-      responses: {
-        create: vi.fn().mockResolvedValue(eventStream()),
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(
+          encoder.encode(
+            `data: ${JSON.stringify({
+              type: "response.output_text.done",
+              text: "fresh provider answer",
+            })}\n\n`,
+          ),
+        );
+        controller.close();
       },
-    } as never);
+    });
+
+    vi.mocked(global.fetch).mockResolvedValue({
+      ok: true,
+      status: 200,
+      body: stream,
+    } as Response);
 
     const redisDel = vi.fn().mockResolvedValue(1);
     vi.mocked(getRedisClient).mockReturnValue({

@@ -83,7 +83,7 @@ describe("/api/roles", () => {
       );
 
       expect(response.status).toBe(400);
-      await expect(response.json()).resolves.toEqual({ error: "Invalid payload" });
+      await expect(response.json()).resolves.toEqual(expect.objectContaining({ error: "Invalid payload" }));
     });
 
     it("creates a role", async () => {

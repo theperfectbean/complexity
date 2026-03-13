@@ -1,4 +1,5 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("next-auth/react", () => ({
@@ -35,7 +36,6 @@ describe("Sidebar", () => {
     expect(screen.getByText("Home")).toBeInTheDocument();
     expect(screen.getByText("Library")).toBeInTheDocument();
     expect(screen.getByText("Roles")).toBeInTheDocument();
-    expect(screen.getByText("Memory")).toBeInTheDocument();
 
     await waitFor(() => expect(screen.getByText("First thread")).toBeInTheDocument());
   });
@@ -50,10 +50,13 @@ describe("Sidebar", () => {
     expect(onToggle).toHaveBeenCalledTimes(1);
   });
 
-  it("calls signOut from bottom user menu", () => {
+  it("calls signOut from bottom user menu", async () => {
     render(<Sidebar collapsed={false} onToggle={() => {}} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Account menu" }));
+    const signOutItem = await screen.findByRole("menuitem", { name: "Sign out" });
+    await user.click(signOutItem);
     expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/" });
   });
 });

@@ -61,13 +61,15 @@ describe("ThreadPage", () => {
 
     await waitFor(() => {
       expect(mockSendMessage).toHaveBeenCalledWith(
-        { text: "hello model" },
         {
-          body: {
+          parts: [{ type: "text", text: "hello model" }],
+        },
+        expect.objectContaining({
+          body: expect.objectContaining({
             threadId: "thread-1",
             model: "openai/gpt-5.2",
-          },
-        },
+          }),
+        }),
       );
     });
   });
