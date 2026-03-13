@@ -9,7 +9,7 @@ import { roles, users } from "@/lib/db/schema";
 const patchSchema = z.object({
   name: z.string().min(1).max(100).optional(),
   description: z.string().max(1000).optional().nullable(),
-  instructions: z.string().max(5000).optional().nullable(),
+  instructions: z.string().max(50000).optional().nullable(),
 });
 
 async function getUserAndRole(roleId: string, email: string) {
@@ -55,9 +55,11 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ ro
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const parsed = patchSchema.safeParse(await request.json());
+  const body = await request.json();
+  const parsed = patchSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
+    console.error("[Roles API] PATCH validation failed:", parsed.error.format());
+    return NextResponse.json({ error: "Invalid payload", details: parsed.error.format() }, { status: 400 });
   }
 
   await db

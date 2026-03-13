@@ -10,7 +10,7 @@ import { roles, users } from "@/lib/db/schema";
 const createSchema = z.object({
   name: z.string().min(1).max(100),
   description: z.string().max(1000).optional(),
-  instructions: z.string().max(5000).optional(),
+  instructions: z.string().max(50000).optional(),
 });
 
 export async function GET() {
@@ -46,9 +46,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "User not found" }, { status: 404 });
   }
 
-  const parsed = createSchema.safeParse(await request.json());
+  const body = await request.json();
+  const parsed = createSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
+    console.error("[Roles API] POST validation failed:", parsed.error.format());
+    return NextResponse.json({ error: "Invalid payload", details: parsed.error.format() }, { status: 400 });
   }
 
   const id = createId();
