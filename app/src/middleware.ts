@@ -18,20 +18,27 @@ function applySecurityHeaders(response: NextResponse): NextResponse {
 
 const authMiddleware = auth((req) => {
   const { nextUrl, auth: session } = req;
-  const isAuthPage = nextUrl.pathname.startsWith("/login") || nextUrl.pathname.startsWith("/register");
+  
   const isApiAuth = nextUrl.pathname.startsWith("/api/auth");
   const isApiHealth = nextUrl.pathname === "/api/health";
   const isPublicAsset = nextUrl.pathname.startsWith("/_next") || nextUrl.pathname.startsWith("/favicon");
+  
+  const isAuthPage = 
+    nextUrl.pathname === "/login" || 
+    nextUrl.pathname === "/register" ||
+    nextUrl.pathname === "/forgot-password" ||
+    nextUrl.pathname === "/reset-password";
 
-  if (isApiAuth || isApiHealth || isPublicAsset) {
+  const isPublic = isApiAuth || isApiHealth || isPublicAsset || isAuthPage || nextUrl.pathname === "/";
+
+  if (isPublic) {
+    if (session && (nextUrl.pathname === "/login" || nextUrl.pathname === "/register")) {
+      return applySecurityHeaders(NextResponse.redirect(new URL("/", nextUrl)));
+    }
     return applySecurityHeaders(NextResponse.next());
   }
 
-  if (isAuthPage && session) {
-    return applySecurityHeaders(NextResponse.redirect(new URL("/", nextUrl)));
-  }
-
-  if (!isAuthPage && !session && nextUrl.pathname !== "/") {
+  if (!session) {
     return applySecurityHeaders(NextResponse.redirect(new URL("/login", nextUrl)));
   }
 

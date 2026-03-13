@@ -32,8 +32,10 @@ complexity/
 │       │   ├── page.tsx                  # Landing search page (centered SearchBar)
 │       │   ├── globals.css               # Tailwind directives, CSS variables
 │       │   ├── (auth)/
-│       │   │   ├── login/page.tsx
-│       │   │   └── register/page.tsx
+│   ├── login/page.tsx
+│   ├── register/page.tsx
+│   ├── forgot-password/page.tsx
+│   └── reset-password/page.tsx
 │       │   ├── search/
 │       │   │   └── [threadId]/page.tsx   # Thread conversation view
 │       │   ├── spaces/
@@ -41,9 +43,11 @@ complexity/
 │       │   │   └── [spaceId]/page.tsx    # Space detail + scoped chat
 │       │   ├── library/
 │       │   │   └── page.tsx              # All past threads
-│       │   └── api/
-│       │       ├── auth/[...nextauth]/route.ts
-│       │       ├── chat/route.ts         # POST — streaming Perplexity + RAG
+│       └── api/
+│           ├── auth/[...nextauth]/route.ts
+│           ├── auth/forgot-password/route.ts
+│           ├── auth/reset-password/route.ts
+│           ├── chat/route.ts         # POST — streaming Perplexity + RAG
 │       │       ├── threads/
 │       │       │   ├── route.ts          # GET (list), POST (create)
 │       │       │   └── [threadId]/route.ts  # GET, DELETE, PATCH (rename)
@@ -190,7 +194,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 | `userId`       | `text`      | FK → users(id) CASCADE |
 | `expires`      | `timestamp` | NOT NULL               |
 
-#### `verification_tokens` (Auth.js standard — for future email verification)
+#### `verification_tokens` (Auth.js standard — used for password resets)
 
 | Column       | Type        | Constraints          |
 | ------------ | ----------- | -------------------- |
