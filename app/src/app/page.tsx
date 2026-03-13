@@ -42,8 +42,16 @@ export default function Home() {
       }
 
       const payload = (await response.json()) as { thread: { id: string } };
-      // Note: Full multi-file prompt support on initial redirect will require standardizing how we pass initial files.
-      // For now, we redirect. If the user had files, we could theoretically upload them here, but useChat handles it best.
+      
+      // Note: In a production app, we would upload these files immediately or store them in a persistent draft state.
+      // For this implementation, since SearchBar state is lost on redirect, we notify the user.
+      // Alternatively, we could base64 encode them into the URL, but that's risky for large files.
+      // Best approach for now: redirect, then the user can re-attach, or we could handle the first message here.
+      
+      if (attachments.length > 0) {
+        toast.info("Thread created! Please re-attach your files in the chat.");
+      }
+
       router.push(`/search/${payload.thread.id}?q=${encodeURIComponent(query.trim())}&web=${webSearchEnabled}`);
     } catch (error) {
       setLoading(false);

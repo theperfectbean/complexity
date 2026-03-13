@@ -80,12 +80,14 @@ async function extractTextFromMessage(message: UIMessage): Promise<string> {
     }
   }
 
-  // Handle experimental_attachments if present
+  // Handle attachments if present (support both stable and experimental property names)
   const messageRecord = asRecord(message);
+  const attachments = messageRecord?.attachments || messageRecord?.experimental_attachments;
+  
   let attachmentsInfo = "";
-  if (messageRecord && Array.isArray(messageRecord.experimental_attachments)) {
+  if (Array.isArray(attachments)) {
     const attachmentsContents = await Promise.all(
-      messageRecord.experimental_attachments.map(async (a: unknown) => {
+      attachments.map(async (a: unknown) => {
         const att = asRecord(a);
         if (!att || !att.url || typeof att.url !== "string" || !att.url.startsWith("data:")) return "";
         
@@ -111,8 +113,8 @@ async function extractTextFromMessage(message: UIMessage): Promise<string> {
 
   // If we have NO text but we HAVE attachments (e.g. just an image), return a placeholder
   // to satisfy DB notNull constraints and give the LLM/RAG a minimal context.
-  if (!finalText.trim() && messageRecord && Array.isArray(messageRecord.experimental_attachments) && messageRecord.experimental_attachments.length > 0) {
-    const firstAtt = asRecord(messageRecord.experimental_attachments[0]);
+  if (!finalText.trim() && Array.isArray(attachments) && attachments.length > 0) {
+    const firstAtt = asRecord(attachments[0]);
     return `[Attached: ${firstAtt?.name || "File"}]`;
   }
 
@@ -401,8 +403,10 @@ export async function POST(request: Request) {
       const content: any[] = [{ type: "input_text", text }];
 
       const messageRecord = asRecord(message);
-      if (messageRecord && Array.isArray(messageRecord.experimental_attachments)) {
-        messageRecord.experimental_attachments.forEach((a: unknown) => {
+      const attachments = messageRecord?.attachments || messageRecord?.experimental_attachments;
+      
+      if (Array.isArray(attachments)) {
+        attachments.forEach((a: unknown) => {
           const att = asRecord(a);
           if (att && typeof att.url === "string" && att.url.startsWith("data:")) {
             if (att.contentType?.startsWith("image/")) {
