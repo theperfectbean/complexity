@@ -42,7 +42,7 @@ describe("/api/threads", () => {
     it("returns 401 when unauthenticated", async () => {
       vi.mocked(auth).mockResolvedValue(null as never);
 
-      const response = await GET();
+      const response = await GET(new Request("http://localhost/api/threads"));
 
       expect(response.status).toBe(401);
       await expect(response.json()).resolves.toEqual({ error: "Unauthorized" });
@@ -53,7 +53,7 @@ describe("/api/threads", () => {
         threads: [{ id: "thread-1", title: "Thread 1" }],
       } as never);
 
-      const response = await GET();
+      const response = await GET(new Request("http://localhost/api/threads"));
 
       expect(response.status).toBe(200);
       await expect(response.json()).resolves.toEqual({
@@ -128,6 +128,30 @@ describe("/api/threads", () => {
         thread: { id: "thread-1", title: "Hello", model: "pro-search", userId: "user-1" },
       });
       expect(db.insert).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("GET with roleId", () => {
+    it("filters threads by roleId", async () => {
+      vi.mocked(db.query.users.findFirst).mockResolvedValue({
+        threads: [{ id: "thread-2", title: "Role thread" }],
+      } as never);
+
+      const response = await GET(new Request("http://localhost/api/threads?roleId=role-1"));
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual({
+        threads: [{ id: "thread-2", title: "Role thread" }],
+      });
+      expect(db.query.users.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          with: expect.objectContaining({
+            threads: expect.objectContaining({
+              where: expect.any(Function),
+            }),
+          }),
+        }),
+      );
     });
   });
 });

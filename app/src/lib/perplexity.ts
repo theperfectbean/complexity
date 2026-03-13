@@ -2,13 +2,10 @@ import Perplexity from "@perplexity-ai/perplexity_ai";
 import { LanguageModelV3, LanguageModelV3CallOptions, LanguageModelV3GenerateResult, LanguageModelV3StreamResult } from "@ai-sdk/provider";
 import { ResponseStreamChunk, ResponseCreateResponse } from "@perplexity-ai/perplexity_ai/resources/responses";
 
-export function createPerplexityClient() {
-  const apiKey = process.env.PERPLEXITY_API_KEY;
-  if (!apiKey) {
-    throw new Error("PERPLEXITY_API_KEY is not set");
-  }
+import { env } from "@/lib/env";
 
-  return new Perplexity({ apiKey });
+export function createPerplexityClient() {
+  return new Perplexity({ apiKey: env.PERPLEXITY_API_KEY });
 }
 
 /**

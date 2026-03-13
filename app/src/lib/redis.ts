@@ -1,11 +1,13 @@
 import Redis from "ioredis";
 
+import { env } from "@/lib/env";
+
 declare global {
   var __complexityRedis__: Redis | undefined;
 }
 
 export function getRedisClient(): Redis | null {
-  const url = process.env.REDIS_URL;
+  const url = env.REDIS_URL;
   if (!url) {
     return null;
   }

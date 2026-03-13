@@ -353,8 +353,13 @@ export async function POST(request: Request) {
 
   const stream = createUIMessageStream({
     execute: async ({ writer }) => {
+      console.log(`[Chat API] Starting request for model: ${safeModel} (thread: ${parsed.data.threadId})`);
+      const startTime = Date.now();
+
       // Ensure user message is persisted
       await persistUserMessage;
+      console.log(`[Chat API] User message persisted (${Date.now() - startTime}ms)`);
+
       const responseMessageId = createId();
       const textId = createId();
 
@@ -365,6 +370,7 @@ export async function POST(request: Request) {
       let ragContext = "";
       // ONLY perform RAG if the thread is associated with a role
       if (activeRoleId) {
+        console.log(`[Chat API] Starting RAG search...`);
         writer.write({
           type: "data-call-start",
           data: {
@@ -383,7 +389,9 @@ export async function POST(request: Request) {
 
         try {
           const [embedding] = await getEmbeddings([userText]);
+          console.log(`[Chat API] Embeddings retrieved (${Date.now() - startTime}ms)`);
           const topChunks = await similaritySearch(activeRoleId, embedding, 8);
+          console.log(`[Chat API] Similarity search complete: found ${topChunks.length} chunks (${Date.now() - startTime}ms)`);
           if (topChunks.length > 0) {
             ragContext = topChunks.map((chunk, index) => `(${index + 1}) ${chunk.content}`).join("\n\n");
           }
@@ -396,7 +404,7 @@ export async function POST(request: Request) {
             },
           } as UIMessageChunk);
         } catch (error) {
-          console.error("[RAG Error]", error);
+          console.error("[Chat API] RAG Error:", error);
           writer.write({
             type: "data-call-result",
             data: {
@@ -431,8 +439,11 @@ export async function POST(request: Request) {
         },
       } as UIMessageChunk);
 
+      console.log(`[Chat API] Calling Perplexity API... (${Date.now() - startTime}ms)`);
+
       try {
         const client = createPerplexityClient();
+        const forceStreamingOnly = safeModel === "google/gemini-3.1-pro-preview";
         const requestBodyBase = isPresetModel(safeModel)
           ? {
               preset: safeModel,
@@ -447,9 +458,9 @@ export async function POST(request: Request) {
             };
 
         const requestBody: Responses.ResponseCreateParamsStreaming = {
-          ...requestBodyBase,
-          stream: true,
-        } as Responses.ResponseCreateParamsStreaming;
+            ...requestBodyBase,
+            stream: true,
+          } as Responses.ResponseCreateParamsStreaming;
 
         let streamEventCount = 0;
         let streamingFailed = false;
@@ -564,6 +575,7 @@ export async function POST(request: Request) {
 
             if (eventRecord?.type === "response.output_text.delta") {
               if (!hasWrittenTextDelta) {
+                console.log(`[Chat API] First text delta received (${Date.now() - startTime}ms)`);
                 writer.write({
                   type: "data-call-result",
                   data: {
@@ -630,6 +642,9 @@ export async function POST(request: Request) {
 
         // --- FALLBACK TO NON-STREAMING ---
         if (streamingFailed || streamEventCount === 0 || (!assistantText && !completedResponse)) {
+          if (forceStreamingOnly) {
+            throw new Error(`Streaming required for ${safeModel} but streaming failed.`);
+          }
           const nonStreamingResponse = await client.responses.create(
             requestBodyBase as Responses.ResponseCreateParamsNonStreaming,
           );
@@ -652,7 +667,7 @@ export async function POST(request: Request) {
       } catch (error: unknown) {
         // One final fallback attempt if the outer try block caught it (e.g. createPerplexityClient or initial create call failed)
         const err = error as { message?: string; status?: number };
-        if (!hasWrittenTextDelta && (err.message?.includes("400") || err.status === 400)) {
+        if (!hasWrittenTextDelta && (err.message?.includes("400") || err.status === 400) && !forceStreamingOnly) {
           console.log(`[Chat API] Outer catch streaming failed for ${safeModel}, falling back to non-streaming.`);
           try {
             const requestBodyBase = isPresetModel(safeModel)
@@ -781,6 +796,7 @@ export async function POST(request: Request) {
         }
       }
 
+      console.log(`[Chat API] Finished request for model: ${safeModel} (thread: ${parsed.data.threadId}) in ${Date.now() - startTime}ms`);
       writer.write({ type: "text-end", id: textId });
       writer.write({ type: "finish" });
     },

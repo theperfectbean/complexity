@@ -84,9 +84,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ rol
       status: "ready",
     });
   } catch (error) {
+    console.error("[Upload Error]", error);
     await db.update(documents).set({ status: "failed" }).where(eq(documents.id, documentId));
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Upload failed" },
+      { error: "Upload processing failed" },
       { status: 500 },
     );
   }

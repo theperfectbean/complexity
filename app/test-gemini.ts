@@ -1,6 +1,5 @@
 
 import Perplexity from "@perplexity-ai/perplexity_ai";
-import { ResponseCreateParamsNonStreaming } from "@perplexity-ai/perplexity_ai/resources/responses";
 
 const apiKey = process.env.PERPLEXITY_API_KEY;
 if (!apiKey) {
@@ -11,61 +10,63 @@ if (!apiKey) {
 const client = new Perplexity({ apiKey });
 
 const model = "google/gemini-3.1-pro-preview";
+const prompt = "What is the capital of France? Answer in exactly one word.";
 
-async function testWithSystemMessage() {
-  console.log(`--- Testing ${model} with SYSTEM message in input ---`);
-  const input = [
-    {
+async function runCase({ label, stream, includeSystem, includeTools }) {
+  console.log(`--- ${label} ---`);
+  const input = [];
+  if (includeSystem) {
+    input.push({
       type: "message",
       role: "system",
       content: [{ type: "input_text", text: "You are a helpful assistant." }],
-    },
-    {
-      type: "message",
-      role: "user",
-      content: [{ type: "input_text", text: "Say hello." }],
-    },
-  ];
-  try {
-    await client.responses.create({
-      model,
-      input: input as ResponseCreateParamsNonStreaming["input"],
-      instructions: "Be concise.",
-      stream: false,
     });
-    console.log("Success with system message!");
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : String(error);
-    console.error("Failed with system message:", message);
   }
-}
+  input.push({
+    type: "message",
+    role: "user",
+    content: [{ type: "input_text", text: prompt }],
+  });
 
-async function testWithoutSystemMessage() {
-  console.log(`--- Testing ${model} WITHOUT system message in input ---`);
-  const input = [
-    {
-      type: "message",
-      role: "user",
-      content: [{ type: "input_text", text: "Say hello." }],
-    },
-  ];
   try {
-    await client.responses.create({
+    const request = {
       model,
-      input: input as ResponseCreateParamsNonStreaming["input"],
+      input,
       instructions: "Be concise.",
-      stream: false,
-    });
-    console.log("Success without system message!");
+      stream,
+      ...(includeTools ? { tools: [{ type: "web_search" }, { type: "fetch_url" }] } : {}),
+    };
+
+    const result = await client.responses.create(request);
+    const outputText = typeof result?.output_text === "string" ? result.output_text : "";
+    console.log("Success");
+    if (outputText) {
+      console.log("Output:", outputText);
+    }
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
-    console.error("Failed without system message:", message);
+    console.error("Failed:", message);
+    if (error && typeof error === "object") {
+      console.error("Error object:", JSON.stringify(error, null, 2));
+    }
   }
 }
 
 async function run() {
-  await testWithSystemMessage();
-  await testWithoutSystemMessage();
+  const cases = [
+    { label: "non-streaming, no tools, system", stream: false, includeTools: false, includeSystem: true },
+    { label: "non-streaming, no tools, no system", stream: false, includeTools: false, includeSystem: false },
+    { label: "non-streaming, tools, system", stream: false, includeTools: true, includeSystem: true },
+    { label: "non-streaming, tools, no system", stream: false, includeTools: true, includeSystem: false },
+    { label: "streaming, no tools, system", stream: true, includeTools: false, includeSystem: true },
+    { label: "streaming, no tools, no system", stream: true, includeTools: false, includeSystem: false },
+    { label: "streaming, tools, system", stream: true, includeTools: true, includeSystem: true },
+    { label: "streaming, tools, no system", stream: true, includeTools: true, includeSystem: false },
+  ];
+
+  for (const testCase of cases) {
+    await runCase(testCase);
+  }
 }
 
 run();

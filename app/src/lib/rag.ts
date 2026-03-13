@@ -2,10 +2,13 @@ import { and, cosineDistance, eq } from "drizzle-orm";
 
 import { db } from "@/lib/db";
 import { chunks, documents } from "@/lib/db/schema";
+import { env } from "@/lib/env";
 
-const EMBEDDER_URL = process.env.EMBEDDER_URL ?? "http://embedder:8000";
+const CHUNK_MAX_CHARS = 2200;
+const CHUNK_OVERLAP = 200;
+const DEFAULT_SEARCH_LIMIT = 5;
 
-export function chunkText(input: string, maxChars = 2200, overlap = 200) {
+export function chunkText(input: string, maxChars = CHUNK_MAX_CHARS, overlap = CHUNK_OVERLAP) {
   const text = input.replace(/\r\n/g, "\n").trim();
   if (!text) {
     return [];
@@ -26,7 +29,7 @@ export function chunkText(input: string, maxChars = 2200, overlap = 200) {
 }
 
 export async function getEmbeddings(texts: string[]) {
-  const response = await fetch(`${EMBEDDER_URL}/embed`, {
+  const response = await fetch(`${env.EMBEDDER_URL}/embed`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

@@ -14,18 +14,26 @@ const createSchema = z.object({
   roleId: z.string().optional(),
 });
 
-export async function GET() {
+export async function GET(request: Request) {
   const session = await auth();
   const userEmail = session?.user?.email;
   if (!userEmail) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const { searchParams } = new URL(request.url);
+  const roleId = searchParams.get("roleId")?.trim();
+
   const rows = await db.query.users.findFirst({
     where: (users, { eq }) => eq(users.email, userEmail),
     with: {
       threads: {
         orderBy: (table, { desc }) => desc(table.updatedAt),
+        ...(roleId
+          ? {
+              where: (table, { eq }) => eq(table.roleId, roleId),
+            }
+          : {}),
       },
     },
   });
