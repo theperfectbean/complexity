@@ -2,7 +2,7 @@
 
 import { Check, Copy, RotateCcw } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 
 import { RelatedQuestions } from "@/components/chat/RelatedQuestions";
 import { SourceCarousel } from "@/components/chat/SourceCarousel";
@@ -61,6 +61,14 @@ function extractRelatedQuestions(text: string): string[] {
 
 export function MessageList({ messages, emptyLabel, onRelatedQuestionClick, onRetry }: MessageListProps) {
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to bottom when messages or their content change
+  useEffect(() => {
+    if (messages.length > 0) {
+      bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    }
+  }, [messages, messages[messages.length - 1]?.content, messages[messages.length - 1]?.thinking?.length]);
 
   async function copyMessage(messageId: string, content: string) {
     try {
@@ -216,6 +224,7 @@ export function MessageList({ messages, emptyLabel, onRelatedQuestionClick, onRe
           </article>
         );
       })}
+      <div ref={bottomRef} className="h-px w-full scroll-mt-40" />
     </div>
   );
 }
