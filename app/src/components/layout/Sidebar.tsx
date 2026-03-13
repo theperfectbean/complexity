@@ -1,11 +1,26 @@
 "use client";
 
 import { motion } from "motion/react";
-import { BookOpen, Brain, ChevronLeft, ChevronRight, Home, Users, LogOut, Plus, Trash2 } from "lucide-react";
+import { 
+  BookOpen, 
+  Brain, 
+  ChevronLeft, 
+  ChevronRight, 
+  Home, 
+  Users, 
+  LogOut, 
+  Plus, 
+  Trash2,
+  Settings,
+  ChevronsUpDown,
+  Keyboard,
+  Moon
+} from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 
 import { KeyboardShortcutsDialog } from "@/components/layout/KeyboardShortcutsDialog";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
@@ -28,6 +43,20 @@ type SidebarProps = {
   onToggle?: () => void;
   onNavigate?: () => void;
 };
+
+function getInitials(name?: string | null, email?: string | null) {
+  if (name) {
+    const parts = name.split(" ");
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[1][0]).toUpperCase();
+    }
+    return name.slice(0, 2).toUpperCase();
+  }
+  if (email) {
+    return email.slice(0, 2).toUpperCase();
+  }
+  return "??";
+}
 
 export function Sidebar({ collapsed = false, onToggle, onNavigate }: SidebarProps) {
   const { data: session } = useSession();
@@ -102,6 +131,8 @@ export function Sidebar({ collapsed = false, onToggle, onNavigate }: SidebarProp
     }
   }
 
+  const userInitials = getInitials(session?.user?.name, session?.user?.email);
+
   return (
     <motion.aside className="flex h-screen w-full flex-col bg-sidebar" initial={false} animate={{ width: "100%" }}>
       <div className={cn("flex items-center border-b border-sidebar-border px-3 py-3", collapsed ? "justify-center" : "justify-between")}>
@@ -125,7 +156,7 @@ export function Sidebar({ collapsed = false, onToggle, onNavigate }: SidebarProp
         ) : null}
       </div>
 
-      <div className="border-b border-sidebar-border p-3">
+      <div className="border-b border-sidebar-border p-3 shrink-0">
         <Link
           href="/"
           onClick={onNavigate}
@@ -140,108 +171,160 @@ export function Sidebar({ collapsed = false, onToggle, onNavigate }: SidebarProp
         </Link>
       </div>
 
-      <nav className="space-y-1 px-2 py-3 text-sm">
-        {navItems.map((item) => {
-          const Icon = item.icon;
-          return (
+      <div className="min-h-0 flex-1 flex flex-col overflow-hidden">
+        <nav className="space-y-1 px-2 py-3 text-sm shrink-0">
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            return (
+              <Link
+                key={item.href}
+                className={cn(
+                  "flex items-center rounded-lg px-3 py-2 text-sidebar-foreground transition-colors hover:bg-black/5 dark:hover:bg-white/5",
+                  collapsed ? "justify-center" : "gap-3",
+                )}
+                href={item.href}
+                onClick={onNavigate}
+                title={collapsed ? item.label : undefined}
+              >
+                <Icon className="h-4 w-4 shrink-0" />
+                {!collapsed && <span>{item.label}</span>}
+              </Link>
+            );
+          })}
+          {collapsed && pinnedRoles.map((role) => (
             <Link
-              key={item.href}
-              className={cn(
-                "flex items-center rounded-lg px-3 py-2 text-sidebar-foreground transition-colors hover:bg-black/5 dark:hover:bg-white/5",
-                collapsed ? "justify-center" : "gap-3",
-              )}
-              href={item.href}
+              key={role.id}
+              className="flex items-center justify-center rounded-lg px-3 py-2 text-sidebar-foreground transition-colors hover:bg-black/5 dark:hover:bg-white/5"
+              href={`/roles/${role.id}`}
               onClick={onNavigate}
-              title={collapsed ? item.label : undefined}
+              title={role.name}
             >
-              <Icon className="h-4 w-4 shrink-0" />
-              {!collapsed && <span>{item.label}</span>}
+              <Users className="h-4 w-4 shrink-0 text-primary" />
             </Link>
-          );
-        })}
-        {collapsed && pinnedRoles.map((role) => (
-          <Link
-            key={role.id}
-            className="flex items-center justify-center rounded-lg px-3 py-2 text-sidebar-foreground transition-colors hover:bg-black/5 dark:hover:bg-white/5"
-            href={`/roles/${role.id}`}
-            onClick={onNavigate}
-            title={role.name}
-          >
-            <Users className="h-4 w-4 shrink-0 text-primary" />
-          </Link>
-        ))}
-      </nav>
+          ))}
+        </nav>
 
-      {!collapsed && (
-        <section className="min-h-0 flex-1 space-y-4 overflow-y-auto px-2 pb-2 text-sm scrollbar-thin">
-          {pinnedRoles.length > 0 && (
+        {!collapsed && (
+          <section className="flex-1 space-y-4 overflow-y-auto px-2 pb-4 text-sm scrollbar-thin">
+            {pinnedRoles.length > 0 && (
+              <div className="rounded-lg border border-sidebar-border/80 bg-card/70 p-2">
+                <p className="mb-2 px-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Pinned Roles</p>
+                <div className="space-y-1">
+                  {pinnedRoles.map((role) => (
+                    <Link
+                      key={role.id}
+                      className="flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-black/5 dark:hover:bg-white/5"
+                      href={`/roles/${role.id}`}
+                      onClick={onNavigate}
+                      title={role.name}
+                    >
+                      <Users className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                      <span className="truncate">{role.name}</span>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="rounded-lg border border-sidebar-border/80 bg-card/70 p-2">
-              <p className="mb-2 px-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Pinned Roles</p>
+              <p className="mb-2 px-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Recent</p>
               <div className="space-y-1">
-                {pinnedRoles.map((role) => (
-                  <Link
-                    key={role.id}
-                    className="flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-black/5 dark:hover:bg-white/5"
-                    href={`/roles/${role.id}`}
-                    onClick={onNavigate}
-                    title={role.name}
-                  >
-                    <Users className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                    <span className="truncate">{role.name}</span>
-                  </Link>
+                {recentThreads.length === 0 ? <p className="px-2 py-1 text-xs text-muted-foreground">No recent threads</p> : null}
+                {recentThreads.map((thread) => (
+                  <div key={thread.id} className="group flex items-center gap-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/5">
+                    <Link
+                      className="block min-w-0 flex-1 truncate px-2 py-1.5"
+                      href={`/search/${thread.id}`}
+                      title={thread.title}
+                      onClick={onNavigate}
+                    >
+                      {thread.title}
+                    </Link>
+                    <button
+                      type="button"
+                      aria-label={`Delete ${thread.title}`}
+                      className="mr-1 inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-black/10 dark:hover:bg-white/10"
+                      onClick={() => void handleDeleteThread(thread.id)}
+                      disabled={deletingThreadId === thread.id}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
                 ))}
               </div>
             </div>
-          )}
+          </section>
+        )}
+      </div>
 
-          <div className="rounded-lg border border-sidebar-border/80 bg-card/70 p-2">
-            <p className="mb-2 px-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Recent</p>
-            <div className="space-y-1">
-              {recentThreads.length === 0 ? <p className="px-2 py-1 text-xs text-muted-foreground">No recent threads</p> : null}
-              {recentThreads.map((thread) => (
-                <div key={thread.id} className="group flex items-center gap-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/5">
-                  <Link
-                    className="block min-w-0 flex-1 truncate px-2 py-1.5"
-                    href={`/search/${thread.id}`}
-                    title={thread.title}
-                    onClick={onNavigate}
-                  >
-                    {thread.title}
-                  </Link>
-                  <button
-                    type="button"
-                    aria-label={`Delete ${thread.title}`}
-                    className="mr-1 inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-black/10 dark:hover:bg-white/10"
-                    onClick={() => void handleDeleteThread(thread.id)}
-                    disabled={deletingThreadId === thread.id}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
+      <div className="mt-auto border-t border-sidebar-border p-3 shrink-0">
+        <DropdownMenu.Root>
+          <DropdownMenu.Trigger asChild>
+            <button
+              type="button"
+              className={cn(
+                "flex items-center gap-3 rounded-xl p-2 text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5 focus:outline-none",
+                collapsed ? "w-10 h-10 justify-center px-0" : "w-full"
+              )}
+            >
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[11px] font-bold text-primary">
+                {userInitials}
+              </div>
+              {!collapsed && (
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-foreground">
+                    {session?.user?.name || session?.user?.email?.split("@")[0] || "User"}
+                  </p>
+                  <p className="truncate text-xs text-muted-foreground">Free plan</p>
                 </div>
-              ))}
-            </div>
-          </div>
-        </section>
-      )}
+              )}
+              {!collapsed && <ChevronsUpDown className="h-4 w-4 text-muted-foreground/50" />}
+            </button>
+          </DropdownMenu.Trigger>
 
-      <div className="mt-auto space-y-2 border-t border-sidebar-border px-3 py-3">
-        {!collapsed && <p className="truncate text-xs text-muted-foreground">{session?.user?.email ?? "Not signed in"}</p>}
-        {!collapsed && <ThemeToggle />}
-        {!collapsed && <KeyboardShortcutsDialog />}
+          <DropdownMenu.Portal>
+            <DropdownMenu.Content
+              className="z-[60] min-w-[220px] overflow-hidden rounded-xl border border-sidebar-border bg-popover p-1 shadow-lg animate-in fade-in zoom-in-95 duration-100"
+              side="right"
+              align="end"
+              sideOffset={12}
+            >
+              <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
+                {session?.user?.email}
+              </div>
+              <DropdownMenu.Separator className="my-1 h-px bg-sidebar-border" />
+              
+              <div className="px-1 py-1">
+                <div className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm">
+                  <Moon className="h-4 w-4 text-muted-foreground" />
+                  <div className="flex-1">
+                    <ThemeToggle />
+                  </div>
+                </div>
+              </div>
 
-        <button
-          type="button"
-          className={cn(
-            "inline-flex items-center rounded-lg border border-sidebar-border bg-card text-sm text-sidebar-foreground hover:bg-black/5 dark:hover:bg-white/5",
-            collapsed ? "h-9 w-9 justify-center" : "w-full justify-center gap-2 px-3 py-2",
-          )}
-          onClick={() => signOut({ callbackUrl: "/" })}
-          aria-label="Sign out"
-          title={collapsed ? "Sign out" : undefined}
-        >
-          <LogOut className="h-4 w-4" />
-          {!collapsed && "Sign out"}
-        </button>
+              <KeyboardShortcutsDialog trigger={
+                <DropdownMenu.Item 
+                  className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm outline-none hover:bg-black/5 dark:hover:bg-white/5 focus:bg-black/5 dark:focus:bg-white/5"
+                  onSelect={(e) => e.preventDefault()}
+                >
+                  <Keyboard className="h-4 w-4 text-muted-foreground" />
+                  Shortcuts
+                </DropdownMenu.Item>
+              } />
+
+              <DropdownMenu.Separator className="my-1 h-px bg-sidebar-border" />
+              
+              <DropdownMenu.Item
+                className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm text-destructive outline-none hover:bg-destructive/10 focus:bg-destructive/10"
+                onSelect={() => signOut({ callbackUrl: "/" })}
+              >
+                <LogOut className="h-4 w-4" />
+                Sign out
+              </DropdownMenu.Item>
+            </DropdownMenu.Content>
+          </DropdownMenu.Portal>
+        </DropdownMenu.Root>
       </div>
     </motion.aside>
   );

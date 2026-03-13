@@ -2,6 +2,7 @@
 
 import * as Dialog from "@radix-ui/react-dialog";
 import { Keyboard } from "lucide-react";
+import { ReactNode } from "react";
 
 const shortcuts = [
   { key: "Cmd/Ctrl + K", action: "Open command palette" },
@@ -10,17 +11,23 @@ const shortcuts = [
   { key: "Esc", action: "Close open dialog" },
 ];
 
-export function KeyboardShortcutsDialog() {
+type KeyboardShortcutsDialogProps = {
+  trigger?: ReactNode;
+};
+
+export function KeyboardShortcutsDialog({ trigger }: KeyboardShortcutsDialogProps) {
   return (
     <Dialog.Root>
       <Dialog.Trigger asChild>
-        <button
-          type="button"
-          className="inline-flex w-full items-center justify-center gap-2 rounded-lg border bg-card px-3 py-2 text-sm hover:bg-black/5 dark:hover:bg-white/5"
-        >
-          <Keyboard className="h-4 w-4" />
-          Shortcuts
-        </button>
+        {trigger ?? (
+          <button
+            type="button"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-lg border bg-card px-3 py-2 text-sm hover:bg-black/5 dark:hover:bg-white/5"
+          >
+            <Keyboard className="h-4 w-4" />
+            Shortcuts
+          </button>
+        )}
       </Dialog.Trigger>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-[70] bg-black/40" />
