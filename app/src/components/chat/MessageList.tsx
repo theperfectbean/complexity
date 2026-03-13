@@ -69,10 +69,14 @@ export function MessageList({ messages, emptyLabel, onRelatedQuestionClick, onRe
   // Auto-scroll to bottom when messages or their content change
   useEffect(() => {
     if (messages.length > 0) {
-      // Synchronize scroll with paint cycle to prevent layout thrashing
-      requestAnimationFrame(() => {
-        window.scrollTo({ top: document.documentElement.scrollHeight });
-      });
+      // Only auto-scroll if the user is already near the bottom
+      const isNearBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 150;
+      
+      if (isNearBottom) {
+        requestAnimationFrame(() => {
+          window.scrollTo({ top: document.documentElement.scrollHeight });
+        });
+      }
     }
   }, [messages, lastMessageContent, lastMessageThinkingLength]);
 
