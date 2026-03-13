@@ -2,9 +2,11 @@ import { eq, and } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import crypto from "crypto";
+import nodemailer from "nodemailer";
 
 import { db } from "@/lib/db";
 import { users, verificationTokens } from "@/lib/db/schema";
+import { env } from "@/lib/env";
 
 const schema = z.object({
   email: z.string().email(),
@@ -45,10 +47,33 @@ export async function POST(request: Request) {
         expires,
       });
 
-      // In a real app, you would send an email here.
-      // For now, we'll log it to the console in development.
-      const resetLink = `${process.env.NEXTAUTH_URL}/reset-password?token=${token}&email=${encodeURIComponent(email)}`;
+      const nextAuthUrl = env.NEXTAUTH_URL || process.env.NEXTAUTH_URL || "http://localhost:3002";
+      const resetLink = `${nextAuthUrl}/reset-password?token=${token}&email=${encodeURIComponent(email)}`;
+      
       console.log(`[Password Reset] Link for ${email}: ${resetLink}`);
+
+      if (env.SMTP_HOST && env.SMTP_PORT) {
+        const transporter = nodemailer.createTransport({
+          host: env.SMTP_HOST,
+          port: env.SMTP_PORT,
+          secure: env.SMTP_PORT === 465,
+          auth: env.SMTP_USER ? {
+            user: env.SMTP_USER,
+            pass: env.SMTP_PASSWORD,
+          } : undefined,
+        });
+
+        await transporter.sendMail({
+          from: env.SMTP_FROM || '"Complexity" <noreply@complexity.local>',
+          to: email,
+          subject: "Reset your Complexity password",
+          text: `You requested a password reset. Click the following link to set a new password: ${resetLink}\n\nThis link will expire in 1 hour.`,
+          html: `<p>You requested a password reset.</p><p><a href="${resetLink}">Click here to set a new password</a></p><p>This link will expire in 1 hour.</p>`,
+        });
+        console.log(`[Password Reset] Email sent successfully to ${email}`);
+      } else {
+        console.warn("[Password Reset] SMTP is not configured. Email not sent.");
+      }
     }
 
     // Always return success to prevent email enumeration
