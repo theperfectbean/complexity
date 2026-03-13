@@ -59,23 +59,36 @@ function normalizeCitations(citations: unknown): ChatCitation[] {
     .filter((item) => Boolean(item.url));
 }
 
-export default function ThreadPage() {
-  const params = useParams<{ threadId: string }>();
+type ThreadChatProps = {
+  threadId: string;
+  initialModel: string;
+  initialRoleId: string | null;
+  initialHistory: ChatMessageItem[];
+  initialWebSearch: boolean;
+};
+
+function ThreadChat({
+  threadId,
+  initialModel,
+  initialRoleId,
+  initialHistory,
+  initialWebSearch,
+}: ThreadChatProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const threadId = params.threadId;
   const initialQuery = searchParams.get("q")?.trim() ?? "";
-  const [model, setModel] = useState<string>(getDefaultModel());
-  const [roleId, setRoleId] = useState<string | null>(null);
-  const [webSearchEnabled, setWebSearchEnabled] = useState(() => {
-    return searchParams.get("web") !== "false";
-  });
-  const [historyMessages, setHistoryMessages] = useState<ChatMessageItem[]>([]);
-  const [loadingHistory, setLoadingHistory] = useState(true);
+  const [model, setModel] = useState<string>(initialModel);
+  const [roleId] = useState<string | null>(initialRoleId);
+  const [webSearchEnabled, setWebSearchEnabled] = useState(initialWebSearch);
   const hasSubmittedInitialQuery = useRef(false);
 
   const [data, setData] = useState<Record<string, unknown>[]>([]);
   const { messages, sendMessage, regenerate, status, error } = useChat({
+    initialMessages: initialHistory.map((msg) => ({
+      id: msg.id,
+      role: msg.role as "user" | "assistant" | "system",
+      content: msg.content,
+    })),
     transport: new DefaultChatTransport({
       api: "/api/chat",
       body: () => ({
@@ -93,57 +106,19 @@ export default function ThreadPage() {
   });
   const [prompt, setPrompt] = useState("");
 
-  useEffect(() => {
-    let active = true;
-
-    fetch(`/api/threads/${threadId}`)
-      .then((response) => (response.ok ? response.json() : Promise.reject(new Error("Failed to load thread"))))
-      .then((payload: ThreadPayload) => {
-        if (!active) {
-          return;
-        }
-
-        setModel(payload.thread.model || getDefaultModel());
-        setRoleId(payload.thread.roleId);
-        setHistoryMessages(
-          payload.messages.map((message) => ({
-            id: message.id,
-            role: message.role,
-            content: message.content,
-            citations: normalizeCitations(message.citations),
-          })),
-        );
-      })
-      .catch(() => {
-        if (active) {
-          setHistoryMessages([]);
-        }
-      })
-      .finally(() => {
-        if (active) {
-          setLoadingHistory(false);
-        }
-      });
-
-    return () => {
-      active = false;
-    };
-  }, [threadId]);
-
   const liveMessages = useMemo<ChatMessageItem[]>(
     () => messages.map((message) => normalizeUIMessage(message)),
     [messages],
   );
 
-  const mergedMessages = [...historyMessages, ...liveMessages];
   const chatErrorMessage = getChatErrorMessage(error);
 
   useEffect(() => {
-    if (!initialQuery || hasSubmittedInitialQuery.current || loadingHistory) {
+    if (!initialQuery || hasSubmittedInitialQuery.current) {
       return;
     }
 
-    if (mergedMessages.length > 0) {
+    if (initialHistory.length > 0) {
       hasSubmittedInitialQuery.current = true;
       router.replace(`/search/${threadId}`);
       return;
@@ -166,7 +141,7 @@ export default function ThreadPage() {
       .catch(() => {
         toast.error("Failed to send initial query");
       });
-  }, [initialQuery, loadingHistory, mergedMessages.length, model, roleId, router, sendMessage, threadId]);
+  }, [initialQuery, initialHistory.length, model, roleId, router, sendMessage, threadId]);
 
   useEffect(() => {
     if (error) {
@@ -212,8 +187,7 @@ export default function ThreadPage() {
   }
 
   return (
-    <main className="relative mx-auto flex h-full min-h-screen w-full max-w-3xl flex-col px-6 pt-16 pb-48">
-
+    <>
       {chatErrorMessage ? (
         <div
           className="mb-6 rounded-xl border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive"
@@ -224,19 +198,12 @@ export default function ThreadPage() {
       ) : null}
 
       <div className="flex-1 space-y-12">
-        {loadingHistory ? (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground/60">
-            <div className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary" />
-            Loading conversation...
-          </div>
-        ) : (
-          <MessageList
-            messages={mergedMessages}
-            emptyLabel="Start this thread with your first question."
-            onRelatedQuestionClick={(question) => setPrompt(question)}
-            onRetry={() => void regenerate()}
-          />
-        )}
+        <MessageList
+          messages={liveMessages}
+          emptyLabel="Start this thread with your first question."
+          onRelatedQuestionClick={(question) => setPrompt(question)}
+          onRetry={() => void regenerate()}
+        />
       </div>
 
       <div className="fixed inset-x-0 bottom-0 z-20 pointer-events-none bg-gradient-to-t from-background via-background/95 to-transparent pb-6 pt-10">
@@ -258,6 +225,80 @@ export default function ThreadPage() {
           </div>
         </form>
       </div>
+    </>
+  );
+}
+
+export default function ThreadPage() {
+  const params = useParams<{ threadId: string }>();
+  const searchParams = useSearchParams();
+  const threadId = params.threadId;
+  const [threadData, setThreadData] = useState<{
+    model: string;
+    roleId: string | null;
+    history: ChatMessageItem[];
+  } | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+
+    fetch(`/api/threads/${threadId}`)
+      .then((response) => (response.ok ? response.json() : Promise.reject(new Error("Failed to load thread"))))
+      .then((payload: ThreadPayload) => {
+        if (!active) {
+          return;
+        }
+
+        setThreadData({
+          model: payload.thread.model || getDefaultModel(),
+          roleId: payload.thread.roleId,
+          history: payload.messages.map((message) => ({
+            id: message.id,
+            role: message.role,
+            content: message.content,
+            citations: normalizeCitations(message.citations),
+          })),
+        });
+      })
+      .catch(() => {
+        if (active) {
+          setThreadData(null);
+        }
+      })
+      .finally(() => {
+        if (active) {
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [threadId]);
+
+  const webSearchDefault = searchParams.get("web") !== "false";
+
+  return (
+    <main className="relative mx-auto flex h-full min-h-screen w-full max-w-3xl flex-col px-6 pt-16 pb-48">
+      {loading ? (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground/60">
+          <div className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary" />
+          Loading conversation...
+        </div>
+      ) : threadData ? (
+        <ThreadChat
+          threadId={threadId}
+          initialModel={threadData.model}
+          initialRoleId={threadData.roleId}
+          initialHistory={threadData.history}
+          initialWebSearch={webSearchDefault}
+        />
+      ) : (
+        <div className="text-center py-12">
+          <p className="text-muted-foreground">Conversation not found.</p>
+        </div>
+      )}
     </main>
   );
 }
