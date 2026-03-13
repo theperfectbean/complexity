@@ -99,6 +99,7 @@ DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose build app
 
 ### Database & Migrations
 - **ANTHROPIC_API_KEY**: Made `ANTHROPIC_API_KEY` optional in `src/lib/env.ts` to prevent the application from crashing on startup if the key is not provided in the environment.
+- **NextAuth BasePath**: Added `basePath: "/api/auth"` to the `NextAuth` configuration in `src/auth.ts`. This ensures that Auth.js correctly identifies its API routes, preventing "Unexpected token '<'" errors caused by requests hitting the default catch-all route instead of the auth handlers.
 - **Missing Tables**: If you see "failed to start thread" or a 500 error mentioning `relation "users" does not exist`, it means the database migrations have not been run. 
 - **Automatic Migrations**: The project is intended to run in Docker. While the current Dockerfile does not auto-migrate, you can run migrations manually using `docker exec complexity-app npm run db:migrate` if the `src` directory is available, or better yet, run them from the host with `cd app && DATABASE_URL=... npm run db:migrate`.
 - **Session Persistence**: Because the app uses JWT sessions, a user can appear to be "logged in" even if the database has been cleared. In this case, API calls will fail with 404 "User not found". The fix is to sign out and register/sign in again to re-sync the database record.

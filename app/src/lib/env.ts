@@ -23,7 +23,22 @@ function validateEnv() {
     const formatted = parsed.error.issues
       .map((issue) => `  ${issue.path.join(".")}: ${issue.message}`)
       .join("\n");
+    
+    // Log masked environment for debugging
+    const maskedEnv = Object.keys(envSchema.shape).reduce((acc, key) => {
+      const val = process.env[key];
+      if (!val) {
+        acc[key] = "MISSING";
+      } else if (key.includes("KEY") || key.includes("SECRET")) {
+        acc[key] = val.slice(0, 4) + "..." + val.slice(-4);
+      } else {
+        acc[key] = val;
+      }
+      return acc;
+    }, {} as Record<string, string>);
+
     console.error(`❌ Invalid environment variables:\n${formatted}`);
+    console.error(`Current environment state:`, JSON.stringify(maskedEnv, null, 2));
     throw new Error("Invalid environment configuration");
   }
 

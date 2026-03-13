@@ -15,6 +15,7 @@ const signInSchema = z.object({
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   trustHost: true,
+  basePath: "/api/auth",
   adapter: DrizzleAdapter(db),
   session: {
     strategy: "jwt",
