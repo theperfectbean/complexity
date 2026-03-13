@@ -132,7 +132,7 @@ export function Sidebar({ collapsed = false, onToggle, onNavigate }: SidebarProp
   const userInitials = getInitials(session?.user?.name, session?.user?.email);
 
   return (
-    <motion.aside className="flex h-screen w-full flex-col bg-sidebar" initial={false} animate={{ width: "100%" }}>
+    <motion.aside className="flex h-full w-full flex-col bg-sidebar" initial={false} animate={{ width: "100%" }}>
       <div className={cn("flex items-center border-b border-sidebar-border px-3 py-3", collapsed ? "justify-center" : "justify-between")}>
         {!collapsed && (
           <Link href="/" className="inline-flex items-center gap-2 text-sm font-semibold tracking-tight" onClick={onNavigate}>

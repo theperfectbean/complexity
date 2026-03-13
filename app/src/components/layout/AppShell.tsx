@@ -22,9 +22,9 @@ export function AppShell({ children, contentClassName }: AppShellProps) {
   const isAuthenticated = status === "authenticated";
 
   return (
-    <div className="relative flex min-h-screen bg-background text-foreground">
+    <div className="relative flex min-h-[100dvh] bg-background text-foreground">
       {isAuthenticated && (
-        <div className="sticky top-0 hidden h-screen w-[278px] shrink-0 border-r border-sidebar-border bg-sidebar md:block">
+        <div className="sticky top-0 hidden h-[100dvh] w-[278px] shrink-0 border-r border-sidebar-border bg-sidebar md:block">
           <Sidebar collapsed={false} />
         </div>
       )}
