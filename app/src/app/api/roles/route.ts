@@ -11,6 +11,7 @@ const createSchema = z.object({
   name: z.string().min(1).max(100),
   description: z.string().max(1000).optional(),
   instructions: z.string().max(50000).optional(),
+  pinned: z.boolean().optional().default(false),
 });
 
 export async function GET() {
@@ -59,6 +60,7 @@ export async function POST(request: Request) {
     name: parsed.data.name,
     description: parsed.data.description,
     instructions: parsed.data.instructions,
+    pinned: parsed.data.pinned,
     userId: user.id,
   });
 

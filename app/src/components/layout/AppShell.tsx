@@ -25,7 +25,7 @@ export function AppShell({ children, contentClassName }: AppShellProps) {
     <div className="relative flex min-h-screen bg-background text-foreground">
       {isAuthenticated && (
         <div className="hidden w-[278px] shrink-0 border-r border-sidebar-border bg-sidebar md:block">
-          <Sidebar collapsed={false} onOpenCommandPalette={() => setCommandOpen(true)} />
+          <Sidebar collapsed={false} />
         </div>
       )}
 

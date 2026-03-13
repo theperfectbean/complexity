@@ -1,9 +1,10 @@
 "use client";
 
 import { motion } from "motion/react";
-import { BookOpen, Brain, ChevronLeft, ChevronRight, Command, Home, Users, LogOut, Plus, Trash2 } from "lucide-react";
+import { BookOpen, Brain, ChevronLeft, ChevronRight, Home, Users, LogOut, Plus, Trash2 } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { KeyboardShortcutsDialog } from "@/components/layout/KeyboardShortcutsDialog";
@@ -26,11 +27,11 @@ type SidebarProps = {
   collapsed?: boolean;
   onToggle?: () => void;
   onNavigate?: () => void;
-  onOpenCommandPalette?: () => void;
 };
 
-export function Sidebar({ collapsed = false, onToggle, onNavigate, onOpenCommandPalette }: SidebarProps) {
+export function Sidebar({ collapsed = false, onToggle, onNavigate }: SidebarProps) {
   const { data: session } = useSession();
+  const pathname = usePathname();
   const [threads, setThreads] = useState<Thread[]>([]);
   const [pinnedRoles, setPinnedRoles] = useState<Role[]>([]);
   const [deletingThreadId, setDeletingThreadId] = useState<string | null>(null);
@@ -73,7 +74,7 @@ export function Sidebar({ collapsed = false, onToggle, onNavigate, onOpenCommand
     return () => {
       active = false;
     };
-  }, [session?.user]);
+  }, [session?.user, pathname]);
 
   const navItems = [
     { href: "/", label: "Home", icon: Home },
@@ -83,7 +84,6 @@ export function Sidebar({ collapsed = false, onToggle, onNavigate, onOpenCommand
   ];
 
   const recentThreads = threads;
-  const shortcutLabel = typeof navigator !== "undefined" && navigator.platform.toLowerCase().includes("mac") ? "⌘K" : "Ctrl+K";
 
   async function handleDeleteThread(threadId: string) {
     setDeletingThreadId(threadId);
@@ -174,18 +174,6 @@ export function Sidebar({ collapsed = false, onToggle, onNavigate, onOpenCommand
 
       {!collapsed && (
         <section className="min-h-0 flex-1 space-y-4 overflow-y-auto px-2 pb-2 text-sm scrollbar-thin">
-          <button
-            type="button"
-            className="flex w-full items-center justify-between rounded-lg border border-sidebar-border bg-card px-2.5 py-2 text-left hover:bg-black/5 dark:hover:bg-white/5"
-            onClick={onOpenCommandPalette}
-          >
-            <span className="inline-flex items-center gap-2">
-              <Command className="h-4 w-4" />
-              Search threads
-            </span>
-            <kbd className="rounded border border-sidebar-border bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">{shortcutLabel}</kbd>
-          </button>
-
           {pinnedRoles.length > 0 && (
             <div className="rounded-lg border border-sidebar-border/80 bg-card/70 p-2">
               <p className="mb-2 px-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Pinned Roles</p>

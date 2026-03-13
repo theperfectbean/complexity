@@ -7,6 +7,7 @@ type Role = {
   name: string;
   description?: string | null;
   instructions?: string | null;
+  pinned: boolean;
   updatedAt: string;
 };
 
@@ -21,6 +22,7 @@ export function RoleCreateForm({ onCreated, onCancel, submitLabel = "Create role
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [instructions, setInstructions] = useState("");
+  const [pinned, setPinned] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -41,6 +43,7 @@ export function RoleCreateForm({ onCreated, onCancel, submitLabel = "Create role
           name: name.trim(),
           description: description.trim() || undefined,
           instructions: instructions.trim() || undefined,
+          pinned,
         }),
       });
 
@@ -90,6 +93,18 @@ export function RoleCreateForm({ onCreated, onCancel, submitLabel = "Create role
             value={instructions}
             onChange={(event) => setInstructions(event.target.value)}
           />
+        </div>
+        <div className="flex items-center gap-2 px-1 py-2">
+          <input
+            id="pin-role"
+            type="checkbox"
+            checked={pinned}
+            onChange={(e) => setPinned(e.target.checked)}
+            className="h-4 w-4 rounded border-border/60 text-primary focus:ring-primary/20"
+          />
+          <label htmlFor="pin-role" className="text-sm font-medium select-none cursor-pointer">
+            Pin this role to the sidebar
+          </label>
         </div>
       </div>
       {error ? <p className="mt-3 text-xs text-destructive">{error}</p> : null}
