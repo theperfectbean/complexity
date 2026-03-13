@@ -132,8 +132,8 @@ export function Sidebar({ collapsed = false, onToggle, onNavigate }: SidebarProp
   const userInitials = getInitials(session?.user?.name, session?.user?.email);
 
   return (
-    <motion.aside className="flex h-screen w-full flex-col bg-sidebar" initial={false} animate={{ width: "100%" }}>
-      <div className={cn("flex items-center border-b border-sidebar-border px-3 py-3", collapsed ? "justify-center" : "justify-between")}>
+    <motion.aside className="flex h-screen w-full flex-col bg-transparent" initial={false} animate={{ width: "100%" }}>
+      <div className={cn("flex items-center px-3 py-4", collapsed ? "justify-center" : "justify-between")}>
         {!collapsed && (
           <Link href="/" className="inline-flex items-center gap-2 text-sm font-semibold tracking-tight" onClick={onNavigate}>
             <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
@@ -145,7 +145,7 @@ export function Sidebar({ collapsed = false, onToggle, onNavigate }: SidebarProp
         {onToggle ? (
           <button
             type="button"
-            className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-sidebar-border bg-card text-muted-foreground hover:bg-black/5 dark:hover:bg-white/5"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-sidebar-border bg-card text-muted-foreground shadow-sm hover:bg-black/5 dark:hover:bg-white/5"
             onClick={onToggle}
             aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
@@ -154,12 +154,12 @@ export function Sidebar({ collapsed = false, onToggle, onNavigate }: SidebarProp
         ) : null}
       </div>
 
-      <div className="border-b border-sidebar-border p-3 shrink-0">
+      <div className="p-3 shrink-0">
         <Link
           href="/"
           onClick={onNavigate}
           className={cn(
-            "inline-flex w-full items-center justify-center rounded-lg border border-primary/20 bg-primary/10 px-3 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/20",
+            "inline-flex w-full items-center justify-center rounded-lg border border-primary/20 bg-primary/10 px-3 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/20 shadow-sm",
             collapsed && "h-10 w-10 rounded-full px-0",
           )}
           title={collapsed ? "New search" : undefined}
@@ -205,7 +205,7 @@ export function Sidebar({ collapsed = false, onToggle, onNavigate }: SidebarProp
         {!collapsed && (
           <section className="flex-1 space-y-4 overflow-y-auto px-2 pb-4 text-sm scrollbar-thin">
             {pinnedRoles.length > 0 && (
-              <div className="rounded-lg border border-sidebar-border/80 bg-card/70 p-2">
+              <div className="rounded-lg border border-sidebar-border/80 bg-card/70 p-2 shadow-xs">
                 <p className="mb-2 px-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Pinned Roles</p>
                 <div className="space-y-1">
                   {pinnedRoles.map((role) => (
@@ -224,7 +224,7 @@ export function Sidebar({ collapsed = false, onToggle, onNavigate }: SidebarProp
               </div>
             )}
 
-            <div className="rounded-lg border border-sidebar-border/80 bg-card/70 p-2">
+            <div className="rounded-lg border border-sidebar-border/80 bg-card/70 p-2 shadow-xs">
               <p className="mb-2 px-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Recent</p>
               <div className="space-y-1">
                 {recentThreads.length === 0 ? <p className="px-2 py-1 text-xs text-muted-foreground">No recent threads</p> : null}
@@ -255,14 +255,14 @@ export function Sidebar({ collapsed = false, onToggle, onNavigate }: SidebarProp
         )}
       </div>
 
-      <div className="mt-auto border-t border-sidebar-border p-3 shrink-0">
+      <div className="mt-auto p-3 shrink-0">
         <DropdownMenu.Root>
           <DropdownMenu.Trigger asChild>
             <button
               type="button"
               className={cn(
-                "flex items-center gap-3 rounded-xl p-2 text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5 focus:outline-none",
-                collapsed ? "w-10 h-10 justify-center px-0" : "w-full"
+                "flex items-center gap-3 rounded-2xl border border-sidebar-border/50 bg-card p-2.5 text-left shadow-lg transition-all hover:bg-black/[0.02] dark:hover:bg-white/[0.02] focus:outline-none active:scale-[0.98]",
+                collapsed ? "w-11 h-11 justify-center px-0" : "w-full"
               )}
             >
               <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[11px] font-bold text-primary">
@@ -273,7 +273,6 @@ export function Sidebar({ collapsed = false, onToggle, onNavigate }: SidebarProp
                   <p className="truncate text-sm font-medium text-foreground">
                     {session?.user?.name || session?.user?.email?.split("@")[0] || "User"}
                   </p>
-                  <p className="truncate text-xs text-muted-foreground">Free plan</p>
                 </div>
               )}
               {!collapsed && <ChevronsUpDown className="h-4 w-4 text-muted-foreground/50" />}
