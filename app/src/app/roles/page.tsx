@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Plus, Search } from "lucide-react";
+import { toast } from "sonner";
 
 import { useSession } from "next-auth/react";
 
@@ -14,6 +15,7 @@ type Role = {
   id: string;
   name: string;
   description?: string | null;
+  pinned: boolean;
   updatedAt: string;
 };
 
@@ -109,6 +111,30 @@ export default function RolesPage() {
     }
   }
 
+  async function togglePin(role: Role) {
+    setBusyRoleId(role.id);
+    const newPinned = !role.pinned;
+    try {
+      const response = await fetch(`/api/roles/${role.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pinned: newPinned }),
+      });
+
+      if (!response.ok) {
+        toast.error("Failed to update pin status");
+        return;
+      }
+
+      setRoles((current) =>
+        current.map((item) => (item.id === role.id ? { ...item, pinned: newPinned } : item)),
+      );
+      toast.success(newPinned ? "Role pinned to sidebar" : "Role unpinned");
+    } finally {
+      setBusyRoleId(null);
+    }
+  }
+
   const filteredRoles = roles
     .filter((role) => {
       if (!query.trim()) {
@@ -181,10 +207,12 @@ export default function RolesPage() {
             id={role.id}
             name={role.name}
             description={role.description}
+            pinned={role.pinned}
             updatedAt={role.updatedAt}
             busy={busyRoleId === role.id}
             onRename={() => void renameRole(role)}
             onDelete={() => void deleteRole(role)}
+            onPin={() => void togglePin(role)}
           />
         ))}
       </div>

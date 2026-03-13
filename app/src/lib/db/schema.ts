@@ -72,6 +72,7 @@ export const roles = pgTable("spaces", {
   name: varchar("name", { length: 100 }).notNull(),
   description: text("description"),
   instructions: text("instructions"),
+  pinned: boolean("pinned").notNull().default(false),
   userId: text("user_id")
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),

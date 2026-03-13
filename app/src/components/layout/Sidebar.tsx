@@ -16,6 +16,12 @@ type Thread = {
   updatedAt: string;
 };
 
+type Role = {
+  id: string;
+  name: string;
+  pinned: boolean;
+};
+
 type SidebarProps = {
   collapsed?: boolean;
   onToggle?: () => void;
@@ -26,6 +32,7 @@ type SidebarProps = {
 export function Sidebar({ collapsed = false, onToggle, onNavigate, onOpenCommandPalette }: SidebarProps) {
   const { data: session } = useSession();
   const [threads, setThreads] = useState<Thread[]>([]);
+  const [pinnedRoles, setPinnedRoles] = useState<Role[]>([]);
   const [deletingThreadId, setDeletingThreadId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -45,6 +52,21 @@ export function Sidebar({ collapsed = false, onToggle, onNavigate, onOpenCommand
       .catch(() => {
         if (active) {
           setThreads([]);
+        }
+      });
+
+    // Fetch pinned roles
+    fetch("/api/roles")
+      .then((response) => (response.ok ? response.json() : Promise.reject(new Error("Failed to load roles"))))
+      .then((payload: { roles: Role[] }) => {
+        if (!active) {
+          return;
+        }
+        setPinnedRoles(payload.roles.filter((r) => r.pinned));
+      })
+      .catch(() => {
+        if (active) {
+          setPinnedRoles([]);
         }
       });
 
@@ -137,6 +159,17 @@ export function Sidebar({ collapsed = false, onToggle, onNavigate, onOpenCommand
             </Link>
           );
         })}
+        {collapsed && pinnedRoles.map((role) => (
+          <Link
+            key={role.id}
+            className="flex items-center justify-center rounded-lg px-3 py-2 text-sidebar-foreground transition-colors hover:bg-black/5 dark:hover:bg-white/5"
+            href={`/roles/${role.id}`}
+            onClick={onNavigate}
+            title={role.name}
+          >
+            <Users className="h-4 w-4 shrink-0 text-primary" />
+          </Link>
+        ))}
       </nav>
 
       {!collapsed && (
@@ -152,6 +185,26 @@ export function Sidebar({ collapsed = false, onToggle, onNavigate, onOpenCommand
             </span>
             <kbd className="rounded border border-sidebar-border bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">{shortcutLabel}</kbd>
           </button>
+
+          {pinnedRoles.length > 0 && (
+            <div className="rounded-lg border border-sidebar-border/80 bg-card/70 p-2">
+              <p className="mb-2 px-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Pinned Roles</p>
+              <div className="space-y-1">
+                {pinnedRoles.map((role) => (
+                  <Link
+                    key={role.id}
+                    className="flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-black/5 dark:hover:bg-white/5"
+                    href={`/roles/${role.id}`}
+                    onClick={onNavigate}
+                    title={role.name}
+                  >
+                    <Users className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                    <span className="truncate">{role.name}</span>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="rounded-lg border border-sidebar-border/80 bg-card/70 p-2">
             <p className="mb-2 px-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Recent</p>

@@ -5,11 +5,12 @@ import { useChat } from "@ai-sdk/react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { MoreHorizontal, Loader2 } from "lucide-react";
+import { MoreHorizontal, Loader2, Pin } from "lucide-react";
 import { toast } from "sonner";
 
 import { useSession } from "next-auth/react";
 
+import { cn } from "@/lib/utils";
 import { DocumentList, RoleDocument } from "@/components/roles/DocumentList";
 import { FileUploader } from "@/components/roles/FileUploader";
 import { EmptyState } from "@/components/shared/EmptyState";
@@ -21,6 +22,7 @@ type Role = {
   name: string;
   description?: string | null;
   instructions?: string | null;
+  pinned: boolean;
 };
 
 type Thread = {
@@ -205,6 +207,29 @@ export default function RoleDetailPage() {
     }
   }
 
+  async function togglePin() {
+    if (!role) return;
+
+    const newPinned = !role.pinned;
+    try {
+      const response = await fetch(`/api/roles/${roleId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pinned: newPinned }),
+      });
+
+      if (!response.ok) {
+        toast.error("Failed to update pin status");
+        return;
+      }
+
+      setRole((current) => (current ? { ...current, pinned: newPinned } : current));
+      toast.success(newPinned ? "Role pinned to sidebar" : "Role unpinned");
+    } catch {
+      toast.error("An error occurred");
+    }
+  }
+
   if (!session?.user) {
     return (
       <main className="mx-auto max-w-5xl p-6">
@@ -221,13 +246,29 @@ export default function RoleDetailPage() {
 
       <div className="mt-6 flex items-center justify-between gap-4">
         <h1 className="font-[var(--font-accent)] text-3xl font-medium">{role ? role.name : `Role ${roleId}`}</h1>
-        <button
-          type="button"
-          className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-border/60 bg-background text-muted-foreground hover:bg-muted/40"
-          aria-label="Role actions"
-        >
-          <MoreHorizontal className="h-4 w-4" />
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => void togglePin()}
+            className={cn(
+              "inline-flex h-9 w-9 items-center justify-center rounded-full border border-border/60 transition-colors",
+              role?.pinned 
+                ? "bg-primary/10 text-primary border-primary/20 hover:bg-primary/20" 
+                : "bg-background text-muted-foreground hover:bg-muted/40"
+            )}
+            title={role?.pinned ? "Unpin from sidebar" : "Pin to sidebar"}
+            aria-label={role?.pinned ? "Unpin role" : "Pin role"}
+          >
+            <Pin className={cn("h-4 w-4", role?.pinned && "fill-current")} />
+          </button>
+          <button
+            type="button"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-border/60 bg-background text-muted-foreground hover:bg-muted/40"
+            aria-label="Role actions"
+          >
+            <MoreHorizontal className="h-4 w-4" />
+          </button>
+        </div>
       </div>
 
       <div className="mt-10 grid gap-12 md:grid-cols-[1fr_280px] lg:gap-16 lg:grid-cols-[1fr_300px] xl:grid-cols-[1fr_360px]">

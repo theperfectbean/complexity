@@ -10,6 +10,7 @@ const patchSchema = z.object({
   name: z.string().min(1).max(100).optional(),
   description: z.string().max(1000).optional().nullable(),
   instructions: z.string().max(50000).optional().nullable(),
+  pinned: z.boolean().optional(),
 });
 
 async function getUserAndRole(roleId: string, email: string) {
@@ -68,6 +69,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ ro
       name: parsed.data.name ?? row.role.name,
       description: parsed.data.description ?? row.role.description,
       instructions: parsed.data.instructions !== undefined ? parsed.data.instructions : row.role.instructions,
+      pinned: parsed.data.pinned !== undefined ? parsed.data.pinned : row.role.pinned,
+      updatedAt: new Date(),
     })
     .where(eq(roles.id, roleId));
 
