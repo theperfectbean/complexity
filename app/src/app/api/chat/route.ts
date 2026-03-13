@@ -153,7 +153,11 @@ function collectTextStrings(value: unknown): string[] {
 }
 
 function extractAssistantTextFromCompletedResponse(response: unknown): string {
-  return Array.from(new Set(collectTextStrings(response))).join("\n").trim();
+  const strings = collectTextStrings(response);
+  if (strings.length === 0) return "";
+  // Return the longest string found (likely the full response) to avoid 
+  // duplication from multiple fields containing the same text.
+  return strings.sort((a, b) => b.length - a.length)[0].trim();
 }
 
 export async function POST(request: Request) {
@@ -619,16 +623,27 @@ export async function POST(request: Request) {
 
             if (eventRecord?.type === "response.output_text.done") {
               const outputText = asRecord(eventRecord.output_text);
-              const doneText =
-                (typeof eventRecord.text === "string" && eventRecord.text) ||
-                (typeof outputText?.text === "string" && outputText.text) ||
-                (typeof eventRecord.delta === "string" && eventRecord.delta) ||
-                "";
+              const fullText =
+                (typeof eventRecord.text === "string" ? eventRecord.text : null) ||
+                (typeof outputText?.text === "string" ? outputText.text : null);
 
-              if (doneText) {
-                assistantText += doneText;
-                writer.write({ type: "text-delta", id: textId, delta: doneText });
-                hasWrittenTextDelta = true;
+              if (fullText !== null) {
+                // If we've already written deltas, we update assistantText to the full string
+                // but don't write it to the stream again to avoid duplication.
+                assistantText = fullText;
+                if (!hasWrittenTextDelta) {
+                  writer.write({ type: "text-delta", id: textId, delta: fullText });
+                  hasWrittenTextDelta = true;
+                }
+              } else {
+                const delta =
+                  (typeof eventRecord.delta === "string" ? eventRecord.delta : null) ||
+                  (typeof outputText?.delta === "string" ? outputText.delta : "");
+                if (delta) {
+                  assistantText += delta;
+                  writer.write({ type: "text-delta", id: textId, delta });
+                  hasWrittenTextDelta = true;
+                }
               }
               continue;
             }

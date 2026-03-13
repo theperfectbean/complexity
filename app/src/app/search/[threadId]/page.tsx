@@ -106,16 +106,15 @@ function ThreadChat({
   });
   const [prompt, setPrompt] = useState("");
 
-  const liveMessages = useMemo<ChatMessageItem[]>(
-    () => messages.map((message) => normalizeUIMessage(message)),
-    [messages],
-  );
-
-  const mergedMessages = useMemo(() => {
-    const liveIds = new Set(liveMessages.map((m) => m.id));
-    const uniqueHistory = initialHistory.filter((m) => !liveIds.has(m.id));
-    return [...uniqueHistory, ...liveMessages];
-  }, [initialHistory, liveMessages]);
+  const mergedMessages = useMemo<ChatMessageItem[]>(() => {
+    // If the SDK has messages (including initial history), use them as the source of truth.
+    // This ensures that when regenerate() slices the state, the UI correctly reflects it.
+    if (messages.length > 0) {
+      return messages.map((message) => normalizeUIMessage(message));
+    }
+    // Fallback only if messages is completely empty (e.g. initial load before hook settles)
+    return initialHistory;
+  }, [initialHistory, messages]);
 
   const chatErrorMessage = getChatErrorMessage(error);
 

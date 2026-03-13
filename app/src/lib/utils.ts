@@ -78,7 +78,7 @@ export function normalizeUIMessage(message: unknown): ChatMessageItem {
 
   const citations: ChatCitation[] = [];
   const thinking: ChatThinkingPart[] = [];
-  
+
   if (Array.isArray(msg.parts)) {
     msg.parts.forEach((part: unknown) => {
       if (part && typeof part === "object") {
@@ -120,6 +120,20 @@ export function normalizeUIMessage(message: unknown): ChatMessageItem {
             }
           }
         }
+      }
+    });
+  }
+
+  // Support top-level citations from history (DB rows)
+  if (citations.length === 0 && Array.isArray(msg.citations)) {
+    msg.citations.forEach((c: unknown) => {
+      if (c && typeof c === "object") {
+        const citation = c as Record<string, unknown>;
+        citations.push({
+          url: citation.url as string,
+          title: citation.title as string,
+          snippet: citation.snippet as string,
+        });
       }
     });
   }
