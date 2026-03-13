@@ -3,7 +3,7 @@
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { ChevronDown, Globe, Paperclip, SendHorizontal } from "lucide-react";
 import { motion } from "motion/react";
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 import TextareaAutosize from "react-textarea-autosize";
 
 import { MODELS, getDefaultModel } from "@/lib/models";
@@ -26,7 +26,7 @@ type SearchBarProps = {
   model?: string;
   onModelChange?: (model: string) => void;
   modelOptions?: readonly SearchModelOption[];
-  onAttachClick?: () => void;
+  onAttachClick?: (files: FileList | null) => void;
   webSearchEnabled?: boolean;
   onWebSearchChange?: (enabled: boolean) => void;
 };
@@ -46,6 +46,7 @@ export function SearchBar({
   webSearchEnabled = true,
   onWebSearchChange,
 }: SearchBarProps) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const groupedModels = useMemo(() => {
     return modelOptions.reduce<Record<string, SearchModelOption[]>>((accumulator, option) => {
       if (!accumulator[option.category]) {
@@ -58,6 +59,16 @@ export function SearchBar({
 
   const activeModelLabel = modelOptions.find((item) => item.id === model)?.label ?? model;
 
+  const handleAttachClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    onAttachClick?.(event.target.files);
+    // Reset the input value so the same file can be selected again
+    event.target.value = "";
+  };
+
   return (
     <motion.div
       layoutId={layoutId}
@@ -67,6 +78,14 @@ export function SearchBar({
         "focus-within:border-primary/40 focus-within:ring-2 focus-within:ring-ring/20 focus-within:shadow",
       )}
     >
+      <input
+        type="file"
+        ref={fileInputRef}
+        className="hidden"
+        multiple
+        onChange={handleFileChange}
+        accept=".pdf,.docx,.txt,.md"
+      />
       <div className="flex items-end gap-2">
         <TextareaAutosize
           minRows={compact ? 1 : 2}
@@ -140,7 +159,7 @@ export function SearchBar({
             type="button"
             className="inline-flex h-8 w-8 items-center justify-center rounded-full border bg-card text-muted-foreground hover:bg-black/5 dark:hover:bg-white/5"
             aria-label="Attach file"
-            onClick={onAttachClick}
+            onClick={handleAttachClick}
           >
             <Paperclip className="h-4 w-4" />
           </button>

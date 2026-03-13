@@ -93,6 +93,11 @@ export default function Home() {
             placeholder="Ask anything..."
             submitLabel={loading ? "Starting..." : "Start"}
             disabled={loading}
+            onAttachClick={(files) => {
+              if (files && files.length > 0) {
+                toast.info("File attachments for new threads coming soon. Try uploading to a Role first!");
+              }
+            }}
           />
           <div className="text-center">
             <span className="text-xs text-muted-foreground">Model applies to this new thread</span>

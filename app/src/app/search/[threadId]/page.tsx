@@ -241,6 +241,11 @@ function ThreadChat({
               onModelChange={setModel}
               webSearchEnabled={webSearchEnabled}
               onWebSearchChange={setWebSearchEnabled}
+              onAttachClick={(files) => {
+                if (files && files.length > 0) {
+                  toast.info("Thread-level attachments coming soon.");
+                }
+              }}
             />
           </div>
         </form>
