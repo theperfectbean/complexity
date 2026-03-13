@@ -6,7 +6,6 @@ import { env } from "@/lib/env";
 
 const CHUNK_MAX_CHARS = 2200;
 const CHUNK_OVERLAP = 200;
-const DEFAULT_SEARCH_LIMIT = 5;
 
 export function chunkText(input: string, maxChars = CHUNK_MAX_CHARS, overlap = CHUNK_OVERLAP) {
   const text = input.replace(/\r\n/g, "\n").trim();

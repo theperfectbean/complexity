@@ -487,7 +487,7 @@ export async function POST(request: Request) {
             }
 
             if (eventRecord?.type === "response.reasoning.search_queries") {
-              const queries = (eventRecord as any).queries as string[];
+              const queries = (eventRecord as Record<string, unknown>).queries as string[];
               writer.write({
                 type: "data-call-result",
                 data: {
@@ -510,7 +510,7 @@ export async function POST(request: Request) {
             }
 
             if (eventRecord?.type === "response.reasoning.fetch_url_queries") {
-              const urls = (eventRecord as any).urls as string[];
+              const urls = (eventRecord as Record<string, unknown>).urls as string[];
               writer.write({
                 type: "data-call-start",
                 data: {

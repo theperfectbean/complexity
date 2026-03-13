@@ -60,7 +60,7 @@ export function RoleCard({
       </div>
 
       <div className="mt-6 flex items-center justify-between">
-...
+        <p className="text-[13px] text-muted-foreground">
           Updated {new Date(updatedAt).toLocaleDateString()}
         </p>
         {(onRename || onDelete) && (

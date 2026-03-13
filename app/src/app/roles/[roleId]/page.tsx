@@ -1,11 +1,9 @@
 "use client";
 
-import { DefaultChatTransport, UIMessageChunk } from "ai";
-import { useChat } from "@ai-sdk/react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { MoreHorizontal, Loader2, Pin } from "lucide-react";
+import { MoreHorizontal, Pin } from "lucide-react";
 import { toast } from "sonner";
 
 import { useSession } from "next-auth/react";
@@ -13,7 +11,6 @@ import { useSession } from "next-auth/react";
 import { cn } from "@/lib/utils";
 import { DocumentList, RoleDocument } from "@/components/roles/DocumentList";
 import { FileUploader } from "@/components/roles/FileUploader";
-import { EmptyState } from "@/components/shared/EmptyState";
 import { LoadingSkeleton } from "@/components/shared/LoadingSkeleton";
 import { MODELS, getDefaultModel } from "@/lib/models";
 

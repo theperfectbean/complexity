@@ -1,4 +1,4 @@
-import { FileText, FileCode, File, Loader2 } from "lucide-react";
+import { FileText, File, Loader2 } from "lucide-react";
 import { ProcessingBadge } from "@/components/roles/ProcessingBadge";
 
 export type RoleDocument = {
