@@ -7,7 +7,7 @@ import { Toaster } from "sonner";
 
 export function AppProviders({ children }: { children: ReactNode }) {
   return (
-    <SessionProvider>
+    <SessionProvider basePath="/api/auth">
       <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
         {children}
         <Toaster richColors position="top-right" />
