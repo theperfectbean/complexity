@@ -98,6 +98,7 @@ DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose build app
   - The user message is not duplicated in the database.
 
 ### Database & Migrations
+- **ANTHROPIC_API_KEY**: Made `ANTHROPIC_API_KEY` optional in `src/lib/env.ts` to prevent the application from crashing on startup if the key is not provided in the environment.
 - **Missing Tables**: If you see "failed to start thread" or a 500 error mentioning `relation "users" does not exist`, it means the database migrations have not been run. 
 - **Automatic Migrations**: The project is intended to run in Docker. While the current Dockerfile does not auto-migrate, you can run migrations manually using `docker exec complexity-app npm run db:migrate` if the `src` directory is available, or better yet, run them from the host with `cd app && DATABASE_URL=... npm run db:migrate`.
 - **Session Persistence**: Because the app uses JWT sessions, a user can appear to be "logged in" even if the database has been cleared. In this case, API calls will fail with 404 "User not found". The fix is to sign out and register/sign in again to re-sync the database record.
@@ -111,3 +112,8 @@ DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose build app
 ### Docker & Next.js (SWC)
 - **Binary Mismatch**: When using Alpine-based Docker images, ensure `@next/swc-linux-x64-musl` is installed. 
 - **Volume Isolation**: To prevent host-to-container binary conflicts (glibc vs musl), use a named volume for `node_modules` in `docker-compose.dev.yml` (e.g., `- node_modules:/app/node_modules`).
+
+### Anthropic vs. Perplexity Benchmarking (2026-03-13)
+- **Model Access**: Successfully benchmarked **Claude Sonnet 4.6** (released Feb 2026) using both direct Anthropic and Perplexity Agent APIs. Both providers correctly identify `claude-sonnet-4-6` or its prefixed alias.
+- **Latency Findings**: Direct Anthropic access (using `@ai-sdk/anthropic`) for Sonnet 4.6 demonstrated a significantly lower **TTFT of ~1.3s**, compared to Perplexity's **TTFT of ~7.1s**. Total durations were comparable at ~6.8s and ~7.1s respectively.
+- **Library Integration**: Added `@ai-sdk/anthropic` and `ANTHROPIC_API_KEY` to `env.ts` to support direct comparisons and future multi-provider routing.
