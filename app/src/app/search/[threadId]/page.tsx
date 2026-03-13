@@ -84,7 +84,7 @@ function ThreadChat({
 
   const [data, setData] = useState<Record<string, unknown>[]>([]);
   const { messages, sendMessage, regenerate, status, error } = useChat({
-    messages: initialHistory.map((msg) => ({
+    initialMessages: initialHistory.map((msg) => ({
       id: msg.id,
       role: msg.role as "user" | "assistant" | "system",
       content: msg.content,
@@ -106,10 +106,16 @@ function ThreadChat({
   });
   const [prompt, setPrompt] = useState("");
 
-  const mergedMessages = useMemo<ChatMessageItem[]>(
+  const liveMessages = useMemo<ChatMessageItem[]>(
     () => messages.map((message) => normalizeUIMessage(message)),
     [messages],
   );
+
+  const mergedMessages = useMemo(() => {
+    const liveIds = new Set(liveMessages.map((m) => m.id));
+    const uniqueHistory = initialHistory.filter((m) => !liveIds.has(m.id));
+    return [...uniqueHistory, ...liveMessages];
+  }, [initialHistory, liveMessages]);
 
   const chatErrorMessage = getChatErrorMessage(error);
 
@@ -204,7 +210,19 @@ function ThreadChat({
           onRelatedQuestionClick={(question) => setPrompt(question)}
           onRetry={() => {
             const lastMessage = mergedMessages[mergedMessages.length - 1];
-            void regenerate({ messageId: lastMessage?.id });
+            if (!lastMessage) return;
+
+            // Ensure the internal state has all messages (initial + live)
+            // so that regenerate can find the messageId and its predecessors.
+            setMessages(
+              mergedMessages.map((m) => ({
+                id: m.id,
+                role: m.role as "user" | "assistant" | "system",
+                content: m.content,
+              })),
+            );
+
+            void regenerate({ messageId: lastMessage.id });
           }}
         />
       </div>

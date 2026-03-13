@@ -80,7 +80,8 @@ DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose build app
 ### Vercel AI SDK v6 Migration (Update)
 - **useChat Changes**: The `data` return property has been removed. Use the `onData` callback and local `useState` to capture custom stream parts.
 - **isDataUIMessageChunk Removal**: The `isDataUIMessageChunk` helper is no longer exported in v6. Use `part.type === 'data-json'` or `part.type.startsWith('data-')` to identify data chunks in the `onData` callback.
-- **initialMessages Rename**: In v6, the `useChat` option `initialMessages` has been renamed to `messages`. Using `initialMessages` will result in an empty message state, causing `regenerate()` (formerly `reload`) to fail with "message undefined not found".
+- **initialMessages Property**: In v6 `@ai-sdk/react`, the `useChat` option for initial state remains `initialMessages` (not `messages`, which is for controlled state).
+- **Regenerate State Sync**: When using a hybrid history (merged from a database and live streaming), the internal SDK state may only contain live messages. Before calling `regenerate()`, use `setMessages()` to sync the full `mergedMessages` into the SDK's internal state. This prevents "message not found" errors when regenerating messages that were originally loaded from history.
 - **Method Renaming**: `append` has been renamed to `sendMessage` and `reload` has been renamed to `regenerate`.
 - **Regenerate Robustness**: When calling `regenerate()`, it is more reliable to pass the specific `messageId` of the message to be regenerated (e.g., `regenerate({ messageId: lastMessage.id })`) to avoid "message undefined not found" errors when the internal state is not perfectly in sync with the UI's merged messages.
 - **Type Safety**: When using `onData`, define the state with `Record<string, unknown>[]` instead of `any[]` to satisfy strict linting rules.
