@@ -121,3 +121,7 @@ DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose build app
   - **Haiku 4.5**: Direct Anthropic TTFT of **~0.6s**, Perplexity TTFT of **~3.4s**.
   - Direct access consistently provides a significantly faster Time to First Token (TTFT).
 - **Library Integration**: Added `@ai-sdk/anthropic` and `ANTHROPIC_API_KEY` to `env.ts` to support direct comparisons and future multi-provider routing.
+
+### Perplexity SDK v0.26 Streaming Bug
+- **Silent Failure**: In Node.js environments, the `@perplexity-ai/perplexity_ai` v0.26.1 streaming iterator for `responses.create` silently yields zero items instead of throwing an error or parsing Server-Sent Events (SSE) properly. This caused the UI to receive the entire response at once by falling back to the non-streaming flow.
+- **Manual SSE Fetch Fix**: The issue has been fixed by bypassing the SDK for streaming and using a direct HTTP `fetch` to `https://api.perplexity.ai/v1/responses` combined with a manual `data:` line parser to yield real-time `text-delta` chunks to the UI.

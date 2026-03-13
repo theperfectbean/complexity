@@ -489,13 +489,45 @@ export async function POST(request: Request) {
         let streamingFailed = false;
 
         try {
-          // Wrap stream creation in a try-catch to immediately intercept HTTP 400s
-          // (which happens if the model doesn't support streaming, e.g. Gemini 3.1 Pro)
-          const eventStream = await client.responses.create(requestBody);
+          // Bypass broken Perplexity SDK iterator with direct fetch
+          const res = await fetch("https://api.perplexity.ai/v1/responses", {
+            method: "POST",
+            headers: {
+              "Authorization": "Bearer " + process.env.PERPLEXITY_API_KEY,
+              "Content-Type": "application/json",
+              "Accept": "text/event-stream"
+            },
+            body: JSON.stringify(requestBody)
+          });
 
-          for await (const event of eventStream as unknown as AsyncIterable<unknown>) {
-            streamEventCount += 1;
-            const eventRecord = asRecord(event);
+          if (!res.ok) {
+             if (res.status === 400) {
+               console.log(`[Chat API] HTTP 400 (${safeModel}), falling back to non-streaming.`);
+               streamingFailed = true;
+             } else {
+               const errText = await res.text();
+               throw new Error(`Perplexity API Error: ${res.status} ${errText}`);
+             }
+          } else if (res.body) {
+            const reader = res.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = "";
+
+            while (!streamingFailed) {
+              const { value, done } = await reader.read();
+              if (done) break;
+              
+              buffer += decoder.decode(value, { stream: true });
+              const lines = buffer.split('\n');
+              buffer = lines.pop() || "";
+              
+              for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                  const dataStr = line.slice(6).trim();
+                  if (dataStr === '[DONE]' || !dataStr) continue;
+                  
+                  const eventRecord = asRecord(JSON.parse(dataStr));
+                  streamEventCount += 1;
             
             if (eventRecord?.type === "response.reasoning.started") {
               writer.write({
@@ -661,6 +693,9 @@ export async function POST(request: Request) {
                 break;
               }
               throw new Error(message || "Agent API request failed");
+            }
+                }
+              }
             }
           }
         } catch (error: unknown) {
