@@ -69,7 +69,7 @@ export function MessageList({ messages, emptyLabel, onRelatedQuestionClick, onRe
   // Auto-scroll to bottom when messages or their content change
   useEffect(() => {
     if (messages.length > 0) {
-      bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+      bottomRef.current?.scrollIntoView({ block: "end" });
     }
   }, [messages, lastMessageContent, lastMessageThinkingLength]);
 
