@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { MoreHorizontal, Pin } from "lucide-react";
 import { toast } from "sonner";
+import TextareaAutosize from "react-textarea-autosize";
 
 import { useSession } from "next-auth/react";
 
@@ -270,8 +271,10 @@ export default function RoleDetailPage() {
 
       <div className="mt-10 grid gap-12 md:grid-cols-[1fr_280px] lg:gap-16 lg:grid-cols-[1fr_300px] xl:grid-cols-[1fr_360px]">
         <section className="min-w-0">
-          <form onSubmit={onStartChat} className="relative flex min-h-[140px] flex-col rounded-3xl border border-border/70 bg-card p-4 transition-shadow focus-within:border-primary/40 focus-within:ring-4 focus-within:ring-primary/10">
-            <textarea
+          <form onSubmit={onStartChat} className="relative flex min-h-[60px] flex-col rounded-3xl border border-border/70 bg-card p-4 transition-shadow focus-within:border-primary/40 focus-within:ring-4 focus-within:ring-primary/10">
+            <TextareaAutosize
+              minRows={2}
+              maxRows={12}
               className="w-full flex-1 resize-none bg-transparent px-2 py-2 text-lg outline-none placeholder:text-muted-foreground/60"
               placeholder="Type / for commands"
               value={prompt}

@@ -81,7 +81,7 @@ export function SearchBar({
           }}
           disabled={disabled}
           placeholder={placeholder}
-          className="max-h-52 flex-1 resize-none bg-transparent px-2 py-2 text-base outline-none placeholder:text-muted-foreground disabled:opacity-50"
+          className="flex-1 resize-none bg-transparent px-2 py-2 text-base outline-none placeholder:text-muted-foreground disabled:opacity-50"
         />
       </div>
 
