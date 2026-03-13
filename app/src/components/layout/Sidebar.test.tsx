@@ -57,6 +57,6 @@ describe("Sidebar", () => {
     await user.click(screen.getByRole("button", { name: "Account menu" }));
     const signOutItem = await screen.findByRole("menuitem", { name: "Sign out" });
     await user.click(signOutItem);
-    expect(signOut).toHaveBeenCalledWith({ callbackUrl: "/" });
+    expect(signOut).toHaveBeenCalledWith({ callbackUrl: window.location.origin + "/" });
   });
 });

@@ -326,7 +326,7 @@ export function Sidebar({ collapsed = false, onToggle, onNavigate }: SidebarProp
               
               <DropdownMenu.Item
                 className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm text-destructive outline-none hover:bg-destructive/10 focus:bg-destructive/10"
-                onSelect={() => signOut({ callbackUrl: "/" })}
+                onSelect={() => signOut({ callbackUrl: window.location.origin + "/" })}
               >
                 <LogOut className="h-4 w-4" />
                 Sign out

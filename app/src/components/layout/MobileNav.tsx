@@ -62,7 +62,7 @@ export function MobileNav({ open, onClose, onOpenCommandPalette }: MobileNavProp
             <button
               type="button"
               className="inline-flex w-full items-center justify-center gap-2 rounded-lg border bg-card px-3 py-2 text-sm hover:bg-black/5 dark:hover:bg-white/5"
-              onClick={() => signOut({ callbackUrl: "/" })}
+              onClick={() => signOut({ callbackUrl: window.location.origin + "/" })}
             >
               <LogOut className="h-4 w-4" />
               Sign out
