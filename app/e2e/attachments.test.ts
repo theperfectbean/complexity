@@ -120,4 +120,41 @@ test.describe("SearchBar Attachment Button", () => {
     const lastArticle = page.locator('article').last();
     await expect(lastArticle).toBeVisible();
   });
+
+  test("sending ONLY an attachment (no text)", async ({ page }) => {
+    // 1. Navigate to thread
+    await page.getByPlaceholder("Ask anything...").fill("Initial query");
+    await page.getByPlaceholder("Ask anything...").press("Enter");
+    await expect(page).toHaveURL(/\/search\//, { timeout: 15000 });
+    await page.waitForLoadState('networkidle');
+
+    // 2. Wait for initial response
+    await expect(page.getByRole("button", { name: "Copy message" })).toBeVisible({ timeout: 30000 });
+
+    // 3. Attach a file
+    const fileChooserPromise = page.waitForEvent('filechooser');
+    const threadSearchBar = page.getByTestId("thread-searchbar");
+    await threadSearchBar.getByRole("button", { name: "Attach file" }).click();
+    const fileChooser = await fileChooserPromise;
+
+    await fileChooser.setFiles([{
+      name: 'only-attachment.txt',
+      mimeType: 'text/plain',
+      buffer: Buffer.from('this is the only content')
+    }]);
+
+    await expect(threadSearchBar.getByTestId("file-chip").filter({ hasText: "only-attachment.txt" })).toBeVisible({ timeout: 15000 });
+
+    // 4. Send the message WITHOUT filling any text
+    const input = threadSearchBar.getByPlaceholder("Ask a follow-up...");
+    await input.press("Enter");
+
+    // 5. Verify no 400 error appears and chip is gone
+    await expect(page.getByText("Message text required")).toBeHidden();
+    await expect(threadSearchBar.getByTestId("file-chip").filter({ hasText: "only-attachment.txt" })).toBeHidden();
+    
+    // 6. Verify the LLM starts responding
+    const lastArticle = page.locator('article').last();
+    await expect(lastArticle).toBeVisible();
+  });
 });

@@ -82,6 +82,7 @@ async function extractTextFromMessage(message: UIMessage): Promise<string> {
 
   // Handle experimental_attachments if present
   const messageRecord = asRecord(message);
+  let attachmentsInfo = "";
   if (messageRecord && Array.isArray(messageRecord.experimental_attachments)) {
     const attachmentsContents = await Promise.all(
       messageRecord.experimental_attachments.map(async (a: unknown) => {
@@ -101,11 +102,18 @@ async function extractTextFromMessage(message: UIMessage): Promise<string> {
       })
     );
 
-    const attachmentsInfo = attachmentsContents.filter(Boolean).join("\n\n");
+    attachmentsInfo = attachmentsContents.filter(Boolean).join("\n\n");
 
     if (attachmentsInfo) {
       finalText = finalText ? `${finalText}\n\n${attachmentsInfo}` : attachmentsInfo;
     }
+  }
+
+  // If we have NO text but we HAVE attachments (e.g. just an image), return a placeholder
+  // to satisfy DB notNull constraints and give the LLM/RAG a minimal context.
+  if (!finalText.trim() && messageRecord && Array.isArray(messageRecord.experimental_attachments) && messageRecord.experimental_attachments.length > 0) {
+    const firstAtt = asRecord(messageRecord.experimental_attachments[0]);
+    return `[Attached: ${firstAtt?.name || "File"}]`;
   }
 
   return finalText;

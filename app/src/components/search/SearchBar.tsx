@@ -87,7 +87,6 @@ export function SearchBar({
     >
       <input
         type="file"
-        name="attachment-input"
         ref={fileInputRef}
         className="hidden"
         multiple
