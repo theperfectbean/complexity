@@ -83,6 +83,7 @@ function ThreadChat({
   const hasSubmittedInitialQuery = useRef(false);
 
   const [data, setData] = useState<Record<string, unknown>[]>([]);
+  const [attachments, setAttachments] = useState<File[]>([]);
   const { messages, setMessages, sendMessage, regenerate, status, error } = useChat({
     initialMessages: initialHistory.map((msg) => ({
       id: msg.id,
@@ -168,16 +169,19 @@ function ThreadChat({
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
     const currentPrompt = prompt.trim();
-    if (!currentPrompt) {
+    if (!currentPrompt && attachments.length === 0) {
       return;
     }
 
     setPrompt("");
+    const currentAttachments = [...attachments];
+    setAttachments([]);
 
     try {
       await sendMessage(
         { text: currentPrompt },
         {
+          experimental_attachments: currentAttachments,
           body: {
             threadId,
             model,
@@ -188,6 +192,7 @@ function ThreadChat({
     } catch {
       toast.error("Failed to send message");
       setPrompt(currentPrompt);
+      setAttachments(currentAttachments);
     }
   }
 
@@ -226,10 +231,12 @@ function ThreadChat({
         />
       </div>
 
-      <div className="fixed inset-x-0 bottom-0 z-20 pointer-events-none bg-gradient-to-t from-background via-background/95 to-transparent pb-6 pt-10">
-        <form onSubmit={onSubmit} className="mx-auto max-w-3xl px-4 pointer-events-auto">
+      <div className="fixed inset-x-0 bottom-0 z-20 bg-gradient-to-t from-background via-background/95 to-transparent pb-6 pt-10">
+        <form onSubmit={onSubmit} className="mx-auto max-w-3xl px-4">
           <div className="rounded-2xl border bg-card/50 p-1 shadow-lg backdrop-blur-md transition-shadow focus-within:shadow-xl focus-within:ring-1 focus-within:ring-primary/20">
             <SearchBar
+              key="thread-searchbar"
+              data-testid="thread-searchbar"
               value={prompt}
               onChange={setPrompt}
               placeholder="Ask a follow-up..."
@@ -241,9 +248,13 @@ function ThreadChat({
               onModelChange={setModel}
               webSearchEnabled={webSearchEnabled}
               onWebSearchChange={setWebSearchEnabled}
+              attachments={attachments}
+              onRemoveAttachment={(index) => {
+                setAttachments((prev) => prev.filter((_, i) => i !== index));
+              }}
               onAttachClick={(files) => {
                 if (files && files.length > 0) {
-                  toast.info("Thread-level attachments coming soon.");
+                  setAttachments((prev) => [...prev, ...Array.from(files)]);
                 }
               }}
             />

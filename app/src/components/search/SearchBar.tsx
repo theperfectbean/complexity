@@ -1,7 +1,7 @@
 "use client";
 
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { ChevronDown, Globe, Paperclip, SendHorizontal } from "lucide-react";
+import { ChevronDown, Globe, Paperclip, SendHorizontal, X, FileText } from "lucide-react";
 import { motion } from "motion/react";
 import { useMemo, useRef } from "react";
 import TextareaAutosize from "react-textarea-autosize";
@@ -27,8 +27,11 @@ type SearchBarProps = {
   onModelChange?: (model: string) => void;
   modelOptions?: readonly SearchModelOption[];
   onAttachClick?: (files: FileList | null) => void;
+  attachments?: File[];
+  onRemoveAttachment?: (index: number) => void;
   webSearchEnabled?: boolean;
   onWebSearchChange?: (enabled: boolean) => void;
+  "data-testid"?: string;
 };
 
 export function SearchBar({
@@ -43,8 +46,11 @@ export function SearchBar({
   onModelChange,
   modelOptions = MODELS,
   onAttachClick,
+  attachments = [],
+  onRemoveAttachment,
   webSearchEnabled = true,
   onWebSearchChange,
+  "data-testid": dataTestId,
 }: SearchBarProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const groupedModels = useMemo(() => {
@@ -73,19 +79,44 @@ export function SearchBar({
     <motion.div
       layoutId={layoutId}
       layout={!compact}
+      data-testid={dataTestId}
       className={cn(
-        "rounded-xl border bg-card p-3 shadow-sm transition-shadow",
+        "flex flex-col rounded-xl border bg-card p-3 shadow-sm transition-shadow",
         "focus-within:border-primary/40 focus-within:ring-2 focus-within:ring-ring/20 focus-within:shadow",
       )}
     >
       <input
         type="file"
+        name="attachment-input"
         ref={fileInputRef}
         className="hidden"
         multiple
         onChange={handleFileChange}
-        accept=".pdf,.docx,.txt,.md"
+        accept=".pdf,.docx,.txt,.md,image/*"
       />
+      
+      {attachments.length > 0 && (
+        <div className="flex flex-wrap gap-2 pb-2 px-2" data-testid="attachments-container">
+          {attachments.map((file, index) => (
+            <div 
+              key={`${file.name}-${index}`} 
+              data-testid="file-chip"
+              className="flex items-center gap-1.5 rounded-md bg-muted/50 pl-2 pr-1 py-1 text-xs text-muted-foreground border border-border/50 max-w-[150px]"
+            >
+              <FileText className="h-3 w-3 shrink-0" />
+              <span className="truncate font-medium">{file.name}</span>
+              <button
+                type="button"
+                onClick={() => onRemoveAttachment?.(index)}
+                className="ml-auto inline-flex h-4 w-4 items-center justify-center rounded-full hover:bg-black/10 dark:hover:bg-white/10 shrink-0"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
       <div className="flex items-end gap-2">
         <TextareaAutosize
           minRows={compact ? 1 : 2}

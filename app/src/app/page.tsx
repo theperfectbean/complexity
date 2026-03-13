@@ -17,10 +17,11 @@ export default function Home() {
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [webSearchEnabled, setWebSearchEnabled] = useState(true);
+  const [attachments, setAttachments] = useState<File[]>([]);
 
   async function startThread(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!query.trim()) {
+    if (!query.trim() && attachments.length === 0) {
       return;
     }
 
@@ -30,7 +31,7 @@ export default function Home() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          title: query.slice(0, 80),
+          title: query.slice(0, 80) || (attachments.length > 0 ? attachments[0].name : "New Thread"),
           model,
         }),
       });
@@ -41,6 +42,8 @@ export default function Home() {
       }
 
       const payload = (await response.json()) as { thread: { id: string } };
+      // Note: Full multi-file prompt support on initial redirect will require standardizing how we pass initial files.
+      // For now, we redirect. If the user had files, we could theoretically upload them here, but useChat handles it best.
       router.push(`/search/${payload.thread.id}?q=${encodeURIComponent(query.trim())}&web=${webSearchEnabled}`);
     } catch (error) {
       setLoading(false);
@@ -84,6 +87,7 @@ export default function Home() {
             <p className="text-lg text-muted-foreground">Web-grounded AI search with roles</p>
           </div>
           <SearchBar
+            key="home-searchbar"
             value={query}
             onChange={setQuery}
             model={model}
@@ -93,9 +97,13 @@ export default function Home() {
             placeholder="Ask anything..."
             submitLabel={loading ? "Starting..." : "Start"}
             disabled={loading}
+            attachments={attachments}
+            onRemoveAttachment={(index) => {
+              setAttachments((prev) => prev.filter((_, i) => i !== index));
+            }}
             onAttachClick={(files) => {
               if (files && files.length > 0) {
-                toast.info("File attachments for new threads coming soon. Try uploading to a Role first!");
+                setAttachments((prev) => [...prev, ...Array.from(files)]);
               }
             }}
           />

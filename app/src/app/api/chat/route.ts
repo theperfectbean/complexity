@@ -47,45 +47,55 @@ function extractTextFromMessage(message: UIMessage): string {
       .join("\n")
       .trim() ?? "";
 
-  if (partsText) {
-    return partsText;
-  }
+  let finalText = partsText;
 
-  const messageRecord = asRecord(message);
-  const rawContent = messageRecord?.content;
+  if (!finalText) {
+    const messageRecord = asRecord(message);
+    const rawContent = messageRecord?.content;
 
-  if (typeof rawContent === "string") {
-    return rawContent.trim();
-  }
+    if (typeof rawContent === "string") {
+      finalText = rawContent.trim();
+    } else if (Array.isArray(rawContent)) {
+      finalText = rawContent
+        .map((item) => {
+          const itemRecord = asRecord(item);
+          if (!itemRecord) {
+            return "";
+          }
 
-  if (Array.isArray(rawContent)) {
-    const text = rawContent
-      .map((item) => {
-        const itemRecord = asRecord(item);
-        if (!itemRecord) {
+          if (typeof itemRecord.text === "string") {
+            return itemRecord.text;
+          }
+
+          if (typeof itemRecord.input_text === "string") {
+            return itemRecord.input_text;
+          }
+
           return "";
-        }
-
-        if (typeof itemRecord.text === "string") {
-          return itemRecord.text;
-        }
-
-        if (typeof itemRecord.input_text === "string") {
-          return itemRecord.input_text;
-        }
-
-        return "";
-      })
-      .filter(Boolean)
-      .join("\n")
-      .trim();
-
-    if (text) {
-      return text;
+        })
+        .filter(Boolean)
+        .join("\n")
+        .trim();
     }
   }
 
-  return "";
+  // Handle experimental_attachments if present
+  const messageRecord = asRecord(message);
+  if (messageRecord && Array.isArray(messageRecord.experimental_attachments)) {
+    const attachmentsInfo = messageRecord.experimental_attachments
+      .map((a: unknown) => {
+        const att = asRecord(a);
+        return att ? `[Attached File: ${att.name || "unnamed"} (${att.contentType || "unknown type"})]` : "";
+      })
+      .filter(Boolean)
+      .join("\n");
+
+    if (attachmentsInfo) {
+      finalText = finalText ? `${finalText}\n\n${attachmentsInfo}` : attachmentsInfo;
+    }
+  }
+
+  return finalText;
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -366,13 +376,33 @@ export async function POST(request: Request) {
   }
 
   const agentInput: Responses.InputItem[] = inputMessages
-    .map((message) => ({ role: message.role, content: extractTextFromMessage(message) }))
-    .filter((message) => message.content.length > 0)
-    .map((message) => ({
-      type: "message",
-      role: message.role,
-      content: [{ type: "input_text", text: message.content }],
-    }));
+    .map((message) => {
+      const text = extractTextFromMessage(message);
+      const content: any[] = [{ type: "input_text", text }];
+
+      const messageRecord = asRecord(message);
+      if (messageRecord && Array.isArray(messageRecord.experimental_attachments)) {
+        messageRecord.experimental_attachments.forEach((a: unknown) => {
+          const att = asRecord(a);
+          if (att && typeof att.url === "string" && att.url.startsWith("data:")) {
+            if (att.contentType?.startsWith("image/")) {
+              content.push({
+                type: "input_image",
+                image: att.url,
+              });
+            }
+            // Add other attachment types here if supported by the Perplexity API
+          }
+        });
+      }
+
+      return {
+        type: "message",
+        role: message.role as "user" | "assistant",
+        content,
+      };
+    })
+    .filter((message) => message.content.length > 0);
 
   const stream = createUIMessageStream({
     execute: async ({ writer }) => {
