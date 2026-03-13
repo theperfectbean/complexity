@@ -89,7 +89,7 @@ export const threads = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     roleId: text("space_id").references(() => roles.id, { onDelete: "set null" }),
-    model: varchar("model", { length: 50 }).notNull().default("perplexity/sonar"),
+    model: varchar("model", { length: 50 }).notNull().default("anthropic/claude-haiku-4-5"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },

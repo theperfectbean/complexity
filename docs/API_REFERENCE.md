@@ -2,6 +2,8 @@
 
 All API routes are served from the Next.js app under `app/src/app/api`.
 
+Terminology note: “Roles” is the canonical product term. For database compatibility, roles are stored in the `spaces` table and referenced via `space_id` foreign keys.
+
 ## Auth
 
 ### `POST /api/auth/register`

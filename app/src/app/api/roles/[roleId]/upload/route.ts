@@ -64,19 +64,24 @@ export async function POST(request: Request, { params }: { params: Promise<{ rol
     }
 
     const embeddings = await getEmbeddings(splitChunks);
+    if (embeddings.length !== splitChunks.length) {
+      throw new Error("Embedding count mismatch");
+    }
 
-    await db.insert(chunks).values(
-      splitChunks.map((content, index) => ({
-        id: createId(),
-        documentId,
-        roleId,
-        content,
-        embedding: embeddings[index],
-        chunkIndex: index,
-      })),
-    );
+    await db.transaction(async (tx) => {
+      await tx.insert(chunks).values(
+        splitChunks.map((content, index) => ({
+          id: createId(),
+          documentId,
+          roleId,
+          content,
+          embedding: embeddings[index],
+          chunkIndex: index,
+        })),
+      );
 
-    await db.update(documents).set({ status: "ready" }).where(eq(documents.id, documentId));
+      await tx.update(documents).set({ status: "ready" }).where(eq(documents.id, documentId));
+    });
 
     return NextResponse.json({
       documentId,

@@ -9,6 +9,7 @@ vi.mock("@/lib/db", () => ({
     select: vi.fn(),
     insert: vi.fn(),
     update: vi.fn(),
+    transaction: vi.fn(),
   },
 }));
 
@@ -45,12 +46,18 @@ describe("POST /api/roles/[roleId]/upload", () => {
 
   function mockMutationChains() {
     const firstValues = vi.fn().mockResolvedValue(undefined);
-    const secondValues = vi.fn().mockResolvedValue(undefined);
-    vi.mocked(db.insert).mockReturnValueOnce({ values: firstValues } as never).mockReturnValueOnce({ values: secondValues } as never);
+    vi.mocked(db.insert).mockReturnValueOnce({ values: firstValues } as never);
 
     const where = vi.fn().mockResolvedValue(undefined);
     const set = vi.fn(() => ({ where }));
     vi.mocked(db.update).mockReturnValue({ set } as never);
+
+    const txInsertValues = vi.fn().mockResolvedValue(undefined);
+    const txWhere = vi.fn().mockResolvedValue(undefined);
+    const txSet = vi.fn(() => ({ where: txWhere }));
+    vi.mocked(db.transaction).mockImplementation(async (cb) => {
+      await cb({ insert: () => ({ values: txInsertValues }), update: () => ({ set: txSet }) } as never);
+    });
   }
 
   it("returns 401 when unauthenticated", async () => {
@@ -131,8 +138,8 @@ describe("POST /api/roles/[roleId]/upload", () => {
     expect(payload.status).toBe("ready");
     expect(payload.chunkCount).toBe(2);
     expect(typeof payload.documentId).toBe("string");
-    expect(db.insert).toHaveBeenCalledTimes(2);
-    expect(db.update).toHaveBeenCalledTimes(1);
+    expect(db.insert).toHaveBeenCalledTimes(1);
+    expect(db.transaction).toHaveBeenCalledTimes(1);
   });
 
   it("returns 400 for oversized file", async () => {
@@ -172,7 +179,7 @@ describe("POST /api/roles/[roleId]/upload", () => {
 
     const response = await POST(request, { params: Promise.resolve({ roleId: "role-1" }) });
     expect(response.status).toBe(500);
-    await expect(response.json()).resolves.toEqual({ error: "parse failed" });
+    await expect(response.json()).resolves.toEqual({ error: "Upload processing failed" });
     expect(db.update).toHaveBeenCalled();
   });
 });

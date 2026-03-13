@@ -6,6 +6,7 @@ import { env } from "@/lib/env";
 
 const CHUNK_MAX_CHARS = 2200;
 const CHUNK_OVERLAP = 200;
+const EMBEDDER_TIMEOUT_MS = 1000 * 20;
 
 export function chunkText(input: string, maxChars = CHUNK_MAX_CHARS, overlap = CHUNK_OVERLAP) {
   const text = input.replace(/\r\n/g, "\n").trim();
@@ -28,6 +29,9 @@ export function chunkText(input: string, maxChars = CHUNK_MAX_CHARS, overlap = C
 }
 
 export async function getEmbeddings(texts: string[]) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), EMBEDDER_TIMEOUT_MS);
+
   const response = await fetch(`${env.EMBEDDER_URL}/embed`, {
     method: "POST",
     headers: {
@@ -35,7 +39,8 @@ export async function getEmbeddings(texts: string[]) {
     },
     body: JSON.stringify({ texts }),
     cache: "no-store",
-  });
+    signal: controller.signal,
+  }).finally(() => clearTimeout(timeoutId));
 
   if (!response.ok) {
     throw new Error(`Embedding service error: ${response.status}`);
@@ -60,4 +65,3 @@ export async function similaritySearch(roleId: string, embedding: number[], limi
     .orderBy(distance)
     .limit(limit);
 }
-

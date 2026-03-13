@@ -3,6 +3,7 @@ import { and, eq, desc } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import type { Responses } from "@perplexity-ai/perplexity_ai/resources/responses";
+import crypto from "node:crypto";
 
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
@@ -14,6 +15,7 @@ import { createPerplexityClient } from "@/lib/perplexity";
 import { extractTextFromDataUrl } from "@/lib/documents";
 import { getEmbeddings, similaritySearch } from "@/lib/rag";
 import { getRedisClient } from "@/lib/redis";
+import { safeParseJsonLine } from "@/lib/sse";
 
 const schema = z.object({
   threadId: z.string().min(1),
@@ -34,6 +36,8 @@ const CHAT_RATE_LIMIT_PER_MINUTE = 20;
 const CHAT_CACHE_TTL_SECONDS = 60 * 60;
 const EMPTY_RESPONSE_FALLBACK_TEXT = "I couldn't generate a response. Please try again.";
 const MEMORY_EVENT_TIMEOUT_MS = 1200;
+const MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024;
+const PERPLEXITY_STREAM_TIMEOUT_MS = 1000 * 60 * 5;
 
 type CachedChatPayload = {
   text: string;
@@ -47,6 +51,24 @@ type FilePart = {
   name?: string;
   contentType?: string;
 };
+
+class AttachmentTooLargeError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "AttachmentTooLargeError";
+  }
+}
+
+function getBase64Payload(dataUrl: string): string | null {
+  const commaIndex = dataUrl.indexOf(",");
+  if (commaIndex === -1) return null;
+  return dataUrl.slice(commaIndex + 1);
+}
+
+function getDecodedByteLength(base64: string): number {
+  const padding = base64.endsWith("==") ? 2 : base64.endsWith("=") ? 1 : 0;
+  return Math.max(0, Math.floor((base64.length * 3) / 4) - padding);
+}
 
 function collectFileParts(message: UIMessage): FilePart[] {
   const fileParts: FilePart[] = [];
@@ -137,6 +159,13 @@ async function extractTextFromMessage(message: UIMessage): Promise<string> {
 
         const name = att.filename || att.name || "unnamed";
         const mediaType = att.mediaType || att.contentType || "";
+        const base64Payload = getBase64Payload(att.url);
+        if (base64Payload) {
+          const bytes = getDecodedByteLength(base64Payload);
+          if (bytes > MAX_ATTACHMENT_BYTES) {
+            throw new AttachmentTooLargeError(`Attachment exceeds ${Math.floor(MAX_ATTACHMENT_BYTES / (1024 * 1024))}MB limit.`);
+          }
+        }
 
         // Even for images, we want to know we have an attachment so we don't trigger "text required" errors.
         if (mediaType.startsWith("image/")) {
@@ -236,6 +265,7 @@ function extractAssistantTextFromCompletedResponse(response: unknown): string {
 }
 
 export async function POST(request: Request) {
+  const requestId = createId();
   const session = await auth();
   const userEmail = session?.user?.email;
   if (!userEmail) {
@@ -332,7 +362,15 @@ export async function POST(request: Request) {
   }
 
   const lastMessage = inputMessages[inputMessages.length - 1];
-  const userText = await extractTextFromMessage(lastMessage);
+  let userText = "";
+  try {
+    userText = await extractTextFromMessage(lastMessage);
+  } catch (error) {
+    if (error instanceof AttachmentTooLargeError) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+    throw error;
+  }
   if (!userText) {
     return NextResponse.json({ error: "Message text required" }, { status: 400 });
   }
@@ -348,7 +386,9 @@ export async function POST(request: Request) {
     : Promise.resolve();
 
   const safeModel = isValidModelId(parsed.data.model) ? parsed.data.model : getDefaultModel();
-  const cacheKey = `cache:chat:${userEmail}:${safeModel}:${parsed.data.roleId ?? "none"}:${thread.memoryEnabled ? "mem-on" : "mem-off"}:${Buffer.from(userText).toString("base64")}`;
+  const roleHash = roleInstructions ? crypto.createHash("sha256").update(roleInstructions).digest("hex").slice(0, 12) : "none";
+  const webSearchLabel = parsed.data.webSearch ? "web-on" : "web-off";
+  const cacheKey = `cache:chat:${userEmail}:${safeModel}:${parsed.data.roleId ?? "none"}:${thread.memoryEnabled ? "mem-on" : "mem-off"}:${webSearchLabel}:${roleHash}:${Buffer.from(userText).toString("base64")}`;
 
   if (redis && !isRegenerate) {
     try {
@@ -439,10 +479,12 @@ export async function POST(request: Request) {
     }
   }
 
-  const agentInput: Responses.InputItem[] = (await Promise.all(inputMessages
-    .map(async (message) => {
-      const text = await extractTextFromMessage(message);
-      const content: Record<string, unknown>[] = [{ type: "input_text", text }];
+  let agentInput: Responses.InputItem[] = [];
+  try {
+    agentInput = (await Promise.all(inputMessages
+      .map(async (message) => {
+        const text = await extractTextFromMessage(message);
+        const content: Record<string, unknown>[] = [{ type: "input_text", text }];
 
       const fileParts = collectFileParts(message);
       fileParts.forEach((att) => {
@@ -456,28 +498,34 @@ export async function POST(request: Request) {
         // Add other attachment types here if supported by the Perplexity API
       });
 
-      return ({
+        return ({
         type: "message",
         role: message.role as "user" | "assistant",
         content,
-      } as unknown) as Responses.InputItem;
-    })))
-    .filter((message) => {
-       const msg = message as unknown as Record<string, unknown>;
-       if (!Array.isArray(msg.content)) return false;
-       const contentArray = msg.content as Record<string, unknown>[];
-       const textContent = (contentArray.find(c => c.type === 'input_text')?.text as string) || '';
-       return textContent.length > 0 || contentArray.some(c => c.type === 'input_image');
-    });
+        } as unknown) as Responses.InputItem;
+      })))
+      .filter((message) => {
+        const msg = message as unknown as Record<string, unknown>;
+        if (!Array.isArray(msg.content)) return false;
+        const contentArray = msg.content as Record<string, unknown>[];
+        const textContent = (contentArray.find((c) => c.type === "input_text")?.text as string) || "";
+        return textContent.length > 0 || contentArray.some((c) => c.type === "input_image");
+      });
+  } catch (error) {
+    if (error instanceof AttachmentTooLargeError) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+    throw error;
+  }
 
   const stream = createUIMessageStream({
     execute: async ({ writer }) => {
-      console.log(`[Chat API] Starting request for model: ${safeModel} (thread: ${parsed.data.threadId})`);
+      console.log(`[Chat API:${requestId}] Starting request for model: ${safeModel} (thread: ${parsed.data.threadId})`);
       const startTime = Date.now();
 
       // Ensure user message is persisted
       await persistUserMessage;
-      console.log(`[Chat API] User message persisted (${Date.now() - startTime}ms)`);
+      console.log(`[Chat API:${requestId}] User message persisted (${Date.now() - startTime}ms)`);
 
       const responseMessageId = createId();
       const textId = createId();
@@ -489,7 +537,7 @@ export async function POST(request: Request) {
       let ragContext = "";
       // ONLY perform RAG if the thread is associated with a role
       if (activeRoleId) {
-        console.log(`[Chat API] Starting RAG search...`);
+        console.log(`[Chat API:${requestId}] Starting RAG search...`);
         writer.write({
           type: "data-call-start",
           data: {
@@ -508,9 +556,9 @@ export async function POST(request: Request) {
 
         try {
           const [embedding] = await getEmbeddings([userText]);
-          console.log(`[Chat API] Embeddings retrieved (${Date.now() - startTime}ms)`);
+          console.log(`[Chat API:${requestId}] Embeddings retrieved (${Date.now() - startTime}ms)`);
           const topChunks = await similaritySearch(activeRoleId, embedding, 8);
-          console.log(`[Chat API] Similarity search complete: found ${topChunks.length} chunks (${Date.now() - startTime}ms)`);
+          console.log(`[Chat API:${requestId}] Similarity search complete: found ${topChunks.length} chunks (${Date.now() - startTime}ms)`);
           if (topChunks.length > 0) {
             ragContext = topChunks.map((chunk, index) => `(${index + 1}) ${chunk.content}`).join("\n\n");
           }
@@ -523,7 +571,7 @@ export async function POST(request: Request) {
             },
           } as UIMessageChunk);
         } catch (error) {
-          console.error("[Chat API] RAG Error:", error);
+          console.error(`[Chat API:${requestId}] RAG Error:`, error);
           writer.write({
             type: "data-call-result",
             data: {
@@ -558,7 +606,7 @@ export async function POST(request: Request) {
         },
       } as UIMessageChunk);
 
-      console.log(`[Chat API] Calling Perplexity API... (${Date.now() - startTime}ms)`);
+      console.log(`[Chat API:${requestId}] Calling Perplexity API... (${Date.now() - startTime}ms)`);
 
       const forceStreamingOnly = safeModel === "google/gemini-3.1-pro-preview";
 
@@ -587,19 +635,23 @@ export async function POST(request: Request) {
 
         try {
           // Bypass broken Perplexity SDK iterator with direct fetch
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), PERPLEXITY_STREAM_TIMEOUT_MS);
+
           const res = await fetch("https://api.perplexity.ai/v1/responses", {
             method: "POST",
             headers: {
               "Authorization": "Bearer " + process.env.PERPLEXITY_API_KEY,
               "Content-Type": "application/json",
-              "Accept": "text/event-stream"
+              "Accept": "text/event-stream",
             },
-            body: JSON.stringify(requestBody)
-          });
+            body: JSON.stringify(requestBody),
+            signal: controller.signal,
+          }).finally(() => clearTimeout(timeoutId));
 
           if (!res.ok) {
              if (res.status === 400) {
-               console.log(`[Chat API] HTTP 400 (${safeModel}), falling back to non-streaming.`);
+               console.log(`[Chat API:${requestId}] HTTP 400 (${safeModel}), falling back to non-streaming.`);
                streamingFailed = true;
              } else {
                const errText = await res.text();
@@ -623,7 +675,10 @@ export async function POST(request: Request) {
                   const dataStr = line.slice(6).trim();
                   if (dataStr === '[DONE]' || !dataStr) continue;
                   
-                  const eventRecord = asRecord(JSON.parse(dataStr));
+                  const eventRecord = safeParseJsonLine(dataStr);
+                  if (!eventRecord) {
+                    continue;
+                  }
                   streamEventCount += 1;
             
             if (eventRecord?.type === "response.reasoning.started") {
@@ -728,7 +783,7 @@ export async function POST(request: Request) {
 
             if (eventRecord?.type === "response.output_text.delta") {
               if (!hasWrittenTextDelta) {
-                console.log(`[Chat API] First text delta received (${Date.now() - startTime}ms)`);
+                console.log(`[Chat API:${requestId}] First text delta received (${Date.now() - startTime}ms)`);
                 writer.write({
                   type: "data-call-result",
                   data: {
@@ -800,7 +855,7 @@ export async function POST(request: Request) {
           // If the API throws a 400 immediately on the create() call, or we haven't written deltas yet, fallback.
           const err = error as { message?: string; status?: number };
           if (!hasWrittenTextDelta && (err.message?.includes("400") || err.status === 400 || streamingFailed === false)) {
-             console.log(`[Chat API] Streaming failed for ${safeModel}, falling back to non-streaming.`);
+             console.log(`[Chat API:${requestId}] Streaming failed for ${safeModel}, falling back to non-streaming.`);
              streamingFailed = true;
           } else {
              throw error;
@@ -835,7 +890,7 @@ export async function POST(request: Request) {
         // One final fallback attempt if the outer try block caught it (e.g. createPerplexityClient or initial create call failed)
         const err = error as { message?: string; status?: number };
         if (!hasWrittenTextDelta && (err.message?.includes("400") || err.status === 400) && !forceStreamingOnly) {
-          console.log(`[Chat API] Outer catch streaming failed for ${safeModel}, falling back to non-streaming.`);
+          console.log(`[Chat API:${requestId}] Outer catch streaming failed for ${safeModel}, falling back to non-streaming.`);
           try {
             const requestBodyBase = isPresetModel(safeModel)
               ? {
@@ -963,7 +1018,7 @@ export async function POST(request: Request) {
         }
       }
 
-      console.log(`[Chat API] Finished request for model: ${safeModel} (thread: ${parsed.data.threadId}) in ${Date.now() - startTime}ms`);
+      console.log(`[Chat API:${requestId}] Finished request for model: ${safeModel} (thread: ${parsed.data.threadId}) in ${Date.now() - startTime}ms`);
       writer.write({ type: "text-end", id: textId });
       writer.write({ type: "finish" });
     },

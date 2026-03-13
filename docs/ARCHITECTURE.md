@@ -9,6 +9,8 @@ Complexity is a self-hosted, Docker Compose-based application with four services
 - `embedder` — FastAPI embedding microservice using `all-MiniLM-L6-v2`
 - `redis` — rate limiting and response caching
 
+Terminology note: “Roles” is the canonical product term. For database compatibility, roles are stored in the `spaces` table and referenced via `space_id` foreign keys.
+
 The platform supports authenticated chat, thread persistence, spaces for document-grounded retrieval, and streaming responses from Perplexity's Agent API.
 
 ## Service Topology
