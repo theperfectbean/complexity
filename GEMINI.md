@@ -88,6 +88,12 @@ DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose build app
 - **Transport Pattern**: API endpoints and dynamic request bodies must now be configured via `transport: new DefaultChatTransport({ api, body: () => ({ ... }) })`. The `body` must be a function to capture reactive state correctly.
 - **Custom Stream Parts**: Custom data chunks written via `writer.write` in the backend must now use `type: "data-json"` (or other `data-` prefixed types) to satisfy the `UIMessageChunk` discriminated union.
 
+### Chat API Trigger Support
+- **Regenerate Message Trigger**: Added support for `trigger: "regenerate-message"` in the `/api/chat` POST request. When this trigger is present:
+  - The last assistant message in the thread is automatically deleted from the database before generating a new response.
+  - Redis cache is bypassed to ensure a fresh generation from the LLM.
+  - The user message is not duplicated in the database.
+
 ### Database & Migrations
 - **Missing Tables**: If you see "failed to start thread" or a 500 error mentioning `relation "users" does not exist`, it means the database migrations have not been run. 
 - **Automatic Migrations**: The project is intended to run in Docker. While the current Dockerfile does not auto-migrate, you can run migrations manually using `docker exec complexity-app npm run db:migrate` if the `src` directory is available, or better yet, run them from the host with `cd app && DATABASE_URL=... npm run db:migrate`.

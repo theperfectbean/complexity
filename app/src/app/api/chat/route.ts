@@ -1,5 +1,5 @@
 import { createUIMessageStream, createUIMessageStreamResponse, UIMessage, UIMessageChunk } from "ai";
-import { and, eq } from "drizzle-orm";
+import { and, eq, desc } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import type { Responses } from "@perplexity-ai/perplexity_ai/resources/responses";
@@ -20,6 +20,7 @@ const schema = z.object({
   messages: z.array(z.unknown()),
   roleId: z.string().nullable().optional(),
   webSearch: z.boolean().optional().default(true),
+  trigger: z.string().optional(),
 });
 
 type Citation = {
@@ -235,6 +236,22 @@ export async function POST(request: Request) {
     roleInstructions = ownedRole.instructions;
   }
 
+  const isRegenerate = parsed.data.trigger === "regenerate-message";
+
+  if (isRegenerate) {
+    // Delete the last assistant message to allow it to be replaced
+    const [lastAssistantMessage] = await db
+      .select({ id: messages.id })
+      .from(messages)
+      .where(and(eq(messages.threadId, parsed.data.threadId), eq(messages.role, "assistant")))
+      .orderBy(desc(messages.createdAt))
+      .limit(1);
+
+    if (lastAssistantMessage) {
+      await db.delete(messages).where(eq(messages.id, lastAssistantMessage.id));
+    }
+  }
+
   const lastMessage = inputMessages[inputMessages.length - 1];
   const userText = extractTextFromMessage(lastMessage);
 
@@ -242,18 +259,20 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Message text required" }, { status: 400 });
   }
 
-  // Start persisting user message in background
-  const persistUserMessage = db.insert(messages).values({
-    id: createId(),
-    threadId: parsed.data.threadId,
-    role: "user",
-    content: userText,
-  });
+  // Start persisting user message in background (skip if regenerating)
+  const persistUserMessage = !isRegenerate 
+    ? db.insert(messages).values({
+        id: createId(),
+        threadId: parsed.data.threadId,
+        role: "user",
+        content: userText,
+      })
+    : Promise.resolve();
 
   const safeModel = isValidModelId(parsed.data.model) ? parsed.data.model : getDefaultModel();
   const cacheKey = `cache:chat:${userEmail}:${safeModel}:${parsed.data.roleId ?? "none"}:${thread.memoryEnabled ? "mem-on" : "mem-off"}:${Buffer.from(userText).toString("base64")}`;
 
-  if (redis) {
+  if (redis && !isRegenerate) {
     try {
       const cachedRaw = await redis.get(cacheKey);
       if (cachedRaw) {
