@@ -77,9 +77,12 @@ DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose build app
 
 ## Key Findings & Implementation Notes
 
-### Vercel AI SDK v6 Migration
+### Vercel AI SDK v6 Migration (Update)
 - **useChat Changes**: The `data` return property has been removed. Use the `onData` callback and local `useState` to capture custom stream parts.
 - **isDataUIMessageChunk Removal**: The `isDataUIMessageChunk` helper is no longer exported in v6. Use `part.type === 'data-json'` or `part.type.startsWith('data-')` to identify data chunks in the `onData` callback.
+- **initialMessages Rename**: In v6, the `useChat` option `initialMessages` has been renamed to `messages`. Using `initialMessages` will result in an empty message state, causing `regenerate()` (formerly `reload`) to fail with "message undefined not found".
+- **Method Renaming**: `append` has been renamed to `sendMessage` and `reload` has been renamed to `regenerate`.
+- **Regenerate Robustness**: When calling `regenerate()`, it is more reliable to pass the specific `messageId` of the message to be regenerated (e.g., `regenerate({ messageId: lastMessage.id })`) to avoid "message undefined not found" errors when the internal state is not perfectly in sync with the UI's merged messages.
 - **Type Safety**: When using `onData`, define the state with `Record<string, unknown>[]` instead of `any[]` to satisfy strict linting rules.
 - **Transport Pattern**: API endpoints and dynamic request bodies must now be configured via `transport: new DefaultChatTransport({ api, body: () => ({ ... }) })`. The `body` must be a function to capture reactive state correctly.
 - **Custom Stream Parts**: Custom data chunks written via `writer.write` in the backend must now use `type: "data-json"` (or other `data-` prefixed types) to satisfy the `UIMessageChunk` discriminated union.

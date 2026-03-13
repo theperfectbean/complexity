@@ -84,7 +84,7 @@ function ThreadChat({
 
   const [data, setData] = useState<Record<string, unknown>[]>([]);
   const { messages, sendMessage, regenerate, status, error } = useChat({
-    initialMessages: initialHistory.map((msg) => ({
+    messages: initialHistory.map((msg) => ({
       id: msg.id,
       role: msg.role as "user" | "assistant" | "system",
       content: msg.content,
@@ -106,16 +106,10 @@ function ThreadChat({
   });
   const [prompt, setPrompt] = useState("");
 
-  const liveMessages = useMemo<ChatMessageItem[]>(
+  const mergedMessages = useMemo<ChatMessageItem[]>(
     () => messages.map((message) => normalizeUIMessage(message)),
     [messages],
   );
-
-  const mergedMessages = useMemo(() => {
-    const liveIds = new Set(liveMessages.map((m) => m.id));
-    const uniqueHistory = initialHistory.filter((m) => !liveIds.has(m.id));
-    return [...uniqueHistory, ...liveMessages];
-  }, [initialHistory, liveMessages]);
 
   const chatErrorMessage = getChatErrorMessage(error);
 
@@ -208,7 +202,10 @@ function ThreadChat({
           messages={mergedMessages}
           emptyLabel="Start this thread with your first question."
           onRelatedQuestionClick={(question) => setPrompt(question)}
-          onRetry={() => void regenerate()}
+          onRetry={() => {
+            const lastMessage = mergedMessages[mergedMessages.length - 1];
+            void regenerate({ messageId: lastMessage?.id });
+          }}
         />
       </div>
 

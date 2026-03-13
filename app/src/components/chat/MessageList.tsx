@@ -63,12 +63,15 @@ export function MessageList({ messages, emptyLabel, onRelatedQuestionClick, onRe
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
+  const lastMessageContent = messages[messages.length - 1]?.content;
+  const lastMessageThinkingLength = messages[messages.length - 1]?.thinking?.length;
+
   // Auto-scroll to bottom when messages or their content change
   useEffect(() => {
     if (messages.length > 0) {
       bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
     }
-  }, [messages, messages[messages.length - 1]?.content, messages[messages.length - 1]?.thinking?.length]);
+  }, [messages, lastMessageContent, lastMessageThinkingLength]);
 
   async function copyMessage(messageId: string, content: string) {
     try {
@@ -159,31 +162,18 @@ export function MessageList({ messages, emptyLabel, onRelatedQuestionClick, onRe
 
                 <div className="mt-4 flex items-center justify-end">
                   <div className="flex items-center gap-2">
-                    <AnimatePresence>
-                      {copiedId === message.id && (
-                        <motion.span
-                          initial={{ opacity: 0, x: 5 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          exit={{ opacity: 0, x: 5 }}
-                          className="text-[10px] font-medium text-emerald-500"
-                        >
-                          Copied
-                        </motion.span>
-                      )}
-                    </AnimatePresence>
-
                     {isLastAssistantMessage && onRetry && (
                       <button
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-black/10 dark:hover:bg-white/10"
+                        className="inline-flex h-7 w-7 items-center justify-center rounded-lg transition-colors hover:bg-black/5 dark:hover:bg-white/5 active:scale-95"
                         onClick={onRetry}
                         title="Retry"
                       >
-                        <RotateCcw className="h-4 w-4 text-muted-foreground" />
+                        <RotateCcw className="h-3.5 w-3.5 text-muted-foreground/70" strokeWidth={1.5} />
                       </button>
                     )}
 
                     <button
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-black/10 dark:hover:bg-white/10"
+                      className="relative inline-flex h-7 w-7 items-center justify-center rounded-lg transition-colors hover:bg-black/5 dark:hover:bg-white/5 active:scale-95"
                       onClick={() => void copyMessage(message.id, message.content)}
                       title="Copy message"
                     >
@@ -191,22 +181,22 @@ export function MessageList({ messages, emptyLabel, onRelatedQuestionClick, onRe
                         {copiedId === message.id ? (
                           <motion.div
                             key="check"
-                            initial={{ scale: 0.5, opacity: 0 }}
+                            initial={{ scale: 0.8, opacity: 0 }}
                             animate={{ scale: 1, opacity: 1 }}
-                            exit={{ scale: 0.5, opacity: 0 }}
-                            transition={{ duration: 0.15 }}
+                            exit={{ scale: 0.8, opacity: 0 }}
+                            transition={{ duration: 0.1 }}
                           >
-                            <Check className="h-4 w-4 text-emerald-500" strokeWidth={2.5} />
+                            <Check className="h-3.5 w-3.5 text-emerald-500" strokeWidth={2} />
                           </motion.div>
                         ) : (
                           <motion.div
                             key="copy"
-                            initial={{ scale: 0.5, opacity: 0 }}
+                            initial={{ scale: 0.8, opacity: 0 }}
                             animate={{ scale: 1, opacity: 1 }}
-                            exit={{ scale: 0.5, opacity: 0 }}
-                            transition={{ duration: 0.15 }}
+                            exit={{ scale: 0.8, opacity: 0 }}
+                            transition={{ duration: 0.1 }}
                           >
-                            <Copy className="h-4 w-4 text-muted-foreground" />
+                            <Copy className="h-3.5 w-3.5 text-muted-foreground/70" strokeWidth={1.5} />
                           </motion.div>
                         )}
                       </AnimatePresence>
