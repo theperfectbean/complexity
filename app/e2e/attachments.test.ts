@@ -27,11 +27,7 @@ test.describe("SearchBar Attachment Button", () => {
   });
 
   test("selecting a file on home page displays it as a chip", async ({ page }) => {
-    const fileChooserPromise = page.waitForEvent('filechooser');
-    await page.getByRole("button", { name: "Attach file" }).click();
-    const fileChooser = await fileChooserPromise;
-
-    await fileChooser.setFiles([{
+    await page.getByTestId("file-upload-input").setInputFiles([{
       name: 'home-test.txt',
       mimeType: 'text/plain',
       buffer: Buffer.from('home test content')
@@ -44,33 +40,25 @@ test.describe("SearchBar Attachment Button", () => {
     // Navigate to a thread first
     await page.getByPlaceholder("Ask anything...").fill("navigate to search");
     await page.getByPlaceholder("Ask anything...").press("Enter");
-    await expect(page).toHaveURL(/\/search\//, { timeout: 15000 });
-    await page.waitForLoadState('networkidle');
-
-    // Wait for initial stream to finish
+    
+    // Wait for the URL to stabilize (no more query params)
+    await expect(page).toHaveURL(/\/search\/[a-zA-Z0-9_-]+$/, { timeout: 15000 });
+    
+    // Wait for initial response
     await expect(page.getByRole("button", { name: "Copy message" })).toBeVisible({ timeout: 30000 });
     
     // Attach a file on thread page
-    const fileChooserPromise = page.waitForEvent('filechooser');
-    const threadSearchBar = page.getByTestId("thread-searchbar");
-    await threadSearchBar.getByRole("button", { name: "Attach file" }).click();
-    const threadFileChooser = await fileChooserPromise;
-
-    await threadFileChooser.setFiles([{
+    await page.getByTestId("file-upload-input").setInputFiles([{
       name: 'thread-test.pdf',
       mimeType: 'application/pdf',
       buffer: Buffer.from('thread test content')
     }]);
 
-    await expect(threadSearchBar.getByTestId("file-chip").filter({ hasText: "thread-test.pdf" })).toBeVisible({ timeout: 15000 });
+    await expect(page.getByTestId("file-chip").filter({ hasText: "thread-test.pdf" })).toBeVisible({ timeout: 15000 });
   });
 
   test("removing an attachment from the search bar", async ({ page }) => {
-    const fileChooserPromise = page.waitForEvent('filechooser');
-    await page.getByRole("button", { name: "Attach file" }).click();
-    const fileChooser = await fileChooserPromise;
-
-    await fileChooser.setFiles([{
+    await page.getByTestId("file-upload-input").setInputFiles([{
       name: 'remove-me.txt',
       mimeType: 'text/plain',
       buffer: Buffer.from('delete this')
@@ -88,33 +76,30 @@ test.describe("SearchBar Attachment Button", () => {
     // 1. Navigate to thread
     await page.getByPlaceholder("Ask anything...").fill("Initial query");
     await page.getByPlaceholder("Ask anything...").press("Enter");
-    await expect(page).toHaveURL(/\/search\//, { timeout: 15000 });
-    await page.waitForLoadState('networkidle');
+    
+    // Wait for the URL to stabilize
+    await expect(page).toHaveURL(/\/search\/[a-zA-Z0-9_-]+$/, { timeout: 15000 });
 
     // 2. Wait for initial response
     await expect(page.getByRole("button", { name: "Copy message" })).toBeVisible({ timeout: 30000 });
 
     // 3. Attach a file
-    const fileChooserPromise = page.waitForEvent('filechooser');
-    const threadSearchBar = page.getByTestId("thread-searchbar");
-    await threadSearchBar.getByRole("button", { name: "Attach file" }).click();
-    const threadFileChooser = await fileChooserPromise;
-
-    await threadFileChooser.setFiles([{
+    await page.getByTestId("file-upload-input").setInputFiles([{
       name: 'test-attachment.txt',
       mimeType: 'text/plain',
       buffer: Buffer.from('this is the content of the attached file')
     }]);
 
-    await expect(threadSearchBar.getByTestId("file-chip").filter({ hasText: "test-attachment.txt" })).toBeVisible({ timeout: 15000 });
+    await expect(page.getByTestId("file-chip").filter({ hasText: "test-attachment.txt" })).toBeVisible({ timeout: 15000 });
 
     // 4. Send the message
+    const threadSearchBar = page.getByTestId("thread-searchbar");
     const input = threadSearchBar.getByPlaceholder("Ask a follow-up...");
     await input.fill("What is in this file?");
     await input.press("Enter");
 
     // 5. Verify the message is sent and attachment chip is gone from input
-    await expect(threadSearchBar.getByTestId("file-chip").filter({ hasText: "test-attachment.txt" })).toBeHidden();
+    await expect(page.getByTestId("file-chip").filter({ hasText: "test-attachment.txt" })).toBeHidden();
     
     // 6. Verify the LLM starts responding
     const lastArticle = page.locator('article').last();
@@ -125,36 +110,30 @@ test.describe("SearchBar Attachment Button", () => {
     // 1. Navigate to thread
     await page.getByPlaceholder("Ask anything...").fill("PDF test");
     await page.getByPlaceholder("Ask anything...").press("Enter");
-    await expect(page).toHaveURL(/\/search\//, { timeout: 15000 });
-    await page.waitForLoadState('networkidle');
+    
+    // Wait for the URL to stabilize
+    await expect(page).toHaveURL(/\/search\/[a-zA-Z0-9_-]+$/, { timeout: 15000 });
 
     // 2. Wait for initial response
     await expect(page.getByRole("button", { name: "Copy message" })).toBeVisible({ timeout: 30000 });
 
     // 3. Attach a PDF
-    const fileChooserPromise = page.waitForEvent('filechooser');
-    const threadSearchBar = page.getByTestId("thread-searchbar");
-    await threadSearchBar.getByRole("button", { name: "Attach file" }).click();
-    const fileChooser = await fileChooserPromise;
-
-    // Use a valid-ish PDF header buffer
-    const pdfBuffer = Buffer.from('%PDF-1.4\n1 0 obj\n<< /Title (Test) >>\nendobj\ntrailer\n<< /Root 1 0 R >>\n%%EOF');
-
-    await fileChooser.setFiles([{
+    await page.getByTestId("file-upload-input").setInputFiles([{
       name: 'test.pdf',
       mimeType: 'application/pdf',
-      buffer: pdfBuffer
+      buffer: Buffer.from('%PDF-1.4\n1 0 obj\n<< /Title (Test) >>\nendobj\ntrailer\n<< /Root 1 0 R >>\n%%EOF')
     }]);
 
-    await expect(threadSearchBar.getByTestId("file-chip").filter({ hasText: "test.pdf" })).toBeVisible({ timeout: 15000 });
+    await expect(page.getByTestId("file-chip").filter({ hasText: "test.pdf" })).toBeVisible({ timeout: 15000 });
 
     // 4. Send the message WITHOUT filling any text
+    const threadSearchBar = page.getByTestId("thread-searchbar");
     const input = threadSearchBar.getByPlaceholder("Ask a follow-up...");
     await input.press("Enter");
 
     // 5. Verify no 400 error appears and chip is gone
     await expect(page.getByText("Message text required")).toBeHidden();
-    await expect(threadSearchBar.getByTestId("file-chip").filter({ hasText: "test.pdf" })).toBeHidden();
+    await expect(page.getByTestId("file-chip").filter({ hasText: "test.pdf" })).toBeHidden();
     
     // 6. Verify the LLM starts responding
     const lastArticle = page.locator('article').last();

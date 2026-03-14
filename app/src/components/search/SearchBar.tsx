@@ -88,6 +88,7 @@ export function SearchBar({
       <input
         type="file"
         ref={fileInputRef}
+        data-testid="file-upload-input"
         className="hidden"
         multiple
         onChange={handleFileChange}

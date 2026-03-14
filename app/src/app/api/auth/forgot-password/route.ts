@@ -47,8 +47,13 @@ export async function POST(request: Request) {
         expires,
       });
 
-      const nextAuthUrl = env.NEXTAUTH_URL || process.env.NEXTAUTH_URL || "http://localhost:3002";
-      const resetLink = `${nextAuthUrl}/reset-password?token=${token}&email=${encodeURIComponent(email)}`;
+      const host = request.headers.get("host");
+      const protocol = request.headers.get("x-forwarded-proto") || "http";
+      const baseAppUrl = env.NEXTAUTH_URL && !env.NEXTAUTH_URL.includes("localhost:3002") 
+        ? env.NEXTAUTH_URL 
+        : `${protocol}://${host}`;
+      
+      const resetLink = `${baseAppUrl}/reset-password?token=${token}&email=${encodeURIComponent(email)}`;
       
       console.log(`[Password Reset] Link for ${email}: ${resetLink}`);
 
