@@ -32,9 +32,10 @@ export async function DELETE(
   // Delete the document (chunks will be deleted automatically due to cascade)
   const result = await db
     .delete(documents)
-    .where(and(eq(documents.id, documentId), eq(documents.roleId, roleId)));
+    .where(and(eq(documents.id, documentId), eq(documents.roleId, roleId)))
+    .returning({ id: documents.id });
 
-  if (result.rowCount === 0) {
+  if (result.length === 0) {
     return NextResponse.json({ error: "Document not found" }, { status: 404 });
   }
 
