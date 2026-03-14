@@ -94,7 +94,7 @@ export function FileUploader({ roleId, onUploaded, variant = "button" }: FileUpl
         )}
         <div className="space-y-1">
           <p className="text-sm font-medium">Click or drag to upload</p>
-          <p className="text-xs text-muted-foreground">PDF, DOCX, TXT, or MD up to 20MB</p>
+          <p className="text-xs text-muted-foreground">PDF, DOCX, TXT, or MD up to 50MB</p>
         </div>
       </div>
     </div>

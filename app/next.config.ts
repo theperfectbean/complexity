@@ -7,7 +7,7 @@ const nextConfig: NextConfig = {
     tsconfigPath: "./tsconfig.build.json",
   },
   experimental: {
-    middlewareClientMaxBodySize: 20 * 1024 * 1024, // 20MB
+    middlewareClientMaxBodySize: 50 * 1024 * 1024, // 50MB
   },
 };
 

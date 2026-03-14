@@ -8,7 +8,7 @@ import { chunks, documents, roles, users } from "@/lib/db/schema";
 import { extractTextFromFile, isAllowedDocument } from "@/lib/documents";
 import { chunkText, getEmbeddings } from "@/lib/rag";
 
-const MAX_FILE_SIZE = 20 * 1024 * 1024;
+const MAX_FILE_SIZE = 50 * 1024 * 1024;
 
 export async function POST(request: Request, { params }: { params: Promise<{ roleId: string }> }) {
   const session = await auth();
