@@ -25,8 +25,7 @@ test.describe("Role document upload + chat", () => {
 
     await page.goto("/roles");
     await page.getByRole("link", { name: "New role" }).click();
-    await page.getByPlaceholder("Name your role").fill(roleName);
-    await page.getByPlaceholder("Describe your role, goals, subject, etc.").fill(roleDescription);
+    await page.getByPlaceholder("e.g. Python Expert, Research Assistant, etc...").fill(roleName);
     await page.getByRole("button", { name: "Create role" }).click();
 
     await expect(page).toHaveURL(/\/roles\//, { timeout: 15000 });
@@ -61,7 +60,7 @@ test.describe("Role document upload + chat", () => {
 
     await page.goto("/roles");
     await page.getByRole("link", { name: "New role" }).click();
-    await page.getByPlaceholder("Name your role").fill(roleName);
+    await page.getByPlaceholder("e.g. Python Expert, Research Assistant, etc...").fill(roleName);
     await page.getByRole("button", { name: "Create role" }).click();
 
     await expect(page).toHaveURL(/\/roles\//, { timeout: 15000 });
@@ -103,8 +102,7 @@ test.describe("Role document upload + chat", () => {
 
     await page.goto("/roles");
     await page.getByRole("link", { name: "New role" }).click();
-    await page.getByPlaceholder("Name your role").fill(roleName);
-    await page.getByPlaceholder("Describe your role, goals, subject, etc.").fill(roleDescription);
+    await page.getByPlaceholder("e.g. Python Expert, Research Assistant, etc...").fill(roleName);
     await page.getByRole("button", { name: "Create role" }).click();
 
     await expect(page).toHaveURL(/\/roles\//, { timeout: 15000 });

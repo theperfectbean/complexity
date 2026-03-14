@@ -96,6 +96,7 @@ export default function Home() {
           </div>
           <SearchBar
             key="home-searchbar"
+            id="home-searchbar"
             value={query}
             onChange={setQuery}
             model={model}

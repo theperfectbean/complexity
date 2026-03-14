@@ -1,0 +1,74 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e1]:
+  - generic [ref=e2]:
+    - complementary [ref=e4]:
+      - link "C Complexity" [ref=e6] [cursor=pointer]:
+        - /url: /
+        - generic [ref=e7]: C
+        - text: Complexity
+      - link "New search" [ref=e9] [cursor=pointer]:
+        - /url: /
+        - img [ref=e10]
+        - generic [ref=e11]: New search
+      - generic [ref=e12]:
+        - navigation [ref=e13]:
+          - link "Home" [ref=e14] [cursor=pointer]:
+            - /url: /
+            - img [ref=e15]
+            - generic [ref=e18]: Home
+          - link "Roles" [ref=e19] [cursor=pointer]:
+            - /url: /roles
+            - img [ref=e20]
+            - generic [ref=e25]: Roles
+        - generic [ref=e27]:
+          - link "Recent" [ref=e28] [cursor=pointer]:
+            - /url: /recent
+            - generic [ref=e29]: Recent
+            - img [ref=e30]
+          - generic [ref=e33]:
+            - link "navigate to search" [ref=e34] [cursor=pointer]:
+              - /url: /search/feb7a40851ce41dea4e448f0d3498c78
+            - button "Delete navigate to search" [ref=e35]:
+              - img [ref=e36]
+      - button "Account menu" [ref=e40]:
+        - generic [ref=e41]: AE
+        - paragraph [ref=e43]: Attach E2E
+        - img [ref=e44]
+    - main [ref=e49]:
+      - generic [ref=e51]:
+        - article [ref=e52]:
+          - paragraph [ref=e54]: navigate to search
+        - article [ref=e55]:
+          - generic [ref=e56]:
+            - generic [ref=e58]:
+              - paragraph [ref=e59]: I'm ready to help you search the web! However, I need to know what you'd like to search for.
+              - paragraph [ref=e60]: What topic, question, or information are you looking for?
+            - generic [ref=e62]:
+              - button "Copy message" [ref=e63]:
+                - img [ref=e65]
+              - button "Retry" [ref=e68]:
+                - img [ref=e69]
+            - generic [ref=e73]:
+              - heading "Related Questions" [level=4] [ref=e74]
+              - button "What topic, question, or information are you looking for?" [ref=e76]:
+                - generic [ref=e77]: What topic, question, or information are you looking for?
+                - img [ref=e78]
+      - generic [ref=e84]:
+        - textbox "Ask a follow-up..." [ref=e86]
+        - generic [ref=e87]:
+          - generic [ref=e88]:
+            - button "Select model" [ref=e89]:
+              - generic [ref=e90]: Claude Haiku 4.5
+              - img [ref=e91]
+            - button "Toggle web search" [ref=e94]:
+              - img [ref=e95]
+              - generic [ref=e98]: Search
+            - button "Attach file" [active] [ref=e99]:
+              - img [ref=e100]
+          - button "Send" [disabled] [ref=e102]:
+            - img [ref=e103]
+  - region "Notifications alt+T"
+  - alert [ref=e105]
+```

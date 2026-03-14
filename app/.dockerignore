@@ -5,7 +5,6 @@ npm-debug.log
 .gitignore
 Dockerfile
 README.md
-src/lib/db/migrations
 src/**/*.test.ts
 src/**/*.test.tsx
 src/test

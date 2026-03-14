@@ -65,6 +65,8 @@ type ThreadChatProps = {
   initialRoleId: string | null;
   initialHistory: ChatMessageItem[];
   initialWebSearch: boolean;
+  attachments: File[];
+  setAttachments: React.Dispatch<React.SetStateAction<File[]>>;
 };
 
 function ThreadChat({
@@ -73,6 +75,8 @@ function ThreadChat({
   initialRoleId,
   initialHistory,
   initialWebSearch,
+  attachments,
+  setAttachments,
 }: ThreadChatProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -83,7 +87,6 @@ function ThreadChat({
   const hasSubmittedInitialQuery = useRef(false);
 
   const [data, setData] = useState<Record<string, unknown>[]>([]);
-  const [attachments, setAttachments] = useState<File[]>([]);
   const { messages, setMessages, sendMessage, regenerate, status, error } = useChat({
     messages: initialHistory.map((msg) => {
       const uiMsg = {
@@ -268,7 +271,7 @@ function ThreadChat({
           <div className="rounded-2xl border bg-card/50 p-1 shadow-lg backdrop-blur-md transition-shadow focus-within:shadow-xl focus-within:ring-1 focus-within:ring-primary/20">
             <SearchBar
               key="thread-searchbar"
-              data-testid="thread-searchbar"
+              id="thread-searchbar"
               value={prompt}
               onChange={setPrompt}
               placeholder="Ask a follow-up..."
@@ -307,6 +310,7 @@ export default function ThreadPage() {
     history: ChatMessageItem[];
   } | null>(null);
   const [loading, setLoading] = useState(true);
+  const [attachments, setAttachments] = useState<File[]>([]);
 
   useEffect(() => {
     let active = true;
@@ -361,6 +365,8 @@ export default function ThreadPage() {
           initialRoleId={threadData.roleId}
           initialHistory={threadData.history}
           initialWebSearch={webSearchDefault}
+          attachments={attachments}
+          setAttachments={setAttachments}
         />
       ) : (
         <div className="text-center py-12">

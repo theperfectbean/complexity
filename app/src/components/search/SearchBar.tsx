@@ -32,6 +32,7 @@ type SearchBarProps = {
   webSearchEnabled?: boolean;
   onWebSearchChange?: (enabled: boolean) => void;
   "data-testid"?: string;
+  id?: string;
 };
 
 export function SearchBar({
@@ -51,6 +52,7 @@ export function SearchBar({
   webSearchEnabled = true,
   onWebSearchChange,
   "data-testid": dataTestId,
+  id,
 }: SearchBarProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const groupedModels = useMemo(() => {
@@ -77,9 +79,10 @@ export function SearchBar({
 
   return (
     <motion.div
+      id={id}
       layoutId={layoutId}
       layout={!compact}
-      data-testid={dataTestId}
+      data-testid={dataTestId || id}
       className={cn(
         "flex flex-col rounded-[22px] border bg-card p-2 shadow-md transition-all duration-200",
         "focus-within:border-primary/30 focus-within:ring-4 focus-within:ring-primary/5 focus-within:shadow-lg",

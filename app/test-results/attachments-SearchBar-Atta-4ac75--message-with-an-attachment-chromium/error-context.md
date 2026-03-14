@@ -1,0 +1,79 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - complementary [ref=e4]:
+      - link "C Complexity" [ref=e6] [cursor=pointer]:
+        - /url: /
+        - generic [ref=e7]: C
+        - text: Complexity
+      - link "New search" [ref=e9] [cursor=pointer]:
+        - /url: /
+        - img [ref=e10]
+        - generic [ref=e11]: New search
+      - generic [ref=e12]:
+        - navigation [ref=e13]:
+          - link "Home" [ref=e14] [cursor=pointer]:
+            - /url: /
+            - img [ref=e15]
+            - generic [ref=e18]: Home
+          - link "Roles" [ref=e19] [cursor=pointer]:
+            - /url: /roles
+            - img [ref=e20]
+            - generic [ref=e25]: Roles
+        - generic [ref=e27]:
+          - link "Recent" [ref=e28] [cursor=pointer]:
+            - /url: /recent
+            - generic [ref=e29]: Recent
+            - img [ref=e30]
+          - generic [ref=e33]:
+            - link "Initial query" [ref=e34] [cursor=pointer]:
+              - /url: /search/17b4108a2700472282bdbba307f89b5a
+            - button "Delete Initial query" [ref=e35]:
+              - img [ref=e36]
+      - button "Account menu" [ref=e40]:
+        - generic [ref=e41]: AE
+        - paragraph [ref=e43]: Attach E2E
+        - img [ref=e44]
+    - main [ref=e49]:
+      - generic [ref=e51]:
+        - article [ref=e52]:
+          - paragraph [ref=e54]: Initial query
+        - article [ref=e55]:
+          - generic [ref=e56]:
+            - generic [ref=e58]:
+              - paragraph [ref=e59]: I'm ready to help! However, I notice you've included "Initial query" as a placeholder rather than an actual question or request.
+              - paragraph [ref=e60]: "Could you please provide your specific query or question? For example, you might ask me to:"
+              - list [ref=e61]:
+                - listitem [ref=e62]: • Search for current information about a topic
+                - listitem [ref=e63]: • Fetch and analyze content from specific websites
+                - listitem [ref=e64]: • Help you find factual, up-to-date information
+              - paragraph [ref=e65]: What would you like me to help you with?
+            - generic [ref=e67]:
+              - button "Copy message" [ref=e68]:
+                - img [ref=e70]
+              - button "Retry" [ref=e73]:
+                - img [ref=e74]
+            - generic [ref=e78]:
+              - heading "Related Questions" [level=4] [ref=e79]
+              - button "Could you please provide your specific query or question?" [ref=e81]:
+                - generic [ref=e82]: Could you please provide your specific query or question?
+                - img [ref=e83]
+      - generic [ref=e89]:
+        - textbox "Ask a follow-up..." [ref=e91]
+        - generic [ref=e92]:
+          - generic [ref=e93]:
+            - button "Select model" [ref=e94]:
+              - generic [ref=e95]: Claude Haiku 4.5
+              - img [ref=e96]
+            - button "Toggle web search" [ref=e99]:
+              - img [ref=e100]
+              - generic [ref=e103]: Search
+            - button "Attach file" [ref=e104]:
+              - img [ref=e105]
+          - button "Send" [disabled] [ref=e107]:
+            - img [ref=e108]
+  - region "Notifications alt+T"
+  - alert [ref=e110]
+```
