@@ -29,7 +29,7 @@
             - img [ref=e30]
           - generic [ref=e33]:
             - link "Initial query" [ref=e34] [cursor=pointer]:
-              - /url: /search/17b4108a2700472282bdbba307f89b5a
+              - /url: /search/2abb17e71d7246b795013373666c24cd
             - button "Delete Initial query" [ref=e35]:
               - img [ref=e36]
       - button "Account menu" [ref=e40]:
@@ -43,13 +43,13 @@
         - article [ref=e55]:
           - generic [ref=e56]:
             - generic [ref=e58]:
-              - paragraph [ref=e59]: I'm ready to help! However, I notice you've included "Initial query" as a placeholder rather than an actual question or request.
-              - paragraph [ref=e60]: "Could you please provide your specific query or question? For example, you might ask me to:"
+              - paragraph [ref=e59]: I'm ready to help! However, I notice you've marked this as an "Initial query" but haven't actually asked me a question yet.
+              - paragraph [ref=e60]: "Could you please tell me what you'd like to know? For example, I can help you with:"
               - list [ref=e61]:
-                - listitem [ref=e62]: • Search for current information about a topic
-                - listitem [ref=e63]: • Fetch and analyze content from specific websites
-                - listitem [ref=e64]: • Help you find factual, up-to-date information
-              - paragraph [ref=e65]: What would you like me to help you with?
+                - listitem [ref=e62]: • Searching for current information on the web
+                - listitem [ref=e63]: • Retrieving detailed content from web pages
+                - listitem [ref=e64]: • Answering questions about recent events, facts, or topics
+              - paragraph [ref=e65]: What would you like to ask?
             - generic [ref=e67]:
               - button "Copy message" [ref=e68]:
                 - img [ref=e70]
@@ -57,8 +57,8 @@
                 - img [ref=e74]
             - generic [ref=e78]:
               - heading "Related Questions" [level=4] [ref=e79]
-              - button "Could you please provide your specific query or question?" [ref=e81]:
-                - generic [ref=e82]: Could you please provide your specific query or question?
+              - button "Could you please tell me what you'd like to know?" [ref=e81]:
+                - generic [ref=e82]: Could you please tell me what you'd like to know?
                 - img [ref=e83]
       - generic [ref=e89]:
         - textbox "Ask a follow-up..." [ref=e91]

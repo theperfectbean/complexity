@@ -29,7 +29,7 @@
             - img [ref=e30]
           - generic [ref=e33]:
             - link "navigate to search" [ref=e34] [cursor=pointer]:
-              - /url: /search/feb7a40851ce41dea4e448f0d3498c78
+              - /url: /search/89bb6fa2d988497383e78538205acb4e
             - button "Delete navigate to search" [ref=e35]:
               - img [ref=e36]
       - button "Account menu" [ref=e40]:
@@ -43,32 +43,40 @@
         - article [ref=e55]:
           - generic [ref=e56]:
             - generic [ref=e58]:
-              - paragraph [ref=e59]: I'm ready to help you search the web! However, I need to know what you'd like to search for.
-              - paragraph [ref=e60]: What topic, question, or information are you looking for?
-            - generic [ref=e62]:
-              - button "Copy message" [ref=e63]:
-                - img [ref=e65]
-              - button "Retry" [ref=e68]:
-                - img [ref=e69]
-            - generic [ref=e73]:
-              - heading "Related Questions" [level=4] [ref=e74]
-              - button "What topic, question, or information are you looking for?" [ref=e76]:
-                - generic [ref=e77]: What topic, question, or information are you looking for?
-                - img [ref=e78]
-      - generic [ref=e84]:
-        - textbox "Ask a follow-up..." [ref=e86]
-        - generic [ref=e87]:
-          - generic [ref=e88]:
-            - button "Select model" [ref=e89]:
-              - generic [ref=e90]: Claude Haiku 4.5
-              - img [ref=e91]
-            - button "Toggle web search" [ref=e94]:
-              - img [ref=e95]
-              - generic [ref=e98]: Search
-            - button "Attach file" [active] [ref=e99]:
-              - img [ref=e100]
-          - button "Send" [disabled] [ref=e102]:
-            - img [ref=e103]
+              - paragraph [ref=e59]: I'm ready to help you search! However, I don't have a "navigate" function in the traditional sense.
+              - paragraph [ref=e60]: To search the web, I can use my search tool to find information for you. What would you like me to search for? Just tell me what you're looking for, and I'll search the web and provide you with relevant results.
+              - paragraph [ref=e61]: "For example, you could ask me to:"
+              - list [ref=e62]:
+                - listitem [ref=e63]: • Search for current news on a topic
+                - listitem [ref=e64]: • Find information about a product or service
+                - listitem [ref=e65]: • Look up facts or data
+                - listitem [ref=e66]: • Research a company or person
+                - listitem [ref=e67]: • Or anything else you'd like to know about
+              - paragraph [ref=e68]: What would you like to search for?
+            - generic [ref=e70]:
+              - button "Copy message" [ref=e71]:
+                - img [ref=e73]
+              - button "Retry" [ref=e76]:
+                - img [ref=e77]
+            - generic [ref=e81]:
+              - heading "Related Questions" [level=4] [ref=e82]
+              - button "What would you like me to search for?" [ref=e84]:
+                - generic [ref=e85]: What would you like me to search for?
+                - img [ref=e86]
+      - generic [ref=e92]:
+        - textbox "Ask a follow-up..." [ref=e94]
+        - generic [ref=e95]:
+          - generic [ref=e96]:
+            - button "Select model" [ref=e97]:
+              - generic [ref=e98]: Claude Haiku 4.5
+              - img [ref=e99]
+            - button "Toggle web search" [ref=e102]:
+              - img [ref=e103]
+              - generic [ref=e106]: Search
+            - button "Attach file" [active] [ref=e107]:
+              - img [ref=e108]
+          - button "Send" [disabled] [ref=e110]:
+            - img [ref=e111]
   - region "Notifications alt+T"
-  - alert [ref=e105]
+  - alert [ref=e113]
 ```

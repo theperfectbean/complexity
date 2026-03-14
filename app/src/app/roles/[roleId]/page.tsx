@@ -5,7 +5,6 @@ import { useParams, useRouter } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { MoreHorizontal, Pin } from "lucide-react";
 import { toast } from "sonner";
-import TextareaAutosize from "react-textarea-autosize";
 
 import { useSession } from "next-auth/react";
 
@@ -14,6 +13,7 @@ import { DocumentList, RoleDocument } from "@/components/roles/DocumentList";
 import { FileUploader } from "@/components/roles/FileUploader";
 import { LoadingSkeleton } from "@/components/shared/LoadingSkeleton";
 import { MODELS, getDefaultModel } from "@/lib/models";
+import { SearchBar } from "@/components/search/SearchBar";
 
 type Role = {
   id: string;
@@ -45,17 +45,8 @@ export default function RoleDetailPage() {
   const [editingInstructions, setEditingInstructions] = useState(false);
   const [instructionsDraft, setInstructionsDraft] = useState("");
   const [savingInstructions, setSavingInstructions] = useState(false);
-
-  const groupedModels = useMemo<Record<string, Array<(typeof MODELS)[number]>>>(() => {
-    return MODELS.reduce<Record<string, Array<(typeof MODELS)[number]>>>((accumulator, option) => {
-      const category = option.category;
-      if (!accumulator[category]) {
-        accumulator[category] = [];
-      }
-      accumulator[category].push(option);
-      return accumulator;
-    }, {});
-  }, []);
+  const [webSearchEnabled, setWebSearchEnabled] = useState(true);
+  const [attachments, setAttachments] = useState<File[]>([]);
 
   const loadDocuments = useCallback(async () => {
     setDocsLoading(true);
@@ -170,8 +161,14 @@ export default function RoleDetailPage() {
       }
 
       const payload = (await response.json()) as { thread: { id: string } };
+      
+      if (attachments.length > 0) {
+        toast.info("Thread created! Please re-attach your files in the chat.");
+      }
+
       setPrompt("");
-      router.push(`/search/${payload.thread.id}?q=${encodeURIComponent(currentPrompt)}`);
+      setAttachments([]);
+      router.push(`/search/${payload.thread.id}?q=${encodeURIComponent(currentPrompt)}&web=${webSearchEnabled}`);
     } finally {
       setCreatingThread(false);
     }
@@ -271,58 +268,27 @@ export default function RoleDetailPage() {
 
       <div className="mt-10 grid gap-12 md:grid-cols-[1fr_280px] lg:gap-16 lg:grid-cols-[1fr_300px] xl:grid-cols-[1fr_360px]">
         <section className="min-w-0">
-          <form onSubmit={onStartChat} className="relative flex min-h-[60px] flex-col rounded-3xl border border-border/70 bg-card p-4 transition-shadow focus-within:border-primary/40 focus-within:ring-4 focus-within:ring-primary/10">
-            <TextareaAutosize
-              minRows={2}
-              maxRows={12}
-              className="w-full flex-1 resize-none bg-transparent px-2 py-2 text-lg outline-none placeholder:text-muted-foreground/60"
-              placeholder="Ask anything..."
+          <form onSubmit={onStartChat} className="w-full">
+            <SearchBar
               value={prompt}
-              onChange={(event) => setPrompt(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" && !event.shiftKey) {
-                  event.preventDefault();
-                  event.currentTarget.form?.requestSubmit();
+              onChange={setPrompt}
+              placeholder="Ask anything..."
+              submitLabel={creatingThread ? "Starting..." : "Start"}
+              disabled={creatingThread}
+              model={model}
+              onModelChange={setModel}
+              webSearchEnabled={webSearchEnabled}
+              onWebSearchChange={setWebSearchEnabled}
+              attachments={attachments}
+              onRemoveAttachment={(index) => {
+                setAttachments((prev) => prev.filter((_, i) => i !== index));
+              }}
+              onAttachClick={(files) => {
+                if (files && files.length > 0) {
+                  setAttachments((prev) => [...prev, ...Array.from(files)]);
                 }
               }}
             />
-            <div className="mt-4 flex items-center justify-between gap-3">
-              <div className="flex items-center gap-1">
-                <FileUploader
-                  roleId={roleId}
-                  onUploaded={() => {
-                    void loadDocuments();
-                    toast.success("Document uploaded");
-                  }}
-                  variant="button"
-                />
-              </div>
-              
-              <div className="flex items-center gap-2">
-                <select
-                  className="rounded-full border border-border/60 bg-background px-4 py-2 text-sm font-medium focus:outline-none"
-                  value={model}
-                  onChange={(event) => setModel(event.target.value)}
-                >
-                  {Object.entries(groupedModels).map(([category, options]) => (
-                    <optgroup key={category} label={category}>
-                      {options.map((option) => (
-                        <option key={option.id} value={option.id}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </optgroup>
-                  ))}
-                </select>
-                <button
-                  type="submit"
-                  disabled={creatingThread || !prompt.trim()}
-                  className="rounded-full bg-foreground px-5 py-2 text-sm font-medium text-background disabled:opacity-60"
-                >
-                  {creatingThread ? "..." : "Start"}
-                </button>
-              </div>
-            </div>
           </form>
 
           <div className="mt-16">
