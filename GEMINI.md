@@ -142,6 +142,10 @@ DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose build app
   - **Search Status Indicators**: Updated the `thinking` part UI in `MessageList` to show specific animated icons (Globe, Database, Brain, Search) depending on the tool call (`Searching`, `Retrieval`, `Reasoning`). Added support for dynamically updating the `data-call-start` state so that live search queries (`Searching for: [query]`) are displayed immediately while the search is in progress, mimicking Perplexity/Claude's transparent web search UI.
   - **SearchBar Styling**: Removed the hard top border, rounded the corners to `22px`, improved hover/focus transitions, and updated the attachment chips to be more compact and visually appealing.
 
+### Sign-Out Redirect Fix
+- **Absolute URLs Rejected**: Calling `signOut({ callbackUrl: window.location.origin + "/" })` was causing redirects back to `localhost:3002` when accessed via an external proxy. NextAuth server-side validation rejects the client-provided absolute callback URL if the host header doesn't strictly match the configured `NEXTAUTH_URL`, falling back to the configured default base URL.
+- **Relative URLs**: Using a relative callback URL (`signOut({ callbackUrl: "/login" })`) bypasses domain mismatch validation and allows NextAuth to correctly redirect the user locally based on their current actual origin.
+
 ### Password Reset Flow (Implemented 2026-03-14)
 - **UI Option**: Added a "Forgot password?" link to the login screen.
 - **Pages**: 
