@@ -276,7 +276,7 @@ export default function RoleDetailPage() {
               minRows={2}
               maxRows={12}
               className="w-full flex-1 resize-none bg-transparent px-2 py-2 text-lg outline-none placeholder:text-muted-foreground/60"
-              placeholder="Type / for commands"
+              placeholder="Ask anything..."
               value={prompt}
               onChange={(event) => setPrompt(event.target.value)}
               onKeyDown={(event) => {
@@ -464,7 +464,7 @@ export default function RoleDetailPage() {
                    <p className="text-sm text-muted-foreground/60">No files uploaded</p>
                 </div>
               ) : (
-                <DocumentList documents={documents} />
+                <DocumentList documents={documents} onDeleted={loadDocuments} />
               )}
             </div>
           </section>

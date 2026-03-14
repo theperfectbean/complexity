@@ -47,11 +47,51 @@ test.describe("Role document upload + chat", () => {
 
     await expect(page.getByText("rag-notes.txt")).toBeVisible({ timeout: 30000 });
 
-    await page.getByPlaceholder("Type / for commands").fill("What is the secret word?");
+    await page.getByPlaceholder("Ask anything...").fill("What is the secret word?");
     await page.getByRole("button", { name: "Start" }).click();
 
     await expect(page).toHaveURL(/\/search\//, { timeout: 15000 });
     await expect(page.getByRole("button", { name: "Copy message" })).toBeVisible({ timeout: 30000 });
+  });
+
+  test("deletes an uploaded document", async ({ page }) => {
+    const roleName = `Delete Test Role ${Math.random().toString(36).slice(2, 8)}`;
+    
+    await registerAndLogin(page);
+
+    await page.goto("/roles");
+    await page.getByRole("link", { name: "New role" }).click();
+    await page.getByPlaceholder("Name your role").fill(roleName);
+    await page.getByRole("button", { name: "Create role" }).click();
+
+    await expect(page).toHaveURL(/\/roles\//, { timeout: 15000 });
+
+    const uploadButton = page.getByRole("button", { name: "Upload file" }).first();
+    const fileChooserPromise = page.waitForEvent("filechooser");
+    await uploadButton.click();
+    const fileChooser = await fileChooserPromise;
+
+    await fileChooser.setFiles([
+      {
+        name: "delete-me.txt",
+        mimeType: "text/plain",
+        buffer: Buffer.from("Delete this file."),
+      },
+    ]);
+
+    const docChip = page.getByText("delete-me.txt");
+    await expect(docChip).toBeVisible({ timeout: 30000 });
+
+    // Handle the confirmation dialog
+    page.on('dialog', dialog => dialog.accept());
+
+    // Hover to reveal the delete button and click it
+    await docChip.hover();
+    const deleteButton = page.getByLabel("Delete delete-me.txt");
+    await deleteButton.click();
+
+    // Verify it is gone
+    await expect(docChip).toBeHidden({ timeout: 15000 });
   });
 
   test("uploads a large document (12MB) successfully", async ({ page }) => {

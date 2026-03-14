@@ -37,7 +37,7 @@ test.describe("Roles flow", () => {
     await expect(page).toHaveURL(/\/roles\//, { timeout: 15000 });
     await expect(page.getByRole("heading", { name: roleName })).toBeVisible();
 
-    const promptInput = page.getByPlaceholder("Type / for commands");
+    const promptInput = page.getByPlaceholder("Ask anything...");
     await promptInput.fill(firstPrompt);
     await page.getByRole("button", { name: "Start" }).click();
 

@@ -1,5 +1,7 @@
-import { FileText, File, Loader2 } from "lucide-react";
+import { FileText, File, Loader2, X } from "lucide-react";
 import { ProcessingBadge } from "@/components/roles/ProcessingBadge";
+import { useState } from "react";
+import { toast } from "sonner";
 
 export type RoleDocument = {
   id: string;
@@ -7,11 +9,13 @@ export type RoleDocument = {
   status: string;
   createdAt: string;
   sizeBytes: number;
+  roleId: string;
 };
 
 type DocumentListProps = {
   documents: RoleDocument[];
   loading?: boolean;
+  onDeleted?: (documentId: string) => void;
 };
 
 function getFileIcon(filename: string) {
@@ -33,7 +37,32 @@ function getFileTypeLabel(filename: string) {
   return filename.split(".").pop()?.toUpperCase() || "FILE";
 }
 
-export function DocumentList({ documents, loading }: DocumentListProps) {
+export function DocumentList({ documents, loading, onDeleted }: DocumentListProps) {
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  async function handleDelete(documentId: string, roleId: string) {
+    if (!confirm("Are you sure you want to delete this document?")) return;
+
+    setDeletingId(documentId);
+    try {
+      const response = await fetch(`/api/roles/${roleId}/documents/${documentId}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        toast.error("Failed to delete document");
+        return;
+      }
+
+      toast.success("Document deleted");
+      onDeleted?.(documentId);
+    } catch {
+      toast.error("An error occurred while deleting");
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center gap-2 py-4 text-sm text-muted-foreground">
@@ -55,6 +84,20 @@ export function DocumentList({ documents, loading }: DocumentListProps) {
           className="group relative flex flex-col justify-between rounded-xl border border-border/50 bg-background p-3 transition-colors hover:bg-muted/30"
           title={document.filename}
         >
+          <button
+            type="button"
+            onClick={() => void handleDelete(document.id, document.roleId)}
+            disabled={deletingId === document.id}
+            className="absolute right-2 top-2 z-10 hidden rounded-full p-1 text-muted-foreground hover:bg-muted group-hover:block"
+            aria-label={`Delete ${document.filename}`}
+          >
+            {deletingId === document.id ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <X className="h-3.5 w-3.5" />
+            )}
+          </button>
+
           <div className="flex flex-1 flex-col items-start gap-2">
              <div className="mb-1">{getFileIcon(document.filename)}</div>
              <p className="line-clamp-2 w-full text-[13px] font-medium leading-tight text-foreground/90">
