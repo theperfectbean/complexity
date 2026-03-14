@@ -91,6 +91,8 @@ services:
       NODE_ENV: production
       PORT: 3000
       HOSTNAME: 0.0.0.0
+    volumes:
+      - ./.data/external:/app/external:ro
     depends_on:
       postgres:
         condition: service_healthy

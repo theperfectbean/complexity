@@ -13,7 +13,8 @@ import {
   Trash2,
   ChevronsUpDown,
   Keyboard,
-  Moon
+  Moon,
+  Shield
 } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
 import Link from "next/link";
@@ -339,6 +340,19 @@ export function Sidebar({ collapsed = false, onToggle, onNavigate }: SidebarProp
                   Memories
                 </Link>
               </DropdownMenu.Item>
+
+              {(session?.user as any)?.isAdmin && (
+                <DropdownMenu.Item asChild>
+                  <Link 
+                    href="/settings/admin"
+                    className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm outline-none hover:bg-black/5 dark:hover:bg-white/5 focus:bg-black/5 dark:focus:bg-white/5 font-semibold text-primary"
+                    onClick={onNavigate}
+                  >
+                    <Shield className="h-4 w-4" />
+                    Admin Settings
+                  </Link>
+                </DropdownMenu.Item>
+              )}
 
               <DropdownMenu.Separator className="my-1 h-px bg-sidebar-border" />
               

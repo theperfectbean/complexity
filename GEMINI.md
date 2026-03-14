@@ -143,18 +143,25 @@ DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose build app
   - **SearchBar Styling**: Removed the hard top border, rounded the corners to `22px`, improved hover/focus transitions, and updated the attachment chips to be more compact and visually appealing.
 
 ### Sign-Out Redirect Fix
-- **Absolute URLs Rejected**: Calling `signOut({ callbackUrl: window.location.origin + "/" })` was causing redirects back to `localhost:3002` when accessed via an external proxy. NextAuth server-side validation rejects the client-provided absolute callback URL if the host header doesn't strictly match the configured `NEXTAUTH_URL`, falling back to the configured default base URL.
-- **Relative URLs**: Using a relative callback URL (`signOut({ callbackUrl: "/login" })`) bypasses domain mismatch validation and allows NextAuth to correctly redirect the user locally based on their current actual origin.
+### Sign-Out Redirect Fix (Updated 2026-03-14)
+- **Problem**: Calling `signOut({ callbackUrl: "/login" })` was still redirecting to `http://localhost:3002/login` when accessed via an external proxy (`https://complexity.internal.lan`). 
+- **Finding**: Even with `trustHost: true`, the `NEXTAUTH_URL` environment variable acts as a canonical base URL that overrides dynamic host detection in NextAuth v5. If `NEXTAUTH_URL` is hardcoded to `localhost`, the server will absolute-ify all relative redirect URLs using that base.
+- **Fix**: 
+  1. Added a custom `redirect` callback in `app/src/auth.ts` to allow relative URLs.
+  2. Recommended that users either remove `NEXTAUTH_URL` entirely (to let `trustHost: true` work dynamically) or set it to their actual public URL in their `.env`.
+  3. Added manual host detection as a fallback in `forgot-password/route.ts` to construct reset links correctly even if `NEXTAUTH_URL` is misconfigured.
+
 
 ### Password Reset Flow (Implemented 2026-03-14)
-- **UI Option**: Added a "Forgot password?" link to the login screen.
-- **Pages**: 
-  - `/forgot-password`: Allows users to request a reset link by email.
-  - `/reset-password`: Allows users to set a new password using a token.
-- **API Routes**:
-  - `POST /api/auth/forgot-password`: Generates a random reset token, stores it in `verification_tokens` table, and logs the reset link to the server console (SMTP not yet configured).
-  - `POST /api/auth/reset-password`: Verifies the token, updates the hashed password in the `users` table, and deletes the used token.
-- **Public Access**: Updated `proxy.ts` to allow unauthenticated access to the password reset flow.
+... (existing content)
+
+### Multi-Provider & Admin Settings (Implemented 2026-03-14)
+- **Direct Providers**: Integrated Vercel AI SDK providers (`@ai-sdk/anthropic`, `@ai-sdk/openai`, `@ai-sdk/google`, `@ai-sdk/xai`) into the `/api/chat` route. This allows for direct, low-latency connections to LLMs alongside the Perplexity Agent API.
+- **Local LLMs**: Added support for local models via **Ollama** (`ai-sdk-ollama`) and generic **OpenAI-compatible** APIs (e.g., LM Studio, vLLM).
+- **Admin Settings**: Added a new `settings` table to the database to store API keys and base URLs. 
+- **Settings UI**: Implemented `/settings/admin` page, accessible only to admin users, allowing global configuration of API keys and local provider base URLs (Ollama, Local OpenAI) via the UI.
+- **Role-based Access**: Added `isAdmin` field to the `users` table and updated Auth.js session to include this field, enabling protected admin routes.
+- **Auto-Migrations**: The `settings` table and `users.isAdmin` column are automatically managed via Drizzle migrations.
 
 - **Nodemailer in Docker**: When adding `nodemailer` to the project, ensured it was installed inside the Docker container by running `npm install` via `docker compose exec` and updated the `Dockerfile` with `--legacy-peer-deps` to resolve peer dependency conflicts with `next-auth`.
 
@@ -164,9 +171,13 @@ DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose build app
 - **Auto-Migrations**: Updated the `app/Dockerfile` and entrypoint to automatically run `npm run db:migrate` on container startup, ensuring the database schema is always in sync with the codebase.
 - **Hygiene**: Added `.data/` and `backups/` to `.gitignore` and `.dockerignore`.
 
-### Drizzle & postgres-js Type Fix (2026-03-14)
-- **Problem**: `db.delete().where()` in `drizzle-orm` with the `postgres-js` driver returns a `RowList` that does not have a `rowCount` property, causing TypeScript build failures in `src/app/api/roles/[roleId]/documents/[documentId]/route.ts`.
-- **Fix**: Replaced `result.rowCount` check with `.returning({ id: table.id })` followed by a `result.length === 0` check. This pattern is type-safe and consistent across different Drizzle drivers.
+### External Data Injection (Implemented 2026-03-14)
+- **Feature**: Allows specific roles to have "Live" access to external files (like CGM data) without hardcoding personal info.
+- **Architecture**:
+  1. Generic mount: `./.data/external` on host is mapped to `/app/external` in the container.
+  2. Dynamic Mapping: The `ROLE_EXTERNAL_DATA` environment variable holds a JSON mapping of Role IDs to their respective data files.
+  3. Prompt Injection: The `/api/chat` route detects the active Role ID and automatically injects the file's contents into the system prompt as high-priority context.
+- **Privacy**: The `.data/` directory is `.gitignore`ed, ensuring personal health or private data is never committed to source control.
 
 - **Body Size Limit**: Increased Next.js proxy body size limit to 50MB in `next.config.ts` using `experimental.proxyClientMaxBodySize`. This resolved 'TypeError: Failed to parse body as FormData' errors when uploading large files.
 - **Embedding Batching**: Implemented parallel batching in `app/src/lib/rag.ts` for document embeddings. Large documents are now split into batches of 200 chunks and processed with a concurrency limit of 4. This prevents the embedding service from timing out and improves reliability for large files.

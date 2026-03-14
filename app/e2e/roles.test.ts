@@ -19,7 +19,6 @@ test.describe("Roles flow", () => {
 
   test("create role and start a chat", async ({ page }) => {
     const roleName = `E2E Role ${Math.random().toString(36).slice(2, 8)}`;
-    const roleDescription = "E2E role description";
     const firstPrompt = "Summarize the key goals for this role.";
 
     await registerAndLogin(page);

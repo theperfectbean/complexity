@@ -39,6 +39,9 @@ export const MODELS = [
     category: "xAI",
     isPreset: false,
   },
+  { id: "ollama/llama3", label: "Ollama: Llama 3", category: "Local", isPreset: false },
+  { id: "ollama/mistral", label: "Ollama: Mistral", category: "Local", isPreset: false },
+  { id: "local-openai/custom-model", label: "Local OpenAI API", category: "Local", isPreset: false },
 ] as const;
 
 export type ModelOption = (typeof MODELS)[number];

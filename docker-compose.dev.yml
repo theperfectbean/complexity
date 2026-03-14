@@ -5,6 +5,7 @@ services:
     volumes:
       - ./app:/app
       - node_modules:/app/node_modules
+      - ./.data/external:/app/external:ro
     # Ensure variables matched from the base file are used
     command: npm run dev
     environment:

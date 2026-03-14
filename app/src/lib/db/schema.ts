@@ -23,11 +23,18 @@ export const users = pgTable(
     name: varchar("name", { length: 100 }),
     image: text("image"),
     memoryEnabled: boolean("memory_enabled").notNull().default(true),
+    isAdmin: boolean("is_admin").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [unique("users_email_unique").on(table.email)],
 );
+
+export const settings = pgTable("settings", {
+  key: varchar("key", { length: 255 }).primaryKey(),
+  value: text("value"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
 
 export const accounts = pgTable(
   "accounts",

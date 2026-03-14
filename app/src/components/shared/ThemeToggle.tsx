@@ -22,6 +22,7 @@ export function ThemeToggle() {
   const isDark = theme?.includes("dark") || (theme === "system" && resolvedTheme === "dark");
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true);
   }, []);
 

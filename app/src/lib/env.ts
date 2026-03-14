@@ -8,6 +8,12 @@ const envSchema = z.object({
   REDIS_URL: z.string().url().optional(),
   PERPLEXITY_API_KEY: z.string().min(1, "PERPLEXITY_API_KEY is required"),
   ANTHROPIC_API_KEY: z.string().min(1).optional(),
+  OPENAI_API_KEY: z.string().min(1).optional(),
+  GOOGLE_GENERATIVE_AI_API_KEY: z.string().min(1).optional(),
+  XAI_API_KEY: z.string().min(1).optional(),
+  OLLAMA_BASE_URL: z.string().url().optional().default("http://localhost:11434/api"),
+  LOCAL_OPENAI_BASE_URL: z.string().url().optional(),
+  LOCAL_OPENAI_API_KEY: z.string().optional(),
   NEXTAUTH_SECRET: z.string().min(1, "NEXTAUTH_SECRET is required"),
   NEXTAUTH_URL: z.string().url().optional(),
   EMBEDDER_URL: z.string().url().default("http://embedder:8000"),
@@ -19,6 +25,7 @@ const envSchema = z.object({
   SMTP_USER: z.string().optional(),
   SMTP_PASSWORD: z.string().optional(),
   SMTP_FROM: z.string().optional(),
+  ROLE_EXTERNAL_DATA: z.string().optional().describe("JSON string mapping role IDs to external file paths"),
 });
 
 function validateEnv() {

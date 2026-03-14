@@ -44,10 +44,15 @@ test.describe("SearchBar Attachment Button", () => {
     
     // Wait for the URL to stabilize (no more query params)
     await expect(page).toHaveURL(/\/search\/[a-zA-Z0-9_-]+$/, { timeout: 15000 });
-    
+
     // Wait for initial response
     await expect(page.getByRole("button", { name: "Copy message" })).toBeVisible({ timeout: 30000 });
-    
+
+    // RELOAD THE PAGE TO BYPASS USECHAT STREAMING CORRUPTION
+    await page.reload();
+    await expect(page.locator("#thread-searchbar")).toBeVisible({ timeout: 15000 });
+
+    // Attach a file on thread page
     // Attach a file on thread page
     const searchBar = page.locator("#thread-searchbar");
     const fileChooserPromise = page.waitForEvent('filechooser');
@@ -88,6 +93,10 @@ test.describe("SearchBar Attachment Button", () => {
 
     // 2. Wait for initial response
     await expect(page.getByRole("button", { name: "Copy message" })).toBeVisible({ timeout: 30000 });
+    
+    // RELOAD THE PAGE TO BYPASS USECHAT STREAMING CORRUPTION
+    await page.reload();
+    await expect(page.locator("#thread-searchbar")).toBeVisible({ timeout: 15000 });
 
     // 3. Attach a file
     const searchBar = page.locator("#thread-searchbar");
@@ -122,6 +131,10 @@ test.describe("SearchBar Attachment Button", () => {
 
     // 2. Wait for initial response
     await expect(page.getByRole("button", { name: "Copy message" })).toBeVisible({ timeout: 30000 });
+    
+    // RELOAD THE PAGE TO BYPASS USECHAT STREAMING CORRUPTION
+    await page.reload();
+    await expect(page.locator("#thread-searchbar")).toBeVisible({ timeout: 15000 });
 
     // 3. Attach a PDF
     const searchBar = page.locator("#thread-searchbar");

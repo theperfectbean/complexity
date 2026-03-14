@@ -3,7 +3,7 @@
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { ChevronDown, Globe, Paperclip, SendHorizontal, X, FileText } from "lucide-react";
 import { motion } from "motion/react";
-import { useMemo, useRef } from "react";
+import { useMemo, useRef, useState, useEffect } from "react";
 import TextareaAutosize from "react-textarea-autosize";
 
 import { MODELS, getDefaultModel } from "@/lib/models";
@@ -55,6 +55,12 @@ export function SearchBar({
   id,
 }: SearchBarProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  const [internalAttachments, setInternalAttachments] = useState<File[]>(attachments);
+  useEffect(() => {
+    setInternalAttachments(attachments);
+  }, [attachments]);
+
   const groupedModels = useMemo(() => {
     return modelOptions.reduce<Record<string, SearchModelOption[]>>((accumulator, option) => {
       if (!accumulator[option.category]) {
@@ -72,8 +78,11 @@ export function SearchBar({
   };
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    onAttachClick?.(event.target.files);
-    // Reset the input value so the same file can be selected again
+    const files = event.target.files;
+    if (files && files.length > 0) {
+      setInternalAttachments((prev) => [...prev, ...Array.from(files)]);
+    }
+    onAttachClick?.(files);
     event.target.value = "";
   };
 
@@ -98,9 +107,9 @@ export function SearchBar({
         accept=".pdf,.docx,.txt,.md,image/*"
       />
       
-      {attachments.length > 0 && (
+      {internalAttachments.length > 0 && (
         <div className="flex flex-wrap gap-2 pb-1.5 px-2" data-testid="attachments-container">
-          {attachments.map((file, index) => (
+          {internalAttachments.map((file, index) => (
             <motion.div 
               key={`${file.name}-${index}`} 
               initial={{ opacity: 0, scale: 0.9 }}
@@ -112,7 +121,10 @@ export function SearchBar({
               <span className="truncate font-medium">{file.name}</span>
               <button
                 type="button"
-                onClick={() => onRemoveAttachment?.(index)}
+                onClick={() => {
+                  setInternalAttachments(prev => prev.filter((_, i) => i !== index));
+                  onRemoveAttachment?.(index);
+                }}
                 className="ml-1 inline-flex h-4 w-4 items-center justify-center rounded-full hover:bg-foreground/10 shrink-0 transition-colors"
               >
                 <X className="h-3 w-3" />
@@ -210,9 +222,9 @@ export function SearchBar({
           type="submit"
           className={cn(
             "inline-flex h-8 w-8 items-center justify-center rounded-xl bg-primary text-primary-foreground transition-all active:scale-95 disabled:opacity-30",
-            !value.trim() && attachments.length === 0 && "bg-muted text-muted-foreground"
+            !value.trim() && internalAttachments.length === 0 && "bg-muted text-muted-foreground"
           )}
-          disabled={disabled || (!value.trim() && attachments.length === 0)}
+          disabled={disabled || (!value.trim() && internalAttachments.length === 0)}
           aria-label={submitLabel}
         >
           <SendHorizontal className="h-4 w-4" />

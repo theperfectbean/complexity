@@ -15,7 +15,6 @@ export default function ForgotPasswordPage() {
     setError(null);
     setMessage(null);
 
-    // TODO: Implement actual forgot password logic
     const response = await fetch("/api/auth/forgot-password", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -37,7 +36,7 @@ export default function ForgotPasswordPage() {
       <div className="w-full space-y-4 rounded-2xl border p-6">
         <h1 className="text-2xl font-semibold">Reset password</h1>
         <p className="text-sm text-muted-foreground">
-          Enter your email address and we'll send you a link to reset your password.
+          Enter your email address and we&apos;ll send you a link to reset your password.
         </p>
         <form onSubmit={onSubmit} className="space-y-4">
           <input

@@ -1,54 +1,42 @@
-import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
-import { z } from "zod";
-
 import { auth } from "@/auth";
-import { db } from "@/lib/db";
-import { users } from "@/lib/db/schema";
+import { getSetting, setSetting } from "@/lib/settings";
 
-const patchSchema = z.object({
-  memoryEnabled: z.boolean(),
-});
+const ALLOWED_KEYS = [
+  "ANTHROPIC_API_KEY",
+  "OPENAI_API_KEY",
+  "GOOGLE_GENERATIVE_AI_API_KEY",
+  "XAI_API_KEY",
+  "PERPLEXITY_API_KEY",
+];
 
 export async function GET() {
   const session = await auth();
-  const userEmail = session?.user?.email;
-  if (!userEmail) {
+  if (!(session?.user as any)?.isAdmin) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const [user] = await db.select().from(users).where(eq(users.email, userEmail)).limit(1);
-  if (!user) {
-    return NextResponse.json({ error: "User not found" }, { status: 404 });
+  const settings: Record<string, string | null> = {};
+  for (const key of ALLOWED_KEYS) {
+    settings[key] = await getSetting(key);
   }
 
-  return NextResponse.json({ memoryEnabled: user.memoryEnabled });
+  return NextResponse.json(settings);
 }
 
-export async function PATCH(request: Request) {
+export async function POST(request: Request) {
   const session = await auth();
-  const userEmail = session?.user?.email;
-  if (!userEmail) {
+  if (!(session?.user as any)?.isAdmin) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const [user] = await db.select().from(users).where(eq(users.email, userEmail)).limit(1);
-  if (!user) {
-    return NextResponse.json({ error: "User not found" }, { status: 404 });
+  const body = await request.json();
+  
+  for (const key of ALLOWED_KEYS) {
+    if (body[key] !== undefined) {
+      await setSetting(key, body[key]);
+    }
   }
 
-  const parsed = patchSchema.safeParse(await request.json());
-  if (!parsed.success) {
-    return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
-  }
-
-  await db
-    .update(users)
-    .set({
-      memoryEnabled: parsed.data.memoryEnabled,
-      updatedAt: new Date(),
-    })
-    .where(eq(users.id, user.id));
-
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ success: true });
 }

@@ -4,18 +4,20 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import type { Responses } from "@perplexity-ai/perplexity_ai/resources/responses";
 import crypto from "node:crypto";
+import fs from "node:fs/promises";
 
 import { auth } from "@/auth";
+import { env } from "@/lib/env";
 import { db } from "@/lib/db";
 import { createId } from "@/lib/db/cuid";
 import { getDefaultModel, isPresetModel, isValidModelId } from "@/lib/models";
 import { messages, roles, threads, users } from "@/lib/db/schema";
 import { getMemoryPrompt, saveExtractedMemories } from "@/lib/memory";
-import { createPerplexityClient } from "@/lib/perplexity";
+import { runGeneration } from "@/lib/llm";
+import { getApiKeys } from "@/lib/settings";
 import { extractTextFromDataUrl } from "@/lib/documents";
 import { getEmbeddings, similaritySearch } from "@/lib/rag";
 import { getRedisClient } from "@/lib/redis";
-import { safeParseJsonLine } from "@/lib/sse";
 
 const schema = z.object({
   threadId: z.string().min(1),
@@ -582,9 +584,37 @@ export async function POST(request: Request) {
         }
       }
 
+      let externalContext = "";
+      if (activeRoleId && env.ROLE_EXTERNAL_DATA) {
+        try {
+          const mapping = JSON.parse(env.ROLE_EXTERNAL_DATA) as Record<string, string | string[]>;
+          const files = mapping[activeRoleId];
+          if (files) {
+            const filePaths = Array.isArray(files) ? files : [files];
+            const contents = await Promise.all(
+              filePaths.map(async (filePath) => {
+                try {
+                  console.log(`[Chat API:${requestId}] Loading external data for role from ${filePath}...`);
+                  const content = await fs.readFile(filePath, "utf-8");
+                  console.log(`[Chat API:${requestId}] Successfully loaded ${content.length} bytes from ${filePath}.`);
+                  return `File: ${filePath}\n---\n${content}`;
+                } catch (err) {
+                  console.error(`[Chat API:${requestId}] Failed to load external file ${filePath}:`, err);
+                  return "";
+                }
+              })
+            );
+            externalContext = contents.filter(Boolean).join("\n\n---\n\n");
+          }
+        } catch (err) {
+          console.error(`[Chat API:${requestId}] Failed to parse ROLE_EXTERNAL_DATA:`, err);
+        }
+      }
+
       const memoryPrompt = thread.memoryEnabled ? await getMemoryPrompt(thread.userId, userText) : "";
       const memoryBlock = memoryPrompt ? `${memoryPrompt}\n\n` : "";
-      const baseInstructions = memoryBlock + (roleInstructions ? roleInstructions + "\n\n" : "");
+      const externalBlock = externalContext ? `\n\nExternal User Data (Always use this as primary context if relevant):\n${externalContext}\n\n` : "";
+      const baseInstructions = memoryBlock + (roleInstructions ? roleInstructions + "\n\n" : "") + externalBlock;
       const instructions = ragContext
         ? baseInstructions + `Use this local context if relevant:\n\n${ragContext}\n\nIf local context is insufficient, continue with normal web-grounded reasoning.`
         : baseInstructions + (activeRoleId ? "Provide concise, accurate, citation-backed answers." : "Provide a concise and accurate response.");
@@ -593,367 +623,26 @@ export async function POST(request: Request) {
       // ensure we always send an instruction payload, even if it's generic, or explicitly push it into the input.
       const safeInstructions = instructions.trim() ? instructions : "Provide a concise and accurate response.";
 
-      let assistantText = "";
-      let completedResponse: unknown;
-      let hasWrittenTextDelta = false;
+      console.log(`[Chat API:${requestId}] Calling generation for model: ${safeModel} (thread: ${parsed.data.threadId})`);
 
-      writer.write({
-        type: "data-call-start",
-        data: {
-          callId: "model-gen",
-          toolName: "Reasoning",
-          input: { model: safeModel },
-        },
-      } as UIMessageChunk);
+      const keys = await getApiKeys();
 
-      console.log(`[Chat API:${requestId}] Calling Perplexity API... (${Date.now() - startTime}ms)`);
+      const result = await runGeneration({
+        modelId: safeModel,
+        messages: inputMessages,
+        agentInput,
+        system: safeInstructions,
+        keys,
+        requestId,
+        textId,
+        webSearch: !!parsed.data.webSearch,
+        writer,
+      });
 
-      const forceStreamingOnly = safeModel === "google/gemini-3.1-pro-preview";
+      const assistantText = result.text || EMPTY_RESPONSE_FALLBACK_TEXT;
+      const citations = result.citations || [];
 
-      try {
-        const client = createPerplexityClient();
-        const requestBodyBase = isPresetModel(safeModel)
-          ? {
-              preset: safeModel,
-              input: agentInput,
-              instructions: safeInstructions,
-            }
-          : {
-              model: safeModel,
-              input: agentInput,
-              instructions: safeInstructions,
-              tools: parsed.data.webSearch ? [{ type: "web_search" }, { type: "fetch_url" }] : [],
-            };
-
-        const requestBody: Responses.ResponseCreateParamsStreaming = {
-            ...requestBodyBase,
-            stream: true,
-          } as Responses.ResponseCreateParamsStreaming;
-
-        let streamEventCount = 0;
-        let streamingFailed = false;
-
-        try {
-          // Bypass broken Perplexity SDK iterator with direct fetch
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), PERPLEXITY_STREAM_TIMEOUT_MS);
-
-          const res = await fetch("https://api.perplexity.ai/v1/responses", {
-            method: "POST",
-            headers: {
-              "Authorization": "Bearer " + process.env.PERPLEXITY_API_KEY,
-              "Content-Type": "application/json",
-              "Accept": "text/event-stream",
-            },
-            body: JSON.stringify(requestBody),
-            signal: controller.signal,
-          }).finally(() => clearTimeout(timeoutId));
-
-          if (!res.ok) {
-             if (res.status === 400) {
-               console.log(`[Chat API:${requestId}] HTTP 400 (${safeModel}), falling back to non-streaming.`);
-               streamingFailed = true;
-             } else {
-               const errText = await res.text();
-               throw new Error(`Perplexity API Error: ${res.status} ${errText}`);
-             }
-          } else if (res.body) {
-            const reader = res.body.getReader();
-            const decoder = new TextDecoder();
-            let buffer = "";
-
-            while (!streamingFailed) {
-              const { value, done } = await reader.read();
-              if (done) break;
-              
-              buffer += decoder.decode(value, { stream: true });
-              const lines = buffer.split('\n');
-              buffer = lines.pop() || "";
-              
-              for (const line of lines) {
-                if (line.startsWith('data: ')) {
-                  const dataStr = line.slice(6).trim();
-                  if (dataStr === '[DONE]' || !dataStr) continue;
-                  
-                  const eventRecord = safeParseJsonLine(dataStr);
-                  if (!eventRecord) {
-                    continue;
-                  }
-                  streamEventCount += 1;
-            
-            if (eventRecord?.type === "response.reasoning.started") {
-              writer.write({
-                type: "data-call-start",
-                data: {
-                  callId: "reasoning",
-                  toolName: "Searching",
-                  input: eventRecord.thought ? { thought: eventRecord.thought } : {},
-                },
-              } as UIMessageChunk);
-              continue;
-            }
-
-            if (eventRecord?.type === "response.reasoning.search_queries") {
-              const queries = (eventRecord as Record<string, unknown>).queries as string[];
-              writer.write({
-                type: "data-call-start",
-                data: {
-                  callId: "reasoning",
-                  toolName: "Searching",
-                  input: { query: queries.join(", ") },
-                },
-              } as UIMessageChunk);
-              continue;
-            }
-
-            if (eventRecord?.type === "response.reasoning.search_results") {
-              writer.write({
-                type: "data-call-result",
-                data: {
-                  callId: "reasoning",
-                  result: "Retrieved search results.",
-                },
-              } as UIMessageChunk);
-              continue;
-            }
-
-            if (eventRecord?.type === "response.reasoning.fetch_url_queries") {
-              const urls = (eventRecord as Record<string, unknown>).urls as string[];
-              writer.write({
-                type: "data-call-start",
-                data: {
-                  callId: "fetching",
-                  toolName: "Reading",
-                  input: { urls },
-                },
-              } as UIMessageChunk);
-              continue;
-            }
-
-            if (eventRecord?.type === "response.reasoning.fetch_url_results") {
-              writer.write({
-                type: "data-call-result",
-                data: {
-                  callId: "fetching",
-                  result: "Finished reading URLs.",
-                },
-              } as UIMessageChunk);
-              continue;
-            }
-
-            if (eventRecord?.type === "response.reasoning.stopped") {
-              writer.write({
-                type: "data-call-result",
-                data: {
-                  callId: "reasoning",
-                  result: "Reasoning complete.",
-                },
-              } as UIMessageChunk);
-              continue;
-            }
-
-            if (eventRecord?.type === "response.output_item.added") {
-              const item = asRecord(eventRecord.item);
-              if (item?.type === "function_call") {
-                writer.write({
-                  type: "data-call-start",
-                  data: {
-                    callId: (item.id as string) || `tool-${Date.now()}`,
-                    toolName: (item.name as string) || "Tool",
-                    input: item.arguments,
-                  },
-                } as UIMessageChunk);
-              }
-              continue;
-            }
-
-            if (eventRecord?.type === "response.output_item.done") {
-              const item = asRecord(eventRecord.item);
-              if (item?.type === "function_call") {
-                writer.write({
-                  type: "data-call-result",
-                  data: {
-                    callId: (item.id as string) || `tool-${Date.now()}`,
-                    result: "Completed.",
-                  },
-                } as UIMessageChunk);
-              }
-              continue;
-            }
-
-            if (eventRecord?.type === "response.output_text.delta") {
-              if (!hasWrittenTextDelta) {
-                console.log(`[Chat API:${requestId}] First text delta received (${Date.now() - startTime}ms)`);
-                writer.write({
-                  type: "data-call-result",
-                  data: {
-                    callId: "model-gen",
-                    result: "Finished reasoning.",
-                  },
-                } as UIMessageChunk);
-              }
-              const outputText = asRecord(eventRecord.output_text);
-              const delta =
-                (typeof eventRecord.delta === "string" && eventRecord.delta) ||
-                (typeof outputText?.delta === "string" && outputText.delta) ||
-                "";
-
-              if (delta) {
-                assistantText += delta;
-                writer.write({ type: "text-delta", id: textId, delta });
-                hasWrittenTextDelta = true;
-              }
-              continue;
-            }
-
-            if (eventRecord?.type === "response.output_text.done") {
-              const outputText = asRecord(eventRecord.output_text);
-              const fullText =
-                (typeof eventRecord.text === "string" ? eventRecord.text : null) ||
-                (typeof outputText?.text === "string" ? outputText.text : null);
-
-              if (fullText !== null) {
-                // If we've already written deltas, we update assistantText to the full string
-                // but don't write it to the stream again to avoid duplication.
-                assistantText = fullText;
-                if (!hasWrittenTextDelta) {
-                  writer.write({ type: "text-delta", id: textId, delta: fullText });
-                  hasWrittenTextDelta = true;
-                }
-              } else {
-                const delta =
-                  (typeof eventRecord.delta === "string" ? eventRecord.delta : null) ||
-                  (typeof outputText?.delta === "string" ? outputText.delta : "");
-                if (delta) {
-                  assistantText += delta;
-                  writer.write({ type: "text-delta", id: textId, delta });
-                  hasWrittenTextDelta = true;
-                }
-              }
-              continue;
-            }
-
-            if (eventRecord?.type === "response.completed") {
-              completedResponse = eventRecord.response ?? event;
-              continue;
-            }
-
-            if (eventRecord?.type === "response.failed") {
-              const errorRecord = asRecord(eventRecord.error);
-              const message = typeof errorRecord?.message === "string" ? errorRecord.message : "";
-              if (!hasWrittenTextDelta) {
-                streamingFailed = true;
-                break;
-              }
-              throw new Error(message || "Agent API request failed");
-            }
-                }
-              }
-            }
-          }
-        } catch (error: unknown) {
-          // If the API throws a 400 immediately on the create() call, or we haven't written deltas yet, fallback.
-          const err = error as { message?: string; status?: number };
-          if (!hasWrittenTextDelta && (err.message?.includes("400") || err.status === 400 || streamingFailed === false)) {
-             console.log(`[Chat API:${requestId}] Streaming failed for ${safeModel}, falling back to non-streaming.`);
-             streamingFailed = true;
-          } else {
-             throw error;
-          }
-        }
-
-        // --- FALLBACK TO NON-STREAMING ---
-        if (streamingFailed || streamEventCount === 0 || (!assistantText && !completedResponse)) {
-          if (forceStreamingOnly) {
-            throw new Error(`Streaming required for ${safeModel} but streaming failed.`);
-          }
-          const nonStreamingResponse = await client.responses.create(
-            requestBodyBase as Responses.ResponseCreateParamsNonStreaming,
-          );
-
-          completedResponse = nonStreamingResponse;
-          if (!assistantText) {
-            assistantText = extractAssistantTextFromCompletedResponse(nonStreamingResponse);
-            if (assistantText) {
-              writer.write({
-                type: "data-call-result",
-                data: {
-                  callId: "model-gen",
-                  result: "Finished reasoning.",
-                },
-              } as UIMessageChunk);
-              writer.write({ type: "text-delta", id: textId, delta: assistantText });
-            }
-          }
-        }
-      } catch (error: unknown) {
-        // One final fallback attempt if the outer try block caught it (e.g. createPerplexityClient or initial create call failed)
-        const err = error as { message?: string; status?: number };
-        if (!hasWrittenTextDelta && (err.message?.includes("400") || err.status === 400) && !forceStreamingOnly) {
-          console.log(`[Chat API:${requestId}] Outer catch streaming failed for ${safeModel}, falling back to non-streaming.`);
-          try {
-            const requestBodyBase = isPresetModel(safeModel)
-              ? {
-                  preset: safeModel,
-                  input: agentInput,
-                  instructions: safeInstructions,
-                }
-              : {
-                  model: safeModel,
-                  input: agentInput,
-                  instructions: safeInstructions,
-                  tools: [{ type: "web_search" }, { type: "fetch_url" }],
-                };            
-            const client = createPerplexityClient();
-            const nonStreamingResponse = await client.responses.create(
-              requestBodyBase as Responses.ResponseCreateParamsNonStreaming,
-            );
-  
-            completedResponse = nonStreamingResponse;
-            assistantText = extractAssistantTextFromCompletedResponse(nonStreamingResponse);
-            if (assistantText) {
-              writer.write({
-                type: "data-call-result",
-                data: {
-                  callId: "model-gen",
-                  result: "Finished reasoning.",
-                },
-              } as UIMessageChunk);
-              writer.write({ type: "text-delta", id: textId, delta: assistantText });
-              hasWrittenTextDelta = true;
-            }
-          } catch (fallbackError: unknown) {
-             const message = fallbackError instanceof Error ? fallbackError.message : "Agent API fallback request failed";
-             assistantText = `Model request failed: ${message}`;
-             writer.write({ type: "text-delta", id: textId, delta: assistantText });
-             hasWrittenTextDelta = true;
-          }
-        } else {
-          const message = error instanceof Error ? error.message : "Agent API request failed";
-          assistantText = `Model request failed: ${message}`;
-          writer.write({ type: "text-delta", id: textId, delta: assistantText });
-          hasWrittenTextDelta = true;
-        }
-      }
-
-      if (!assistantText) {
-        assistantText = extractAssistantTextFromCompletedResponse(completedResponse);
-      }
-
-      if (!assistantText) {
-        assistantText = EMPTY_RESPONSE_FALLBACK_TEXT;
-        writer.write({ type: "text-delta", id: textId, delta: assistantText });
-        hasWrittenTextDelta = true;
-      }
-
-      if (!hasWrittenTextDelta && assistantText) {
-        writer.write({ type: "text-delta", id: textId, delta: assistantText });
-        hasWrittenTextDelta = true;
-      }
-
-      const citations = extractCitationsFromResponse(completedResponse);
-
-      citations.forEach((citation, index) => {
+      citations.forEach((citation: any, index: number) => {
         writer.write({
           type: "source-url",
           sourceId: `source-${index}`,
@@ -1026,3 +715,4 @@ export async function POST(request: Request) {
 
   return createUIMessageStreamResponse({ stream });
 }
+

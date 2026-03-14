@@ -19,7 +19,6 @@ test.describe("Role document upload + chat", () => {
 
   test("uploads a document and starts a role chat", async ({ page }) => {
     const roleName = `E2E Role ${Math.random().toString(36).slice(2, 8)}`;
-    const roleDescription = "E2E role description";
 
     await registerAndLogin(page);
 
@@ -96,7 +95,6 @@ test.describe("Role document upload + chat", () => {
   test("uploads a large document (12MB) successfully", async ({ page }) => {
     test.setTimeout(600000);
     const roleName = `Large File Role ${Math.random().toString(36).slice(2, 8)}`;
-    const roleDescription = "Test for large file uploads";
 
     await registerAndLogin(page);
 

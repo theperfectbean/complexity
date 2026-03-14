@@ -52,11 +52,33 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           email: user.email,
           name: user.name,
           image: user.image,
+          isAdmin: user.isAdmin,
         };
       },
     }),
   ],
   pages: {
     signIn: "/login",
+  },
+  callbacks: {
+    async jwt({ token, user }) {
+      if (user) {
+        token.isAdmin = (user as any).isAdmin;
+      }
+      return token;
+    },
+    async session({ session, token }) {
+      if (session.user) {
+        (session.user as any).isAdmin = token.isAdmin;
+      }
+      return session;
+    },
+    async redirect({ url, baseUrl }) {
+      // Allows relative callback URLs
+      if (url.startsWith("/")) return url;
+      // Allows callback URLs on the same origin
+      if (new URL(url).origin === new URL(baseUrl).origin) return url;
+      return baseUrl;
+    },
   },
 });

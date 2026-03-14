@@ -2,7 +2,7 @@
 
 ## Overview
 
-A Docker Compose application with 4 services: a **Next.js 15 App Router** frontend/backend, a **PostgreSQL 16 + pgvector** database, a **Python FastAPI embedding microservice** (CPU-only `all-MiniLM-L6-v2`), and **Redis** for caching/rate-limiting. All LLM inference and web search flows through the **Perplexity Sonar API** via the Vercel AI SDK v6 (`@ai-sdk/perplexity`). RAG is handled locally — documents are chunked, embedded by the microservice, stored as `vector(384)` columns in pgvector, and retrieved via cosine similarity at query time. Auth is NextAuth.js v5 (Auth.js) with Credentials provider (JWT sessions) + Drizzle adapter. UI uses shadcn/ui + Tailwind + Motion (formerly Framer Motion) + Inter + Lucide icons.
+A Docker Compose application with 4 services: a **Next.js 16 App Router** frontend/backend, a **PostgreSQL 16 + pgvector** database, a **Python FastAPI embedding microservice** (CPU-only `all-MiniLM-L6-v2`), and **Redis** for caching/rate-limiting. All LLM inference and web search flows through the **Perplexity Agent API** via the official SDK (`@perplexity-ai/perplexity_ai`) integrated with Vercel AI SDK v6. RAG is handled locally — documents are chunked, embedded by the microservice, stored as `vector(384)` columns in pgvector, and retrieved via cosine similarity at query time. Auth is NextAuth.js v5 (Auth.js) with Credentials provider (JWT sessions) + Drizzle adapter. UI uses shadcn/ui + Tailwind + Motion (formerly Framer Motion) + Inter + Lucide icons.
 
 ---
 

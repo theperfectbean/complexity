@@ -1,19 +1,20 @@
 import Perplexity from "@perplexity-ai/perplexity_ai";
 import { LanguageModelV3, LanguageModelV3CallOptions, LanguageModelV3GenerateResult, LanguageModelV3StreamResult } from "@ai-sdk/provider";
+import { LanguageModel } from "ai";
 import { ResponseStreamChunk, ResponseCreateResponse } from "@perplexity-ai/perplexity_ai/resources/responses";
 
 import { env } from "@/lib/env";
 
-export function createPerplexityClient() {
-  return new Perplexity({ apiKey: env.PERPLEXITY_API_KEY });
+export function createPerplexityClient(apiKey?: string) {
+  return new Perplexity({ apiKey: apiKey || env.PERPLEXITY_API_KEY });
 }
 
 /**
- * Creates a standard AI SDK LanguageModelV3 for Perplexity.
+ * Creates a standard AI SDK LanguageModel for Perplexity.
  * This allows using standard streamText() and other higher-level tools.
  */
-export function createPerplexityModel(modelId: string): LanguageModelV3 {
-  const client = createPerplexityClient();
+export function createPerplexityModel(modelId: string, apiKey?: string): LanguageModel {
+  const client = createPerplexityClient(apiKey);
   
   return {
     specificationVersion: "v3",
