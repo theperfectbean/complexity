@@ -2,7 +2,7 @@
 
 ## Overview
 
-A Docker Compose application with 4 services: a **Next.js 16 App Router** frontend/backend, a **PostgreSQL 16 + pgvector** database, a **Python FastAPI embedding microservice** (CPU-only `all-MiniLM-L6-v2`), and **Redis** for caching/rate-limiting. All LLM inference and web search flows through the **Perplexity Agent API** via the official SDK (`@perplexity-ai/perplexity_ai`) integrated with Vercel AI SDK v6. RAG is handled locally — documents are chunked, embedded by the microservice, stored as `vector(384)` columns in pgvector, and retrieved via cosine similarity at query time. Auth is NextAuth.js v5 (Auth.js) with Credentials provider (JWT sessions) + Drizzle adapter. UI uses shadcn/ui + Tailwind + Motion (formerly Framer Motion) + Inter + Lucide icons.
+A Docker Compose application with 4 services: a **Next.js 16 App Router** frontend/backend, a **PostgreSQL 16 + pgvector** database, a **Python FastAPI embedding microservice** (CPU-only `all-MiniLM-L6-v2`), and **Redis** for caching/rate-limiting. LLM inference supports multiple providers (Anthropic, OpenAI, Google, xAI) via the Vercel AI SDK, alongside the **Perplexity Agent API** for web-grounded search. Local LLM support is provided via **Ollama** and generic OpenAI-compatible APIs. RAG is handled locally — documents are chunked, embedded by the microservice, stored as `vector(384)` columns in pgvector, and retrieved via cosine similarity at query time. Auth is NextAuth.js v5 (Auth.js) with Credentials provider (JWT sessions) + Drizzle adapter. UI uses shadcn/ui + Tailwind + Motion (formerly Framer Motion) + Inter + Lucide icons.
 
 ---
 
@@ -300,18 +300,17 @@ POST /api/chat  { messages, model, threadId?, spaceId? }
   │       "Use these documents as additional context:\n{chunks}"
   │
   ▼
-streamText({
-  model: perplexity(selectedModel),
+runGeneration({
+  modelId: selectedModel,
   system: systemPrompt + ragContext,
   messages: conversationHistory,
-  providerOptions: {
-    perplexity: { search_recency_filter: 'month' }
-  },
-  onFinish({ text, sources }) {
-    // Persist user + assistant messages to DB
-    // Store citations from sources
-  }
+  keys: apiKeysFromDb,
+  writer: streamWriter,
 })
+  │
+  ├─ Resolves provider (Perplexity Agent or Direct SDK)
+  ├─ Streams text deltas and tool events (Reasoning/Searching)
+  └─ Returns text + citations
   │
   ▼
 result.toUIMessageStreamResponse()  →  SSE stream to client
@@ -554,7 +553,7 @@ CSS variables in `globals.css` for light/dark, toggled via `ThemeToggle` (shadcn
 | **Separate embedder microservice**   | Python `sentence-transformers` can't run in Node.js. Microservice keeps Next.js container lean (~150MB vs ~2GB).                        |
 | **HNSW over IVFFlat index**          | Better recall at query time, no need to `VACUUM` after inserts. Slightly more memory but negligible at personal instance scale.         |
 | **CPU-only PyTorch**                 | `all-MiniLM-L6-v2` is 22.7M params / 80MB. Fast on CPU. Avoids CUDA dependency, keeps Docker image small via `--index-url .../cpu`.   |
-| **Perplexity as sole LLM provider**  | Single API key for Sonar/Sonar Pro/Reasoning/Deep Research. Models access OpenAI/Anthropic/Gemini internally. No multi-key management. |
+| **Multi-Provider LLM Registry**      | Centralized hub in `lib/llm.ts` to resolve models to Anthropic, OpenAI, Google, xAI, Ollama, or Perplexity. Allows flexible model choice. |
 | **pgvector over dedicated vector DB**| Eliminates Chroma/Qdrant/Weaviate container. Vector storage lives alongside relational data. Simpler ops, fewer services, JOIN-capable. |
 | **Redis for rate limiting + caching**| Lightweight (7MB Alpine image), avoids stateful rate limiting in the app. Also useful for response caching with TTL.                    |
 
@@ -563,8 +562,16 @@ CSS variables in `globals.css` for light/dark, toggled via `ThemeToggle` (shadcn
 ## Environment Variables (`.env.example`)
 
 ```env
-# Perplexity
+# LLM Providers (Can also be set via Admin UI)
 PERPLEXITY_API_KEY=pplx-xxxxxxxxxxxxxxxxxxxx
+ANTHROPIC_API_KEY=sk-ant-xxxxxxxxxxxxxxxxxxxx
+OPENAI_API_KEY=sk-xxxxxxxxxxxxxxxxxxxx
+GOOGLE_GENERATIVE_AI_API_KEY=xxxxxxxxxxxxxxxxxxxx
+XAI_API_KEY=xai-xxxxxxxxxxxxxxxxxxxx
+
+# Local LLM (Optional)
+OLLAMA_BASE_URL=http://localhost:11434/api
+LOCAL_OPENAI_BASE_URL=http://localhost:1234/v1
 
 # PostgreSQL
 POSTGRES_USER=complexity
@@ -575,12 +582,6 @@ DATABASE_URL=postgresql://complexity:changeme@postgres:5432/complexity
 # Auth.js
 NEXTAUTH_SECRET=generate-a-32-char-random-string
 NEXTAUTH_URL=http://localhost:3000
-
-# Embedder (internal service URL)
-EMBEDDER_URL=http://embedder:8000
-
-# Redis
-REDIS_URL=redis://redis:6379
 ```
 
 ---

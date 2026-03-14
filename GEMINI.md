@@ -158,6 +158,10 @@ DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose build app
 ### Multi-Provider & Admin Settings (Implemented 2026-03-14)
 - **Direct Providers**: Integrated Vercel AI SDK providers (`@ai-sdk/anthropic`, `@ai-sdk/openai`, `@ai-sdk/google`, `@ai-sdk/xai`) into the `/api/chat` route. This allows for direct, low-latency connections to LLMs alongside the Perplexity Agent API.
 - **Local LLMs**: Added support for local models via **Ollama** (`ai-sdk-ollama`) and generic **OpenAI-compatible** APIs (e.g., LM Studio, vLLM).
+- **Architectural Refactor**: 
+  - Refactored the monolithic `/api/chat` route into a **Dynamic Provider Registry** pattern.
+  - Created `app/src/lib/llm.ts` as the central registry for resolving providers and running generation.
+  - Created `app/src/lib/perplexity-agent.ts` to encapsulate the complex streaming and fallback logic of the Perplexity Agent API.
 - **Admin Settings**: Added a new `settings` table to the database to store API keys and base URLs. 
 - **Settings UI**: Implemented `/settings/admin` page, accessible only to admin users, allowing global configuration of API keys and local provider base URLs (Ollama, Local OpenAI) via the UI.
 - **Role-based Access**: Added `isAdmin` field to the `users` table and updated Auth.js session to include this field, enabling protected admin routes.
