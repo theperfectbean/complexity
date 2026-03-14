@@ -2,6 +2,7 @@
 
 import { ChangeEvent, useRef, useState } from "react";
 import { Plus, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
 type FileUploaderProps = {
   roleId: string;
@@ -28,15 +29,18 @@ export function FileUploader({ roleId, onUploaded, variant = "button" }: FileUpl
       });
 
       if (!response.ok) {
-        throw new Error("Upload failed");
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || "Upload failed");
       }
 
+      toast.success("File uploaded successfully");
       onUploaded();
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }
     } catch (error) {
       console.error(error);
+      toast.error(error instanceof Error ? error.message : "Upload failed");
     } finally {
       setUploading(false);
     }

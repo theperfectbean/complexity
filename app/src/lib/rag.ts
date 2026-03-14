@@ -6,7 +6,7 @@ import { env } from "@/lib/env";
 
 const CHUNK_MAX_CHARS = 2200;
 const CHUNK_OVERLAP = 200;
-const EMBEDDER_TIMEOUT_MS = 1000 * 20;
+const EMBEDDER_TIMEOUT_MS = 1000 * 600;
 
 export function chunkText(input: string, maxChars = CHUNK_MAX_CHARS, overlap = CHUNK_OVERLAP) {
   const text = input.replace(/\r\n/g, "\n").trim();
@@ -29,25 +29,52 @@ export function chunkText(input: string, maxChars = CHUNK_MAX_CHARS, overlap = C
 }
 
 export async function getEmbeddings(texts: string[]) {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), EMBEDDER_TIMEOUT_MS);
+  const BATCH_SIZE = 200;
+  const CONCURRENCY_LIMIT = 4;
+  const allEmbeddings: number[][] = new Array(texts.length);
 
-  const response = await fetch(`${env.EMBEDDER_URL}/embed`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ texts }),
-    cache: "no-store",
-    signal: controller.signal,
-  }).finally(() => clearTimeout(timeoutId));
-
-  if (!response.ok) {
-    throw new Error(`Embedding service error: ${response.status}`);
+  const batches: string[][] = [];
+  for (let i = 0; i < texts.length; i += BATCH_SIZE) {
+    batches.push(texts.slice(i, i + BATCH_SIZE));
   }
 
-  const payload = (await response.json()) as { embeddings: number[][] };
-  return payload.embeddings;
+  for (let i = 0; i < batches.length; i += CONCURRENCY_LIMIT) {
+    const batchGroup = batches.slice(i, i + CONCURRENCY_LIMIT);
+    await Promise.all(
+      batchGroup.map(async (batch, groupIndex) => {
+        const batchStartIndex = (i + groupIndex) * BATCH_SIZE;
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), EMBEDDER_TIMEOUT_MS);
+
+        try {
+          const response = await fetch(`${env.EMBEDDER_URL}/embed`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ texts: batch }),
+            cache: "no-store",
+            signal: controller.signal,
+          });
+
+          if (!response.ok) {
+            throw new Error(`Embedding service error: ${response.status}`);
+          }
+
+          const payload = (await response.json()) as { embeddings: number[][] };
+          
+          // Place embeddings in the correct positions
+          payload.embeddings.forEach((emb, j) => {
+            allEmbeddings[batchStartIndex + j] = emb;
+          });
+        } finally {
+          clearTimeout(timeoutId);
+        }
+      }),
+    );
+  }
+
+  return allEmbeddings;
 }
 
 export async function similaritySearch(roleId: string, embedding: number[], limit = 5) {

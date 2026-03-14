@@ -6,6 +6,9 @@ const nextConfig: NextConfig = {
   typescript: {
     tsconfigPath: "./tsconfig.build.json",
   },
+  experimental: {
+    middlewareClientMaxBodySize: 20 * 1024 * 1024, // 20MB
+  },
 };
 
 export default nextConfig;

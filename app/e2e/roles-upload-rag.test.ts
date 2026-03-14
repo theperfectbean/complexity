@@ -53,4 +53,39 @@ test.describe("Role document upload + chat", () => {
     await expect(page).toHaveURL(/\/search\//, { timeout: 15000 });
     await expect(page.getByRole("button", { name: "Copy message" })).toBeVisible({ timeout: 30000 });
   });
+
+  test("uploads a large document (12MB) successfully", async ({ page }) => {
+    test.setTimeout(600000);
+    const roleName = `Large File Role ${Math.random().toString(36).slice(2, 8)}`;
+    const roleDescription = "Test for large file uploads";
+
+    await registerAndLogin(page);
+
+    await page.goto("/roles");
+    await page.getByRole("link", { name: "New role" }).click();
+    await page.getByPlaceholder("Name your role").fill(roleName);
+    await page.getByPlaceholder("Describe your role, goals, subject, etc.").fill(roleDescription);
+    await page.getByRole("button", { name: "Create role" }).click();
+
+    await expect(page).toHaveURL(/\/roles\//, { timeout: 15000 });
+
+    const uploadButton = page.getByRole("button", { name: "Upload file" }).first();
+    const fileChooserPromise = page.waitForEvent("filechooser");
+    await uploadButton.click();
+    const fileChooser = await fileChooserPromise;
+
+    // Create a 12MB buffer of dummy text
+    const largeBuffer = Buffer.alloc(12 * 1024 * 1024, "This is a test file for large upload verification. ");
+
+    await fileChooser.setFiles([
+      {
+        name: "large-test.txt",
+        mimeType: "text/plain",
+        buffer: largeBuffer,
+      },
+    ]);
+
+    // Large files take longer to process (upload + chunk + embed)
+    await expect(page.getByText("large-test.txt")).toBeVisible({ timeout: 540000 });
+  });
 });

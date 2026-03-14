@@ -30,7 +30,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ rol
     return NextResponse.json({ error: "Role not found" }, { status: 404 });
   }
 
-  const formData = await request.formData();
+  let formData: FormData;
+  try {
+    formData = await request.formData();
+  } catch (error) {
+    console.error("[Upload Error] Failed to parse FormData:", error);
+    return NextResponse.json({ error: "Failed to parse upload data. The file might be too large." }, { status: 400 });
+  }
   const file = formData.get("file");
 
   if (!(file instanceof File)) {
