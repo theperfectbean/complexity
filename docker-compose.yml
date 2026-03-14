@@ -7,7 +7,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - ./.data/postgres:/var/lib/postgresql/data
       - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     ports:
       - "127.0.0.1:5432:5432"
@@ -18,12 +18,38 @@ services:
       retries: 5
     restart: unless-stopped
 
+  postgres-backup:
+    image: pgvector/pgvector:pg16-trixie
+    container_name: complexity-postgres-backup
+    volumes:
+      - ./backups/postgres:/backups
+    environment:
+      PGHOST: postgres
+      PGUSER: ${POSTGRES_USER}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGDATABASE: ${POSTGRES_DB}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: >
+      sh -c "
+      while true; do
+        FILENAME=/backups/backup-$(date +%Y-%m-%d-%H%M).sql
+        echo \"[$(date)] Starting backup to $FILENAME...\"
+        pg_dump -h postgres -U ${POSTGRES_USER} -d ${POSTGRES_DB} > $FILENAME
+        echo \"[$(date)] Backup complete. Cleaning up old backups (keeping last 7 days)...\"
+        find /backups -type f -name 'backup-*.sql' -mtime +7 -delete
+        sleep 86400
+      done
+      "
+    restart: unless-stopped
+
   redis:
     image: redis:7-alpine
     container_name: complexity-redis
     command: ["redis-server", "--appendonly", "yes"]
     volumes:
-      - redisdata:/data
+      - ./.data/redis:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -39,9 +65,10 @@ services:
     environment:
       - SENTENCE_TRANSFORMERS_HOME=/models
     volumes:
-      - embedding_models:/models
+      - ./.data/models:/models
     expose:
       - "8000"
+
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 20s

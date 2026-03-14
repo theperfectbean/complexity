@@ -154,6 +154,12 @@ DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose build app
 
 - **Nodemailer in Docker**: When adding `nodemailer` to the project, ensured it was installed inside the Docker container by running `npm install` via `docker compose exec` and updated the `Dockerfile` with `--legacy-peer-deps` to resolve peer dependency conflicts with `next-auth`.
 
+### Data Resilience & Backup Strategy (2026-03-14)
+- **Persistence**: Switched from Docker-managed named volumes to local bind mounts in `.data/` for Postgres, Redis, and Embedder models. This ensures data persists in the project folder and survives `down -v` commands.
+- **Automated Backups**: Added a `postgres-backup` sidecar service that performs a `pg_dump` every 24 hours to the `backups/postgres/` directory and retains the last 7 days of snapshots.
+- **Auto-Migrations**: Updated the `app/Dockerfile` and entrypoint to automatically run `npm run db:migrate` on container startup, ensuring the database schema is always in sync with the codebase.
+- **Hygiene**: Added `.data/` and `backups/` to `.gitignore` and `.dockerignore`.
+
 ### Drizzle & postgres-js Type Fix (2026-03-14)
 - **Problem**: `db.delete().where()` in `drizzle-orm` with the `postgres-js` driver returns a `RowList` that does not have a `rowCount` property, causing TypeScript build failures in `src/app/api/roles/[roleId]/documents/[documentId]/route.ts`.
 - **Fix**: Replaced `result.rowCount` check with `.returning({ id: table.id })` followed by a `result.length === 0` check. This pattern is type-safe and consistent across different Drizzle drivers.

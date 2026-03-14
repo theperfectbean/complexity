@@ -27,3 +27,5 @@ yarn-error.log*
 
 .gemini/
 gha-creds-*.json
+.data/
+backups/

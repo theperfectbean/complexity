@@ -23,5 +23,16 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/public ./public
+
+# Copy migrations and config for auto-migration
+COPY --from=builder /app/src/lib/db/migrations ./src/lib/db/migrations
+COPY --from=builder /app/drizzle.config.ts ./drizzle.config.ts
+COPY --from=builder /app/package.json ./package.json
+
 EXPOSE 3000
-CMD ["node", "server.js"]
+
+# Entrypoint script to run migrations before starting
+RUN echo -e '#!/bin/sh\nnpm run db:migrate\nnode server.js' > /app/entrypoint.sh && chmod +x /app/entrypoint.sh
+
+CMD ["/app/entrypoint.sh"]
+
