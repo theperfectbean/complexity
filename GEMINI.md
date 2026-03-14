@@ -155,7 +155,7 @@ DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose build app
 - **Nodemailer in Docker**: When adding `nodemailer` to the project, ensured it was installed inside the Docker container by running `npm install` via `docker compose exec` and updated the `Dockerfile` with `--legacy-peer-deps` to resolve peer dependency conflicts with `next-auth`.
 
 ### File Upload & RAG Scaling (Fixed 2026-03-14)
-- **Body Size Limit**: Increased Next.js middleware body size limit to 50MB in `next.config.ts` using `experimental.middlewareClientMaxBodySize`. This resolved 'TypeError: Failed to parse body as FormData' errors when uploading large files.
+- **Body Size Limit**: Increased Next.js proxy body size limit to 50MB in `next.config.ts` using `experimental.proxyClientMaxBodySize`. This resolved 'TypeError: Failed to parse body as FormData' errors when uploading large files.
 - **Embedding Batching**: Implemented parallel batching in `app/src/lib/rag.ts` for document embeddings. Large documents are now split into batches of 200 chunks and processed with a concurrency limit of 4. This prevents the embedding service from timing out and improves reliability for large files.
 - **Embedder Concurrency**: Increased `uvicorn` workers to 4 in `embedder/Dockerfile` to utilize multiple CPU cores for parallel embedding requests.
 - **Timeouts**: Increased the embedder timeout to 600 seconds to accommodate the processing time required for very large documents (e.g., 12MB+ of text).

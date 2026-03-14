@@ -106,7 +106,6 @@ export function Sidebar({ collapsed = false, onToggle, onNavigate }: SidebarProp
 
   const navItems = [
     { href: "/", label: "Home", icon: Home },
-    { href: "/library", label: "Library", icon: BookOpen },
     { href: "/roles", label: "Roles", icon: Users },
   ];
 
@@ -189,6 +188,18 @@ export function Sidebar({ collapsed = false, onToggle, onNavigate }: SidebarProp
               </Link>
             );
           })}
+          {collapsed && (
+            <Link
+              className={cn(
+                "flex items-center justify-center rounded-lg px-3 py-2 text-sidebar-foreground transition-colors hover:bg-black/5 dark:hover:bg-white/5",
+              )}
+              href="/recent"
+              onClick={onNavigate}
+              title="Recent"
+            >
+              <BookOpen className="h-4 w-4 shrink-0" />
+            </Link>
+          )}
           {collapsed && pinnedRoles.map((role) => (
             <Link
               key={role.id}
@@ -225,7 +236,14 @@ export function Sidebar({ collapsed = false, onToggle, onNavigate }: SidebarProp
             )}
 
             <div className="rounded-lg border border-sidebar-border/80 bg-card/70 p-2">
-              <p className="mb-2 px-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Recent</p>
+              <Link 
+                href="/recent" 
+                onClick={onNavigate}
+                className="mb-2 flex items-center justify-between px-2 py-1 transition-colors hover:text-primary group"
+              >
+                <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground group-hover:text-primary">Recent</span>
+                <BookOpen className="h-3.5 w-3.5 text-muted-foreground/50 group-hover:text-primary" />
+              </Link>
               <div className="space-y-1">
                 {recentThreads.length === 0 ? <p className="px-2 py-1 text-xs text-muted-foreground">No recent threads</p> : null}
                 {recentThreads.map((thread) => (

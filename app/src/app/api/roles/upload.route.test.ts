@@ -45,8 +45,8 @@ describe("POST /api/roles/[roleId]/upload", () => {
   });
 
   function mockMutationChains() {
-    const firstValues = vi.fn().mockResolvedValue(undefined);
-    vi.mocked(db.insert).mockReturnValueOnce({ values: firstValues } as never);
+    const values = vi.fn().mockResolvedValue(undefined);
+    vi.mocked(db.insert).mockReturnValue({ values } as never);
 
     const where = vi.fn().mockResolvedValue(undefined);
     const set = vi.fn(() => ({ where }));
@@ -144,10 +144,11 @@ describe("POST /api/roles/[roleId]/upload", () => {
 
   it("returns 400 for oversized file", async () => {
     mockOwnedRole([{ id: "role-1" }]);
+    mockMutationChains();
     vi.mocked(isAllowedDocument).mockReturnValue(true);
 
     const oversizedFile = new File(["hello"], "big.pdf", { type: "application/pdf" });
-    Object.defineProperty(oversizedFile, "size", { value: 21 * 1024 * 1024 });
+    Object.defineProperty(oversizedFile, "size", { value: 51 * 1024 * 1024 });
 
     const request = {
       formData: async () => ({
@@ -157,7 +158,7 @@ describe("POST /api/roles/[roleId]/upload", () => {
 
     const response = await POST(request, { params: Promise.resolve({ roleId: "role-1" }) });
     expect(response.status).toBe(400);
-    await expect(response.json()).resolves.toEqual({ error: "File exceeds 20MB limit" });
+    await expect(response.json()).resolves.toEqual({ error: "File exceeds 50MB limit" });
   });
 
   it("marks document failed when extraction throws", async () => {

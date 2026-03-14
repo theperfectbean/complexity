@@ -34,7 +34,7 @@ describe("Sidebar", () => {
     render(<Sidebar collapsed={false} onToggle={() => {}} />);
 
     expect(screen.getByText("Home")).toBeInTheDocument();
-    expect(screen.getByText("Library")).toBeInTheDocument();
+    expect(screen.getByText("Recent")).toBeInTheDocument();
     expect(screen.getByText("Roles")).toBeInTheDocument();
 
     await waitFor(() => expect(screen.getByText("First thread")).toBeInTheDocument());

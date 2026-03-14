@@ -87,7 +87,7 @@ Major routes:
 
 - `/` — landing + new search
 - `/search/[threadId]` — thread chat
-- `/library` — thread management
+- `/recent` — thread management
 - `/settings/memory` — memory management
 - `/spaces` — space management
 - `/spaces/[spaceId]` — upload + space-scoped chat

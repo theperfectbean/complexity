@@ -48,7 +48,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ rol
   }
 
   if (file.size > MAX_FILE_SIZE) {
-    return NextResponse.json({ error: "File exceeds 20MB limit" }, { status: 400 });
+    return NextResponse.json({ error: "File exceeds 50MB limit" }, { status: 400 });
   }
 
   const documentId = createId();

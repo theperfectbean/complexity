@@ -1,6 +1,6 @@
 "use client";
 
-import { Brain, Command, Home, Library, Users, LogOut } from "lucide-react";
+import { Brain, Command, Home, BookOpen, Users, LogOut } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
 import Link from "next/link";
 import { Drawer } from "vaul";
@@ -26,20 +26,36 @@ export function MobileNav({ open, onClose, onOpenCommandPalette }: MobileNavProp
             <p className="text-xs text-muted-foreground">Search and workspace</p>
           </div>
 
-          <nav className="mt-5 space-y-2 text-sm">
-            <Link className="flex items-center gap-2 rounded-lg border bg-card px-3 py-2 hover:bg-black/5 dark:hover:bg-white/5" href="/" onClick={onClose}>
+          <nav className="mt-6 flex flex-col gap-2">
+            <Link 
+              className="flex items-center gap-2 rounded-lg border bg-card px-3 py-2 hover:bg-black/5 dark:hover:bg-white/5" 
+              href="/" 
+              onClick={onClose}
+            >
               <Home className="h-4 w-4" />
-              New search
+              Home
             </Link>
-            <Link className="flex items-center gap-2 rounded-lg border bg-card px-3 py-2 hover:bg-black/5 dark:hover:bg-white/5" href="/library" onClick={onClose}>
-              <Library className="h-4 w-4" />
-              Library
+            <Link 
+              className="flex items-center gap-2 rounded-lg border bg-card px-3 py-2 hover:bg-black/5 dark:hover:bg-white/5" 
+              href="/recent" 
+              onClick={onClose}
+            >
+              <BookOpen className="h-4 w-4" />
+              Recent
             </Link>
-            <Link className="flex items-center gap-2 rounded-lg border bg-card px-3 py-2 hover:bg-black/5 dark:hover:bg-white/5" href="/roles" onClick={onClose}>
+            <Link 
+              className="flex items-center gap-2 rounded-lg border bg-card px-3 py-2 hover:bg-black/5 dark:hover:bg-white/5" 
+              href="/roles" 
+              onClick={onClose}
+            >
               <Users className="h-4 w-4" />
               Roles
             </Link>
-            <Link className="flex items-center gap-2 rounded-lg border bg-card px-3 py-2 hover:bg-black/5 dark:hover:bg-white/5" href="/settings/memory" onClick={onClose}>
+            <Link 
+              className="flex items-center gap-2 rounded-lg border bg-card px-3 py-2 hover:bg-black/5 dark:hover:bg-white/5" 
+              href="/settings/memory" 
+              onClick={onClose}
+            >
               <Brain className="h-4 w-4" />
               Memory
             </Link>

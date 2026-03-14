@@ -46,7 +46,7 @@ Self-hosted Perplexity-style AI search and RAG workspace.
   - `/`, `/login`, `/register`
   - `/search/[threadId]`
   - `/spaces`, `/spaces/[spaceId]`
-  - `/library`
+  - `/recent`
   - `/settings/memory`
 - Chat UI uses AI SDK v6 transport (`DefaultChatTransport`) and features enhanced Framer Motion animations (for copy buttons, layout transitions, and thinking states).
 
@@ -69,7 +69,7 @@ Self-hosted Perplexity-style AI search and RAG workspace.
 - `npm test` and `npx playwright test` pass in [app](app)
 
 ### Test Suite Status
-- Frameworks: Vitest + React Testing Library (Unit/Integration) and Playwright (E2E)
+- Frameworks: Vitest + React Testing Recent (Unit/Integration) and Playwright (E2E)
 - Current scope: 64 unit/integration tests and 4 E2E test files covering auth guards, ownership checks, validation errors, cache-hit/rate-limit paths, and UI interactions.
 
 ## Documentation Index
@@ -109,7 +109,7 @@ The Compose config includes local build cache settings for the `app` image to sp
 
 - Phase 1: `docker compose up --build` and verify all services become healthy.
 - Phase 2: Create a thread, send a prompt, confirm streaming response and persisted history after reload.
-- Phase 3: Verify sidebar/mobile navigation, library search/delete, and theme toggle.
+- Phase 3: Verify sidebar/mobile navigation, recent search/delete, and theme toggle.
 - Phase 4: Create a space, upload a document, wait for `ready`, then ask a space-scoped question.
 - Phase 5: Trigger chat rate limit and verify `429` response behavior.
 

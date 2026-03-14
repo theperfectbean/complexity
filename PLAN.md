@@ -41,7 +41,7 @@ complexity/
 │       │   ├── spaces/
 │       │   │   ├── page.tsx              # Space grid
 │       │   │   └── [spaceId]/page.tsx    # Space detail + scoped chat
-│       │   ├── library/
+│       │   ├── recent/
 │       │   │   └── page.tsx              # All past threads
 │       └── api/
 │           ├── auth/[...nextauth]/route.ts
@@ -394,7 +394,7 @@ Return { documentId, chunkCount, status: 'ready' }
 - **`DocumentList`** — table/list of docs with `ProcessingBadge` (processing / ready / failed)
 - Chat panel reuses the same `MessageList` / `FollowUpInput` components, but `POST /api/chat` includes `spaceId`
 
-### Page: `/library`
+### Page: `/recent`
 
 - **`ThreadGrid`** — searchable list of all threads, sorted by recency
 - **`ThreadCard`** — title (auto-generated from first query), model badge, date, delete action
@@ -455,15 +455,15 @@ CSS variables in `globals.css` for light/dark, toggled via `ThemeToggle` (shadcn
 10. Build `FollowUpInput` — compact SearchBar variant pinned to bottom, submits to same thread
 11. **Verify:** type query → model selector works → response streams with markdown rendering → sources appear → follow-up works → thread persists on reload
 
-### Phase 3 — Layout & Navigation (Sidebar, Library, Polish)
+### Phase 3 — Layout & Navigation (Sidebar, Recent, Polish)
 
 1. Build `AppShell` — flex layout with collapsible `Sidebar` (Motion `animate` width between 280px and 0px)
 2. Build `Sidebar` — sections: logo/brand at top, "New Search" button, "Recent" thread list (last 20), "Spaces" link, user avatar + settings dropdown at bottom
 3. Build `MobileNav` — shadcn `Sheet` triggered by hamburger icon, contains same sidebar content
-4. Build `Library` page — paginated thread grid, search/filter by title, delete thread action
+4. Build `Recent` page — paginated thread grid, search/filter by title, delete thread action
 5. Build `ThreadCard` — title, model badge (colored per model), relative timestamp, click to navigate
 6. Implement `layoutId="searchbar"` shared transition — homepage search bar animates to top-bar position when navigating to thread page
-7. Add loading skeletons for thread list, message list, library grid
+7. Add loading skeletons for thread list, message list, recent grid
 8. Add `EmptyState` components for no threads, no spaces, no messages
 9. Implement `next-themes` dark/light toggle with CSS variable palette matching Perplexity's low-contrast aesthetic
 10. **Verify:** sidebar collapses on mobile → thread list loads → navigation feels fluid → dark mode works
@@ -549,7 +549,7 @@ CSS variables in `globals.css` for light/dark, toggled via `ThemeToggle` (shadcn
 | Decision                             | Rationale                                                                                                                               |
 | ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
 | **Drizzle over Prisma**              | Native `vector(384)` column type + HNSW index support + `cosineDistance` helper. Prisma requires raw SQL for all pgvector operations.   |
-| **Motion v12 over Framer Motion**    | Same library, rebranded. Import from `motion/react` not `framer-motion`.                                                               |
+| **Motion v12 over Framer Motion**    | Same recent, rebranded. Import from `motion/react` not `framer-motion`.                                                               |
 | **JWT over DB sessions**             | Credentials provider in Auth.js doesn't persist DB sessions by default. JWT is simpler, avoids Redis session store complexity.           |
 | **Separate embedder microservice**   | Python `sentence-transformers` can't run in Node.js. Microservice keeps Next.js container lean (~150MB vs ~2GB).                        |
 | **HNSW over IVFFlat index**          | Better recall at query time, no need to `VACUUM` after inserts. Slightly more memory but negligible at personal instance scale.         |
@@ -591,6 +591,6 @@ REDIS_URL=redis://redis:6379
 | ----- | ------------------------------------------------------------------------------------------------------------------ |
 | 1     | `docker compose up --build` → all services healthy, register + login works, DB tables exist with pgvector extension |
 | 2     | Submit query → streaming markdown response → citations render → thread persists on refresh → model switching works  |
-| 3     | Sidebar navigation → thread list → library search → dark mode toggle → layout animations smooth                     |
+| 3     | Sidebar navigation → thread list → recent search → dark mode toggle → layout animations smooth                     |
 | 4     | Create space → upload PDF/DOCX/TXT → embedding completes → space-scoped query returns RAG-augmented response        |
 | 5     | Rate limiting triggers at threshold → error toasts appear → `docker compose down && up` preserves all data          |
