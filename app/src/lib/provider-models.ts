@@ -33,9 +33,13 @@ export async function fetchProviderModels(): Promise<ProviderModel[]> {
         { id: "sonar-reasoning", name: "Sonar Reasoning", provider: "Perplexity" },
         { id: "sonar-reasoning-pro", name: "Sonar Reasoning Pro", provider: "Perplexity" },
         { id: "sonar-deep-research", name: "Sonar Deep Research", provider: "Perplexity" },
-        { id: "claude-3-5-sonnet", name: "Claude 3.5 Sonnet (via Perplexity)", provider: "Perplexity" },
-        { id: "claude-3-5-haiku", name: "Claude 3.5 Haiku (via Perplexity)", provider: "Perplexity" },
+        { id: "claude-opus-4-6", name: "Claude Opus 4.6 (via Perplexity)", provider: "Perplexity" },
+        { id: "claude-sonnet-4-6", name: "Claude Sonnet 4.6 (via Perplexity)", provider: "Perplexity" },
+        { id: "claude-haiku-4-5", name: "Claude Haiku 4.5 (via Perplexity)", provider: "Perplexity" },
+        { id: "gpt-5.4", name: "GPT-5.4 (via Perplexity)", provider: "Perplexity" },
         { id: "gpt-4o", name: "GPT-4o (via Perplexity)", provider: "Perplexity" },
+        { id: "gemini-3.1-pro-preview", name: "Gemini 3.1 Pro (via Perplexity)", provider: "Perplexity" },
+        { id: "gemini-3-flash-preview", name: "Gemini 3 Flash (via Perplexity)", provider: "Perplexity" },
       ].forEach((m) => allModels.push(m));
     }
   }
