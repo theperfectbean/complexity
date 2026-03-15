@@ -8,6 +8,8 @@ services:
       - ./.data/external:/app/external:ro
     # Ensure variables matched from the base file are used
     command: npm run dev
+    env_file:
+      - .env
     environment:
       - NODE_ENV=development
       - PORT=3000
