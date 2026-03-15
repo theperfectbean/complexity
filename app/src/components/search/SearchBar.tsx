@@ -61,6 +61,7 @@ export function SearchBar({
   
   const [internalAttachments, setInternalAttachments] = useState<File[]>(attachments);
   const [availableModels, setAvailableModels] = useState<readonly SearchModelOption[]>(providedModelOptions || MODELS);
+  const [hasUserSelectedModel, setHasUserSelectedModel] = useState(false);
 
   useEffect(() => {
     setInternalAttachments(attachments);
@@ -71,18 +72,25 @@ export function SearchBar({
       fetch("/api/models")
         .then(res => res.json())
         .then(data => {
-          if (data.models) {
+          if (data.models && data.models.length > 0) {
             setAvailableModels(data.models);
-            // If current model is not in available models, switch to default or first available
-            if (!data.models.some((m: SearchModelOption) => m.id === model)) {
-              const fallback = data.models.find((m: SearchModelOption) => m.isPreset)?.id || data.models[0]?.id;
-              if (fallback) onModelChange?.(fallback);
+            
+            // Logic: if user hasn't explicitly clicked a model yet, 
+            // OR if current model is invalid, switch to the TOP model in the list.
+            const currentModelIsValid = data.models.some((m: SearchModelOption) => m.id === model);
+            const isInitialDefault = model === getDefaultModel();
+
+            if (!currentModelIsValid || (!hasUserSelectedModel && isInitialDefault)) {
+              const topModel = data.models[0].id;
+              if (topModel && topModel !== model) {
+                onModelChange?.(topModel);
+              }
             }
           }
         })
         .catch(err => console.error("Failed to fetch available models:", err));
     }
-  }, [autoFilter, providedModelOptions, model, onModelChange]);
+  }, [autoFilter, providedModelOptions, model, onModelChange, hasUserSelectedModel]);
 
   const modelOptions = availableModels;
 
@@ -100,6 +108,11 @@ export function SearchBar({
 
   const handleAttachClick = () => {
     fileInputRef.current?.click();
+  };
+
+  const handleModelSelect = (id: string) => {
+    setHasUserSelectedModel(true);
+    onModelChange?.(id);
   };
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -201,7 +214,7 @@ export function SearchBar({
                     {options.map((option) => (
                       <DropdownMenu.Item
                         key={option.id}
-                        onSelect={() => onModelChange?.(option.id)}
+                        onSelect={() => handleModelSelect(option.id)}
                         className={cn(
                           "flex cursor-pointer items-center rounded-lg px-3 py-2 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground",
                           model === option.id && "bg-primary/5 text-primary font-medium"

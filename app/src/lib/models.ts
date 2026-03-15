@@ -19,5 +19,5 @@ export function getDefaultModel(): ModelId {
   if (defaultModelId && MODEL_IDS.includes(defaultModelId)) {
     return defaultModelId;
   }
-  return models[0]?.id || "anthropic/claude-haiku-4-5";
+  return models[0]?.id || "perplexity/sonar";
 }

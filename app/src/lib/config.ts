@@ -23,7 +23,7 @@ const DEFAULT_MODELS: ModelOption[] = [
   { id: "local-openai/custom-model", label: "Local OpenAI API", category: "Local", isPreset: false },
 ];
 
-const DEFAULT_MODEL_ID = "pro-search";
+const DEFAULT_MODEL_ID = null;
 
 function parseModelsJson(raw: string | undefined): ModelOption[] | null {
   if (!raw) return null;
