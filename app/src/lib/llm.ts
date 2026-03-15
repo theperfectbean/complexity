@@ -50,7 +50,8 @@ export function getProviderAndModel(modelId: string): { provider: ProviderType; 
     return { provider: "local-openai", model: modelId.replace("local-openai/", "") };
   }
   
-  return { provider: "perplexity", model: modelId };
+  const model = modelId.startsWith("perplexity/") ? modelId.replace("perplexity/", "") : modelId;
+  return { provider: "perplexity", model };
 }
 
 function extractCitationsFromResponse(response: Record<string, unknown> | null): { url: string; title?: string }[] {
@@ -73,12 +74,12 @@ function extractCitationsFromResponse(response: Record<string, unknown> | null):
 }
 
 export async function runGeneration(options: GenerationOptions): Promise<GenerationResult> {
-  const { provider } = getProviderAndModel(options.modelId);
+  const { provider, model: modelName } = getProviderAndModel(options.modelId);
 
   if (provider === "perplexity") {
     try {
       const result = await runPerplexityAgent({
-        modelId: options.modelId,
+        modelId: modelName,
         agentInput: options.agentInput,
         instructions: options.system || "",
         webSearch: !!options.webSearch,

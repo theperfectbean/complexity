@@ -7,6 +7,7 @@ import { useSession } from "next-auth/react";
 import { LoadingSkeleton } from "@/components/shared/LoadingSkeleton";
 import { Check, Info, ShieldCheck, Zap, RefreshCw, Plus, Trash2, GripVertical, Settings2 } from "lucide-react";
 import { Reorder } from "motion/react";
+import { MODELS } from "@/lib/models";
 
 type SettingInfo = {
   value: string | null;
@@ -108,7 +109,7 @@ export default function AdminSettingsPage() {
   const [fetchingModels, setFetchingModels] = useState(false);
 
   useEffect(() => {
-    if (status !== "authenticated" || !(session?.user as { isAdmin?: boolean })?.isAdmin) {
+    if (status !== "authenticated") {
       return;
     }
 
@@ -124,20 +125,40 @@ export default function AdminSettingsPage() {
       if (data.details) {
         setDetails(data.details);
         const initialForm: Record<string, string> = {};
-        Object.entries(data.details as Record<string, SettingInfo>).forEach(([key, info]) => {
-          if (info.source === "db") {
-            initialForm[key] = info.value || "";
+        
+        PROVIDERS.forEach(provider => {
+          const keyInfo = data.details[provider.keyName];
+          const toggleInfo = provider.toggleName ? data.details[provider.toggleName] : null;
+          
+          if (keyInfo?.source === "db") {
+            initialForm[provider.keyName] = keyInfo.value || "";
+          }
+          
+          if (provider.toggleName) {
+            if (toggleInfo?.source === "db") {
+              initialForm[provider.toggleName] = toggleInfo.value || "false";
+            } else {
+              const hasKey = keyInfo && keyInfo.source !== "none";
+              initialForm[provider.toggleName] = hasKey ? "true" : "false";
+            }
           }
         });
+
+        if (data.details["CUSTOM_MODEL_LIST"]?.source === "db") {
+          initialForm["CUSTOM_MODEL_LIST"] = data.details["CUSTOM_MODEL_LIST"].value || "";
+        }
+
         setFormData(initialForm);
 
-        // Load active model list
         if (data.details["CUSTOM_MODEL_LIST"]?.value) {
           try {
             setActiveModels(JSON.parse(data.details["CUSTOM_MODEL_LIST"].value));
           } catch (error) {
             console.error("Failed to parse model list", error);
+            setActiveModels([...MODELS]);
           }
+        } else {
+          setActiveModels([...MODELS]);
         }
       }
     } catch (error) {
@@ -285,23 +306,30 @@ export default function AdminSettingsPage() {
                     </div>
                   </div>
                   
-                  {provider.toggleName && (
-                    <div className="flex items-center gap-2">
-                      <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/60">
-                        {formData[provider.toggleName] === "true" ? "Enabled" : "Disabled"}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => updateField(provider.toggleName!, formData[provider.toggleName!] === "true" ? "false" : "true")}
-                        className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
-                          formData[provider.toggleName] === "true" ? "bg-primary" : "bg-muted"
-                        }`}
-                      >
-                        <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${formData[provider.toggleName] === "true" ? "translate-x-5" : "translate-x-0"}`} />
-                      </button>
-                    </div>
-                  )}
-                </div>
+                {provider.toggleName && (
+                  <div className="flex items-center gap-2">
+                    {(() => {
+                      const isEnabled = formData[provider.toggleName!] === "true";
+                      
+                      return (
+                        <>
+                          <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/60">
+                            {isEnabled ? "Enabled" : "Disabled"}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => updateField(provider.toggleName!, isEnabled ? "false" : "true")}
+                            className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
+                              isEnabled ? "bg-primary" : "bg-muted"
+                            }`}
+                          >
+                            <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${isEnabled ? "translate-x-5" : "translate-x-0"}`} />
+                          </button>
+                        </>
+                      );
+                    })()}
+                  </div>
+                )}                </div>
 
                 <div className="mt-6 space-y-2">
                   <div className="flex items-center justify-between">

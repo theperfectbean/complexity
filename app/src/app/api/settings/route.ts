@@ -60,7 +60,18 @@ export async function GET() {
 
 export async function POST(request: Request) {
   const session = await auth();
-  if (!(session?.user as { isAdmin?: boolean })?.isAdmin) {
+  const userEmail = session?.user?.email;
+  if (!userEmail) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const [user] = await db
+    .select({ isAdmin: users.isAdmin })
+    .from(users)
+    .where(eq(users.email, userEmail))
+    .limit(1);
+
+  if (!user?.isAdmin) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
