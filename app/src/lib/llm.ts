@@ -103,7 +103,6 @@ export async function runGeneration(options: GenerationOptions): Promise<Generat
   }
 
   // Direct Vercel AI SDK Providers
-  const { model: modelName } = getProviderAndModel(options.modelId);
   let model: LanguageModel;
 
   switch (provider) {
