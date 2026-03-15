@@ -31,17 +31,18 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    command: >
-      sh -c "
-      while true; do
-        FILENAME=/backups/backup-$(date +%Y-%m-%d-%H%M).sql
-        echo \"[$(date)] Starting backup to $FILENAME...\"
-        pg_dump -h postgres -U ${POSTGRES_USER} -d ${POSTGRES_DB} > $FILENAME
-        echo \"[$(date)] Backup complete. Cleaning up old backups (keeping last 7 days)...\"
-        find /backups -type f -name 'backup-*.sql' -mtime +7 -delete
-        sleep 86400
-      done
-      "
+    command:
+      - sh
+      - -c
+      - |
+        while true; do
+          FILENAME=/backups/backup-$$(date +%Y-%m-%d-%H%M).sql
+          echo "[ $$(date) ] Starting backup to $$FILENAME..."
+          pg_dump -h postgres > "$$FILENAME"
+          echo "[ $$(date) ] Backup complete. Cleaning up old backups (keeping last 7 days)..."
+          find /backups -type f -name 'backup-*.sql' -mtime +7 -delete
+          sleep 86400
+        done
     restart: unless-stopped
 
   redis:

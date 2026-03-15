@@ -187,6 +187,7 @@ DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose build app
   - Corrected TypeScript type mismatches in `runGeneration` (`llm.ts`) to properly support `UIMessage` and Perplexity `InputItem` types.
   - Updated `SearchBar.tsx` to include `isPreset` in its local model option type definition.
   - Enhanced `env.ts` to skip strict validation when `typeof window !== "undefined"`, preventing client-side startup crashes.
+  - Fixed a shell syntax error in the `postgres-backup` service within `docker-compose.yml` by using literal block scalars and proper dollar-sign escaping for container-side execution.
 
 ### Data Resilience & Backup Strategy (2026-03-14)
 - **Persistence**: Switched from Docker-managed named volumes to local bind mounts in `.data/` for Postgres, Redis, and Embedder models. This ensures data persists in the project folder and survives `down -v` commands.
