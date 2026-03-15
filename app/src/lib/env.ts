@@ -93,7 +93,7 @@ const envSchema = z.object({
 });
 
 function validateEnv() {
-  if (process.env.SKIP_ENV_VALIDATION === "true") {
+  if (process.env.SKIP_ENV_VALIDATION === "true" || typeof window !== "undefined") {
     return envSchema.partial().parse(process.env) as z.infer<typeof envSchema>;
   }
 
