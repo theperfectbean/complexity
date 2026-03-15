@@ -216,5 +216,10 @@ DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose build app
 - **Mechanism**: The model is instructed to output JSON data wrapped in a markdown code block with the language `chart`. `MarkdownRenderer.tsx` intercepts this specific language block and dynamically renders a custom `ChartRenderer` component built with Recharts, instead of displaying raw JSON text.
 - **Robustness**: This markdown interception approach ensures portability across all LLM providers (Perplexity, Anthropic, OpenAI) without relying on sometimes-flakey native tool-calling (Generative UI) features, while still delivering a rich graphical UI.
 
+### Voice Input Integration & Rendering Fix (Implemented 2026-03-16)
+- **Web Speech API**: Integrated native browser `SpeechRecognition` / `webkitSpeechRecognition` directly into the `SearchBar` component.
+- **Responsive UI**: The microphone icon button appears automatically if the browser supports speech recognition. During active listening, it pulses with a red aura to provide visual feedback.
+- **State Optimization & Render Loop Fix**: Discovered and resolved a severe infinite re-render loop inside the `SearchBar` and its Vitest suites. The root cause was an inline default parameter (`attachments = []`) generating a new array reference on every render, which then triggered a `useEffect` to `setInternalAttachments`, causing `Maximum update depth exceeded` errors. The fix extracted the empty array reference `const EMPTY_ATTACHMENTS: File[] = []` outside of the component scope to stabilize reference checks during renders.
+
 ## Workspace Hygiene & Maintenance
 - **Mandatory Cleanup**: To prevent disk space exhaustion, the agent MUST run `sudo rm -rf app/.next` and `npm cache clean --force` as a mandatory final step for every task execution. **If the `complexity-app` container is running, it MUST be restarted immediately after cleanup to restore missing build manifests.** This is critical in this environment where large E2E test runs and frequent builds can rapidly consume storage.

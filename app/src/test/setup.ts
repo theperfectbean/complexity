@@ -1,4 +1,5 @@
 import "@testing-library/jest-dom/vitest";
+import { vi } from "vitest";
 
 process.env.PERPLEXITY_API_KEY = process.env.PERPLEXITY_API_KEY ?? "test-perplexity-key";
 process.env.NEXTAUTH_SECRET = process.env.NEXTAUTH_SECRET ?? "test-nextauth-secret";
@@ -18,3 +19,11 @@ Object.defineProperty(window, "matchMedia", {
     dispatchEvent: () => false,
   }),
 });
+
+// Mock global fetch
+global.fetch = vi.fn().mockImplementation(() => 
+  Promise.resolve({
+    json: () => Promise.resolve({ models: [] }),
+    ok: true,
+  })
+);

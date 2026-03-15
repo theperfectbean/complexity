@@ -1,13 +1,47 @@
 "use client";
 
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { ChevronDown, Globe, Paperclip, SendHorizontal, X, FileText } from "lucide-react";
+import { ChevronDown, Globe, Paperclip, SendHorizontal, X, FileText, Mic, MicOff } from "lucide-react";
 import { motion } from "motion/react";
 import { useMemo, useRef, useState, useEffect } from "react";
 import TextareaAutosize from "react-textarea-autosize";
 
 import { MODELS, getDefaultModel } from "@/lib/models";
 import { cn } from "@/lib/utils";
+
+// Add global type for Web Speech API if not already defined
+interface SpeechRecognitionEvent extends Event {
+  results: {
+    [index: number]: {
+      [index: number]: {
+        transcript: string;
+      };
+    };
+    length: number;
+  };
+}
+
+interface SpeechRecognitionErrorEvent extends Event {
+  error: string;
+}
+
+interface SpeechRecognition extends EventTarget {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  onresult: (event: SpeechRecognitionEvent) => void;
+  onend: () => void;
+  onerror: (event: SpeechRecognitionErrorEvent) => void;
+  start: () => void;
+  stop: () => void;
+}
+
+declare global {
+  interface Window {
+    SpeechRecognition: new () => SpeechRecognition;
+    webkitSpeechRecognition: new () => SpeechRecognition;
+  }
+}
 
 type SearchModelOption = {
   id: string;
@@ -37,6 +71,8 @@ type SearchBarProps = {
   id?: string;
 };
 
+const EMPTY_ATTACHMENTS: File[] = [];
+
 export function SearchBar({
   value,
   onChange,
@@ -49,7 +85,7 @@ export function SearchBar({
   onModelChange,
   modelOptions: providedModelOptions,
   onAttachClick,
-  attachments = [],
+  attachments = EMPTY_ATTACHMENTS,
   onRemoveAttachment,
   webSearchEnabled = true,
   onWebSearchChange,
@@ -58,10 +94,73 @@ export function SearchBar({
   id,
 }: SearchBarProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const onChangeRef = useRef(onChange);
   
+  // Keep onChangeRef up to date
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  }, [onChange]);
+
   const [internalAttachments, setInternalAttachments] = useState<File[]>(attachments);
   const [availableModels, setAvailableModels] = useState<readonly SearchModelOption[]>(providedModelOptions || MODELS);
   const [hasUserSelectedModel, setHasUserSelectedModel] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const [isSpeechSupported, setIsSpeechSupported] = useState(false);
+
+  useEffect(() => {
+    const SpeechRecognition = typeof window !== "undefined" && (window.SpeechRecognition || window.webkitSpeechRecognition);
+    
+    if (SpeechRecognition) {
+      setIsSpeechSupported(true);
+      const recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = "en-US";
+
+      recognition.onresult = (event: SpeechRecognitionEvent) => {
+        let transcript = "";
+        for (let i = 0; i < event.results.length; i++) {
+          transcript += event.results[i][0].transcript;
+        }
+        
+        onChangeRef.current(transcript);
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+      };
+
+      recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+        console.error("Speech recognition error", event.error);
+        setIsListening(false);
+      };
+
+      recognitionRef.current = recognition;
+    }
+
+    return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+    };
+  }, []);
+
+  const toggleVoiceInput = () => {
+    if (!recognitionRef.current) return;
+
+    if (isListening) {
+      recognitionRef.current.stop();
+    } else {
+      try {
+        recognitionRef.current.start();
+        setIsListening(true);
+      } catch (err) {
+        console.error("Failed to start recognition:", err);
+        setIsListening(false);
+      }
+    }
+  };
 
   useEffect(() => {
     setInternalAttachments(attachments);
@@ -256,17 +355,35 @@ export function SearchBar({
           </button>
         </div>
 
-        <button
-          type="submit"
-          className={cn(
-            "inline-flex h-8 w-8 items-center justify-center rounded-xl bg-primary text-primary-foreground transition-all active:scale-95 disabled:opacity-30",
-            !value.trim() && internalAttachments.length === 0 && "bg-muted text-muted-foreground"
+        <div className="flex items-center gap-1.5">
+          {isSpeechSupported && (
+            <button
+              type="button"
+              onClick={toggleVoiceInput}
+              className={cn(
+                "inline-flex h-8 w-8 items-center justify-center rounded-xl transition-all active:scale-95",
+                isListening 
+                  ? "bg-red-500 text-white animate-pulse shadow-[0_0_12px_rgba(239,68,68,0.5)]" 
+                  : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+              )}
+              aria-label={isListening ? "Stop listening" : "Start listening"}
+            >
+              {isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+            </button>
           )}
-          disabled={disabled || (!value.trim() && internalAttachments.length === 0)}
-          aria-label={submitLabel}
-        >
-          <SendHorizontal className="h-4 w-4" />
-        </button>
+
+          <button
+            type="submit"
+            className={cn(
+              "inline-flex h-8 w-8 items-center justify-center rounded-xl bg-primary text-primary-foreground transition-all active:scale-95 disabled:opacity-30",
+              !value.trim() && internalAttachments.length === 0 && "bg-muted text-muted-foreground"
+            )}
+            disabled={disabled || (!value.trim() && internalAttachments.length === 0)}
+            aria-label={submitLabel}
+          >
+            <SendHorizontal className="h-4 w-4" />
+          </button>
+        </div>
       </div>
     </motion.div>
   );

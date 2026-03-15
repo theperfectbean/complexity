@@ -21,6 +21,7 @@ describe("SearchBar", () => {
           submitLabel="Send"
           model="pro-search"
           onModelChange={onModelChange}
+          autoFilter={false}
         />
       </form>,
     );
@@ -42,6 +43,7 @@ describe("SearchBar", () => {
           placeholder="Ask anything"
           submitLabel="Sending"
           disabled
+          autoFilter={false}
         />
       </form>,
     );
@@ -64,6 +66,7 @@ describe("SearchBar", () => {
             { id: "model-b", label: "Model B", category: "Presets" },
           ]}
           onModelChange={onModelChange}
+          autoFilter={false}
         />
       </form>,
     );
@@ -79,7 +82,7 @@ describe("SearchBar", () => {
 
     render(
       <form onSubmit={onSubmit}>
-        <SearchBar value="query" onChange={() => {}} placeholder="Ask anything" submitLabel="Send" />
+        <SearchBar value="query" onChange={() => {}} placeholder="Ask anything" submitLabel="Send" autoFilter={false} />
       </form>,
     );
 
@@ -89,5 +92,31 @@ describe("SearchBar", () => {
 
     fireEvent.keyDown(input, { key: "Enter", code: "Enter", shiftKey: true });
     expect(onSubmit).toHaveBeenCalledTimes(1);
+  });
+
+  it("renders microphone button when speech recognition is supported", () => {
+    // Mock webkitSpeechRecognition
+    class MockSpeechRecognition {
+      start = vi.fn();
+      stop = vi.fn();
+      onresult = null;
+      onend = null;
+      onerror = null;
+      continuous = false;
+      interimResults = false;
+      lang = "";
+    }
+
+    vi.stubGlobal("webkitSpeechRecognition", MockSpeechRecognition);
+
+    render(
+      <form>
+        <SearchBar value="" onChange={() => {}} placeholder="Ask anything" submitLabel="Send" autoFilter={false} />
+      </form>,
+    );
+
+    expect(screen.getByRole("button", { name: "Start listening" })).toBeInTheDocument();
+    
+    vi.unstubAllGlobals();
   });
 });
