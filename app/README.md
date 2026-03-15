@@ -23,10 +23,13 @@ Presets:
 
 Direct models:
 - `perplexity/sonar`
+- `anthropic/claude-opus-4-6`
 - `anthropic/claude-sonnet-4-6`
-- `openai/gpt-5.2`
-- `google/gemini-2.5-pro`
-- `xai/grok-4-1-fast-non-reasoning`
+- `anthropic/claude-haiku-4-5`
+- `openai/gpt-5.4`
+- `google/gemini-3.1-pro-preview`
+- `google/gemini-3-flash-preview`
+- `xai/grok-4.20-beta`
 
 For direct models, the chat route enables Agent API tools:
 - `web_search`

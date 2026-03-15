@@ -169,6 +169,13 @@ DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose build app
 
 - **Nodemailer in Docker**: When adding `nodemailer` to the project, ensured it was installed inside the Docker container by running `npm install` via `docker compose exec` and updated the `Dockerfile` with `--legacy-peer-deps` to resolve peer dependency conflicts with `next-auth`.
 
+### Model Registry Update (2026-03-15)
+- **Anthropic 4.6 Generation**: Updated the model registry and aliases to support the latest Claude 4.6 family (`claude-opus-4-6`, `claude-sonnet-4-6`) and the high-speed `claude-haiku-4-5`.
+- **OpenAI GPT-5.4**: Updated OpenAI support to the latest `gpt-5.4` flagship.
+- **Google Gemini 3.1**: Verified and updated mappings for the `gemini-3.1-pro-preview` and `gemini-3-flash-preview` models.
+- **xAI Grok 4.20**: Upgraded xAI support to the agentic `grok-4.20-beta` architecture.
+- **Registry Synchronization**: Updated `app/src/lib/config.ts`, `app/README.md`, and relevant unit tests to ensure consistent model identifiers across the workspace.
+
 ### Data Resilience & Backup Strategy (2026-03-14)
 - **Persistence**: Switched from Docker-managed named volumes to local bind mounts in `.data/` for Postgres, Redis, and Embedder models. This ensures data persists in the project folder and survives `down -v` commands.
 - **Automated Backups**: Added a `postgres-backup` sidecar service that performs a `pg_dump` every 24 hours to the `backups/postgres/` directory and retains the last 7 days of snapshots.

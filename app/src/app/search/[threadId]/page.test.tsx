@@ -55,7 +55,7 @@ describe("ThreadPage", () => {
 
     const user = userEvent.setup();
     await user.click(await screen.findByRole("button", { name: "Select model" }));
-    await user.click(await screen.findByRole("menuitem", { name: "GPT-5.2" }));
+    await user.click(await screen.findByRole("menuitem", { name: "GPT-5.4" }));
     await user.type(screen.getByPlaceholderText("Ask a follow-up..."), "hello model");
     await user.click(screen.getByRole("button", { name: "Send" }));
 
@@ -67,7 +67,7 @@ describe("ThreadPage", () => {
         expect.objectContaining({
           body: expect.objectContaining({
             threadId: "thread-1",
-            model: "openai/gpt-5.2",
+            model: "openai/gpt-5.4",
           }),
         }),
       );

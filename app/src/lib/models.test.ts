@@ -12,7 +12,7 @@ describe("models helpers", () => {
     expect(isPresetModel("fast-search")).toBe(true);
     expect(isPresetModel("pro-search")).toBe(true);
     expect(isPresetModel("perplexity/sonar")).toBe(false);
-    expect(isPresetModel("openai/gpt-5.2")).toBe(false);
+    expect(isPresetModel("openai/gpt-5.4")).toBe(false);
   });
 
   it("validates model ids", () => {
