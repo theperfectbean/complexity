@@ -39,7 +39,7 @@ export async function GET() {
     return NextResponse.json({ error: "User not found" }, { status: 404 });
   }
 
-  const result: Record<string, any> = {
+  const result: Record<string, unknown> = {
     memoryEnabled: user.memoryEnabled,
   };
 
@@ -54,11 +54,11 @@ export async function GET() {
 
 export async function POST(request: Request) {
   const session = await auth();
-  if (!(session?.user as any)?.isAdmin) {
+  if (!(session?.user as { isAdmin?: boolean })?.isAdmin) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const body = await request.json();
+  const body = await request.json() as Record<string, string | undefined>;
   
   for (const key of ALLOWED_KEYS) {
     if (body[key] !== undefined) {

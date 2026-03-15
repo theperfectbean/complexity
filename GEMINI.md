@@ -175,6 +175,9 @@ DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose build app
 - **Google Gemini 3.1**: Verified and updated mappings for the `gemini-3.1-pro-preview` and `gemini-3-flash-preview` models.
 - **xAI Grok 4.20**: Upgraded xAI support to the agentic `grok-4.20-beta` architecture.
 - **Registry Synchronization**: Updated `app/src/lib/config.ts`, `app/README.md`, and relevant unit tests to ensure consistent model identifiers across the workspace.
+- **Dynamic Model Filtering**: Implemented a new `/api/models` endpoint that filters the available LLM list based on configured API keys in the database or environment. 
+- **Auto-Filtering UI**: Updated the `SearchBar` component to automatically fetch and use the filtered model list, ensuring that users only see models they can actually use. If a selected model becomes unavailable (e.g., after an API key is removed), the UI automatically falls back to a preset.
+- **Type Safety Improvements**: Refactored several core files (`SearchBar.tsx`, `llm.ts`, `api/settings/route.ts`) to replace `any` types with proper interfaces or `Record<string, unknown>`, significantly improving codebase maintainability and satisfy strict linting rules.
 
 ### Data Resilience & Backup Strategy (2026-03-14)
 - **Persistence**: Switched from Docker-managed named volumes to local bind mounts in `.data/` for Postgres, Redis, and Embedder models. This ensures data persists in the project folder and survives `down -v` commands.

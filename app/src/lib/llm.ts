@@ -12,8 +12,8 @@ export type ProviderType = "perplexity" | "anthropic" | "openai" | "google" | "x
 
 export interface GenerationOptions {
   modelId: string;
-  messages: any[];
-  agentInput: any[];
+  messages: Record<string, unknown>[];
+  agentInput: Record<string, unknown>[];
   system?: string;
   keys: Record<string, string | null>;
   requestId: string;
@@ -26,7 +26,7 @@ export interface GenerationOptions {
 
 export interface GenerationResult {
   text: string;
-  citations: any[];
+  citations: Record<string, unknown>[];
 }
 
 export function getProviderAndModel(modelId: string): { provider: ProviderType; model: string } {
@@ -52,17 +52,18 @@ export function getProviderAndModel(modelId: string): { provider: ProviderType; 
   return { provider: "perplexity", model: modelId };
 }
 
-function extractCitationsFromResponse(response: any): { url: string; title?: string }[] {
+function extractCitationsFromResponse(response: Record<string, unknown> | null): { url: string; title?: string }[] {
   const citations: { url: string; title?: string }[] = [];
   if (!response) return citations;
 
   // Handle Perplexity Agent API citations
-  if (response.citations && Array.isArray(response.citations)) {
-    response.citations.forEach((c: any) => {
+  const responseCitations = response.citations;
+  if (responseCitations && Array.isArray(responseCitations)) {
+    responseCitations.forEach((c: string | Record<string, unknown>) => {
       if (typeof c === "string") {
         citations.push({ url: c });
       } else if (c && typeof c === "object" && c.url) {
-        citations.push({ url: c.url, title: c.title });
+        citations.push({ url: c.url as string, title: c.title as string });
       }
     });
   }

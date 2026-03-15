@@ -31,6 +31,7 @@ type SearchBarProps = {
   onRemoveAttachment?: (index: number) => void;
   webSearchEnabled?: boolean;
   onWebSearchChange?: (enabled: boolean) => void;
+  autoFilter?: boolean;
   "data-testid"?: string;
   id?: string;
 };
@@ -45,21 +46,44 @@ export function SearchBar({
   compact,
   model = getDefaultModel(),
   onModelChange,
-  modelOptions = MODELS,
+  modelOptions: providedModelOptions,
   onAttachClick,
   attachments = [],
   onRemoveAttachment,
   webSearchEnabled = true,
   onWebSearchChange,
+  autoFilter = true,
   "data-testid": dataTestId,
   id,
 }: SearchBarProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [internalAttachments, setInternalAttachments] = useState<File[]>(attachments);
+  const [availableModels, setAvailableModels] = useState<readonly SearchModelOption[]>(providedModelOptions || MODELS);
+
   useEffect(() => {
     setInternalAttachments(attachments);
   }, [attachments]);
+
+  useEffect(() => {
+    if (autoFilter && !providedModelOptions) {
+      fetch("/api/models")
+        .then(res => res.json())
+        .then(data => {
+          if (data.models) {
+            setAvailableModels(data.models);
+            // If current model is not in available models, switch to default or first available
+            if (!data.models.some((m: SearchModelOption) => m.id === model)) {
+              const fallback = data.models.find((m: SearchModelOption) => m.isPreset)?.id || data.models[0]?.id;
+              if (fallback) onModelChange?.(fallback);
+            }
+          }
+        })
+        .catch(err => console.error("Failed to fetch available models:", err));
+    }
+  }, [autoFilter, providedModelOptions, model, onModelChange]);
+
+  const modelOptions = availableModels;
 
   const groupedModels = useMemo(() => {
     return modelOptions.reduce<Record<string, SearchModelOption[]>>((accumulator, option) => {

@@ -1,4 +1,4 @@
-import { runtimeConfig, type ModelOption } from "@/lib/config";
+import { runtimeConfig } from "@/lib/config";
 
 export const MODELS = runtimeConfig.models;
 
