@@ -7,6 +7,7 @@ import nodemailer from "nodemailer";
 import { db } from "@/lib/db";
 import { users, verificationTokens } from "@/lib/db/schema";
 import { env } from "@/lib/env";
+import { runtimeConfig } from "@/lib/config";
 
 const schema = z.object({
   email: z.string().email(),
@@ -32,8 +33,8 @@ export async function POST(request: Request) {
 
     if (user) {
       // Generate a random token
-      const token = crypto.randomBytes(32).toString("hex");
-      const expires = new Date(Date.now() + 3600000); // 1 hour from now
+      const token = crypto.randomBytes(runtimeConfig.auth.resetTokenBytes).toString("hex");
+      const expires = new Date(Date.now() + runtimeConfig.auth.resetTokenTtlMs);
 
       // Store token in database
       // Delete any existing tokens for this email first
@@ -49,7 +50,7 @@ export async function POST(request: Request) {
 
       const host = request.headers.get("host");
       const protocol = request.headers.get("x-forwarded-proto") || "http";
-      const baseAppUrl = env.NEXTAUTH_URL && !env.NEXTAUTH_URL.includes("localhost:3002") 
+      const baseAppUrl = env.NEXTAUTH_URL && !env.NEXTAUTH_URL.includes(runtimeConfig.auth.localhostBaseUrl) 
         ? env.NEXTAUTH_URL 
         : `${protocol}://${host}`;
       
@@ -69,11 +70,11 @@ export async function POST(request: Request) {
         });
 
         await transporter.sendMail({
-          from: env.SMTP_FROM || '"Complexity" <noreply@complexity.local>',
+          from: env.SMTP_FROM || runtimeConfig.auth.resetEmailFromDefault,
           to: email,
-          subject: "Reset your Complexity password",
-          text: `You requested a password reset. Click the following link to set a new password: ${resetLink}\n\nThis link will expire in 1 hour.`,
-          html: `<p>You requested a password reset.</p><p><a href="${resetLink}">Click here to set a new password</a></p><p>This link will expire in 1 hour.</p>`,
+          subject: runtimeConfig.auth.resetEmailSubject,
+          text: runtimeConfig.auth.resetEmailTextTemplate.replace("{resetLink}", resetLink),
+          html: runtimeConfig.auth.resetEmailHtmlTemplate.replace("{resetLink}", resetLink),
         });
         console.log(`[Password Reset] Email sent successfully to ${email}`);
       } else {

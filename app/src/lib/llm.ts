@@ -6,6 +6,7 @@ import { createOllama } from "ai-sdk-ollama";
 import { LanguageModel, streamText, convertToModelMessages, UIMessageChunk } from "ai";
 import { createPerplexityModel } from "./perplexity";
 import { runPerplexityAgent } from "./perplexity-agent";
+import { runtimeConfig } from "./config";
 
 export type ProviderType = "perplexity" | "anthropic" | "openai" | "google" | "xai" | "ollama" | "local-openai";
 
@@ -73,21 +74,29 @@ export async function runGeneration(options: GenerationOptions): Promise<Generat
   const { provider } = getProviderAndModel(options.modelId);
 
   if (provider === "perplexity") {
-    const result = await runPerplexityAgent({
-      modelId: options.modelId,
-      agentInput: options.agentInput,
-      instructions: options.system || "",
-      webSearch: !!options.webSearch,
-      apiKey: options.keys["PERPLEXITY_API_KEY"] || undefined,
-      writer: options.writer,
-      textId: options.textId,
-      requestId: options.requestId,
-    });
+    try {
+      const result = await runPerplexityAgent({
+        modelId: options.modelId,
+        agentInput: options.agentInput,
+        instructions: options.system || "",
+        webSearch: !!options.webSearch,
+        apiKey: options.keys["PERPLEXITY_API_KEY"] || undefined,
+        writer: options.writer,
+        textId: options.textId,
+        requestId: options.requestId,
+      });
 
-    return {
-      text: result.text,
-      citations: extractCitationsFromResponse(result.completedResponse),
-    };
+      return {
+        text: result.text,
+        citations: extractCitationsFromResponse(result.completedResponse),
+      };
+    } catch (error) {
+      console.error(`[runGeneration:perplexity] Error:`, error);
+      const message = error instanceof Error ? error.message : "Perplexity Agent request failed";
+      const assistantText = `Model request failed: ${message}`;
+      options.writer.write({ type: "text-delta", id: options.textId, delta: assistantText });
+      return { text: assistantText, citations: [] };
+    }
   }
 
   // Direct Vercel AI SDK Providers
@@ -98,40 +107,33 @@ export async function runGeneration(options: GenerationOptions): Promise<Generat
     case "anthropic":
       const anthropicKey = options.keys["ANTHROPIC_API_KEY"];
       if (!anthropicKey) throw new Error("ANTHROPIC_API_KEY is not configured");
-      let anthropicModel = modelName;
-      if (modelName === "claude-sonnet-4-6") anthropicModel = "claude-3-7-sonnet-20250219";
-      if (modelName === "claude-haiku-4-5") anthropicModel = "claude-3-5-haiku-20241022";
-      if (modelName === "claude-opus-4-6") anthropicModel = "claude-3-opus-20240229";
+      const anthropicModel = runtimeConfig.llm.modelAliases.anthropic[modelName] || modelName;
       model = createAnthropic({ apiKey: anthropicKey })(anthropicModel);
       break;
 
     case "openai":
       const openaiKey = options.keys["OPENAI_API_KEY"];
       if (!openaiKey) throw new Error("OPENAI_API_KEY is not configured");
-      let openaiModel = modelName;
-      if (modelName === "gpt-5.2") openaiModel = "gpt-4o";
+      const openaiModel = runtimeConfig.llm.modelAliases.openai[modelName] || modelName;
       model = createOpenAI({ apiKey: openaiKey })(openaiModel);
       break;
 
     case "google":
       const googleKey = options.keys["GOOGLE_GENERATIVE_AI_API_KEY"];
       if (!googleKey) throw new Error("GOOGLE_GENERATIVE_AI_API_KEY is not configured");
-      let googleModel = modelName;
-      if (modelName === "gemini-3.1-pro-preview") googleModel = "gemini-2.0-pro-exp-02-05";
-      if (modelName === "gemini-3-flash-preview") googleModel = "gemini-2.0-flash";
+      const googleModel = runtimeConfig.llm.modelAliases.google[modelName] || modelName;
       model = createGoogleGenerativeAI({ apiKey: googleKey })(googleModel);
       break;
 
     case "xai":
       const xaiKey = options.keys["XAI_API_KEY"];
       if (!xaiKey) throw new Error("XAI_API_KEY is not configured");
-      let xaiModel = modelName;
-      if (modelName === "grok-4-1-fast-non-reasoning") xaiModel = "grok-2-latest";
+      const xaiModel = runtimeConfig.llm.modelAliases.xai[modelName] || modelName;
       model = createXai({ apiKey: xaiKey })(xaiModel);
       break;
 
     case "ollama":
-      const ollamaBaseUrl = options.keys["OLLAMA_BASE_URL"] || "http://localhost:11434/api";
+      const ollamaBaseUrl = options.keys["OLLAMA_BASE_URL"] || runtimeConfig.llm.ollamaBaseUrl;
       model = createOllama({ baseURL: ollamaBaseUrl })(modelName);
       break;
 
@@ -140,7 +142,7 @@ export async function runGeneration(options: GenerationOptions): Promise<Generat
       if (!localOpenAiBaseUrl) throw new Error("LOCAL_OPENAI_BASE_URL is not configured");
       model = createOpenAI({ 
         baseURL: localOpenAiBaseUrl,
-        apiKey: options.keys["LOCAL_OPENAI_API_KEY"] || "none"
+        apiKey: options.keys["LOCAL_OPENAI_API_KEY"] || runtimeConfig.llm.localOpenAiApiKeyFallback
       })(modelName);
       break;
 

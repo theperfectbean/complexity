@@ -1,6 +1,7 @@
 import Redis from "ioredis";
 
 import { env } from "@/lib/env";
+import { runtimeConfig } from "./config";
 
 declare global {
   var __complexityRedis__: Redis | undefined;
@@ -15,7 +16,7 @@ export function getRedisClient(): Redis | null {
   if (!globalThis.__complexityRedis__) {
     globalThis.__complexityRedis__ = new Redis(url, {
       lazyConnect: true,
-      maxRetriesPerRequest: 1,
+      maxRetriesPerRequest: runtimeConfig.redis.maxRetriesPerRequest,
     });
   }
 

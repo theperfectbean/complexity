@@ -1,9 +1,14 @@
+import os
 from fastapi import FastAPI
 from pydantic import BaseModel
 from sentence_transformers import SentenceTransformer
 
-app = FastAPI(title="Complexity Embedder", version="1.0.0")
-model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
+app_title = os.environ.get("EMBEDDER_APP_TITLE", "Complexity Embedder")
+app_version = os.environ.get("EMBEDDER_APP_VERSION", "1.0.0")
+model_name = os.environ.get("EMBEDDER_MODEL_NAME", "sentence-transformers/all-MiniLM-L6-v2")
+
+app = FastAPI(title=app_title, version=app_version)
+model = SentenceTransformer(model_name)
 
 
 class EmbedRequest(BaseModel):

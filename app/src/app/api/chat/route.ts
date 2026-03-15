@@ -18,6 +18,7 @@ import { getApiKeys } from "@/lib/settings";
 import { extractTextFromDataUrl } from "@/lib/documents";
 import { getEmbeddings, similaritySearch } from "@/lib/rag";
 import { getRedisClient } from "@/lib/redis";
+import { runtimeConfig } from "@/lib/config";
 
 const schema = z.object({
   threadId: z.string().min(1),
@@ -33,13 +34,6 @@ type Citation = {
   title?: string;
   snippet?: string;
 };
-
-const CHAT_RATE_LIMIT_PER_MINUTE = 20;
-const CHAT_CACHE_TTL_SECONDS = 60 * 60;
-const EMPTY_RESPONSE_FALLBACK_TEXT = "I couldn't generate a response. Please try again.";
-const MEMORY_EVENT_TIMEOUT_MS = 1200;
-const MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024;
-const PERPLEXITY_STREAM_TIMEOUT_MS = 1000 * 60 * 5;
 
 type CachedChatPayload = {
   text: string;
@@ -164,8 +158,9 @@ async function extractTextFromMessage(message: UIMessage): Promise<string> {
         const base64Payload = getBase64Payload(att.url);
         if (base64Payload) {
           const bytes = getDecodedByteLength(base64Payload);
-          if (bytes > MAX_ATTACHMENT_BYTES) {
-            throw new AttachmentTooLargeError(`Attachment exceeds ${Math.floor(MAX_ATTACHMENT_BYTES / (1024 * 1024))}MB limit.`);
+          const maxBytes = runtimeConfig.chat.maxAttachmentBytes;
+          if (bytes > maxBytes) {
+            throw new AttachmentTooLargeError(`Attachment exceeds ${Math.floor(maxBytes / (1024 * 1024))}MB limit.`);
           }
         }
 
@@ -283,7 +278,7 @@ export async function POST(request: Request) {
       if (current === 1) {
         await redis.expire(rateKey, 61);
       }
-      if (current > CHAT_RATE_LIMIT_PER_MINUTE) {
+      if (current > runtimeConfig.chat.rateLimitPerMinute) {
         return NextResponse.json({ error: "Rate limit exceeded. Try again in a minute." }, { status: 429 });
       }
     } catch {
@@ -398,7 +393,7 @@ export async function POST(request: Request) {
       if (cachedRaw) {
         const cachedPayload = JSON.parse(cachedRaw) as CachedChatPayload;
 
-        if (cachedPayload.text.trim() === EMPTY_RESPONSE_FALLBACK_TEXT) {
+        if (cachedPayload.text.trim() === runtimeConfig.chat.emptyResponseFallbackText) {
           await redis.del(cacheKey);
         } else {
           // Await user message persistence before finishing cached response if needed, 
@@ -453,7 +448,7 @@ export async function POST(request: Request) {
                 try {
                   const memoryCount = await Promise.race([
                     memoryPromise,
-                    new Promise<null>((resolve) => setTimeout(() => resolve(null), MEMORY_EVENT_TIMEOUT_MS)),
+                    new Promise<null>((resolve) => setTimeout(() => resolve(null), runtimeConfig.chat.memoryEventTimeoutMs)),
                   ]);
 
                   if (typeof memoryCount === "number" && memoryCount > 0) {
@@ -639,7 +634,7 @@ export async function POST(request: Request) {
         writer,
       });
 
-      const assistantText = result.text || EMPTY_RESPONSE_FALLBACK_TEXT;
+      const assistantText = result.text || runtimeConfig.chat.emptyResponseFallbackText;
       const citations = result.citations || [];
 
       citations.forEach((citation: any, index: number) => {
@@ -651,13 +646,13 @@ export async function POST(request: Request) {
         } as UIMessageChunk);
       });
 
-      if (redis && assistantText && assistantText !== EMPTY_RESPONSE_FALLBACK_TEXT) {
+      if (redis && assistantText && assistantText !== runtimeConfig.chat.emptyResponseFallbackText) {
         try {
           const payload: CachedChatPayload = {
             text: assistantText,
             citations,
           };
-          await redis.set(cacheKey, JSON.stringify(payload), "EX", CHAT_CACHE_TTL_SECONDS);
+          await redis.set(cacheKey, JSON.stringify(payload), "EX", runtimeConfig.chat.cacheTtlSeconds);
         } catch {
           // Ignore cache write failures.
         }
@@ -692,7 +687,7 @@ export async function POST(request: Request) {
         try {
           const memoryCount = await Promise.race([
             memoryPromise,
-            new Promise<null>((resolve) => setTimeout(() => resolve(null), MEMORY_EVENT_TIMEOUT_MS)),
+            new Promise<null>((resolve) => setTimeout(() => resolve(null), runtimeConfig.chat.memoryEventTimeoutMs)),
           ]);
 
           if (typeof memoryCount === "number" && memoryCount > 0) {

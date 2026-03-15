@@ -14,6 +14,7 @@ const envSchema = z.object({
   OLLAMA_BASE_URL: z.string().url().optional().default("http://localhost:11434/api"),
   LOCAL_OPENAI_BASE_URL: z.string().url().optional(),
   LOCAL_OPENAI_API_KEY: z.string().optional(),
+  LOCAL_OPENAI_API_KEY_FALLBACK: z.string().optional().default("none"),
   NEXTAUTH_SECRET: z.string().min(1, "NEXTAUTH_SECRET is required"),
   NEXTAUTH_URL: z.string().url().optional(),
   EMBEDDER_URL: z.string().url().default("http://embedder:8000"),
@@ -26,6 +27,67 @@ const envSchema = z.object({
   SMTP_PASSWORD: z.string().optional(),
   SMTP_FROM: z.string().optional(),
   ROLE_EXTERNAL_DATA: z.string().optional().describe("JSON string mapping role IDs to external file paths"),
+  MODELS_JSON: z.string().optional(),
+  DEFAULT_MODEL: z.string().optional(),
+  PERPLEXITY_API_BASE_URL: z.string().url().default("https://api.perplexity.ai/v1/responses"),
+  PERPLEXITY_STREAM_TIMEOUT_MS: z.coerce.number().int().positive().default(1000 * 60 * 5),
+  PERPLEXITY_WEB_TOOLS: z.string().default("web_search,fetch_url"),
+  RAG_CHUNK_MAX_CHARS: z.coerce.number().int().positive().default(2200),
+  RAG_CHUNK_OVERLAP: z.coerce.number().int().nonnegative().default(200),
+  RAG_EMBEDDER_TIMEOUT_MS: z.coerce.number().int().positive().default(1000 * 600),
+  RAG_EMBEDDER_BATCH_SIZE: z.coerce.number().int().positive().default(200),
+  RAG_EMBEDDER_CONCURRENCY: z.coerce.number().int().positive().default(4),
+  RAG_EMBEDDER_PATH: z.string().default("/embed"),
+  RAG_SIMILARITY_LIMIT: z.coerce.number().int().positive().default(5),
+  MEMORY_CACHE_TTL_SECONDS: z.coerce.number().int().positive().default(60 * 5),
+  MEMORY_CACHE_PREFIX: z.string().default("memories"),
+  MEMORY_EXTRACTION_MODEL: z.string().default("anthropic/claude-haiku-4-5"),
+  MEMORY_MAX_MEMORIES: z.coerce.number().int().positive().default(100),
+  MEMORY_TOP_K: z.coerce.number().int().positive().default(10),
+  MEMORY_EXTRACTION_MIN_EXCHANGES: z.coerce.number().int().positive().default(3),
+  MEMORY_EXTRACTION_EVERY_N_EXCHANGES: z.coerce.number().int().positive().default(4),
+  MEMORY_PROMPT_HEADER: z.string().default("## About the user (from past conversations)"),
+  MEMORY_PROMPT_FOOTER: z
+    .string()
+    .default(
+      "Use these memories to personalize your responses. Do not explicitly mention that you have memories unless asked."
+    ),
+  MEMORY_EXTRACTION_INSTRUCTIONS: z
+    .string()
+    .default(
+      "Given the conversation and existing memories, extract NEW user facts and IDENTIFY outdated ones. " +
+        "Only include durable preferences, personal details, work context, or recurring needs. " +
+        "Return a JSON object with two keys: `added` (array of strings for new facts) and `deleted_ids` (array of strings for IDs of existing memories that are now outdated or contradicted). Return { \"added\": [], \"deleted_ids\": [] } if nothing new/changed. Do not include duplicates or trivial facts."
+    ),
+  MEMORY_FAILURE_PREFIX: z.string().default("Model request failed:"),
+  CHAT_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(20),
+  CHAT_CACHE_TTL_SECONDS: z.coerce.number().int().positive().default(60 * 60),
+  CHAT_EMPTY_RESPONSE_FALLBACK_TEXT: z.string().default("I couldn't generate a response. Please try again."),
+  CHAT_MEMORY_EVENT_TIMEOUT_MS: z.coerce.number().int().positive().default(1200),
+  CHAT_MAX_ATTACHMENT_BYTES: z.coerce.number().int().positive().default(5 * 1024 * 1024),
+  ROLE_UPLOAD_MAX_FILE_SIZE: z.coerce.number().int().positive().default(50 * 1024 * 1024),
+  AUTH_PASSWORD_MIN_LENGTH: z.coerce.number().int().positive().default(8),
+  AUTH_BCRYPT_COST: z.coerce.number().int().positive().default(12),
+  AUTH_RESET_TOKEN_BYTES: z.coerce.number().int().positive().default(32),
+  AUTH_RESET_TOKEN_TTL_MS: z.coerce.number().int().positive().default(60 * 60 * 1000),
+  AUTH_RESET_EMAIL_SUBJECT: z.string().default("Reset your Complexity password"),
+  AUTH_RESET_EMAIL_TEXT: z
+    .string()
+    .default(
+      "You requested a password reset. Click the following link to set a new password: {resetLink}\n\nThis link will expire in 1 hour."
+    ),
+  AUTH_RESET_EMAIL_HTML: z
+    .string()
+    .default(
+      "<p>You requested a password reset.</p><p><a href=\"{resetLink}\">Click here to set a new password</a></p><p>This link will expire in 1 hour.</p>"
+    ),
+  AUTH_RESET_EMAIL_FROM_DEFAULT: z.string().default('"Complexity" <noreply@complexity.local>'),
+  AUTH_LOCALHOST_BASE_URL: z.string().default("localhost:3002"),
+  REDIS_MAX_RETRIES_PER_REQUEST: z.coerce.number().int().nonnegative().default(1),
+  DOCUMENT_ALLOWED_EXTENSIONS: z.string().default(".pdf,.docx,.txt,.md"),
+  EMBEDDER_MODEL_NAME: z.string().default("sentence-transformers/all-MiniLM-L6-v2"),
+  EMBEDDER_APP_TITLE: z.string().default("Complexity Embedder"),
+  EMBEDDER_APP_VERSION: z.string().default("1.0.0"),
 });
 
 function validateEnv() {
@@ -39,7 +101,7 @@ function validateEnv() {
     const formatted = parsed.error.issues
       .map((issue) => `  ${issue.path.join(".")}: ${issue.message}`)
       .join("\n");
-    
+
     // Log masked environment for debugging
     const maskedEnv = Object.keys(envSchema.shape).reduce((acc, key) => {
       const val = process.env[key];

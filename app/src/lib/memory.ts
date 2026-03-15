@@ -4,11 +4,7 @@ import { db } from "@/lib/db";
 import { memories } from "@/lib/db/schema";
 import { createPerplexityClient } from "@/lib/perplexity";
 import { getRedisClient } from "@/lib/redis";
-
-const MEMORY_CACHE_TTL_SECONDS = 60 * 5;
-const MEMORY_CACHE_PREFIX = "memories";
-const MEMORY_EXTRACTION_MODEL = "anthropic/claude-haiku-4-5";
-export const MAX_MEMORIES = 100;
+import { runtimeConfig } from "./config";
 
 type ExtractMemoriesInput = {
   userMessage: string;
@@ -91,7 +87,7 @@ function extractAssistantText(response: unknown): string {
 
 export async function getMemoryContents(userId: string, useCache = true): Promise<string[]> {
   const redis = getRedisClient();
-  const cacheKey = `${MEMORY_CACHE_PREFIX}:${userId}`;
+  const cacheKey = `${runtimeConfig.memory.cachePrefix}:${userId}`;
 
   if (useCache && redis) {
     try {
@@ -112,13 +108,13 @@ export async function getMemoryContents(userId: string, useCache = true): Promis
     .from(memories)
     .where(eq(memories.userId, userId))
     .orderBy(desc(memories.createdAt))
-    .limit(MAX_MEMORIES);
+    .limit(runtimeConfig.memory.maxMemories);
 
   const contents = rows.map((row) => row.content);
 
   if (useCache && redis) {
     try {
-      await redis.set(cacheKey, JSON.stringify(contents), "EX", MEMORY_CACHE_TTL_SECONDS);
+      await redis.set(cacheKey, JSON.stringify(contents), "EX", runtimeConfig.memory.cacheTtlSeconds);
     } catch {
       // Ignore cache write errors.
     }
@@ -134,7 +130,7 @@ export async function invalidateMemoryCache(userId: string): Promise<void> {
   }
 
   try {
-    await redis.del(`${MEMORY_CACHE_PREFIX}:${userId}`);
+    await redis.del(`${runtimeConfig.memory.cachePrefix}:${userId}`);
   } catch {
     // Ignore cache delete errors.
   }
@@ -146,22 +142,23 @@ export function buildMemoryPrompt(memoriesList: string[]): string {
   }
 
   return [
-    "## About the user (from past conversations)",
+    runtimeConfig.memory.promptHeader,
     ...memoriesList.map((memory) => `- ${memory}`),
     "",
-    "Use these memories to personalize your responses. Do not explicitly mention that you have memories unless asked.",
+    runtimeConfig.memory.promptFooter,
   ].join("\n");
 }
 
 export async function getMemoryPrompt(userId: string, userText?: string): Promise<string> {
   let memoriesList: string[] = [];
+  const topK = runtimeConfig.memory.topK;
 
   if (!userText) {
     const all = await getMemoryContents(userId, true);
-    memoriesList = all.slice(0, 10);
+    memoriesList = all.slice(0, topK);
   } else {
     const allMemories = await getMemoryContents(userId, true);
-    if (allMemories.length <= 10) {
+    if (allMemories.length <= topK) {
       memoriesList = allMemories;
     } else {
       try {
@@ -174,12 +171,12 @@ export async function getMemoryPrompt(userId: string, userText?: string): Promis
           .from(memories)
           .where(eq(memories.userId, userId))
           .orderBy(distance)
-          .limit(10);
+          .limit(topK);
           
         memoriesList = rows.map((r) => r.content);
       } catch (error) {
         console.error("[Memory] Semantic search failed:", error);
-        memoriesList = allMemories.slice(0, 10);
+        memoriesList = allMemories.slice(0, topK);
       }
     }
   }
@@ -196,7 +193,7 @@ export async function extractMemories({
   const client = createPerplexityClient();
 
   const response = await client.responses.create({
-    model: MEMORY_EXTRACTION_MODEL,
+    model: runtimeConfig.memory.extractionModel,
     input: [
       {
         type: "message",
@@ -209,10 +206,7 @@ export async function extractMemories({
         ],
       },
     ],
-    instructions:
-      "Given the conversation and existing memories, extract NEW user facts and IDENTIFY outdated ones. " +
-      "Only include durable preferences, personal details, work context, or recurring needs. " +
-      "Return a JSON object with two keys: `added` (array of strings for new facts) and `deleted_ids` (array of strings for IDs of existing memories that are now outdated or contradicted). Return { \"added\": [], \"deleted_ids\": [] } if nothing new/changed. Do not include duplicates or trivial facts.",
+    instructions: runtimeConfig.memory.extractionInstructions,
     stream: false,
   });
 
@@ -257,11 +251,14 @@ export async function saveExtractedMemories(params: {
   }
 
   const exchangeCount = Math.floor(conversationMessages / 2);
-  if (exchangeCount < 3 || (exchangeCount - 3) % 4 !== 0) {
+  const minExchanges = runtimeConfig.memory.minExchanges;
+  const everyN = runtimeConfig.memory.extractionEveryN;
+
+  if (exchangeCount < minExchanges || (exchangeCount - minExchanges) % everyN !== 0) {
     return 0;
   }
 
-  if (assistantMessage.startsWith("Model request failed:")) {
+  if (assistantMessage.startsWith(runtimeConfig.memory.failurePrefix)) {
     return 0;
   }
 
@@ -270,7 +267,7 @@ export async function saveExtractedMemories(params: {
     .from(memories)
     .where(eq(memories.userId, userId))
     .orderBy(desc(memories.createdAt))
-    .limit(MAX_MEMORIES);
+    .limit(runtimeConfig.memory.maxMemories);
 
   const { added, deletedIds } = await extractMemories({
     userMessage,
@@ -290,7 +287,7 @@ export async function saveExtractedMemories(params: {
   }
 
   if (added.length > 0) {
-    const availableSlots = MAX_MEMORIES - (existingRows.length - deletedIds.length);
+    const availableSlots = runtimeConfig.memory.maxMemories - (existingRows.length - deletedIds.length);
     const insertMemories = added.slice(0, Math.max(0, availableSlots));
     if (insertMemories.length > 0) {
       let embeddings: number[][] = [];

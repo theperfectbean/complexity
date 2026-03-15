@@ -3,12 +3,13 @@ import { and, cosineDistance, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { chunks, documents } from "@/lib/db/schema";
 import { env } from "@/lib/env";
+import { runtimeConfig } from "./config";
 
-const CHUNK_MAX_CHARS = 2200;
-const CHUNK_OVERLAP = 200;
-const EMBEDDER_TIMEOUT_MS = 1000 * 600;
-
-export function chunkText(input: string, maxChars = CHUNK_MAX_CHARS, overlap = CHUNK_OVERLAP) {
+export function chunkText(
+  input: string, 
+  maxChars = runtimeConfig.rag.chunkMaxChars, 
+  overlap = runtimeConfig.rag.chunkOverlap
+) {
   const text = input.replace(/\r\n/g, "\n").trim();
   if (!text) {
     return [];
@@ -29,8 +30,8 @@ export function chunkText(input: string, maxChars = CHUNK_MAX_CHARS, overlap = C
 }
 
 export async function getEmbeddings(texts: string[]) {
-  const BATCH_SIZE = 200;
-  const CONCURRENCY_LIMIT = 4;
+  const BATCH_SIZE = runtimeConfig.rag.embedderBatchSize;
+  const CONCURRENCY_LIMIT = runtimeConfig.rag.embedderConcurrency;
   const allEmbeddings: number[][] = new Array(texts.length);
 
   const batches: string[][] = [];
@@ -44,10 +45,10 @@ export async function getEmbeddings(texts: string[]) {
       batchGroup.map(async (batch, groupIndex) => {
         const batchStartIndex = (i + groupIndex) * BATCH_SIZE;
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), EMBEDDER_TIMEOUT_MS);
+        const timeoutId = setTimeout(() => controller.abort(), runtimeConfig.rag.embedderTimeoutMs);
 
         try {
-          const response = await fetch(`${env.EMBEDDER_URL}/embed`, {
+          const response = await fetch(`${env.EMBEDDER_URL}${runtimeConfig.rag.embedderPath}`, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -77,7 +78,7 @@ export async function getEmbeddings(texts: string[]) {
   return allEmbeddings;
 }
 
-export async function similaritySearch(roleId: string, embedding: number[], limit = 5) {
+export async function similaritySearch(roleId: string, embedding: number[], limit = runtimeConfig.rag.similarityLimit) {
   const distance = cosineDistance(chunks.embedding, embedding);
 
   return db

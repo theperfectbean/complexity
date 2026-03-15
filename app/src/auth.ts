@@ -7,10 +7,11 @@ import { z } from "zod";
 
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
+import { runtimeConfig } from "@/lib/config";
 
 const signInSchema = z.object({
   email: z.string().email(),
-  password: z.string().min(8),
+  password: z.string().min(runtimeConfig.auth.passwordMinLength),
 });
 
 export const { handlers, auth, signIn, signOut } = NextAuth({

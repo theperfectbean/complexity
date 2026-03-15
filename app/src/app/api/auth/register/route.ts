@@ -6,10 +6,11 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { createId } from "@/lib/db/cuid";
 import { users } from "@/lib/db/schema";
+import { runtimeConfig } from "@/lib/config";
 
 const schema = z.object({
   email: z.string().email(),
-  password: z.string().min(8),
+  password: z.string().min(runtimeConfig.auth.passwordMinLength),
   name: z.string().min(1).max(100).optional(),
 });
 
@@ -31,7 +32,7 @@ export async function POST(request: Request) {
 
   try {
     console.log("[Registration] Hashing password...");
-    const passwordHash = await bcrypt.hash(parsed.data.password, 12);
+    const passwordHash = await bcrypt.hash(parsed.data.password, runtimeConfig.auth.bcryptCost);
 
     console.log("[Registration] Inserting user into DB...");
     await db.insert(users).values({

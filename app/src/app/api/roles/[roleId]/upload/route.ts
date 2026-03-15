@@ -7,10 +7,10 @@ import { createId } from "@/lib/db/cuid";
 import { chunks, documents, roles, users } from "@/lib/db/schema";
 import { extractTextFromFile, isAllowedDocument } from "@/lib/documents";
 import { chunkText, getEmbeddings } from "@/lib/rag";
+import { runtimeConfig } from "@/lib/config";
 
-const MAX_FILE_SIZE = 50 * 1024 * 1024;
-
-export async function POST(request: Request, { params }: { params: Promise<{ roleId: string }> }) {
+export async function POST(
+request: Request, { params }: { params: Promise<{ roleId: string }> }) {
   const session = await auth();
   const userEmail = session?.user?.email;
   if (!userEmail) {
@@ -47,8 +47,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ rol
     return NextResponse.json({ error: "Only pdf/docx/txt/md are allowed" }, { status: 400 });
   }
 
-  if (file.size > MAX_FILE_SIZE) {
-    return NextResponse.json({ error: "File exceeds 50MB limit" }, { status: 400 });
+  const maxSizeBytes = runtimeConfig.uploads.maxRoleFileSizeBytes;
+  if (file.size > maxSizeBytes) {
+    return NextResponse.json({ error: `File exceeds ${Math.floor(maxSizeBytes / (1024 * 1024))}MB limit` }, { status: 400 });
   }
 
   const documentId = createId();

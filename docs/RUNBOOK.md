@@ -18,6 +18,8 @@ cp .env.example .env
 - `PERPLEXITY_API_KEY`
 - `NEXTAUTH_SECRET`
 
+*Note: There are many more configurable environment variables for RAG, Memory, and Chat limits. See `.env.example` or `app/src/lib/env.ts` for a full list of available knobs and their defaults.*
+
 ## Start System
 
 ```bash

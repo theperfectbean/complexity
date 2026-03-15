@@ -3,6 +3,8 @@ import { Responses } from "@perplexity-ai/perplexity_ai/resources/responses";
 import { createPerplexityClient } from "./perplexity";
 import { isPresetModel } from "./models";
 import { safeParseJsonLine } from "./sse";
+import { runtimeConfig } from "./config";
+import { env } from "./env";
 
 export interface PerplexityAgentOptions {
   modelId: string;
@@ -24,7 +26,7 @@ export async function runPerplexityAgent(options: PerplexityAgentOptions) {
   let assistantText = "";
   let completedResponse: any;
   let hasWrittenTextDelta = false;
-  const PERPLEXITY_STREAM_TIMEOUT_MS = 1000 * 60 * 5;
+  const PERPLEXITY_STREAM_TIMEOUT_MS = runtimeConfig.perplexity.streamTimeoutMs;
 
   const client = createPerplexityClient(apiKey);
   const requestBodyBase = isPresetModel(modelId)
@@ -37,7 +39,7 @@ export async function runPerplexityAgent(options: PerplexityAgentOptions) {
         model: modelId,
         input: agentInput,
         instructions: instructions,
-        tools: webSearch ? [{ type: "web_search" }, { type: "fetch_url" }] : [],
+        tools: webSearch ? runtimeConfig.perplexity.webTools : [],
       };
 
   const requestBody: Responses.ResponseCreateParamsStreaming = {
@@ -54,10 +56,10 @@ export async function runPerplexityAgent(options: PerplexityAgentOptions) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), PERPLEXITY_STREAM_TIMEOUT_MS);
 
-    const res = await fetch("https://api.perplexity.ai/v1/responses", {
+    const res = await fetch(runtimeConfig.perplexity.apiBaseUrl, {
       method: "POST",
       headers: {
-        "Authorization": "Bearer " + (apiKey || process.env.PERPLEXITY_API_KEY),
+        "Authorization": "Bearer " + (apiKey || env.PERPLEXITY_API_KEY),
         "Content-Type": "application/json",
         "Accept": "text/event-stream",
       },
@@ -195,6 +197,22 @@ export async function runPerplexityAgent(options: PerplexityAgentOptions) {
 
             if (eventRecord?.type === "response.completed") {
               completedResponse = eventRecord.response;
+              if (!assistantText) {
+                const responseRecord = asRecord(completedResponse);
+                const output = Array.isArray(responseRecord?.output) ? responseRecord.output : [];
+                for (const item of output) {
+                  const itemRecord = asRecord(item);
+                  const content = Array.isArray(itemRecord?.content) ? itemRecord.content : [];
+                  for (const part of content) {
+                    const partRecord = asRecord(part);
+                    if (typeof partRecord?.text === "string" && partRecord.text) {
+                      assistantText = partRecord.text;
+                      break;
+                    }
+                  }
+                  if (assistantText) break;
+                }
+              }
               continue;
             }
 

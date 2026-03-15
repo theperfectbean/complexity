@@ -30,6 +30,10 @@ vi.mock("@/lib/rag", () => ({
   similaritySearch: vi.fn(),
 }));
 
+vi.mock("@/lib/settings", () => ({
+  getApiKeys: vi.fn().mockResolvedValue({ PERPLEXITY_API_KEY: "test-key" }),
+}));
+
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { createPerplexityClient } from "@/lib/perplexity";

@@ -1,5 +1,6 @@
 import mammoth from "mammoth";
 import { PDFParse } from "pdf-parse";
+import { runtimeConfig } from "./config";
 
 export async function extractTextFromFile(file: File) {
   const buffer = Buffer.from(await file.arrayBuffer());
@@ -34,5 +35,5 @@ async function extractTextFromBuffer(buffer: Buffer, name: string, contentType: 
 
 export function isAllowedDocument(file: File) {
   const name = file.name.toLowerCase();
-  return [".pdf", ".docx", ".txt", ".md"].some((extension) => name.endsWith(extension));
+  return runtimeConfig.documents.allowedExtensions.some((extension) => name.endsWith(extension));
 }

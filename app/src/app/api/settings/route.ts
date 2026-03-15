@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
+import { eq } from "drizzle-orm";
+import { z } from "zod";
+
 import { auth } from "@/auth";
+import { db } from "@/lib/db";
+import { users } from "@/lib/db/schema";
 import { getSetting, setSetting } from "@/lib/settings";
 
 const ALLOWED_KEYS = [
@@ -8,20 +13,43 @@ const ALLOWED_KEYS = [
   "GOOGLE_GENERATIVE_AI_API_KEY",
   "XAI_API_KEY",
   "PERPLEXITY_API_KEY",
+  "OLLAMA_BASE_URL",
+  "LOCAL_OPENAI_BASE_URL",
+  "LOCAL_OPENAI_API_KEY",
 ];
+
+const patchSchema = z.object({
+  memoryEnabled: z.boolean(),
+});
 
 export async function GET() {
   const session = await auth();
-  if (!(session?.user as any)?.isAdmin) {
+  const userEmail = session?.user?.email;
+  if (!userEmail) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const settings: Record<string, string | null> = {};
-  for (const key of ALLOWED_KEYS) {
-    settings[key] = await getSetting(key);
+  const [user] = await db
+    .select({ id: users.id, memoryEnabled: users.memoryEnabled, isAdmin: users.isAdmin })
+    .from(users)
+    .where(eq(users.email, userEmail))
+    .limit(1);
+
+  if (!user) {
+    return NextResponse.json({ error: "User not found" }, { status: 404 });
   }
 
-  return NextResponse.json(settings);
+  const result: Record<string, any> = {
+    memoryEnabled: user.memoryEnabled,
+  };
+
+  if (user.isAdmin) {
+    for (const key of ALLOWED_KEYS) {
+      result[key] = await getSetting(key);
+    }
+  }
+
+  return NextResponse.json(result);
 }
 
 export async function POST(request: Request) {
@@ -39,4 +67,35 @@ export async function POST(request: Request) {
   }
 
   return NextResponse.json({ success: true });
+}
+
+export async function PATCH(request: Request) {
+  const session = await auth();
+  const userEmail = session?.user?.email;
+  if (!userEmail) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const body = await request.json();
+  const parsed = patchSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
+  }
+
+  const [user] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.email, userEmail))
+    .limit(1);
+
+  if (!user) {
+    return NextResponse.json({ error: "User not found" }, { status: 404 });
+  }
+
+  await db
+    .update(users)
+    .set({ memoryEnabled: parsed.data.memoryEnabled, updatedAt: new Date() })
+    .where(eq(users.id, user.id));
+
+  return NextResponse.json({ ok: true });
 }

@@ -5,11 +5,12 @@ import { z } from "zod";
 
 import { db } from "@/lib/db";
 import { users, verificationTokens } from "@/lib/db/schema";
+import { runtimeConfig } from "@/lib/config";
 
 const schema = z.object({
   token: z.string().min(1),
   email: z.string().email(),
-  password: z.string().min(8),
+  password: z.string().min(runtimeConfig.auth.passwordMinLength),
 });
 
 export async function POST(request: Request) {
@@ -45,7 +46,7 @@ export async function POST(request: Request) {
     }
 
     // Hash new password
-    const passwordHash = await bcrypt.hash(password, 12);
+    const passwordHash = await bcrypt.hash(password, runtimeConfig.auth.bcryptCost);
 
     // Update user password
     await db
