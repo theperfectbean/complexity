@@ -13,7 +13,14 @@ vi.mock("@/lib/db", () => ({
 
 vi.mock("@/lib/memory", () => ({
   invalidateMemoryCache: vi.fn(),
-  MAX_MEMORIES: 100,
+}));
+
+vi.mock("@/lib/config", () => ({
+  runtimeConfig: {
+    memory: {
+      maxMemories: 100,
+    },
+  },
 }));
 
 import { auth } from "@/auth";

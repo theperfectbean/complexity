@@ -3,7 +3,8 @@ import { createOpenAI } from "@ai-sdk/openai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createXai } from "@ai-sdk/xai";
 import { createOllama } from "ai-sdk-ollama";
-import { LanguageModel, streamText, convertToModelMessages, UIMessageChunk } from "ai";
+import { LanguageModel, streamText, convertToModelMessages, UIMessageChunk, UIMessage } from "ai";
+import type { Responses } from "@perplexity-ai/perplexity_ai/resources/responses";
 import { createPerplexityModel } from "./perplexity";
 import { runPerplexityAgent } from "./perplexity-agent";
 import { runtimeConfig } from "./config";
@@ -12,8 +13,8 @@ export type ProviderType = "perplexity" | "anthropic" | "openai" | "google" | "x
 
 export interface GenerationOptions {
   modelId: string;
-  messages: Record<string, unknown>[];
-  agentInput: Record<string, unknown>[];
+  messages: UIMessage[];
+  agentInput: Responses.InputItem[];
   system?: string;
   keys: Record<string, string | null>;
   requestId: string;

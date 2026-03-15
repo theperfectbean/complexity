@@ -13,6 +13,7 @@ type SearchModelOption = {
   id: string;
   label: string;
   category: string;
+  isPreset: boolean;
 };
 
 type SearchBarProps = {

@@ -5,8 +5,9 @@ import { z } from "zod";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { memories, users } from "@/lib/db/schema";
-import { invalidateMemoryCache, MAX_MEMORIES } from "@/lib/memory";
+import { invalidateMemoryCache } from "@/lib/memory";
 import { getEmbeddings } from "@/lib/rag";
+import { runtimeConfig } from "@/lib/config";
 
 const createSchema = z.object({
   content: z.string().min(1).max(1000),
@@ -54,9 +55,9 @@ export async function POST(request: Request) {
     .select({ id: memories.id })
     .from(memories)
     .where(eq(memories.userId, user.id))
-    .limit(MAX_MEMORIES);
+    .limit(runtimeConfig.memory.maxMemories);
 
-  if (existing.length >= MAX_MEMORIES) {
+  if (existing.length >= runtimeConfig.memory.maxMemories) {
     return NextResponse.json({ error: "Memory limit reached" }, { status: 400 });
   }
 

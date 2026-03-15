@@ -182,6 +182,11 @@ DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose build app
 - **Custom Model Management**: Added a "Manage Models" tab in the Admin Console, allowing administrators to discover provider models, add them to an active list, customize their display labels, and reorder them via drag-and-drop to control the user-facing dropdown sequence. Perplexity models are consistently prefixed with `perplexity/` for clear routing.
 - **Registry Synchronization**: Updated `app/src/lib/config.ts` to prioritize Perplexity models and set `pro-search` as the default. Synchronized unit tests to use latest March 2026 model identifiers (`gpt-5.4`, `claude-sonnet-4-6`).
 - **Type Safety Improvements**: Refactored several core files (`SearchBar.tsx`, `llm.ts`, `api/settings/route.ts`, `provider-models.ts`) to replace `any` types with proper interfaces or `Record<string, unknown>`, significantly improving codebase maintainability and satisfy strict linting rules.
+- **Build & Integration Fixes**: Resolved several critical issues that were causing Docker build failures:
+  - Fixed a broken import of `MAX_MEMORIES` in `api/memories/route.ts` by using the centralized `runtimeConfig`.
+  - Corrected TypeScript type mismatches in `runGeneration` (`llm.ts`) to properly support `UIMessage` and Perplexity `InputItem` types.
+  - Updated `SearchBar.tsx` to include `isPreset` in its local model option type definition.
+  - Enhanced `env.ts` to skip strict validation when `typeof window !== "undefined"`, preventing client-side startup crashes.
 
 ### Data Resilience & Backup Strategy (2026-03-14)
 - **Persistence**: Switched from Docker-managed named volumes to local bind mounts in `.data/` for Postgres, Redis, and Embedder models. This ensures data persists in the project folder and survives `down -v` commands.
