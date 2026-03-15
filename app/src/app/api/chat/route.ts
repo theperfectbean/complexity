@@ -276,7 +276,7 @@ export async function POST(request: Request) {
       const rateKey = `rate:chat:${userEmail}:${rateWindow}`;
       const current = await redis.incr(rateKey);
       if (current === 1) {
-        await redis.expire(rateKey, 61);
+        await redis.expire(rateKey, runtimeConfig.chat.rateLimitTtlSeconds + 1);
       }
       if (current > runtimeConfig.chat.rateLimitPerMinute) {
         return NextResponse.json({ error: "Rate limit exceeded. Try again in a minute." }, { status: 429 });
@@ -554,7 +554,7 @@ export async function POST(request: Request) {
         try {
           const [embedding] = await getEmbeddings([userText]);
           console.log(`[Chat API:${requestId}] Embeddings retrieved (${Date.now() - startTime}ms)`);
-          const topChunks = await similaritySearch(activeRoleId, embedding, 8);
+          const topChunks = await similaritySearch(activeRoleId, embedding, runtimeConfig.rag.similarityTopK);
           console.log(`[Chat API:${requestId}] Similarity search complete: found ${topChunks.length} chunks (${Date.now() - startTime}ms)`);
           if (topChunks.length > 0) {
             ragContext = topChunks.map((chunk, index) => `(${index + 1}) ${chunk.content}`).join("\n\n");

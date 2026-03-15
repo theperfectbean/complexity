@@ -124,6 +124,7 @@ export const runtimeConfig = {
     embedderConcurrency: env.RAG_EMBEDDER_CONCURRENCY ?? 4,
     embedderPath: env.RAG_EMBEDDER_PATH ?? "/embed",
     similarityLimit: env.RAG_SIMILARITY_LIMIT ?? 5,
+    similarityTopK: env.RAG_SIMILARITY_TOP_K ?? 8,
   },
   memory: {
     cacheTtlSeconds: env.MEMORY_CACHE_TTL_SECONDS ?? 60 * 5,
@@ -140,6 +141,7 @@ export const runtimeConfig = {
   },
   chat: {
     rateLimitPerMinute: env.CHAT_RATE_LIMIT_PER_MINUTE ?? 20,
+    rateLimitTtlSeconds: env.CHAT_RATE_LIMIT_TTL_SECONDS ?? 60,
     cacheTtlSeconds: env.CHAT_CACHE_TTL_SECONDS ?? 60 * 60,
     emptyResponseFallbackText: env.CHAT_EMPTY_RESPONSE_FALLBACK_TEXT ?? "I couldn't generate a response. Please try again.",
     memoryEventTimeoutMs: env.CHAT_MEMORY_EVENT_TIMEOUT_MS ?? 1200,
