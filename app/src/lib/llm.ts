@@ -108,28 +108,28 @@ export async function runGeneration(options: GenerationOptions): Promise<Generat
     case "anthropic":
       const anthropicKey = options.keys["ANTHROPIC_API_KEY"];
       if (!anthropicKey) throw new Error("ANTHROPIC_API_KEY is not configured");
-      const anthropicModel = runtimeConfig.llm.modelAliases.anthropic[modelName] || modelName;
+      const anthropicModel = (runtimeConfig.llm.modelAliases.anthropic && runtimeConfig.llm.modelAliases.anthropic[modelName]) || modelName;
       model = createAnthropic({ apiKey: anthropicKey })(anthropicModel);
       break;
 
     case "openai":
       const openaiKey = options.keys["OPENAI_API_KEY"];
       if (!openaiKey) throw new Error("OPENAI_API_KEY is not configured");
-      const openaiModel = runtimeConfig.llm.modelAliases.openai[modelName] || modelName;
+      const openaiModel = (runtimeConfig.llm.modelAliases.openai && runtimeConfig.llm.modelAliases.openai[modelName]) || modelName;
       model = createOpenAI({ apiKey: openaiKey })(openaiModel);
       break;
 
     case "google":
       const googleKey = options.keys["GOOGLE_GENERATIVE_AI_API_KEY"];
       if (!googleKey) throw new Error("GOOGLE_GENERATIVE_AI_API_KEY is not configured");
-      const googleModel = runtimeConfig.llm.modelAliases.google[modelName] || modelName;
+      const googleModel = (runtimeConfig.llm.modelAliases.google && runtimeConfig.llm.modelAliases.google[modelName]) || modelName;
       model = createGoogleGenerativeAI({ apiKey: googleKey })(googleModel);
       break;
 
     case "xai":
       const xaiKey = options.keys["XAI_API_KEY"];
       if (!xaiKey) throw new Error("XAI_API_KEY is not configured");
-      const xaiModel = runtimeConfig.llm.modelAliases.xai[modelName] || modelName;
+      const xaiModel = (runtimeConfig.llm.modelAliases.xai && runtimeConfig.llm.modelAliases.xai[modelName]) || modelName;
       model = createXai({ apiKey: xaiKey })(xaiModel);
       break;
 

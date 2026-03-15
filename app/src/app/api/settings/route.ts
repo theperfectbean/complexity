@@ -5,7 +5,7 @@ import { z } from "zod";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
-import { getSetting, setSetting } from "@/lib/settings";
+import { setSetting, getDetailedSettings } from "@/lib/settings";
 
 const ALLOWED_KEYS = [
   "ANTHROPIC_API_KEY",
@@ -16,6 +16,13 @@ const ALLOWED_KEYS = [
   "OLLAMA_BASE_URL",
   "LOCAL_OPENAI_BASE_URL",
   "LOCAL_OPENAI_API_KEY",
+  "PROVIDER_ANTHROPIC_ENABLED",
+  "PROVIDER_OPENAI_ENABLED",
+  "PROVIDER_GOOGLE_ENABLED",
+  "PROVIDER_XAI_ENABLED",
+  "PROVIDER_OLLAMA_ENABLED",
+  "PROVIDER_LOCAL_OPENAI_ENABLED",
+  "CUSTOM_MODEL_LIST",
 ];
 
 const patchSchema = z.object({
@@ -44,9 +51,7 @@ export async function GET() {
   };
 
   if (user.isAdmin) {
-    for (const key of ALLOWED_KEYS) {
-      result[key] = await getSetting(key);
-    }
+    result.details = await getDetailedSettings(ALLOWED_KEYS);
   }
 
   return NextResponse.json(result);
@@ -59,15 +64,16 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json() as Record<string, string | undefined>;
-  
+
   for (const key of ALLOWED_KEYS) {
     if (body[key] !== undefined) {
-      await setSetting(key, body[key]);
+      await setSetting(key, body[key] as string);
     }
   }
 
   return NextResponse.json({ success: true });
 }
+
 
 export async function PATCH(request: Request) {
   const session = await auth();

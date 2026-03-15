@@ -23,7 +23,7 @@ const DEFAULT_MODELS: ModelOption[] = [
   { id: "local-openai/custom-model", label: "Local OpenAI API", category: "Local", isPreset: false },
 ];
 
-const DEFAULT_MODEL_ID = "anthropic/claude-haiku-4-5";
+const DEFAULT_MODEL_ID = "pro-search";
 
 function parseModelsJson(raw: string | undefined): ModelOption[] | null {
   if (!raw) return null;

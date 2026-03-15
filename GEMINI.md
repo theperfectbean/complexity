@@ -177,7 +177,11 @@ DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose build app
 - **Registry Synchronization**: Updated `app/src/lib/config.ts`, `app/README.md`, and relevant unit tests to ensure consistent model identifiers across the workspace.
 - **Dynamic Model Filtering**: Implemented a new `/api/models` endpoint that filters the available LLM list based on configured API keys in the database or environment. 
 - **Auto-Filtering UI**: Updated the `SearchBar` component to automatically fetch and use the filtered model list, ensuring that users only see models they can actually use. If a selected model becomes unavailable (e.g., after an API key is removed), the UI automatically falls back to a preset.
-- **Type Safety Improvements**: Refactored several core files (`SearchBar.tsx`, `llm.ts`, `api/settings/route.ts`) to replace `any` types with proper interfaces or `Record<string, unknown>`, significantly improving codebase maintainability and satisfy strict linting rules.
+- **Provider Toggles & Source Detection**: Enhanced the Admin Settings to support explicit enabling/disabling of LLM providers. The panel now automatically detects and visually indicates if an API key is sourced from the `.env` file or the database, preventing redundant entry fields.
+- **Dynamic Model Fetching**: Implemented a new utility and API (`/api/admin/fetch-provider-models`) that queries enabled providers (OpenAI, Anthropic, Google, xAI, Ollama) directly for their available model lists.
+- **Custom Model Management**: Added a "Manage Models" tab in the Admin Console, allowing administrators to discover provider models, add them to an active list, customize their display labels, and reorder them via drag-and-drop to control the user-facing dropdown sequence.
+- **Registry Synchronization**: Updated `app/src/lib/config.ts` to prioritize Perplexity models and set `pro-search` as the default. Synchronized unit tests to use latest March 2026 model identifiers (`gpt-5.4`, `claude-sonnet-4-6`).
+- **Type Safety Improvements**: Refactored several core files (`SearchBar.tsx`, `llm.ts`, `api/settings/route.ts`, `provider-models.ts`) to replace `any` types with proper interfaces or `Record<string, unknown>`, significantly improving codebase maintainability and satisfy strict linting rules.
 
 ### Data Resilience & Backup Strategy (2026-03-14)
 - **Persistence**: Switched from Docker-managed named volumes to local bind mounts in `.data/` for Postgres, Redis, and Embedder models. This ensures data persists in the project folder and survives `down -v` commands.

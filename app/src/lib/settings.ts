@@ -40,3 +40,27 @@ export async function getApiKeys(): Promise<Record<string, string | null>> {
     return acc;
   }, {} as Record<string, string | null>);
 }
+
+export type SettingInfo = {
+  value: string | null;
+  source: "db" | "env" | "none";
+};
+
+export async function getDetailedSettings(keys: string[]): Promise<Record<string, SettingInfo>> {
+  const results = await Promise.all(keys.map(async (key) => {
+    const dbValue = await getSetting(key);
+    if (dbValue !== null && dbValue !== "") {
+      return { value: dbValue, source: "db" as const };
+    }
+    const envValue = process.env[key];
+    if (envValue !== undefined && envValue !== "") {
+      return { value: envValue, source: "env" as const };
+    }
+    return { value: null, source: "none" as const };
+  }));
+
+  return keys.reduce((acc, key, index) => {
+    acc[key] = results[index];
+    return acc;
+  }, {} as Record<string, SettingInfo>);
+}
