@@ -10,6 +10,36 @@ export async function fetchProviderModels(): Promise<ProviderModel[]> {
   const keys = await getApiKeys();
   const allModels: ProviderModel[] = [];
 
+  // 0. Perplexity (Sonar models and supported third-party models via Agent API)
+  if (keys["PERPLEXITY_API_KEY"]) {
+    try {
+      const res = await fetch("https://api.perplexity.ai/models", {
+        headers: { Authorization: `Bearer ${keys["PERPLEXITY_API_KEY"]}` },
+      });
+      if (res.ok) {
+        const data = await res.json() as { data?: { id: string }[] };
+        data.data?.forEach((m) => {
+          allModels.push({ id: m.id, name: m.id, provider: "Perplexity" });
+        });
+      } else {
+        throw new Error("Perplexity models endpoint not available");
+      }
+    } catch (e) {
+      console.warn("Falling back to static Perplexity model list", e);
+      // Fallback to known stable models if dynamic discovery fails
+      [
+        { id: "sonar", name: "Sonar", provider: "Perplexity" },
+        { id: "sonar-pro", name: "Sonar Pro", provider: "Perplexity" },
+        { id: "sonar-reasoning", name: "Sonar Reasoning", provider: "Perplexity" },
+        { id: "sonar-reasoning-pro", name: "Sonar Reasoning Pro", provider: "Perplexity" },
+        { id: "sonar-deep-research", name: "Sonar Deep Research", provider: "Perplexity" },
+        { id: "claude-3-5-sonnet", name: "Claude 3.5 Sonnet (via Perplexity)", provider: "Perplexity" },
+        { id: "claude-3-5-haiku", name: "Claude 3.5 Haiku (via Perplexity)", provider: "Perplexity" },
+        { id: "gpt-4o", name: "GPT-4o (via Perplexity)", provider: "Perplexity" },
+      ].forEach((m) => allModels.push(m));
+    }
+  }
+
   // 1. Anthropic
   if (keys["ANTHROPIC_API_KEY"]) {
     try {

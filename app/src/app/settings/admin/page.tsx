@@ -40,8 +40,9 @@ const PROVIDERS: ProviderConfig[] = [
     id: "perplexity",
     name: "Perplexity",
     keyName: "PERPLEXITY_API_KEY",
+    toggleName: "PROVIDER_PERPLEXITY_ENABLED",
     placeholder: "pplx-...",
-    description: "Core provider for Search. Required for Perplexity models.",
+    description: "Core provider for Search. Supports Sonar and Agentic third-party models.",
   },
   {
     id: "anthropic",
@@ -192,7 +193,7 @@ export default function AdminSettingsPage() {
 
   const addModel = (discovered: DiscoveredModel) => {
     const providerPrefix = discovered.provider.toLowerCase().replace(" (local)", "");
-    const id = providerPrefix === "perplexity" ? discovered.id : `${providerPrefix}/${discovered.id}`;
+    const id = `${providerPrefix}/${discovered.id}`;
     
     if (activeModels.some(m => m.id === id)) {
       toast.error("Model already in active list");
