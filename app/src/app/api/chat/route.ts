@@ -609,7 +609,8 @@ export async function POST(request: Request) {
       const memoryPrompt = thread.memoryEnabled ? await getMemoryPrompt(thread.userId, userText) : "";
       const memoryBlock = memoryPrompt ? `${memoryPrompt}\n\n` : "";
       const externalBlock = externalContext ? `\n\nExternal User Data (Always use this as primary context if relevant):\n${externalContext}\n\n` : "";
-      const baseInstructions = memoryBlock + (roleInstructions ? roleInstructions + "\n\n" : "") + externalBlock;
+      const chartInstructions = `\n\nIf the user asks to visualize data (like time-series or numerical tracking), output a JSON block wrapped in a markdown code block with the language "chart". Do not use mermaid. Format the JSON strictly as: { "type": "line" | "bar", "data": [{ "name": "...", "value": 123 }], "xAxisKey": "name", "lines": ["value"] }.`;
+      const baseInstructions = memoryBlock + (roleInstructions ? roleInstructions + "\n\n" : "") + externalBlock + chartInstructions;
       const instructions = ragContext
         ? baseInstructions + `Use this local context if relevant:\n\n${ragContext}\n\nIf local context is insufficient, continue with normal web-grounded reasoning.`
         : baseInstructions + (activeRoleId ? "Provide concise, accurate, citation-backed answers." : "Provide a concise and accurate response.");

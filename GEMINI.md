@@ -211,5 +211,10 @@ DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose build app
 
 - **Database Permissions**: If the database fails to start or reports "Permission denied" on internal files, ensure the `.data/postgres` directory is owned by the container's postgres user (typically UID 999) using `sudo chown -R 999:999 .data/postgres`. This can occur if host-side operations (like recursive chown commands in the home directory) are performed.
 
+### Data Visualization & Charting (Implemented 2026-03-15)
+- **Recharts via Markdown Interception**: Enabled the LLM to generate dynamic, interactive charts (like line or bar charts for time-series data such as diabetes tracking) directly in the chat interface.
+- **Mechanism**: The model is instructed to output JSON data wrapped in a markdown code block with the language `chart`. `MarkdownRenderer.tsx` intercepts this specific language block and dynamically renders a custom `ChartRenderer` component built with Recharts, instead of displaying raw JSON text.
+- **Robustness**: This markdown interception approach ensures portability across all LLM providers (Perplexity, Anthropic, OpenAI) without relying on sometimes-flakey native tool-calling (Generative UI) features, while still delivering a rich graphical UI.
+
 ## Workspace Hygiene & Maintenance
 - **Mandatory Cleanup**: To prevent disk space exhaustion, the agent MUST run `sudo rm -rf app/.next` and `npm cache clean --force` as a mandatory final step for every task execution. **If the `complexity-app` container is running, it MUST be restarted immediately after cleanup to restore missing build manifests.** This is critical in this environment where large E2E test runs and frequent builds can rapidly consume storage.
