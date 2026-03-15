@@ -78,19 +78,24 @@ export function ChartRenderer({ data }: { data: string }) {
             itemStyle={{ color: "hsl(var(--foreground))" }}
           />
           <Legend wrapperStyle={{ paddingTop: "20px" }} />
-          {parsedData.lines.map((key, index) => (
-            <DataComponent 
-              key={key}
-              type="monotone"
-              dataKey={key}
-              stroke={parsedData.type === "line" ? colors[index % colors.length] : undefined}
-              fill={parsedData.type === "bar" ? colors[index % colors.length] : undefined}
-              strokeWidth={2}
-              radius={parsedData.type === "bar" ? ([4, 4, 0, 0] as any) : undefined}
-              dot={{ r: 4, strokeWidth: 2 }}
-              activeDot={{ r: 6, strokeWidth: 0 }}
-            />
-          ))}
+          {parsedData.lines.map((item, index) => {
+            const dataKey = typeof item === "string" ? item : (item as any).valueKey || (item as any).dataKey || (item as any).key;
+            if (!dataKey) return null;
+            
+            return (
+              <DataComponent 
+                key={dataKey}
+                type="monotone"
+                dataKey={dataKey}
+                stroke={parsedData.type === "line" ? (typeof item === "object" && (item as any).color ? (item as any).color : colors[index % colors.length]) : undefined}
+                fill={parsedData.type === "bar" ? (typeof item === "object" && (item as any).color ? (item as any).color : colors[index % colors.length]) : undefined}
+                strokeWidth={(typeof item === "object" && (item as any).strokeWidth) ? (item as any).strokeWidth : 2}
+                radius={parsedData.type === "bar" ? ([4, 4, 0, 0] as any) : undefined}
+                dot={{ r: 4, strokeWidth: 2 }}
+                activeDot={{ r: 6, strokeWidth: 0 }}
+              />
+            );
+          })}
         </ChartComponent>
       </ResponsiveContainer>
     </div>

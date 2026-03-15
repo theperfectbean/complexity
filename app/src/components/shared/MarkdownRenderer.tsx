@@ -10,10 +10,15 @@ type MarkdownRendererProps = {
 
 const components: Components = {
   code({ inline, className, children, ...props }: React.ComponentPropsWithoutRef<"code"> & { inline?: boolean }) {
-    const match = /language-(\w+)/.exec(className || "");
-    if (!inline && match && match[1] === "chart") {
-      return <ChartRenderer data={String(children).replace(/\n$/, "")} />;
+    const content = String(children).trim();
+    
+    // Most resilient detection: 
+    if (!inline && content.startsWith('{') && content.endsWith('}')) {
+      if (content.includes('"type"') && content.includes('"data"')) {
+        return <ChartRenderer data={content} />;
+      }
     }
+
     return (
       <code className={className} {...props}>
         {children}
