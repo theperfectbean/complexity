@@ -209,5 +209,7 @@ DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose build app
 - **Embedder Concurrency**: Increased `uvicorn` workers to 4 in `embedder/Dockerfile` to utilize multiple CPU cores for parallel embedding requests.
 - **Timeouts**: Increased the embedder timeout to 600 seconds to accommodate the processing time required for very large documents (e.g., 12MB+ of text).
 
+- **Database Permissions**: If the database fails to start or reports "Permission denied" on internal files, ensure the `.data/postgres` directory is owned by the container's postgres user (typically UID 999) using `sudo chown -R 999:999 .data/postgres`. This can occur if host-side operations (like recursive chown commands in the home directory) are performed.
+
 ## Workspace Hygiene & Maintenance
 - **Mandatory Cleanup**: To prevent disk space exhaustion, the agent MUST run `sudo rm -rf app/.next` and `npm cache clean --force` as a mandatory final step for every task execution. **If the `complexity-app` container is running, it MUST be restarted immediately after cleanup to restore missing build manifests.** This is critical in this environment where large E2E test runs and frequent builds can rapidly consume storage.
