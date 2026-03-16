@@ -384,6 +384,7 @@ div.markdown-body pre {
   border: 1px solid var(--border) !important;
   background-color: color-mix(in srgb, var(--muted), transparent 70%) !important;
   padding: 1rem !important;
+  position: relative !important;
 }
 
 div.markdown-body pre code {

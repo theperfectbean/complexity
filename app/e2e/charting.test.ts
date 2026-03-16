@@ -35,7 +35,7 @@ test("chart rendering via markdown interception", async ({ page }) => {
 
   // 6. Verify internal SVG components that Recharts uses
   // We'll use a broader selector for the SVG surface
-  const svg = page.locator("svg.recharts-surface");
+  const svg = page.locator("svg.recharts-surface").first();
   await expect(svg).toBeVisible({ timeout: 10000 });
 
   // Check for the legend which we explicitly added

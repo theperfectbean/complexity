@@ -216,11 +216,14 @@ DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose build app
 - **Mechanism**: The model is instructed to output JSON data wrapped in a markdown code block with the language `chart`. `MarkdownRenderer.tsx` intercepts this specific language block and dynamically renders a custom `ChartRenderer` component built with Recharts, instead of displaying raw JSON text.
 - **Robustness**: This markdown interception approach ensures portability across all LLM providers (Perplexity, Anthropic, OpenAI) without relying on sometimes-flakey native tool-calling (Generative UI) features, while still delivering a rich graphical UI.
 
-### Voice Input Integration & Rendering Fix (Implemented 2026-03-16)
-- **Server-Side Transcription (Whisper)**: Replaced the native `SpeechRecognition` API (which suffered from strict SSL context blocking in Chromium/mobile browsers) with a robust server-side architecture. The app now captures audio blobs via the `MediaRecorder` API and posts them to a new `/api/transcribe` route.
-- **Faster-Whisper Integration**: The local `embedder` microservice now includes a `/transcribe` endpoint powered by `faster-whisper` (running the "base" model with `int8` quantization for CPU efficiency). This keeps the transcription process entirely local and private.
-- **Mobile UI Fixes**: Addressed `SearchBar` button crowding on mobile devices. Text labels for "Search" and the active model are now hidden on smaller viewports (`sm` breakpoint), and the button container uses `overflow-x-auto scrollbar-hide` to gracefully handle extreme narrow widths.
-- **State Optimization & Render Loop Fix**: Discovered and resolved a severe infinite re-render loop inside the `SearchBar` and its Vitest suites. The root cause was an inline default parameter (`attachments = []`) generating a new array reference on every render, which then triggered a `useEffect` to `setInternalAttachments`, causing `Maximum update depth exceeded` errors. The fix extracted the empty array reference `const EMPTY_ATTACHMENTS: File[] = []` outside of the component scope to stabilize reference checks during renders.
+### Markdown Copy Button (Implemented 2026-03-16)
+- **Feature**: Added a "Copy" button to all non-inline markdown code blocks.
+- **Visuals**: The button is absolute-positioned in the top-right of the `pre` block and only becomes visible when hovering over the block (using Tailwind's `group-hover` and `opacity-0`).
+- **Feedback**: Provides immediate visual feedback by switching from a `Copy` icon to a green `Check` icon for 2 seconds after a successful copy.
+- **Robustness**: Implemented `extractText` recursive helper to correctly pull plain text from `children` even when `rehype-highlight` has transformed the code into a complex tree of nested spans.
+- **Exclusion**: The button is automatically excluded from `ChartRenderer` blocks and inline code snippets.
+- **Test Adjustment**: Updated `e2e/charting.test.ts` to use `.first()` when locating `svg.recharts-surface` to resolve strict mode violations caused by Recharts generating multiple SVGs (main chart + legend icons).
+- **New Test**: Added `e2e/copy-button.test.ts` to verify button visibility, icon state changes, and actual clipboard content (requires `context.grantPermissions(["clipboard-read", "clipboard-write"])`).
 
 ### Image Attachments in SearchBar (Implemented 2026-03-16)
 - **Multi-Format Support**: Upgraded `SearchBar` to accept image files (`.jpg`, `.png`, `.webp`) alongside existing documents.
