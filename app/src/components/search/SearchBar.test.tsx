@@ -94,20 +94,14 @@ describe("SearchBar", () => {
     expect(onSubmit).toHaveBeenCalledTimes(1);
   });
 
-  it("renders microphone button when speech recognition is supported", () => {
-    // Mock webkitSpeechRecognition
-    class MockSpeechRecognition {
-      start = vi.fn();
-      stop = vi.fn();
-      onresult = null;
-      onend = null;
-      onerror = null;
-      continuous = false;
-      interimResults = false;
-      lang = "";
-    }
-
-    vi.stubGlobal("webkitSpeechRecognition", MockSpeechRecognition);
+  it("renders microphone button when audio recording is supported", () => {
+    // Mock navigator.mediaDevices.getUserMedia
+    const mockGetUserMedia = vi.fn().mockResolvedValue(null);
+    vi.stubGlobal("navigator", {
+      mediaDevices: {
+        getUserMedia: mockGetUserMedia,
+      },
+    });
 
     render(
       <form>

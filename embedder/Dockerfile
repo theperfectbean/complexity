@@ -10,10 +10,11 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     build-essential \
+    ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
-RUN pip install --upgrade pip
+RUN pip install --upgrade pip setuptools
 RUN pip install --index-url https://download.pytorch.org/whl/cpu torch==2.6.0
 RUN pip install -r requirements.txt
 

@@ -10,41 +10,6 @@ import { toast } from "sonner";
 import { MODELS, getDefaultModel } from "@/lib/models";
 import { cn } from "@/lib/utils";
 
-// Add global type for Web Speech API if not already defined
-interface SpeechRecognitionEvent extends Event {
-  results: {
-    [index: number]: {
-      [index: number]: {
-        transcript: string;
-      };
-    };
-    length: number;
-  };
-}
-
-interface SpeechRecognitionErrorEvent extends Event {
-  error: string;
-}
-
-interface SpeechRecognition extends EventTarget {
-  continuous: boolean;
-  interimResults: boolean;
-  lang: string;
-  onstart: () => void;
-  onresult: (event: SpeechRecognitionEvent) => void;
-  onend: () => void;
-  onerror: (event: SpeechRecognitionErrorEvent) => void;
-  start: () => void;
-  stop: () => void;
-}
-
-declare global {
-  interface Window {
-    SpeechRecognition: new () => SpeechRecognition;
-    webkitSpeechRecognition: new () => SpeechRecognition;
-  }
-}
-
 type SearchModelOption = {
   id: string;
   label: string;
@@ -98,7 +63,6 @@ export function SearchBar({
   roleId,
 }: SearchBarProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
   const onChangeRef = useRef(onChange);
   
   // Keep onChangeRef up to date
@@ -112,95 +76,78 @@ export function SearchBar({
   const [hasUserSelectedModel, setHasUserSelectedModel] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [isSpeechSupported, setIsSpeechSupported] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
 
   useEffect(() => {
-    const SpeechRecognition = typeof window !== "undefined" && (window.SpeechRecognition || window.webkitSpeechRecognition);
-    if (SpeechRecognition) {
-      setIsSpeechSupported(true);
-    }
-    return () => {
-      if (recognitionRef.current) {
-        recognitionRef.current.stop();
-      }
-    };
+    const isSupported = typeof window !== "undefined" && 
+      (!!window.navigator.mediaDevices?.getUserMedia || !!(window as any).webkitGetUserMedia);
+    setIsSpeechSupported(isSupported);
   }, []);
 
-  const toggleVoiceInput = () => {
-    const SpeechRecognition = typeof window !== "undefined" && (window.SpeechRecognition || window.webkitSpeechRecognition);
-    
-    if (!SpeechRecognition) {
-      toast.error("Speech Recognition API not found in this browser.");
-      return;
-    }
-
-    if (isListening && recognitionRef.current) {
-      try {
-        recognitionRef.current.stop();
-      } catch (e) {
-        console.error("Stop error", e);
+  const toggleVoiceInput = async () => {
+    if (isListening) {
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+        mediaRecorderRef.current.stop();
+        // The rest is handled in onstop
       }
-      setIsListening(false);
       return;
     }
 
     try {
-      // Create a fresh instance
-      const recognition = new SpeechRecognition();
-      
-      // Basic configuration
-      recognition.continuous = true;
-      recognition.interimResults = true;
-      
-      // Note: Omit recognition.lang to let it use browser default, 
-      // which is more reliable on some Linux Chromium builds.
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      chunksRef.current = [];
 
-      recognition.onstart = () => {
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) {
+          chunksRef.current.push(e.data);
+        }
+      };
+
+      mediaRecorder.onstart = () => {
         setIsListening(true);
         toast.info("Listening...", { duration: 2000 });
       };
 
-      recognition.onresult = (event: SpeechRecognitionEvent) => {
-        let transcript = "";
-        for (let i = 0; i < event.results.length; i++) {
-          transcript += event.results[i][0].transcript;
-        }
-        
-        if (transcript) {
-          onChangeRef.current(transcript);
-        }
-      };
-
-      recognition.onend = () => {
+      mediaRecorder.onstop = async () => {
         setIsListening(false);
-        recognitionRef.current = null;
-      };
+        stream.getTracks().forEach(track => track.stop());
 
-      recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-        console.error("Speech recognition error", event.error);
-        
-        if (event.error === "network") {
-          toast.error("Speech recognition failed (Network). This origin might not be trusted as 'Secure'.");
-        } else if (event.error === "not-allowed") {
-          toast.error("Permission denied. Check Chrome settings and SSL trust.");
-        } else if (event.error === "no-speech") {
-          // Silent failure is fine for no-speech
-          setIsListening(false);
-        } else {
-          toast.error(`Error: ${event.error}`);
+        if (chunksRef.current.length === 0) return;
+
+        const audioBlob = new Blob(chunksRef.current, { type: "audio/webm" });
+        const formData = new FormData();
+        formData.append("file", audioBlob, "audio.webm");
+
+        const loadingToast = toast.loading("Transcribing...");
+
+        try {
+          const response = await fetch("/api/transcribe", {
+            method: "POST",
+            body: formData,
+          });
+
+          if (!response.ok) throw new Error("Transcription failed");
+
+          const data = await response.json();
+          if (data.text) {
+            onChangeRef.current(value ? `${value} ${data.text}` : data.text);
+            toast.success("Transcribed", { id: loadingToast });
+          } else {
+            toast.dismiss(loadingToast);
+          }
+        } catch (err) {
+          console.error("Transcription error:", err);
+          toast.error("Failed to transcribe audio.", { id: loadingToast });
         }
-        
-        setIsListening(false);
-        recognitionRef.current = null;
       };
 
-      recognitionRef.current = recognition;
-      
-      // Final step: Try to start
-      toast.info("Activating microphone...");
-      recognition.start();
+      mediaRecorder.start();
     } catch (err) {
-      console.error("Failed to start recognition:", err);
-      toast.error("Failed to initialize microphone.");
+      console.error("Failed to start recording:", err);
+      toast.error("Could not access microphone.");
       setIsListening(false);
     }
   };
@@ -385,15 +332,16 @@ export function SearchBar({
       </div>
 
       <div className="mt-1 flex items-center justify-between gap-2 px-1 pb-1">
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide">
           <DropdownMenu.Root>
             <DropdownMenu.Trigger asChild>
               <button
                 type="button"
-                className="inline-flex h-8 items-center gap-1.5 rounded-xl bg-transparent px-2.5 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
+                className="inline-flex h-8 items-center gap-1 rounded-xl bg-transparent px-2 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
                 aria-label="Select model"
               >
-                <span className="max-w-32 truncate">{activeModelLabel}</span>
+                <span className="hidden sm:inline max-w-32 truncate">{activeModelLabel}</span>
+                <span className="sm:hidden">Model</span>
                 <ChevronDown className="h-3.5 w-3.5 opacity-50" />
               </button>
             </DropdownMenu.Trigger>
@@ -428,7 +376,7 @@ export function SearchBar({
           <button
             type="button"
             className={cn(
-              "inline-flex h-8 w-fit items-center gap-1.5 rounded-xl px-2.5 text-[13px] font-medium transition-all",
+              "inline-flex h-8 items-center gap-1.5 rounded-xl px-2 text-[13px] font-medium transition-all",
               webSearchEnabled
                 ? "text-primary hover:bg-primary/10"
                 : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
@@ -437,8 +385,9 @@ export function SearchBar({
             onClick={() => onWebSearchChange?.(!webSearchEnabled)}
           >
             <Globe className={cn("h-4 w-4", webSearchEnabled ? "text-primary" : "opacity-60")} />
-            <span>Search</span>
+            <span className="hidden sm:inline">Search</span>
           </button>
+
 
           <button
             type="button"

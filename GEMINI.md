@@ -217,8 +217,9 @@ DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose build app
 - **Robustness**: This markdown interception approach ensures portability across all LLM providers (Perplexity, Anthropic, OpenAI) without relying on sometimes-flakey native tool-calling (Generative UI) features, while still delivering a rich graphical UI.
 
 ### Voice Input Integration & Rendering Fix (Implemented 2026-03-16)
-- **Web Speech API**: Integrated native browser `SpeechRecognition` / `webkitSpeechRecognition` directly into the `SearchBar` component.
-- **Responsive UI**: The microphone icon button appears automatically if the browser supports speech recognition. During active listening, it pulses with a red aura to provide visual feedback.
+- **Server-Side Transcription (Whisper)**: Replaced the native `SpeechRecognition` API (which suffered from strict SSL context blocking in Chromium/mobile browsers) with a robust server-side architecture. The app now captures audio blobs via the `MediaRecorder` API and posts them to a new `/api/transcribe` route.
+- **Faster-Whisper Integration**: The local `embedder` microservice now includes a `/transcribe` endpoint powered by `faster-whisper` (running the "base" model with `int8` quantization for CPU efficiency). This keeps the transcription process entirely local and private.
+- **Mobile UI Fixes**: Addressed `SearchBar` button crowding on mobile devices. Text labels for "Search" and the active model are now hidden on smaller viewports (`sm` breakpoint), and the button container uses `overflow-x-auto scrollbar-hide` to gracefully handle extreme narrow widths.
 - **State Optimization & Render Loop Fix**: Discovered and resolved a severe infinite re-render loop inside the `SearchBar` and its Vitest suites. The root cause was an inline default parameter (`attachments = []`) generating a new array reference on every render, which then triggered a `useEffect` to `setInternalAttachments`, causing `Maximum update depth exceeded` errors. The fix extracted the empty array reference `const EMPTY_ATTACHMENTS: File[] = []` outside of the component scope to stabilize reference checks during renders.
 
 ### Image Attachments in SearchBar (Implemented 2026-03-16)

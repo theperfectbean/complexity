@@ -2,58 +2,56 @@ import { test, expect } from "@playwright/test";
 
 test.describe("Voice Input", () => {
   test.beforeEach(async ({ page }) => {
-    // Setup mock SpeechRecognition that can be controlled via window flags
+    // 1. Setup mock MediaRecorder and getUserMedia
     await page.addInitScript(() => {
-      class MockSpeechRecognition {
-        continuous = false;
-        interimResults = false;
-        lang = "en-US";
+      class MockMediaRecorder {
         onstart: (() => void) | null = null;
-        onresult: ((event: any) => void) | null = null;
-        onend: (() => void) | null = null;
-        onerror: ((event: any) => void) | null = null;
+        onstop: (() => void) | null = null;
+        ondataavailable: ((e: any) => void) | null = null;
+        state = "inactive";
+
+        constructor(public stream: any) {}
 
         start() {
-          // Check for a global flag to simulate error
-          if ((window as any).__MOCK_VOICE_ERROR) {
-            setTimeout(() => {
-              if (this.onstart) this.onstart();
-              setTimeout(() => {
-                if (this.onerror) this.onerror({ error: "not-allowed" });
-                if (this.onend) this.onend();
-              }, 200);
-            }, 100);
-            return;
-          }
-
-          // Normal successful path
+          this.state = "recording";
           setTimeout(() => {
             if (this.onstart) this.onstart();
             
+            // Simulate data
             setTimeout(() => {
-              if (this.onresult) {
-                this.onresult({
-                  results: [
-                    [{ transcript: "Hello from voice test" }]
-                  ],
-                  resultIndex: 0
-                });
+              if (this.ondataavailable) {
+                this.ondataavailable({ data: new Blob(["test-audio"], { type: "audio/webm" }) });
               }
-              if (this.onend) this.onend();
-            }, 500);
-          }, 100);
+            }, 100);
+          }, 50);
         }
 
         stop() {
-          if (this.onend) this.onend();
+          this.state = "inactive";
+          if (this.onstop) this.onstop();
         }
       }
 
-      (window as any).webkitSpeechRecognition = MockSpeechRecognition;
-      (window as any).SpeechRecognition = MockSpeechRecognition;
+      const mockStream = {
+        getTracks: () => [{ stop: () => {} }]
+      };
+
+      (window.navigator.mediaDevices as any) = {
+        getUserMedia: async () => mockStream
+      };
+      (window as any).MediaRecorder = MockMediaRecorder;
     });
 
-    // Register/Login
+    // 2. Mock the transcription API
+    await page.route("**/api/transcribe", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ text: "Transcribed text from Whisper" }),
+      });
+    });
+
+    // 3. Register/Login
     const email = `voice-test-${Math.random().toString(36).slice(2, 10)}@example.com`;
     await page.goto("/register");
     await page.getByPlaceholder("Name").fill("Voice Tester");
@@ -63,25 +61,34 @@ test.describe("Voice Input", () => {
     await expect(page.getByPlaceholder("Ask anything...")).toBeVisible({ timeout: 10000 });
   });
 
-  test("should activate microphone and capture voice transcript", async ({ page }) => {
+  test("should record audio and receive transcription", async ({ page }) => {
+    // 1. Start listening
     await page.getByRole("button", { name: "Start listening" }).click();
     await expect(page.getByRole("button", { name: "Stop listening" })).toBeVisible();
-    
+
+    // 2. Stop listening (manually or wait for mock logic)
+    // In our app, we click again to stop
+    await page.getByRole("button", { name: "Stop listening" }).click();
+
+    // 3. Verify the transcription is appended to the search bar
     const searchBar = page.getByPlaceholder("Ask anything...");
-    await expect(searchBar).toHaveValue("Hello from voice test", { timeout: 10000 });
-    await expect(page.getByRole("button", { name: "Start listening" })).toBeVisible();
+    await expect(searchBar).toHaveValue("Transcribed text from Whisper", { timeout: 10000 });
   });
 
-  test("should handle speech recognition errors gracefully", async ({ page }) => {
-    // Set the flag to trigger error in the mock
-    await page.evaluate(() => {
-      (window as any).__MOCK_VOICE_ERROR = true;
+  test("should handle transcription errors gracefully", async ({ page }) => {
+    // Mock a failure for this specific test
+    await page.route("**/api/transcribe", async (route) => {
+      await route.fulfill({
+        status: 500,
+        contentType: "application/json",
+        body: JSON.stringify({ error: "Failed to transcribe" }),
+      });
     });
 
     await page.getByRole("button", { name: "Start listening" }).click();
-    
-    // Use the actual text found in the UI snapshot
-    await expect(page.getByText("Microphone access was denied.")).toBeVisible({ timeout: 10000 });
-    await expect(page.getByRole("button", { name: "Start listening" })).toBeVisible();
+    await page.getByRole("button", { name: "Stop listening" }).click();
+
+    // Verify toast error appears
+    await expect(page.getByText("Failed to transcribe audio.")).toBeVisible();
   });
 });
