@@ -145,9 +145,15 @@ export function SearchBar({
       };
 
       mediaRecorder.start();
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to start recording:", err);
-      toast.error("Could not access microphone.");
+      const errMsg = err.name === "NotAllowedError" 
+        ? "Permission denied. Check browser settings." 
+        : err.name === "SecurityError"
+        ? "Security error. Origin must be 'Secure' (HTTPS or localhost)."
+        : `Could not access microphone: ${err.message || err.name}`;
+      
+      toast.error(errMsg);
       setIsListening(false);
     }
   };
