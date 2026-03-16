@@ -5,6 +5,7 @@ import { ChevronDown, Globe, Paperclip, SendHorizontal, X, FileText, Mic, MicOff
 import { motion } from "motion/react";
 import { useMemo, useRef, useState, useEffect } from "react";
 import TextareaAutosize from "react-textarea-autosize";
+import { toast } from "sonner";
 
 import { MODELS, getDefaultModel } from "@/lib/models";
 import { cn } from "@/lib/utils";
@@ -161,6 +162,16 @@ export function SearchBar({
 
       recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
         console.error("Speech recognition error", event.error);
+        
+        // Provide user feedback for common errors, especially the 'network' error in Chromium
+        if (event.error === "network") {
+          toast.error("Speech recognition failed (Network). If you are using Chromium on Linux, it may lack Google Speech API keys.");
+        } else if (event.error === "not-allowed") {
+          toast.error("Microphone access was denied.");
+        } else {
+          toast.error(`Speech recognition error: ${event.error}`);
+        }
+        
         setIsListening(false);
         recognitionRef.current = null;
       };
