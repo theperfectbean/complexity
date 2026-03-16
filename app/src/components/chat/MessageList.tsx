@@ -163,6 +163,25 @@ export function MessageList({ messages, emptyLabel, onRelatedQuestionClick, onRe
           >
             {isUser ? (
               <div className="w-fit max-w-[85%] rounded-2xl bg-muted/60 px-5 py-3.5 text-left md:max-w-[75%]">
+                {(() => {
+                  const msgRecord = message as Record<string, unknown>;
+                  const attachments = (msgRecord.experimental_attachments || msgRecord.attachments || []) as Array<{ url?: string; contentType?: string; name?: string }>;
+                  const images = attachments.filter((a) => a.contentType?.startsWith("image/") || a.url?.startsWith("data:image/"));
+                  
+                  return images.length > 0 ? (
+                    <div className="flex flex-wrap gap-2 mb-2">
+                      {images.map((img, idx) => (
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        <img 
+                          key={idx} 
+                          src={img.url} 
+                          alt={img.name || "Attachment"} 
+                          className="max-h-48 rounded-lg object-cover shadow-sm border border-border/50" 
+                        />
+                      ))}
+                    </div>
+                  ) : null;
+                })()}
                 <p className="whitespace-pre-wrap text-[0.9375rem] font-medium leading-[1.6] text-foreground">
                   {message.content}
                 </p>

@@ -225,7 +225,7 @@ DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose build app
 - **Multi-Format Support**: Upgraded `SearchBar` to accept image files (`.jpg`, `.png`, `.webp`) alongside existing documents.
 - **Dynamic Previews**: Introduced `imagePreviews` state to read image blobs as base64 and render real-time image thumbnails directly inside the text input box's attachment chip container.
 - **Context-Aware Uploading**: Maintained document uploading directly to `/api/roles/[roleId]/upload` using the newly introduced `roleId` prop, while image files are sent directly to the chat context without persisting as static documents for the Role.
-
+- **Message List Rendering**: Updated `MessageList.tsx` to display image attachments directly within user message bubbles by casting the `message` object to access `experimental_attachments` or `attachments` and filtering for image types.
 
 ## Workspace Hygiene & Maintenance
 - **Mandatory Cleanup**: To prevent disk space exhaustion, the agent MUST run `sudo rm -rf app/.next` and `npm cache clean --force` as a mandatory final step for every task execution. **If the `complexity-app` container is running, it MUST be restarted immediately after cleanup to restore missing build manifests.** This is critical in this environment where large E2E test runs and frequent builds can rapidly consume storage.
