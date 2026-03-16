@@ -86,6 +86,11 @@ export function SearchBar({
   }, []);
 
   const toggleVoiceInput = async () => {
+    if (!window.isSecureContext) {
+      toast.error("Microphone access requires a Secure Context (HTTPS or localhost).");
+      return;
+    }
+
     if (isListening) {
       if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
         mediaRecorderRef.current.stop();
