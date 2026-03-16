@@ -128,22 +128,35 @@ export function SearchBar({
   const toggleVoiceInput = () => {
     const SpeechRecognition = typeof window !== "undefined" && (window.SpeechRecognition || window.webkitSpeechRecognition);
     
-    if (!SpeechRecognition) return;
+    if (!SpeechRecognition) {
+      toast.error("Speech Recognition API not found in this browser.");
+      return;
+    }
 
     if (isListening && recognitionRef.current) {
-      recognitionRef.current.stop();
+      try {
+        recognitionRef.current.stop();
+      } catch (e) {
+        console.error("Stop error", e);
+      }
       setIsListening(false);
       return;
     }
 
     try {
+      // Create a fresh instance
       const recognition = new SpeechRecognition();
+      
+      // Basic configuration
       recognition.continuous = true;
       recognition.interimResults = true;
-      recognition.lang = "en-US";
+      
+      // Note: Omit recognition.lang to let it use browser default, 
+      // which is more reliable on some Linux Chromium builds.
 
       recognition.onstart = () => {
         setIsListening(true);
+        toast.info("Listening...", { duration: 2000 });
       };
 
       recognition.onresult = (event: SpeechRecognitionEvent) => {
@@ -152,7 +165,9 @@ export function SearchBar({
           transcript += event.results[i][0].transcript;
         }
         
-        onChangeRef.current(transcript);
+        if (transcript) {
+          onChangeRef.current(transcript);
+        }
       };
 
       recognition.onend = () => {
@@ -163,13 +178,15 @@ export function SearchBar({
       recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
         console.error("Speech recognition error", event.error);
         
-        // Provide user feedback for common errors, especially the 'network' error in Chromium
         if (event.error === "network") {
-          toast.error("Speech recognition failed (Network). If you are using Chromium on Linux, it may lack Google Speech API keys.");
+          toast.error("Speech recognition failed (Network). This origin might not be trusted as 'Secure'.");
         } else if (event.error === "not-allowed") {
-          toast.error("Microphone access was denied.");
+          toast.error("Permission denied. Check Chrome settings and SSL trust.");
+        } else if (event.error === "no-speech") {
+          // Silent failure is fine for no-speech
+          setIsListening(false);
         } else {
-          toast.error(`Speech recognition error: ${event.error}`);
+          toast.error(`Error: ${event.error}`);
         }
         
         setIsListening(false);
@@ -177,9 +194,13 @@ export function SearchBar({
       };
 
       recognitionRef.current = recognition;
+      
+      // Final step: Try to start
+      toast.info("Activating microphone...");
       recognition.start();
     } catch (err) {
       console.error("Failed to start recognition:", err);
+      toast.error("Failed to initialize microphone.");
       setIsListening(false);
     }
   };
