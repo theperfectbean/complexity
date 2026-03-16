@@ -73,6 +73,66 @@ function extractCitationsFromResponse(response: Record<string, unknown> | null):
   return citations;
 }
 
+export function getLanguageModel(modelId: string, keys: Record<string, string | null>): LanguageModel {
+  const { provider, model: modelName } = getProviderAndModel(modelId);
+
+  if (provider === "perplexity") {
+    let mappedModelName = modelName;
+    if (mappedModelName === "fast-search" || mappedModelName === "sonar") mappedModelName = "sonar";
+    if (mappedModelName === "pro-search") mappedModelName = "sonar-pro";
+    
+    const perplexityKey = keys["PERPLEXITY_API_KEY"];
+    if (!perplexityKey) throw new Error("PERPLEXITY_API_KEY is not configured");
+    
+    return createOpenAI({
+      apiKey: perplexityKey,
+      baseURL: "https://api.perplexity.ai",
+      compatibility: "compatible",
+    }).chat(mappedModelName);
+  }
+
+  switch (provider) {
+    case "anthropic":
+      const anthropicKey = keys["ANTHROPIC_API_KEY"];
+      if (!anthropicKey) throw new Error("ANTHROPIC_API_KEY is not configured");
+      const anthropicModel = (runtimeConfig.llm.modelAliases.anthropic && runtimeConfig.llm.modelAliases.anthropic[modelName]) || modelName;
+      return createAnthropic({ apiKey: anthropicKey })(anthropicModel);
+
+    case "openai":
+      const openaiKey = keys["OPENAI_API_KEY"];
+      if (!openaiKey) throw new Error("OPENAI_API_KEY is not configured");
+      const openaiModel = (runtimeConfig.llm.modelAliases.openai && runtimeConfig.llm.modelAliases.openai[modelName]) || modelName;
+      return createOpenAI({ apiKey: openaiKey })(openaiModel);
+
+    case "google":
+      const googleKey = keys["GOOGLE_GENERATIVE_AI_API_KEY"];
+      if (!googleKey) throw new Error("GOOGLE_GENERATIVE_AI_API_KEY is not configured");
+      const googleModel = (runtimeConfig.llm.modelAliases.google && runtimeConfig.llm.modelAliases.google[modelName]) || modelName;
+      return createGoogleGenerativeAI({ apiKey: googleKey })(googleModel);
+
+    case "xai":
+      const xaiKey = keys["XAI_API_KEY"];
+      if (!xaiKey) throw new Error("XAI_API_KEY is not configured");
+      const xaiModel = (runtimeConfig.llm.modelAliases.xai && runtimeConfig.llm.modelAliases.xai[modelName]) || modelName;
+      return createXai({ apiKey: xaiKey })(xaiModel);
+
+    case "ollama":
+      const ollamaBaseUrl = keys["OLLAMA_BASE_URL"] || runtimeConfig.llm.ollamaBaseUrl;
+      return createOllama({ baseURL: ollamaBaseUrl })(modelName);
+
+    case "local-openai":
+      const localOpenAiBaseUrl = keys["LOCAL_OPENAI_BASE_URL"];
+      if (!localOpenAiBaseUrl) throw new Error("LOCAL_OPENAI_BASE_URL is not configured");
+      return createOpenAI({ 
+        baseURL: localOpenAiBaseUrl,
+        apiKey: keys["LOCAL_OPENAI_API_KEY"] || runtimeConfig.llm.localOpenAiApiKeyFallback
+      })(modelName);
+
+    default:
+      throw new Error(`Provider ${provider} is not yet fully implemented.`);
+  }
+}
+
 export async function runGeneration(options: GenerationOptions): Promise<GenerationResult> {
   const { provider, model: modelName } = getProviderAndModel(options.modelId);
 
@@ -103,54 +163,7 @@ export async function runGeneration(options: GenerationOptions): Promise<Generat
   }
 
   // Direct Vercel AI SDK Providers
-  let model: LanguageModel;
-
-  switch (provider) {
-    case "anthropic":
-      const anthropicKey = options.keys["ANTHROPIC_API_KEY"];
-      if (!anthropicKey) throw new Error("ANTHROPIC_API_KEY is not configured");
-      const anthropicModel = (runtimeConfig.llm.modelAliases.anthropic && runtimeConfig.llm.modelAliases.anthropic[modelName]) || modelName;
-      model = createAnthropic({ apiKey: anthropicKey })(anthropicModel);
-      break;
-
-    case "openai":
-      const openaiKey = options.keys["OPENAI_API_KEY"];
-      if (!openaiKey) throw new Error("OPENAI_API_KEY is not configured");
-      const openaiModel = (runtimeConfig.llm.modelAliases.openai && runtimeConfig.llm.modelAliases.openai[modelName]) || modelName;
-      model = createOpenAI({ apiKey: openaiKey })(openaiModel);
-      break;
-
-    case "google":
-      const googleKey = options.keys["GOOGLE_GENERATIVE_AI_API_KEY"];
-      if (!googleKey) throw new Error("GOOGLE_GENERATIVE_AI_API_KEY is not configured");
-      const googleModel = (runtimeConfig.llm.modelAliases.google && runtimeConfig.llm.modelAliases.google[modelName]) || modelName;
-      model = createGoogleGenerativeAI({ apiKey: googleKey })(googleModel);
-      break;
-
-    case "xai":
-      const xaiKey = options.keys["XAI_API_KEY"];
-      if (!xaiKey) throw new Error("XAI_API_KEY is not configured");
-      const xaiModel = (runtimeConfig.llm.modelAliases.xai && runtimeConfig.llm.modelAliases.xai[modelName]) || modelName;
-      model = createXai({ apiKey: xaiKey })(xaiModel);
-      break;
-
-    case "ollama":
-      const ollamaBaseUrl = options.keys["OLLAMA_BASE_URL"] || runtimeConfig.llm.ollamaBaseUrl;
-      model = createOllama({ baseURL: ollamaBaseUrl })(modelName);
-      break;
-
-    case "local-openai":
-      const localOpenAiBaseUrl = options.keys["LOCAL_OPENAI_BASE_URL"];
-      if (!localOpenAiBaseUrl) throw new Error("LOCAL_OPENAI_BASE_URL is not configured");
-      model = createOpenAI({ 
-        baseURL: localOpenAiBaseUrl,
-        apiKey: options.keys["LOCAL_OPENAI_API_KEY"] || runtimeConfig.llm.localOpenAiApiKeyFallback
-      })(modelName);
-      break;
-
-    default:
-      throw new Error(`Provider ${provider} is not yet fully implemented.`);
-  }
+  const model = getLanguageModel(options.modelId, options.keys);
 
   options.writer.write({
     type: "data-call-start",

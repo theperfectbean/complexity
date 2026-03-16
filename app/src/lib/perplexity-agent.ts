@@ -20,9 +20,14 @@ export interface PerplexityAgentOptions {
 }
 
 export async function runPerplexityAgent(options: PerplexityAgentOptions) {
-  const { modelId, agentInput, instructions, webSearch, apiKey, writer, textId, requestId } = options;
+  const { modelId: rawModelId, agentInput, instructions, webSearch, apiKey, writer, textId, requestId } = options;
   const startTime = Date.now();
   
+  // Map internal preset IDs to Perplexity preset names
+  let modelId = rawModelId;
+  if (modelId === "fast-search") modelId = "sonar";
+  if (modelId === "pro-search") modelId = "sonar-pro";
+
   let assistantText = "";
   let completedResponse: any;
   let hasWrittenTextDelta = false;
@@ -68,10 +73,11 @@ export async function runPerplexityAgent(options: PerplexityAgentOptions) {
     }).finally(() => clearTimeout(timeoutId));
 
     if (!res.ok) {
+      const errText = await res.text();
       if (res.status === 400) {
+        console.error(`[runPerplexityAgent] Perplexity 400: ${errText}`);
         streamingFailed = true;
       } else {
-        const errText = await res.text();
         throw new Error(`Perplexity API Error: ${res.status} ${errText}`);
       }
     } else if (res.body) {
