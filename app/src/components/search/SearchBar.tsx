@@ -29,6 +29,7 @@ interface SpeechRecognition extends EventTarget {
   continuous: boolean;
   interimResults: boolean;
   lang: string;
+  onstart: () => void;
   onresult: (event: SpeechRecognitionEvent) => void;
   onend: () => void;
   onerror: (event: SpeechRecognitionErrorEvent) => void;
@@ -106,7 +107,6 @@ export function SearchBar({
 
   const [internalAttachments, setInternalAttachments] = useState<File[]>(attachments);
   const [imagePreviews, setImagePreviews] = useState<Record<string, string>>({});
-  const [uploading, setUploading] = useState(false);
   const [availableModels, setAvailableModels] = useState<readonly SearchModelOption[]>(providedModelOptions || MODELS);
   const [hasUserSelectedModel, setHasUserSelectedModel] = useState(false);
   const [isListening, setIsListening] = useState(false);
@@ -114,13 +114,36 @@ export function SearchBar({
 
   useEffect(() => {
     const SpeechRecognition = typeof window !== "undefined" && (window.SpeechRecognition || window.webkitSpeechRecognition);
-    
     if (SpeechRecognition) {
       setIsSpeechSupported(true);
+    }
+    return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+    };
+  }, []);
+
+  const toggleVoiceInput = () => {
+    const SpeechRecognition = typeof window !== "undefined" && (window.SpeechRecognition || window.webkitSpeechRecognition);
+    
+    if (!SpeechRecognition) return;
+
+    if (isListening && recognitionRef.current) {
+      recognitionRef.current.stop();
+      setIsListening(false);
+      return;
+    }
+
+    try {
       const recognition = new SpeechRecognition();
       recognition.continuous = true;
       recognition.interimResults = true;
       recognition.lang = "en-US";
+
+      recognition.onstart = () => {
+        setIsListening(true);
+      };
 
       recognition.onresult = (event: SpeechRecognitionEvent) => {
         let transcript = "";
@@ -133,36 +156,20 @@ export function SearchBar({
 
       recognition.onend = () => {
         setIsListening(false);
+        recognitionRef.current = null;
       };
 
       recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
         console.error("Speech recognition error", event.error);
         setIsListening(false);
+        recognitionRef.current = null;
       };
 
       recognitionRef.current = recognition;
-    }
-
-    return () => {
-      if (recognitionRef.current) {
-        recognitionRef.current.stop();
-      }
-    };
-  }, []);
-
-  const toggleVoiceInput = () => {
-    if (!recognitionRef.current) return;
-
-    if (isListening) {
-      recognitionRef.current.stop();
-    } else {
-      try {
-        recognitionRef.current.start();
-        setIsListening(true);
-      } catch (err) {
-        console.error("Failed to start recognition:", err);
-        setIsListening(false);
-      }
+      recognition.start();
+    } catch (err) {
+      console.error("Failed to start recognition:", err);
+      setIsListening(false);
     }
   };
 
@@ -234,7 +241,6 @@ export function SearchBar({
         reader.readAsDataURL(file);
       } else {
         if (roleId) {
-          setUploading(true);
           try {
             const body = new FormData();
             body.append("file", file);
@@ -244,8 +250,6 @@ export function SearchBar({
             });
           } catch (error) {
             console.error(error);
-          } finally {
-            setUploading(false);
           }
         }
       }
