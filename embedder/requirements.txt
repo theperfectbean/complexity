@@ -4,3 +4,4 @@ sentence-transformers==3.4.1
 torch==2.6.0
 faster-whisper==1.1.1
 numpy<2.0.0
+python-multipart
