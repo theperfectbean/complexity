@@ -69,6 +69,7 @@ type SearchBarProps = {
   autoFilter?: boolean;
   "data-testid"?: string;
   id?: string;
+  roleId?: string;
 };
 
 const EMPTY_ATTACHMENTS: File[] = [];
@@ -92,6 +93,7 @@ export function SearchBar({
   autoFilter = true,
   "data-testid": dataTestId,
   id,
+  roleId,
 }: SearchBarProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
@@ -103,6 +105,8 @@ export function SearchBar({
   }, [onChange]);
 
   const [internalAttachments, setInternalAttachments] = useState<File[]>(attachments);
+  const [imagePreviews, setImagePreviews] = useState<Record<string, string>>({});
+  const [uploading, setUploading] = useState(false);
   const [availableModels, setAvailableModels] = useState<readonly SearchModelOption[]>(providedModelOptions || MODELS);
   const [hasUserSelectedModel, setHasUserSelectedModel] = useState(false);
   const [isListening, setIsListening] = useState(false);
@@ -214,11 +218,40 @@ export function SearchBar({
     onModelChange?.(id);
   };
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
-    if (files && files.length > 0) {
-      setInternalAttachments((prev) => [...prev, ...Array.from(files)]);
+    if (!files || files.length === 0) return;
+
+    const filesArray = Array.from(files);
+    
+    for (const file of filesArray) {
+      if (file.type.startsWith("image/")) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const base64 = e.target?.result as string;
+          setImagePreviews((prev) => ({ ...prev, [file.name]: base64 }));
+        };
+        reader.readAsDataURL(file);
+      } else {
+        if (roleId) {
+          setUploading(true);
+          try {
+            const body = new FormData();
+            body.append("file", file);
+            await fetch(`/api/roles/${roleId}/upload`, {
+              method: "POST",
+              body,
+            });
+          } catch (error) {
+            console.error(error);
+          } finally {
+            setUploading(false);
+          }
+        }
+      }
+      setInternalAttachments((prev) => [...prev, file]);
     }
+    
     onAttachClick?.(files);
     event.target.value = "";
   };
@@ -241,33 +274,59 @@ export function SearchBar({
         className="hidden"
         multiple
         onChange={handleFileChange}
-        accept=".pdf,.docx,.txt,.md,image/*"
+        accept=".pdf,.docx,.txt,.md,image/jpeg,image/png,image/webp"
       />
       
       {internalAttachments.length > 0 && (
         <div className="flex flex-wrap gap-2 pb-1.5 px-2" data-testid="attachments-container">
-          {internalAttachments.map((file, index) => (
-            <motion.div 
-              key={`${file.name}-${index}`} 
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              data-testid="file-chip"
-              className="group flex items-center gap-1.5 rounded-xl bg-muted/40 pl-2.5 pr-1.5 py-1.5 text-[11px] text-muted-foreground border border-border/40 max-w-[160px] transition-colors hover:bg-muted/60"
-            >
-              <FileText className="h-3 w-3 shrink-0 text-primary/60" />
-              <span className="truncate font-medium">{file.name}</span>
-              <button
-                type="button"
-                onClick={() => {
-                  setInternalAttachments(prev => prev.filter((_, i) => i !== index));
-                  onRemoveAttachment?.(index);
-                }}
-                className="ml-1 inline-flex h-4 w-4 items-center justify-center rounded-full hover:bg-foreground/10 shrink-0 transition-colors"
+          {internalAttachments.map((file, index) => {
+            const isImage = file.type.startsWith("image/");
+            const preview = imagePreviews[file.name];
+            
+            return (
+              <motion.div 
+                key={`${file.name}-${index}`} 
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                data-testid="file-chip"
+                className={cn(
+                  "group relative flex items-center rounded-xl bg-muted/40 border border-border/40 transition-colors hover:bg-muted/60",
+                  isImage ? "h-12 w-12 justify-center overflow-hidden" : "gap-1.5 pl-2.5 pr-1.5 py-1.5 text-[11px] text-muted-foreground max-w-[160px]"
+                )}
               >
-                <X className="h-3 w-3" />
-              </button>
-            </motion.div>
-          ))}
+                {isImage ? (
+                  preview ? (
+                    <img src={preview} alt={file.name} className="h-full w-full object-cover" />
+                  ) : (
+                    <span className="text-[10px] text-muted-foreground">Img</span>
+                  )
+                ) : (
+                  <>
+                    <FileText className="h-3 w-3 shrink-0 text-primary/60" />
+                    <span className="truncate font-medium">{file.name}</span>
+                  </>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setInternalAttachments(prev => prev.filter((_, i) => i !== index));
+                    setImagePreviews(prev => {
+                      const copy = { ...prev };
+                      delete copy[file.name];
+                      return copy;
+                    });
+                    onRemoveAttachment?.(index);
+                  }}
+                  className={cn(
+                    "inline-flex items-center justify-center rounded-full hover:bg-foreground/10 shrink-0 transition-colors",
+                    isImage ? "absolute -right-1 -top-1 h-5 w-5 bg-background/80 shadow-sm" : "ml-1 h-4 w-4"
+                  )}
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </motion.div>
+            );
+          })}
         </div>
       )}
 

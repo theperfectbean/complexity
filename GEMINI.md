@@ -221,5 +221,11 @@ DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose build app
 - **Responsive UI**: The microphone icon button appears automatically if the browser supports speech recognition. During active listening, it pulses with a red aura to provide visual feedback.
 - **State Optimization & Render Loop Fix**: Discovered and resolved a severe infinite re-render loop inside the `SearchBar` and its Vitest suites. The root cause was an inline default parameter (`attachments = []`) generating a new array reference on every render, which then triggered a `useEffect` to `setInternalAttachments`, causing `Maximum update depth exceeded` errors. The fix extracted the empty array reference `const EMPTY_ATTACHMENTS: File[] = []` outside of the component scope to stabilize reference checks during renders.
 
+### Image Attachments in SearchBar (Implemented 2026-03-16)
+- **Multi-Format Support**: Upgraded `SearchBar` to accept image files (`.jpg`, `.png`, `.webp`) alongside existing documents.
+- **Dynamic Previews**: Introduced `imagePreviews` state to read image blobs as base64 and render real-time image thumbnails directly inside the text input box's attachment chip container.
+- **Context-Aware Uploading**: Maintained document uploading directly to `/api/roles/[roleId]/upload` using the newly introduced `roleId` prop, while image files are sent directly to the chat context without persisting as static documents for the Role.
+
+
 ## Workspace Hygiene & Maintenance
 - **Mandatory Cleanup**: To prevent disk space exhaustion, the agent MUST run `sudo rm -rf app/.next` and `npm cache clean --force` as a mandatory final step for every task execution. **If the `complexity-app` container is running, it MUST be restarted immediately after cleanup to restore missing build manifests.** This is critical in this environment where large E2E test runs and frequent builds can rapidly consume storage.
