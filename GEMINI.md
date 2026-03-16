@@ -237,3 +237,8 @@ DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose build app
 
 ## Workspace Hygiene & Maintenance
 - **Mandatory Cleanup**: To prevent disk space exhaustion, the agent MUST run `sudo rm -rf app/.next` and `npm cache clean --force` as a mandatory final step for every task execution. **If the `complexity-app` container is running, it MUST be restarted immediately after cleanup to restore missing build manifests.** This is critical in this environment where large E2E test runs and frequent builds can rapidly consume storage.
+
+### AI SDK v6 Streaming & Perplexity Routing (2026-03-16)
+- **toUIMessageStreamResponse**: When using the \`@ai-sdk/react\` hook \`useCompletion\` in combination with the Vercel AI SDK v6, the server must use \`return result.toUIMessageStreamResponse()\` rather than \`toDataStreamResponse()\` or \`toTextStreamResponse()\` to ensure proper NDJSON payload compatibility with the client.
+- **Perplexity Agent vs Chat API**: The application's core chat experience routes through a highly customized \`runPerplexityAgent\` designed exclusively for the **Perplexity Agent API** (\`/v1/responses\`), which requires rigid \`agentInput\` schemas and handles RAG/search internally.
+- **Standard Vercel AI SDK Routing**: To support non-Agent tasks (like instruction generation) that use standard \`streamText\`, the Perplexity fallback uses the standard Vercel AI SDK OpenAI adapter. This must be initialized explicitly using \`createOpenAI({...}).chat("sonar")\` with \`compatibility: "compatible"\` to ensure it routes to the correct \`/chat/completions\` REST endpoint instead of clashing with the Agent API endpoint.
