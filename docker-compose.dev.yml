@@ -15,7 +15,7 @@ services:
       - PORT=3000
       - WATCHPACK_POLLING=true
     ports:
-      - "127.0.0.1:3002:3000"
+      - "3002:3000"
     working_dir: /app
 
 volumes:

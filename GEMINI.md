@@ -227,5 +227,9 @@ DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose build app
 - **Context-Aware Uploading**: Maintained document uploading directly to `/api/roles/[roleId]/upload` using the newly introduced `roleId` prop, while image files are sent directly to the chat context without persisting as static documents for the Role.
 - **Message List Rendering**: Updated `MessageList.tsx` to display image attachments directly within user message bubbles by casting the `message` object to access `experimental_attachments` or `attachments` and filtering for image types.
 
+### LAN Access & Voice Input Compatibility (Updated 2026-03-16)
+- **Port Mapping Update**: Changed Docker port mapping from `127.0.0.1:3002:3000` to `3002:3000` (exposing on `0.0.0.0`). This allows the app to be accessed from any device on the local network (LAN) via the host's IP address.
+- **Voice Input Troubleshooting**: Enabled non-localhost HTTP access to allow the use of the `chrome://flags/#unsafely-treat-insecure-origin-as-secure` workaround. This is the most reliable way to enable the Web Speech API on local networks where HTTPS/SSL certificates might be untrusted, especially on mobile devices.
+
 ## Workspace Hygiene & Maintenance
 - **Mandatory Cleanup**: To prevent disk space exhaustion, the agent MUST run `sudo rm -rf app/.next` and `npm cache clean --force` as a mandatory final step for every task execution. **If the `complexity-app` container is running, it MUST be restarted immediately after cleanup to restore missing build manifests.** This is critical in this environment where large E2E test runs and frequent builds can rapidly consume storage.
