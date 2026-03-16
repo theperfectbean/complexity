@@ -8,12 +8,36 @@ import { db } from "@/lib/db";
 import { users, verificationTokens } from "@/lib/db/schema";
 import { env } from "@/lib/env";
 import { runtimeConfig } from "@/lib/config";
+import { getRedisClient } from "@/lib/redis";
 
 const schema = z.object({
   email: z.string().email(),
 });
 
 export async function POST(request: Request) {
+  // Rate limiting
+  const redis = getRedisClient();
+  if (redis) {
+    try {
+      const ip = request.headers.get("x-forwarded-for") ?? "unknown";
+      const rateWindow = Math.floor(Date.now() / 600000); // 10 minute window
+      const rateKey = `rate:forgot-password:${ip}:${rateWindow}`;
+      const current = await redis.incr(rateKey);
+      if (current === 1) {
+        await redis.expire(rateKey, 600 + 1); // 10 minutes + buffer
+      }
+      if (current > 3) {
+        // Limit to 3 attempts per 10 minutes per IP
+        return NextResponse.json(
+          { error: "Too many password reset requests. Please try again in 10 minutes." },
+          { status: 429 }
+        );
+      }
+    } catch {
+      // Fail open
+    }
+  }
+
   try {
     const payload = await request.json();
     const parsed = schema.safeParse(payload);

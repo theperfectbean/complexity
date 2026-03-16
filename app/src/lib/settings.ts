@@ -1,14 +1,40 @@
 import { eq } from "drizzle-orm";
 import { db } from "./db";
 import { settings } from "./db/schema";
+import { getRedisClient } from "./redis";
 
 export async function getSetting(key: string): Promise<string | null> {
+  const redis = getRedisClient();
+  const cacheKey = `setting:${key}`;
+
+  if (redis) {
+    try {
+      const cached = await redis.get(cacheKey);
+      if (cached !== null) {
+        return cached === "__empty__" ? null : cached;
+      }
+    } catch {
+      // Fail open
+    }
+  }
+
   const [row] = await db
     .select({ value: settings.value })
     .from(settings)
     .where(eq(settings.key, key))
     .limit(1);
-  return row?.value ?? null;
+
+  const value = row?.value ?? null;
+
+  if (redis) {
+    try {
+      await redis.set(cacheKey, value !== null ? value : "__empty__", "EX", 300); // 5 minutes TTL
+    } catch {
+      // Fail open
+    }
+  }
+
+  return value;
 }
 
 export async function setSetting(key: string, value: string): Promise<void> {
@@ -19,6 +45,16 @@ export async function setSetting(key: string, value: string): Promise<void> {
       target: settings.key,
       set: { value, updatedAt: new Date() },
     });
+
+  const redis = getRedisClient();
+  if (redis) {
+    try {
+      const cacheKey = `setting:${key}`;
+      await redis.del(cacheKey);
+    } catch {
+      // Fail open
+    }
+  }
 }
 
 export async function getApiKeys(): Promise<Record<string, string | null>> {

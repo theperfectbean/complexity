@@ -8,6 +8,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 import { runtimeConfig } from "@/lib/config";
+import { getRedisClient } from "@/lib/redis";
 
 const signInSchema = z.object({
   email: z.string().email(),
@@ -33,10 +34,34 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           return null;
         }
 
+        const email = parsed.data.email.toLowerCase();
+
+        // Rate limiting for login attempts
+        const redis = getRedisClient();
+        if (redis) {
+          try {
+            const rateWindow = Math.floor(Date.now() / 600000); // 10 minute window
+            const rateKey = `rate:login:${email}:${rateWindow}`;
+            const current = await redis.incr(rateKey);
+            if (current === 1) {
+              await redis.expire(rateKey, 600 + 1);
+            }
+            if (current > 10) {
+              // Limit to 10 attempts per 10 minutes per email
+              throw new Error("Too many login attempts. Please try again in 10 minutes.");
+            }
+          } catch (e: any) {
+            if (e.message.includes("Too many login attempts")) {
+              throw e;
+            }
+            // Fail open for Redis connection errors
+          }
+        }
+
         const [user] = await db
           .select()
           .from(users)
-          .where(eq(users.email, parsed.data.email.toLowerCase()))
+          .where(eq(users.email, email))
           .limit(1);
 
         if (!user) {

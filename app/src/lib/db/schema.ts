@@ -74,7 +74,7 @@ export const verificationTokens = pgTable(
   (table) => [primaryKey({ columns: [table.identifier, table.token] })],
 );
 
-export const roles = pgTable("spaces", {
+export const roles = pgTable("roles", {
   id: text("id").primaryKey(),
   name: varchar("name", { length: 100 }).notNull(),
   description: text("description"),
@@ -95,7 +95,7 @@ export const threads = pgTable(
     userId: text("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    roleId: text("space_id").references(() => roles.id, { onDelete: "set null" }),
+    roleId: text("role_id").references(() => roles.id, { onDelete: "set null" }),
     model: varchar("model", { length: 50 }).notNull().default("anthropic/claude-haiku-4-5"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
@@ -144,7 +144,7 @@ export const documents = pgTable("documents", {
   filename: varchar("filename", { length: 255 }).notNull(),
   mimeType: varchar("mime_type", { length: 100 }).notNull(),
   sizeBytes: integer("size_bytes").notNull(),
-  roleId: text("space_id")
+  roleId: text("role_id")
     .notNull()
     .references(() => roles.id, { onDelete: "cascade" }),
   status: varchar("status", { length: 20 }).notNull().default("processing"),
@@ -158,7 +158,7 @@ export const chunks = pgTable(
     documentId: text("document_id")
       .notNull()
       .references(() => documents.id, { onDelete: "cascade" }),
-    roleId: text("space_id")
+    roleId: text("role_id")
       .notNull()
       .references(() => roles.id, { onDelete: "cascade" }),
     content: text("content").notNull(),
@@ -168,10 +168,11 @@ export const chunks = pgTable(
   },
   (table) => [
     index("chunks_doc_idx").on(table.documentId),
-    index("chunks_space_idx").on(table.roleId),
+    index("chunks_role_idx").on(table.roleId),
     index("chunks_embedding_hnsw_idx").using("hnsw", table.embedding.op("vector_cosine_ops")),
   ],
 );
+
 
 export const usersRelations = relations(users, ({ many }) => ({
   threads: many(threads),

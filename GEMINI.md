@@ -250,3 +250,13 @@ DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose build app
 - **Testing Coverage**: Verified strong E2E suite (15 Playwright files) but noted a lack of unit tests for core logical components like `memory.ts`, `llm.ts`, and `perplexity-agent.ts`.
 - **Optimization Opportunities**: Recommended Redis caching for API key lookups and context window management for long threads.
 - **Documentation**: Generated a full [Codebase Fitness Report](file:///home/gary/projects/complexity/docs/CODEBASE_FITNESS_REPORT.md) in the workspace.
+
+### Codebase Fitness Report Implementation (2026-03-17)
+- **Security Hardening**:
+  - Implemented robust Content Security Policy (CSP) headers via Next.js `middleware.ts`.
+  - Added Cross-Site Request Forgery (CSRF) protection by strictly validating `Origin` and `Host` headers for all state-mutating requests (`POST`, `PUT`, `PATCH`, `DELETE`).
+  - Implemented Redis-backed rate limiting for `/api/auth/register` (5 attempts/10min), `/api/auth/forgot-password` (3 attempts/10min), and the NextAuth `signIn` callback (10 attempts/10min) to prevent brute-force and enumeration attacks.
+- **Refactoring & De-duplication**: Decomposed the monolithic `chat/route.ts` by moving complex file parsing, attachment processing, and text extraction logic into a dedicated, testable `app/src/lib/chat-utils.ts` service module.
+- **Database Terminology Alignment**: Migrated the legacy `spaces` database table and `space_id` foreign keys to explicitly use `roles` and `role_id`, matching the application's canonical business logic and Drizzle schema. Automated interactive prompts during `drizzle-kit generate` to safely orchestrate the rename without data loss.
+- **Optimization**: Added 5-minute Redis caching to `getSetting` (`app/src/lib/settings.ts`) with cache invalidation on `setSetting` to drastically reduce DB load during the core chat loop when fetching provider API keys.
+- **Testing**: Added rigorous unit tests for `llm.ts`, `memory.ts`, and `perplexity-agent.ts` with mocked dependencies. The full suite of 103 unit tests are fully passing.

@@ -7,6 +7,7 @@ import { db } from "@/lib/db";
 import { createId } from "@/lib/db/cuid";
 import { users } from "@/lib/db/schema";
 import { runtimeConfig } from "@/lib/config";
+import { getRedisClient } from "@/lib/redis";
 
 const schema = z.object({
   email: z.string().email(),
@@ -16,6 +17,30 @@ const schema = z.object({
 
 export async function POST(request: Request) {
   console.log("[Registration] Received POST request");
+
+  // Rate limiting
+  const redis = getRedisClient();
+  if (redis) {
+    try {
+      const ip = request.headers.get("x-forwarded-for") ?? "unknown";
+      const rateWindow = Math.floor(Date.now() / 600000); // 10 minute window
+      const rateKey = `rate:register:${ip}:${rateWindow}`;
+      const current = await redis.incr(rateKey);
+      if (current === 1) {
+        await redis.expire(rateKey, 600 + 1); // 10 minutes + buffer
+      }
+      if (current > 5) {
+        // Limit to 5 attempts per 10 minutes per IP
+        return NextResponse.json(
+          { error: "Too many registration attempts. Please try again in 10 minutes." },
+          { status: 429 }
+        );
+      }
+    } catch {
+      // Fail open
+    }
+  }
+
   const payload = await request.json();
   const parsed = schema.safeParse(payload);
 

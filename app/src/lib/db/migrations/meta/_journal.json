@@ -57,6 +57,13 @@
       "when": 1773477468398,
       "tag": "0007_friendly_red_ghost",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1773704233856,
+      "tag": "0008_long_tempest",
+      "breakpoints": true
     }
   ]
 }
