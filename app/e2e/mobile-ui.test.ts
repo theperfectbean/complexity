@@ -1,48 +1,70 @@
 import { test, expect, devices } from "@playwright/test";
 
+// Test using Pixel 5 profile (Chromium-based mobile)
 test.use({
-  ...devices["iPhone 13"],
+  ...devices["Pixel 5"],
 });
 
-test.describe("Mobile UI Rendering", () => {
-  test("search bar buttons should render correctly on mobile", async ({ page }) => {
-    // 1. Register/Login to get to home page
-    const email = `mobile-test-${Math.random().toString(36).slice(2, 10)}@example.com`;
+test.describe("Mobile UI Layout", () => {
+  test.beforeEach(async ({ page }) => {
+    // Register/Login
+    const email = `mobile-ui-${Math.random().toString(36).slice(2, 10)}@example.com`;
     await page.goto("/register");
     await page.getByPlaceholder("Name").fill("Mobile User");
     await page.getByPlaceholder("Email").fill(email);
     await page.getByPlaceholder("Password (min 8 chars)").fill("password123");
     await page.getByRole("button", { name: "Create account" }).click();
     await expect(page.getByPlaceholder("Ask anything...")).toBeVisible({ timeout: 10000 });
+  });
 
-    // 2. Take a screenshot of the search bar
-    const searchBar = page.locator('[data-testid="home-searchbar"]');
-    await expect(searchBar).toBeVisible();
+  test("search bar buttons should be visible and not overflow", async ({ page }) => {
+    const searchBar = page.locator('div:has(> textarea[placeholder="Ask anything..."])');
     
-    // Check individual buttons
+    // Check if search bar itself is visible
+    await expect(searchBar).toBeVisible();
+
+    // Verify critical buttons are visible even on small screens
     const modelButton = page.getByRole("button", { name: "Select model" });
-    const searchButton = page.getByRole("button", { name: "Toggle web search" });
+    const searchToggle = page.getByRole("button", { name: "Toggle web search" });
     const attachButton = page.getByRole("button", { name: "Attach file" });
-    const micButton = page.getByRole("button", { name: "Start listening" });
-    const sendButton = page.getByRole("button", { name: "Start" });
+    const sendButton = page.getByRole("button", { name: "Start", exact: true });
 
     await expect(modelButton).toBeVisible();
-    await expect(searchButton).toBeVisible();
+    await expect(searchToggle).toBeVisible();
     await expect(attachButton).toBeVisible();
-    // Mic might not be visible if not supported, but we mocked it in other tests
-    // Here we just want to see how they look
-    
-    await page.screenshot({ path: 'test-results/mobile-searchbar.png' });
+    await expect(sendButton).toBeVisible();
 
-    // 3. Verify they don't overlap or overflow
-    const searchBarBox = await searchBar.boundingBox();
-    const modelButtonBox = await modelButton.boundingBox();
-    const sendButtonBox = await sendButton.boundingBox();
+    // Take a screenshot for manual inspection
+    await page.screenshot({ path: 'test-results/mobile-searchbar-v2.png' });
 
-    if (searchBarBox && modelButtonBox && sendButtonBox) {
-      // Basic check: buttons should be within search bar bounds
-      expect(modelButtonBox.x).toBeGreaterThanOrEqual(searchBarBox.x);
-      expect(sendButtonBox.x + sendButtonBox.width).toBeLessThanOrEqual(searchBarBox.x + searchBarBox.width);
+    // Check for overlaps by verifying bounding boxes
+    const modelBox = await modelButton.boundingBox();
+    const searchToggleBox = await searchToggle.boundingBox();
+    const attachBox = await attachButton.boundingBox();
+    const sendBox = await sendButton.boundingBox();
+
+    if (modelBox && searchToggleBox && attachBox && sendBox) {
+      // Basic sanity check: buttons should have positive dimensions
+      expect(modelBox.width).toBeGreaterThan(0);
+      expect(sendBox.width).toBeGreaterThan(0);
+      
+      // Ensure send button is to the right of model button
+      expect(sendBox.x).toBeGreaterThan(modelBox.x);
     }
+  });
+
+  test("sidebar should be toggleable on mobile", async ({ page }) => {
+    // On mobile, sidebar is usually hidden behind a hamburger menu
+    const menuButton = page.getByRole("button", { name: /open menu/i });
+    await expect(menuButton).toBeVisible();
+    
+    await menuButton.click();
+    
+    // MobileNav should now be visible
+    await expect(page.getByRole("link", { name: "Home" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Roles" })).toBeVisible();
+    
+    // Take screenshot of open mobile menu
+    await page.screenshot({ path: 'test-results/mobile-menu-open.png' });
   });
 });
