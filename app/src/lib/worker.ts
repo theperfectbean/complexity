@@ -5,7 +5,7 @@ import { db } from "./db";
 import { chunks, documents } from "./db/schema";
 import { eq } from "drizzle-orm";
 import { createId } from "./db/cuid";
-import { extractTextFromFile } from "./documents";
+import { extractTextFromFile, type DocumentFileLike } from "./documents";
 import { chunkText, getEmbeddings } from "./rag";
 import fs from "fs/promises";
 
@@ -45,11 +45,15 @@ export function startWorker() {
         }
 
         // Create a minimal File-like object for extractTextFromFile
-        const file = {
+        const file: DocumentFileLike = {
           name: fileName,
           type: fileType,
-          arrayBuffer: async () => buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength),
-        } as any;
+          arrayBuffer: async () => {
+            const bytes = new Uint8Array(buffer.byteLength);
+            bytes.set(buffer);
+            return bytes.buffer;
+          },
+        };
 
         const text = await extractTextFromFile(file);
         const splitChunks = chunkText(text);

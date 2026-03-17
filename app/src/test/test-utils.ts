@@ -46,7 +46,7 @@ export function mockMutationChains() {
 /**
  * Creates a ReadableStream that yields SSE events.
  */
-export function createSSEStream(events: any[]) {
+export function createSSEStream(events: unknown[]) {
   const encoder = new TextEncoder();
   return new ReadableStream({
     start(controller) {
@@ -61,7 +61,7 @@ export function createSSEStream(events: any[]) {
 /**
  * Helper to create a POST Request with JSON body.
  */
-export function createPostRequest(url: string, body: any) {
+export function createPostRequest(url: string, body: unknown) {
   return new Request(url, {
     method: "POST",
     body: JSON.stringify(body),

@@ -22,6 +22,8 @@ vi.mock("@/lib/db", () => ({
 }));
 
 describe("/api/admin/fetch-provider-models", () => {
+  const dbLimitMock = db.select().from().where().limit as unknown as ReturnType<typeof vi.fn>;
+
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -31,7 +33,7 @@ describe("/api/admin/fetch-provider-models", () => {
     vi.mocked(fetchProviderModels).mockResolvedValue([
       { id: "gpt-5.4", name: "GPT-5.4", provider: "OpenAI" }
     ]);
-    (db.select().from().where().limit as any).mockResolvedValue([{ isAdmin: true }]);
+    dbLimitMock.mockResolvedValue([{ isAdmin: true }]);
 
     const response = await GET();
     const data = (await response.json()) as { models: { id: string }[] };
@@ -43,7 +45,7 @@ describe("/api/admin/fetch-provider-models", () => {
 
   it("returns 401 when user is not admin", async () => {
     vi.mocked(auth).mockResolvedValue({ user: { email: "user@example.com", isAdmin: false } } as never);
-    (db.select().from().where().limit as any).mockResolvedValue([{ isAdmin: false }]);
+    dbLimitMock.mockResolvedValue([{ isAdmin: false }]);
 
     const response = await GET();
     expect(response.status).toBe(401);

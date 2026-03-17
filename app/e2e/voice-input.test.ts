@@ -8,10 +8,10 @@ test.describe("Voice Input", () => {
       class MockMediaRecorder {
         onstart: (() => void) | null = null;
         onstop: (() => void) | null = null;
-        ondataavailable: ((e: any) => void) | null = null;
+        ondataavailable: ((e: BlobEvent) => void) | null = null;
         state = "inactive";
 
-        constructor(public stream: any) {}
+        constructor(public stream: unknown) {}
 
         start() {
           this.state = "recording";
@@ -37,10 +37,16 @@ test.describe("Voice Input", () => {
         getTracks: () => [{ stop: () => {} }]
       };
 
-      (window.navigator.mediaDevices as any) = {
-        getUserMedia: async () => mockStream
-      };
-      (window as any).MediaRecorder = MockMediaRecorder;
+      Object.defineProperty(window.navigator, "mediaDevices", {
+        configurable: true,
+        value: {
+          getUserMedia: async () => mockStream,
+        },
+      });
+      Object.defineProperty(window, "MediaRecorder", {
+        configurable: true,
+        value: MockMediaRecorder,
+      });
     });
 
     // 2. Mock the transcription API

@@ -341,7 +341,7 @@ export function Sidebar({ collapsed = false, onToggle, onNavigate }: SidebarProp
                 </Link>
               </DropdownMenu.Item>
 
-              {(session?.user as any)?.isAdmin && (
+              {session?.user?.isAdmin && (
                 <DropdownMenu.Item asChild>
                   <Link 
                     href="/settings/admin"

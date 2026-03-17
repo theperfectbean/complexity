@@ -1,7 +1,7 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import type { Responses } from "@perplexity-ai/perplexity_ai/resources/responses";
-import { describe, expect, it } from "vitest";
+import { describe, it } from "vitest";
 import { MODELS } from "@/lib/models";
 import { createPerplexityClient } from "@/lib/perplexity";
 import { extractAssistantText } from "@/lib/extraction-utils";
@@ -91,8 +91,9 @@ promptDescribe("Model Prompt & Response Validation", () => {
             durationMs,
             missingKeywords,
           });
-        } catch (err: any) {
-          console.error(`Failed ${model.label} - ${testCase.name}:`, err.message);
+        } catch (err: unknown) {
+          const message = err instanceof Error ? err.message : String(err);
+          console.error(`Failed ${model.label} - ${testCase.name}:`, message);
         }
       }
       allResults.push(modelResults);

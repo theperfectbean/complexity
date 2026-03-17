@@ -78,7 +78,7 @@ export class ChatService {
     // Build Agent Input
     const agentInput: Responses.InputItem[] = await Promise.all(inputMessages.map(async (msg) => {
       const text = await extractTextFromMessage(msg);
-      const content: { type: string; text?: string; image?: string }[] = [];
+      const content: Responses.InputItem.InputMessage.ContentPartArray[] = [];
       
       if (text.trim()) {
         content.push({ type: "input_text", text });
@@ -86,7 +86,7 @@ export class ChatService {
 
       collectFileParts(msg).forEach((att) => {
         if (att.url?.startsWith("data:") && (att.mediaType || att.contentType || "").startsWith("image/")) {
-          content.push({ type: "input_image", image: att.url });
+          content.push({ type: "input_image", image_url: att.url });
         }
       });
 
@@ -94,7 +94,10 @@ export class ChatService {
         content.push({ type: "input_text", text: " " });
       }
 
-      return { type: "message", role: msg.role as Responses.InputItem["role"], content } as Responses.InputItem;
+      const role: Responses.InputItem.InputMessage["role"] =
+        msg.role === "assistant" || msg.role === "system" ? msg.role : "user";
+
+      return { type: "message", role, content };
     }));
 
     return createUIMessageStreamResponse({

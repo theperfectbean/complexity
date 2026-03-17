@@ -130,7 +130,7 @@
       ]
     },
     {
-      "modelId": "anthropic/claude-sonnet-4-6",
+      "modelId": "anthropic/claude-4-6-sonnet-20260315",
       "modelLabel": "Claude Sonnet 4.6",
       "cases": [
         {

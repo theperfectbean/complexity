@@ -1,14 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { startWorker } from "./worker";
 import { db } from "./db";
-import { documents } from "./db/schema";
-import { eq } from "drizzle-orm";
 
 // Mock BullMQ
 const mockOn = vi.fn();
 vi.mock("bullmq", () => {
   return {
-    Worker: vi.fn().mockImplementation(function(name: string, processor: any) {
+    Worker: vi.fn().mockImplementation(function(name: string, processor: unknown) {
       return {
         on: mockOn,
         processor, // Expose processor for manual trigger in tests
@@ -50,12 +48,14 @@ vi.mock("./logger", () => ({
 describe("Worker Resilience", () => {
   it("should mark document as failed if processing throws an error", async () => {
     const { extractTextFromFile } = await import("./documents");
-    (extractTextFromFile as any).mockRejectedValueOnce(new Error("Extraction failed"));
+    const extractTextFromFileMock = extractTextFromFile as unknown as ReturnType<typeof vi.fn>;
+    extractTextFromFileMock.mockRejectedValueOnce(new Error("Extraction failed"));
 
     // Start worker and get the processor function
     const { Worker } = await import("bullmq");
-    const workerInstance: any = startWorker();
-    const processor = (Worker as any).mock.calls[0][1];
+    startWorker();
+    const workerMock = Worker as unknown as ReturnType<typeof vi.fn>;
+    const processor = workerMock.mock.calls[0]?.[1] as (job: { id: string; data: Record<string, unknown> }) => Promise<unknown>;
 
     const mockJob = {
       id: "job-1",

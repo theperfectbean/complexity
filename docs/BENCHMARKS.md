@@ -3,17 +3,17 @@
 ## Response Time Comparison (2026-03-13)
 
 ### Goal
-Compare direct Anthropic Sonnet access vs. Perplexity Agent API for **Claude Sonnet 4.6** (flagship as of Feb 2026).
+Compare direct Anthropic Sonnet access vs. Perplexity Agent API for **Claude 4.6 Sonnet** (flagship as of Feb 2026).
 
 ### Setup
-- **Direct Anthropic**: `@ai-sdk/anthropic` (Vercel AI SDK), model: `claude-sonnet-4-6`
-- **Perplexity Agent API**: `@perplexity-ai/perplexity_ai`, model: `anthropic/claude-sonnet-4-6`
+- **Direct Anthropic**: `@ai-sdk/anthropic` (Vercel AI SDK), model: `claude-4-6-sonnet-20260315`
+- **Perplexity Agent API**: `@perplexity-ai/perplexity_ai`, model: `anthropic/claude-4-6-sonnet-20260315`
 
 ### Findings
 
 | Model (Provider) | TTFT | Total Duration | Chars/Sec | Success | Notes |
 |-----------------|------|----------------|-----------|---------|-------|
-| **Claude Sonnet 4.6 (Direct)** | 1283ms | 6753ms | 200.21 | ✅ | Superior TTFT and slightly faster total response. |
+| **Claude 4.6 Sonnet (Direct)** | 1283ms | 6753ms | 200.21 | ✅ | Superior TTFT and slightly faster total response. |
 | **Sonnet 4.6 (Perplexity)** | 7064ms | 7064ms | ~190 | ✅ | Latency penalty due to agentic orchestration/grounding. |
 | **Claude Haiku 4.5 (Direct)** | **608ms** | **3476ms** | **431.24** | ✅ | **Fastest TTFT and completion.** |
 | **Haiku 4.5 (Perplexity)** | 3433ms | 3433ms | ~400 | ✅ | Comparable total time to direct, but no streaming deltas. |

@@ -2,7 +2,9 @@ import mammoth from "mammoth";
 import { PDFParse } from "pdf-parse";
 import { runtimeConfig } from "./config";
 
-export async function extractTextFromFile(file: File) {
+export type DocumentFileLike = Pick<File, "name" | "type" | "arrayBuffer">;
+
+export async function extractTextFromFile(file: DocumentFileLike) {
   const buffer = Buffer.from(await file.arrayBuffer());
   return extractTextFromBuffer(buffer, file.name, file.type);
 }

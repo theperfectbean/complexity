@@ -1,11 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { ChatService, ChatSession } from "./chat-service";
 import { db } from "./db";
-import { messages, roles, threads, users } from "./db/schema";
 import { runGeneration } from "./llm";
-import { getEmbeddings, similaritySearch } from "./rag";
-import { getMemoryPrompt, saveExtractedMemories } from "./memory";
-import { createId } from "./db/cuid";
 
 // Mock dependencies
 vi.mock("./db", () => ({
@@ -45,6 +41,8 @@ vi.mock("./settings", () => ({
 }));
 
 describe("ChatService", () => {
+  const dbSelectMock = db.select as unknown as ReturnType<typeof vi.fn>;
+
   const mockSession: ChatSession = {
     requestId: "req-1",
     userEmail: "test@example.com",
@@ -60,7 +58,7 @@ describe("ChatService", () => {
 
   describe("validate", () => {
     it("should throw error if thread not found", async () => {
-      (db.select as any).mockReturnValue({
+      dbSelectMock.mockReturnValue({
         from: vi.fn().mockReturnValue({
           innerJoin: vi.fn().mockReturnValue({
             where: vi.fn().mockReturnValue({
@@ -76,7 +74,7 @@ describe("ChatService", () => {
 
     it("should return thread and role instructions", async () => {
       // Mock thread select
-      (db.select as any).mockReturnValueOnce({
+      dbSelectMock.mockReturnValueOnce({
         from: vi.fn().mockReturnValue({
           innerJoin: vi.fn().mockReturnValue({
             where: vi.fn().mockReturnValue({
@@ -87,7 +85,7 @@ describe("ChatService", () => {
       });
 
       // Mock role select
-      (db.select as any).mockReturnValueOnce({
+      dbSelectMock.mockReturnValueOnce({
         from: vi.fn().mockReturnValue({
           innerJoin: vi.fn().mockReturnValue({
             where: vi.fn().mockReturnValue({
@@ -108,7 +106,7 @@ describe("ChatService", () => {
     it("should delete last assistant message on regeneration trigger", async () => {
       const regenerateSession = { ...mockSession, trigger: "regenerate-message" };
       
-      (db.select as any).mockReturnValue({
+      dbSelectMock.mockReturnValue({
         from: vi.fn().mockReturnValue({
           where: vi.fn().mockReturnValue({
             orderBy: vi.fn().mockReturnValue({
@@ -129,7 +127,7 @@ describe("ChatService", () => {
   describe("execute", () => {
     it("should orchestrate a full chat completion", async () => {
       // Setup validation mocks
-      (db.select as any).mockReturnValueOnce({
+      dbSelectMock.mockReturnValueOnce({
         from: vi.fn().mockReturnValue({
           innerJoin: vi.fn().mockReturnValue({
             where: vi.fn().mockReturnValue({
@@ -138,7 +136,7 @@ describe("ChatService", () => {
           }),
         }),
       });
-      (db.select as any).mockReturnValueOnce({
+      dbSelectMock.mockReturnValueOnce({
         from: vi.fn().mockReturnValue({
           innerJoin: vi.fn().mockReturnValue({
             where: vi.fn().mockReturnValue({

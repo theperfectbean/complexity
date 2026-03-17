@@ -5,6 +5,7 @@ process.env.PERPLEXITY_API_KEY = process.env.PERPLEXITY_API_KEY ?? "test-perplex
 process.env.NEXTAUTH_SECRET = process.env.NEXTAUTH_SECRET ?? "test-nextauth-secret";
 process.env.DATABASE_URL = process.env.DATABASE_URL ?? "postgresql://postgres:postgres@localhost:5432/postgres";
 process.env.EMBEDDER_URL = process.env.EMBEDDER_URL ?? "http://embedder:8000";
+process.env.REDIS_URL = process.env.REDIS_URL ?? "redis://localhost:6379";
 
 Object.defineProperty(window, "matchMedia", {
   writable: true,
@@ -37,5 +38,5 @@ if (!runLive) {
       },
       ok: true,
     })
-  ) as any;
+  ) as unknown as typeof fetch;
 }

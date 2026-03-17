@@ -60,24 +60,33 @@ export function getProviderAndModel(modelId: string): { provider: ProviderType; 
     return { provider: "perplexity", model: modelId };
   }
 
+  // 4. Heuristics for common un-prefixed provider models
+  if (modelId.startsWith("claude-") || modelId.startsWith("claude.")) {
+    return { provider: "anthropic", model: modelId };
+  }
+  if (modelId.startsWith("gpt-") || modelId.startsWith("o1") || modelId.startsWith("o3") || modelId.startsWith("o4")) {
+    return { provider: "openai", model: modelId };
+  }
+  if (modelId.startsWith("gemini-")) {
+    return { provider: "google", model: modelId };
+  }
+  if (modelId.startsWith("grok-")) {
+    return { provider: "xai", model: modelId };
+  }
+
   // Default to perplexity but this is the "risky" path we want to minimize via provider-models.ts updates
   return { provider: "perplexity", model: modelId };
 }
 
 /**
  * Maps internal model IDs to IDs that Perplexity API understands.
- * Especially useful for third-party models hosted by Perplexity.
+ * Preset aliases are normalized, while third-party provider prefixes
+ * (e.g. anthropic/openai/google) are preserved for Perplexity routing.
  */
 function mapToPerplexityModel(modelName: string): string {
   if (modelName === "fast-search" || modelName === "sonar") return "sonar";
   if (modelName === "pro-search" || modelName === "sonar-pro") return "sonar-pro";
-  
-  // Strip provider prefixes if they are still there (e.g. "anthropic/claude-sonnet-4-6" -> "claude-sonnet-4-6")
-  // Perplexity often uses the model name without the provider prefix, or has its own mapping.
-  if (modelName.startsWith("anthropic/")) return modelName.replace("anthropic/", "");
-  if (modelName.startsWith("openai/")) return modelName.replace("openai/", "");
-  if (modelName.startsWith("google/")) return modelName.replace("google/", "");
-  
+
   return modelName;
 }
 

@@ -6,6 +6,10 @@ export type ProviderModel = {
   provider: string;
 };
 
+function normalizePerplexityModelId(id: string): string {
+  return id.startsWith("perplexity/") ? id : `perplexity/${id}`;
+}
+
 export async function fetchProviderModels(): Promise<ProviderModel[]> {
   const keys = await getApiKeys();
   const allModels: ProviderModel[] = [];
@@ -19,7 +23,8 @@ export async function fetchProviderModels(): Promise<ProviderModel[]> {
       if (res.ok) {
         const data = await res.json() as { data?: { id: string }[] };
         data.data?.forEach((m) => {
-          allModels.push({ id: m.id, name: m.id, provider: "Perplexity" });
+          const normalized = normalizePerplexityModelId(m.id);
+          allModels.push({ id: normalized, name: normalized, provider: "Perplexity" });
         });
       } else {
         throw new Error("Perplexity models endpoint not available");
@@ -33,9 +38,9 @@ export async function fetchProviderModels(): Promise<ProviderModel[]> {
         { id: "perplexity/sonar-reasoning", name: "Sonar Reasoning", provider: "Perplexity" },
         { id: "perplexity/sonar-reasoning-pro", name: "Sonar Reasoning Pro", provider: "Perplexity" },
         { id: "perplexity/sonar-deep-research", name: "Sonar Deep Research", provider: "Perplexity" },
-        { id: "perplexity/anthropic/claude-opus-4-6", name: "Claude Opus 4.6 (via Perplexity)", provider: "Perplexity" },
-        { id: "perplexity/anthropic/claude-sonnet-4-6", name: "Claude Sonnet 4.6 (via Perplexity)", provider: "Perplexity" },
-        { id: "perplexity/anthropic/claude-haiku-4-5", name: "Claude Haiku 4.5 (via Perplexity)", provider: "Perplexity" },
+        { id: "perplexity/anthropic/claude-4-6-opus-20260315", name: "Claude 4.6 Opus (via Perplexity)", provider: "Perplexity" },
+        { id: "perplexity/anthropic/claude-4-6-sonnet-20260315", name: "Claude 4.6 Sonnet (via Perplexity)", provider: "Perplexity" },
+        { id: "perplexity/anthropic/claude-4-5-haiku-20251001", name: "Claude 4.5 Haiku (via Perplexity)", provider: "Perplexity" },
         { id: "perplexity/openai/gpt-5.4", name: "GPT-5.4 (via Perplexity)", provider: "Perplexity" },
         { id: "perplexity/openai/gpt-4o", name: "GPT-4o (via Perplexity)", provider: "Perplexity" },
         { id: "perplexity/google/gemini-3.1-pro-preview", name: "Gemini 3.1 Pro (via Perplexity)", provider: "Perplexity" },

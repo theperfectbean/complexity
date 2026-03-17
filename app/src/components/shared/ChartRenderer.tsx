@@ -16,7 +16,22 @@ interface ChartData {
   type: "line" | "bar";
   data: Record<string, unknown>[];
   xAxisKey: string;
-  lines: string[];
+  lines: (string | ChartLineConfig)[];
+}
+
+interface ChartLineConfig {
+  dataKey?: string;
+  valueKey?: string;
+  key?: string;
+  color?: string;
+  strokeWidth?: number;
+}
+
+interface DataSeriesProps {
+  type: "line" | "bar";
+  dataKey: string;
+  color: string;
+  strokeWidth: number;
 }
 
 export function ChartRenderer({ data }: { data: string }) {
@@ -44,9 +59,32 @@ export function ChartRenderer({ data }: { data: string }) {
   // Since MarkdownRenderer is mostly used in client components, we assume it's fine.
   
   const ChartComponent = parsedData.type === "bar" ? BarChart : LineChart;
-  const DataComponent = parsedData.type === "bar" ? Bar : Line;
 
   const colors = ["#3b82f6", "#10b981", "#ef4444", "#f59e0b", "#8b5cf6"];
+  const barRadius: [number, number, number, number] = [4, 4, 0, 0];
+
+  const getDataSeriesProps = (item: string | ChartLineConfig, index: number): DataSeriesProps | null => {
+    if (typeof item === "string") {
+      return {
+        type: parsedData.type,
+        dataKey: item,
+        color: colors[index % colors.length],
+        strokeWidth: 2,
+      };
+    }
+
+    const dataKey = item.valueKey || item.dataKey || item.key;
+    if (!dataKey) {
+      return null;
+    }
+
+    return {
+      type: parsedData.type,
+      dataKey,
+      color: item.color || colors[index % colors.length],
+      strokeWidth: item.strokeWidth ?? 2,
+    };
+  };
 
   return (
     <div className="w-full h-[400px] my-6 p-4 rounded-xl border border-border bg-card/50">
@@ -79,18 +117,27 @@ export function ChartRenderer({ data }: { data: string }) {
           />
           <Legend wrapperStyle={{ paddingTop: "20px" }} />
           {parsedData.lines.map((item, index) => {
-            const dataKey = typeof item === "string" ? item : (item as any).valueKey || (item as any).dataKey || (item as any).key;
-            if (!dataKey) return null;
+            const series = getDataSeriesProps(item, index);
+            if (!series) return null;
             
+            if (series.type === "bar") {
+              return (
+                <Bar
+                  key={series.dataKey}
+                  dataKey={series.dataKey}
+                  fill={series.color}
+                  radius={barRadius}
+                />
+              );
+            }
+
             return (
-              <DataComponent 
-                key={dataKey}
+              <Line
+                key={series.dataKey}
                 type="monotone"
-                dataKey={dataKey}
-                stroke={parsedData.type === "line" ? (typeof item === "object" && (item as any).color ? (item as any).color : colors[index % colors.length]) : undefined}
-                fill={parsedData.type === "bar" ? (typeof item === "object" && (item as any).color ? (item as any).color : colors[index % colors.length]) : undefined}
-                strokeWidth={(typeof item === "object" && (item as any).strokeWidth) ? (item as any).strokeWidth : 2}
-                radius={parsedData.type === "bar" ? ([4, 4, 0, 0] as any) : undefined}
+                dataKey={series.dataKey}
+                stroke={series.color}
+                strokeWidth={series.strokeWidth}
                 dot={{ r: 4, strokeWidth: 2 }}
                 activeDot={{ r: 6, strokeWidth: 0 }}
               />

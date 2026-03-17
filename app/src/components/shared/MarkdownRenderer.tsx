@@ -47,10 +47,15 @@ const components: Components = {
   },
   code({ inline, className, children, ...props }: React.ComponentPropsWithoutRef<"code"> & { inline?: boolean }) {
     // Extract text content from children (which might be an array or nested elements due to rehype-highlight)
-    const extractText = (node: any): string => {
+    const extractText = (node: unknown): string => {
       if (typeof node === "string") return node;
       if (Array.isArray(node)) return node.map(extractText).join("");
-      if (node?.props?.children) return extractText(node.props.children);
+      if (node && typeof node === "object") {
+        const record = node as { props?: { children?: unknown } };
+        if (record.props?.children !== undefined) {
+          return extractText(record.props.children);
+        }
+      }
       return "";
     };
 
