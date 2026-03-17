@@ -330,3 +330,10 @@ DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose build app
 - **Configuration Cleanup**: Fixed a duplicate model ID mapping that triggered startup warnings and synchronized the test suites to assert against the corrected models.
 - **Model Version Correction & Standard Aliases**: Refactored the hardcoded model date strings to use Anthropic's standard `-latest` aliases (e.g., `claude-4-6-sonnet-latest`, `claude-4-5-haiku-latest`, `claude-4-6-opus-latest`) to decouple the application from frequent minor model version changes while incorporating the user's correction that the current generation models in 2026 are version 4.
 
+### Model Identity Hallucination Fix (2026-03-18)
+- **Problem**: Users reported that selecting "Pro Search" resulted in the assistant identifying itself as "Claude Haiku" when asked "Which model are you?".
+- **Finding**: Investigative tests confirmed that Perplexity's `sonar-pro` (and potentially other models) can hallucinate their identity based on the conversation context. If the history contains mentions of "Claude Haiku", the model may adopt that persona when questioned about its identity.
+- **Root Cause**: The system instructions did not explicitly define the model's identity, leaving it susceptible to "identity drift" from the context.
+- **Fix**: Updated `ContextAssembler.ts` to automatically inject the human-readable model label (e.g., "Pro Search", "Claude 4.6 Sonnet") into the system prompt guidelines. This provides a clear anchor for the model's self-identification, preventing it from being swayed by contextual mentions of other models.
+- **Verification**: Verified that the mapping logic correctly routes `pro-search` to the Perplexity Agent API `sonar-pro` preset.
+

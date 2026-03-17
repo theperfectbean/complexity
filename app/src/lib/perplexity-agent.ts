@@ -37,10 +37,9 @@ interface AgentEvent {
     message?: string;
   };
 }
-
 export async function runPerplexityAgent(options: PerplexityAgentOptions) {
   const { modelId: rawModelId, agentInput, instructions, webSearch, apiKey, writer, textId } = options;
-  
+
   // Map internal preset IDs to Perplexity preset names
   let modelId = rawModelId;
   const isPreset = isPresetModel(rawModelId) || modelId === "sonar" || modelId === "sonar-pro" || modelId === "sonar-reasoning" || modelId === "sonar-reasoning-pro" || modelId === "sonar-deep-research";
@@ -49,6 +48,7 @@ export async function runPerplexityAgent(options: PerplexityAgentOptions) {
   if (modelId === "pro-search") modelId = "sonar-pro";
 
   let assistantText = "";
+
   let completedResponse: Record<string, unknown> | null = null;
   let hasWrittenTextDelta = false;
   const PERPLEXITY_STREAM_TIMEOUT_MS = runtimeConfig.perplexity.streamTimeoutMs;

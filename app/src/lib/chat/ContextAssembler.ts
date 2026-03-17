@@ -4,6 +4,7 @@ import { getEmbeddings, similaritySearch } from "../rag";
 import { getMemoryPrompt } from "../memory";
 import { runtimeConfig } from "../config";
 import { env } from "../env";
+import { MODELS } from "../models";
 import type { ChatSession, ThreadInfo } from "./types";
 import type { UIMessageChunk } from "ai";
 
@@ -82,7 +83,11 @@ ${content}`;
 
 CRITICAL: If the user asks to visualize data (like time-series or numerical tracking), you MUST output a JSON block wrapped in a markdown code block with the language "chart". NEVER use text-based bar charts or mermaid. ALWAYS follow this JSON format exactly: { "type": "line" | "bar", "data": [{ "name": "...", "value": 123 }], "xAxisKey": "name", "lines": ["value"] }.`;
     
+    const modelLabel = MODELS.find(m => m.id === session.model)?.label || session.model;
+    const identityGuidelines = `- You are currently using the model: ${modelLabel}.`;
+
     const instructions = [
+      identityGuidelines,
       agenticGuidelines,
       memoryPrompt,
       roleInstructions,

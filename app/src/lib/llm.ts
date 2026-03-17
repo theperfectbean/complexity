@@ -7,6 +7,7 @@ import { LanguageModel, streamText, convertToModelMessages, UIMessageChunk, UIMe
 import type { Responses } from "@perplexity-ai/perplexity_ai/resources/responses";
 import { runPerplexityAgent } from "./perplexity-agent";
 import { runtimeConfig } from "./config";
+import { getLogger } from "./logger";
 import { extractCitationsFromResponse, type Citation } from "./extraction-utils";
 import { isPresetModel } from "./models";
 
