@@ -7,14 +7,10 @@ import { LanguageModel, streamText, convertToModelMessages, UIMessageChunk, UIMe
 import type { Responses } from "@perplexity-ai/perplexity_ai/resources/responses";
 import { runPerplexityAgent } from "./perplexity-agent";
 import { runtimeConfig } from "./config";
+import { extractCitationsFromResponse, type Citation } from "./extraction-utils";
+import { isPresetModel } from "./models";
 
 export type ProviderType = "perplexity" | "anthropic" | "openai" | "google" | "xai" | "ollama" | "local-openai";
-
-export interface Citation {
-  url: string;
-  title?: string;
-  snippet?: string;
-}
 
 export interface GenerationOptions {
   modelId: string;
@@ -35,112 +31,114 @@ export interface GenerationResult {
   citations: Citation[];
 }
 
+const PROVIDER_PREFIX_MAP: Record<string, ProviderType> = {
+  "perplexity/": "perplexity",
+  "anthropic/": "anthropic",
+  "openai/": "openai",
+  "google/": "google",
+  "xai/": "xai",
+  "ollama/": "ollama",
+  "local-openai/": "local-openai",
+};
+
 export function getProviderAndModel(modelId: string): { provider: ProviderType; model: string } {
-  if (modelId.startsWith("anthropic/")) {
-    return { provider: "anthropic", model: modelId.replace("anthropic/", "") };
+  // 1. Check for explicit prefix
+  for (const [prefix, provider] of Object.entries(PROVIDER_PREFIX_MAP)) {
+    if (modelId.startsWith(prefix)) {
+      return { provider, model: modelId.slice(prefix.length) };
+    }
   }
-  if (modelId.startsWith("openai/")) {
-    return { provider: "openai", model: modelId.replace("openai/", "") };
+
+  // 2. Resolve implicit providers
+  if (isPresetModel(modelId)) {
+    return { provider: "perplexity", model: modelId };
   }
-  if (modelId.startsWith("google/")) {
-    return { provider: "google", model: modelId.replace("google/", "") };
+
+  // 3. Handle specific un-prefixed models
+  const knownPerplexityModels = ["sonar", "sonar-pro", "sonar-reasoning", "sonar-reasoning-pro", "sonar-deep-research"];
+  if (knownPerplexityModels.includes(modelId)) {
+    return { provider: "perplexity", model: modelId };
   }
-  if (modelId.startsWith("xai/")) {
-    return { provider: "xai", model: modelId.replace("xai/", "") };
-  }
-  if (modelId.startsWith("ollama/")) {
-    return { provider: "ollama", model: modelId.replace("ollama/", "") };
-  }
-  if (modelId.startsWith("local-openai/")) {
-    return { provider: "local-openai", model: modelId.replace("local-openai/", "") };
-  }
-  
-  const model = modelId.startsWith("perplexity/") ? modelId.replace("perplexity/", "") : modelId;
-  return { provider: "perplexity", model };
+
+  // Default to perplexity but this is the "risky" path we want to minimize via provider-models.ts updates
+  return { provider: "perplexity", model: modelId };
 }
 
-function extractCitationsFromResponse(response: Record<string, unknown> | null): Citation[] {
-  const citations: Citation[] = [];
-  if (!response) return citations;
-
-  const responseCitations = response.citations;
-  if (responseCitations && Array.isArray(responseCitations)) {
-    responseCitations.forEach((c: unknown) => {
-      if (typeof c === "string") {
-        citations.push({ url: c });
-      } else if (c && typeof c === "object") {
-        const citationRecord = c as Record<string, unknown>;
-        if (typeof citationRecord.url === "string") {
-          citations.push({
-            url: citationRecord.url,
-            title: typeof citationRecord.title === "string" ? citationRecord.title : undefined,
-            snippet: typeof citationRecord.snippet === "string" ? citationRecord.snippet : undefined,
-          });
-        }
-      }
-    });
-  }
-
-  return citations;
+/**
+ * Maps internal model IDs to IDs that Perplexity API understands.
+ * Especially useful for third-party models hosted by Perplexity.
+ */
+function mapToPerplexityModel(modelName: string): string {
+  if (modelName === "fast-search" || modelName === "sonar") return "sonar";
+  if (modelName === "pro-search" || modelName === "sonar-pro") return "sonar-pro";
+  
+  // Strip provider prefixes if they are still there (e.g. "anthropic/claude-sonnet-4-6" -> "claude-sonnet-4-6")
+  // Perplexity often uses the model name without the provider prefix, or has its own mapping.
+  if (modelName.startsWith("anthropic/")) return modelName.replace("anthropic/", "");
+  if (modelName.startsWith("openai/")) return modelName.replace("openai/", "");
+  if (modelName.startsWith("google/")) return modelName.replace("google/", "");
+  
+  return modelName;
 }
 
 export function getLanguageModel(modelId: string, keys: Record<string, string | null>): LanguageModel {
   const { provider, model: modelName } = getProviderAndModel(modelId);
 
+  const factories: Record<Exclude<ProviderType, "perplexity">, () => LanguageModel> = {
+    anthropic: () => {
+      const key = keys["ANTHROPIC_API_KEY"];
+      if (!key) throw new Error("ANTHROPIC_API_KEY is not configured");
+      const model = (runtimeConfig.llm.modelAliases.anthropic?.[modelName]) || modelName;
+      return createAnthropic({ apiKey: key })(model);
+    },
+    openai: () => {
+      const key = keys["OPENAI_API_KEY"];
+      if (!key) throw new Error("OPENAI_API_KEY is not configured");
+      const model = (runtimeConfig.llm.modelAliases.openai?.[modelName]) || modelName;
+      return createOpenAI({ apiKey: key })(model);
+    },
+    google: () => {
+      const key = keys["GOOGLE_GENERATIVE_AI_API_KEY"];
+      if (!key) throw new Error("GOOGLE_GENERATIVE_AI_API_KEY is not configured");
+      const model = (runtimeConfig.llm.modelAliases.google?.[modelName]) || modelName;
+      return createGoogleGenerativeAI({ apiKey: key })(model);
+    },
+    xai: () => {
+      const key = keys["XAI_API_KEY"];
+      if (!key) throw new Error("XAI_API_KEY is not configured");
+      const model = (runtimeConfig.llm.modelAliases.xai?.[modelName]) || modelName;
+      return createXai({ apiKey: key })(model);
+    },
+    ollama: () => {
+      const baseUrl = keys["OLLAMA_BASE_URL"] || runtimeConfig.llm.ollamaBaseUrl;
+      return createOllama({ baseURL: baseUrl })(modelName);
+    },
+    "local-openai": () => {
+      const baseUrl = keys["LOCAL_OPENAI_BASE_URL"];
+      if (!baseUrl) throw new Error("LOCAL_OPENAI_BASE_URL is not configured");
+      return createOpenAI({ 
+        baseURL: baseUrl,
+        apiKey: keys["LOCAL_OPENAI_API_KEY"] || runtimeConfig.llm.localOpenAiApiKeyFallback
+      })(modelName);
+    },
+  };
+
   if (provider === "perplexity") {
-    let mappedModelName = modelName;
-    if (mappedModelName === "fast-search" || mappedModelName === "sonar") mappedModelName = "sonar";
-    if (mappedModelName === "pro-search") mappedModelName = "sonar-pro";
-    
     const perplexityKey = keys["PERPLEXITY_API_KEY"];
     if (!perplexityKey) throw new Error("PERPLEXITY_API_KEY is not configured");
     
     return createOpenAI({
       apiKey: perplexityKey,
       baseURL: "https://api.perplexity.ai/v1",
-    }).chat(mappedModelName);
+    }).chat(mapToPerplexityModel(modelName));
   }
 
-  switch (provider) {
-    case "anthropic":
-      const anthropicKey = keys["ANTHROPIC_API_KEY"];
-      if (!anthropicKey) throw new Error("ANTHROPIC_API_KEY is not configured");
-      const anthropicModel = (runtimeConfig.llm.modelAliases.anthropic && runtimeConfig.llm.modelAliases.anthropic[modelName]) || modelName;
-      return createAnthropic({ apiKey: anthropicKey })(anthropicModel);
-
-    case "openai":
-      const openaiKey = keys["OPENAI_API_KEY"];
-      if (!openaiKey) throw new Error("OPENAI_API_KEY is not configured");
-      const openaiModel = (runtimeConfig.llm.modelAliases.openai && runtimeConfig.llm.modelAliases.openai[modelName]) || modelName;
-      return createOpenAI({ apiKey: openaiKey })(openaiModel);
-
-    case "google":
-      const googleKey = keys["GOOGLE_GENERATIVE_AI_API_KEY"];
-      if (!googleKey) throw new Error("GOOGLE_GENERATIVE_AI_API_KEY is not configured");
-      const googleModel = (runtimeConfig.llm.modelAliases.google && runtimeConfig.llm.modelAliases.google[modelName]) || modelName;
-      return createGoogleGenerativeAI({ apiKey: googleKey })(googleModel);
-
-    case "xai":
-      const xaiKey = keys["XAI_API_KEY"];
-      if (!xaiKey) throw new Error("XAI_API_KEY is not configured");
-      const xaiModel = (runtimeConfig.llm.modelAliases.xai && runtimeConfig.llm.modelAliases.xai[modelName]) || modelName;
-      return createXai({ apiKey: xaiKey })(xaiModel);
-
-    case "ollama":
-      const ollamaBaseUrl = keys["OLLAMA_BASE_URL"] || runtimeConfig.llm.ollamaBaseUrl;
-      return createOllama({ baseURL: ollamaBaseUrl })(modelName);
-
-    case "local-openai":
-      const localOpenAiBaseUrl = keys["LOCAL_OPENAI_BASE_URL"];
-      if (!localOpenAiBaseUrl) throw new Error("LOCAL_OPENAI_BASE_URL is not configured");
-      return createOpenAI({ 
-        baseURL: localOpenAiBaseUrl,
-        apiKey: keys["LOCAL_OPENAI_API_KEY"] || runtimeConfig.llm.localOpenAiApiKeyFallback
-      })(modelName);
-
-    default:
-      throw new Error(`Provider ${provider} is not yet fully implemented.`);
+  const factory = factories[provider];
+  if (!factory) {
+    throw new Error(`Provider ${provider} is not yet fully implemented.`);
   }
+
+  return factory();
 }
 
 export async function runGeneration(options: GenerationOptions): Promise<GenerationResult> {
@@ -149,7 +147,7 @@ export async function runGeneration(options: GenerationOptions): Promise<Generat
   if (provider === "perplexity") {
     try {
       const result = await runPerplexityAgent({
-        modelId: modelName,
+        modelId: mapToPerplexityModel(modelName),
         agentInput: options.agentInput,
         instructions: options.system || "",
         webSearch: !!options.webSearch,

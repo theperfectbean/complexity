@@ -38,57 +38,33 @@ import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { createPerplexityClient } from "@/lib/perplexity";
 import { getRedisClient } from "@/lib/redis";
+import {
+  mockSelectResult,
+  mockSelectResults,
+  mockMutationChains,
+  createSSEStream,
+  createPostRequest,
+} from "@/test/test-utils";
 
 import { POST } from "@/app/api/chat/route";
-
-function mockSelectResult(result: unknown) {
-  const limit = vi.fn().mockResolvedValue(result);
-  const where = vi.fn(() => ({ limit }));
-  const innerJoin = vi.fn(() => ({ where }));
-  const from = vi.fn(() => ({ innerJoin }));
-  vi.mocked(db.select).mockReturnValue({ from } as never);
-}
-
-function mockSelectResults(results: unknown[]) {
-  const selectMock = vi.mocked(db.select);
-  selectMock.mockReset();
-
-  for (const result of results) {
-    const limit = vi.fn().mockResolvedValue(result);
-    const where = vi.fn(() => ({ limit }));
-    const innerJoin = vi.fn(() => ({ where }));
-    const from = vi.fn(() => ({ innerJoin }));
-    selectMock.mockReturnValueOnce({ from } as never);
-  }
-}
-
-function mockMutationChains() {
-  const values = vi.fn().mockResolvedValue(undefined);
-  vi.mocked(db.insert).mockReturnValue({ values } as never);
-
-  const where = vi.fn().mockResolvedValue(undefined);
-  const set = vi.fn(() => ({ where }));
-  vi.mocked(db.update).mockReturnValue({ set } as never);
-
-  return { values, set, where };
-}
 
 describe("POST /api/chat", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(getRedisClient).mockReturnValue(null);
     vi.mocked(auth).mockResolvedValue({ user: { email: "gary@example.com" } } as never);
+    vi.mocked(createPerplexityClient).mockReturnValue({
+      responses: {
+        create: vi.fn().mockResolvedValue({ output_text: "" }),
+      },
+    } as never);
     global.fetch = vi.fn();
   });
 
   it("returns 401 when unauthenticated", async () => {
     vi.mocked(auth).mockResolvedValue(null as never);
 
-    const request = new Request("http://localhost/api/chat", {
-      method: "POST",
-      body: JSON.stringify({}),
-      headers: { "Content-Type": "application/json" },
-    });
+    const request = createPostRequest("http://localhost/api/chat", {});
 
     const response = await POST(request);
     expect(response.status).toBe(401);
@@ -102,10 +78,10 @@ describe("POST /api/chat", () => {
       get: vi.fn(),
     } as never);
 
-    const request = new Request("http://localhost/api/chat", {
-      method: "POST",
-      body: JSON.stringify({ threadId: "t1", model: "pro-search", messages: [] }),
-      headers: { "Content-Type": "application/json" },
+    const request = createPostRequest("http://localhost/api/chat", {
+      threadId: "t1",
+      model: "pro-search",
+      messages: [],
     });
 
     const response = await POST(request);
@@ -114,11 +90,7 @@ describe("POST /api/chat", () => {
   });
 
   it("returns 400 for invalid payload", async () => {
-    const request = new Request("http://localhost/api/chat", {
-      method: "POST",
-      body: JSON.stringify({ model: "pro-search" }),
-      headers: { "Content-Type": "application/json" },
-    });
+    const request = createPostRequest("http://localhost/api/chat", { model: "pro-search" });
 
     const response = await POST(request);
     expect(response.status).toBe(400);
@@ -128,14 +100,10 @@ describe("POST /api/chat", () => {
   it("returns 404 when thread is not found", async () => {
     mockSelectResult([]);
 
-    const request = new Request("http://localhost/api/chat", {
-      method: "POST",
-      body: JSON.stringify({
-        threadId: "thread-1",
-        model: "pro-search",
-        messages: [{ role: "user", parts: [{ type: "text", text: "hello" }] }],
-      }),
-      headers: { "Content-Type": "application/json" },
+    const request = createPostRequest("http://localhost/api/chat", {
+      threadId: "thread-1",
+      model: "pro-search",
+      messages: [{ role: "user", parts: [{ type: "text", text: "hello" }] }],
     });
 
     const response = await POST(request);
@@ -144,19 +112,13 @@ describe("POST /api/chat", () => {
   });
 
   it("returns 400 for thread-role mismatch", async () => {
-    mockSelectResults([
-      [{ id: "thread-1", userId: "user-1", roleId: "role-a" }],
-    ]);
+    mockSelectResults([[{ id: "thread-1", userId: "user-1", roleId: "role-a" }]]);
 
-    const request = new Request("http://localhost/api/chat", {
-      method: "POST",
-      body: JSON.stringify({
-        threadId: "thread-1",
-        model: "pro-search",
-        roleId: "role-b",
-        messages: [{ role: "user", parts: [{ type: "text", text: "hello" }] }],
-      }),
-      headers: { "Content-Type": "application/json" },
+    const request = createPostRequest("http://localhost/api/chat", {
+      threadId: "thread-1",
+      model: "pro-search",
+      roleId: "role-b",
+      messages: [{ role: "user", parts: [{ type: "text", text: "hello" }] }],
     });
 
     const response = await POST(request);
@@ -180,14 +142,10 @@ describe("POST /api/chat", () => {
       set: vi.fn(),
     } as never);
 
-    const request = new Request("http://localhost/api/chat", {
-      method: "POST",
-      body: JSON.stringify({
-        threadId: "thread-1",
-        model: "pro-search",
-        messages: [{ role: "user", parts: [{ type: "text", text: "hello" }] }],
-      }),
-      headers: { "Content-Type": "application/json" },
+    const request = createPostRequest("http://localhost/api/chat", {
+      threadId: "thread-1",
+      model: "pro-search",
+      messages: [{ role: "user", parts: [{ type: "text", text: "hello" }] }],
     });
 
     const response = await POST(request);
@@ -206,14 +164,10 @@ describe("POST /api/chat", () => {
       set: vi.fn(),
     } as never);
 
-    const request = new Request("http://localhost/api/chat", {
-      method: "POST",
-      body: JSON.stringify({
-        threadId: "thread-1",
-        model: "pro-search",
-        messages: [{ role: "user", parts: [{ type: "text", text: "hello" }] }],
-      }),
-      headers: { "Content-Type": "application/json" },
+    const request = createPostRequest("http://localhost/api/chat", {
+      threadId: "thread-1",
+      model: "pro-search",
+      messages: [{ role: "user", parts: [{ type: "text", text: "hello" }] }],
     });
 
     const response = await POST(request);
@@ -222,20 +176,13 @@ describe("POST /api/chat", () => {
   });
 
   it("returns 404 when requested role is not owned", async () => {
-    mockSelectResults([
-      [{ id: "thread-1", userId: "user-1", roleId: "space-1" }],
-      [],
-    ]);
+    mockSelectResults([[{ id: "thread-1", userId: "user-1", roleId: "space-1" }], []]);
 
-    const request = new Request("http://localhost/api/chat", {
-      method: "POST",
-      body: JSON.stringify({
-        threadId: "thread-1",
-        model: "pro-search",
-        roleId: "space-1",
-        messages: [{ role: "user", parts: [{ type: "text", text: "hello" }] }],
-      }),
-      headers: { "Content-Type": "application/json" },
+    const request = createPostRequest("http://localhost/api/chat", {
+      threadId: "thread-1",
+      model: "pro-search",
+      roleId: "space-1",
+      messages: [{ role: "user", parts: [{ type: "text", text: "hello" }] }],
     });
 
     const response = await POST(request);
@@ -247,26 +194,18 @@ describe("POST /api/chat", () => {
     mockSelectResults([[{ id: "thread-1", userId: "user-1", roleId: null }]]);
     const { values } = mockMutationChains();
 
-    const encoder = new TextEncoder();
-    const stream = new ReadableStream({
-      start(controller) {
-        controller.enqueue(
-          encoder.encode(
-            `data: ${JSON.stringify({
-              type: "response.completed",
-              response: {
-                output: [
-                  {
-                    content: [{ text: "fallback answer from completed response" }],
-                  },
-                ],
-              },
-            })}\n\n`,
-          ),
-        );
-        controller.close();
+    const stream = createSSEStream([
+      {
+        type: "response.completed",
+        response: {
+          output: [
+            {
+              content: [{ text: "fallback answer from completed response" }],
+            },
+          ],
+        },
       },
-    });
+    ]);
 
     vi.mocked(global.fetch).mockResolvedValue({
       ok: true,
@@ -274,14 +213,10 @@ describe("POST /api/chat", () => {
       body: stream,
     } as Response);
 
-    const request = new Request("http://localhost/api/chat", {
-      method: "POST",
-      body: JSON.stringify({
-        threadId: "thread-1",
-        model: "pro-search",
-        messages: [{ role: "user", parts: [{ type: "text", text: "hello" }] }],
-      }),
-      headers: { "Content-Type": "application/json" },
+    const request = createPostRequest("http://localhost/api/chat", {
+      threadId: "thread-1",
+      model: "pro-search",
+      messages: [{ role: "user", parts: [{ type: "text", text: "hello" }] }],
     });
 
     const response = await POST(request);
@@ -302,28 +237,16 @@ describe("POST /api/chat", () => {
     mockSelectResults([[{ id: "thread-1", userId: "user-1", roleId: null }]]);
     const { values } = mockMutationChains();
 
-    const encoder = new TextEncoder();
-    const stream = new ReadableStream({
-      start(controller) {
-        controller.enqueue(
-          encoder.encode(
-            `data: ${JSON.stringify({
-              type: "response.output_text.done",
-              text: "done event answer",
-            })}\n\n`,
-          ),
-        );
-        controller.enqueue(
-          encoder.encode(
-            `data: ${JSON.stringify({
-              type: "response.completed",
-              response: { output: [] },
-            })}\n\n`,
-          ),
-        );
-        controller.close();
+    const stream = createSSEStream([
+      {
+        type: "response.output_text.done",
+        text: "done event answer",
       },
-    });
+      {
+        type: "response.completed",
+        response: { output: [] },
+      },
+    ]);
 
     vi.mocked(global.fetch).mockResolvedValue({
       ok: true,
@@ -331,14 +254,10 @@ describe("POST /api/chat", () => {
       body: stream,
     } as Response);
 
-    const request = new Request("http://localhost/api/chat", {
-      method: "POST",
-      body: JSON.stringify({
-        threadId: "thread-1",
-        model: "pro-search",
-        messages: [{ role: "user", parts: [{ type: "text", text: "hello" }] }],
-      }),
-      headers: { "Content-Type": "application/json" },
+    const request = createPostRequest("http://localhost/api/chat", {
+      threadId: "thread-1",
+      model: "pro-search",
+      messages: [{ role: "user", parts: [{ type: "text", text: "hello" }] }],
     });
 
     const response = await POST(request);
@@ -388,14 +307,10 @@ describe("POST /api/chat", () => {
       body: stream,
     } as Response);
 
-    const request = new Request("http://localhost/api/chat", {
-      method: "POST",
-      body: JSON.stringify({
-        threadId: "thread-1",
-        model: "pro-search",
-        messages: [{ role: "user", parts: [{ type: "text", text: "hello" }] }],
-      }),
-      headers: { "Content-Type": "application/json" },
+    const request = createPostRequest("http://localhost/api/chat", {
+      threadId: "thread-1",
+      model: "pro-search",
+      messages: [{ role: "user", parts: [{ type: "text", text: "hello" }] }],
     });
 
     const response = await POST(request);
@@ -417,20 +332,12 @@ describe("POST /api/chat", () => {
     mockSelectResults([[{ id: "thread-1", userId: "user-1", roleId: null }]]);
     const { values } = mockMutationChains();
 
-    const encoder = new TextEncoder();
-    const stream = new ReadableStream({
-      start(controller) {
-        controller.enqueue(
-          encoder.encode(
-            `data: ${JSON.stringify({
-              type: "response.output_text.done",
-              text: "fresh provider answer",
-            })}\n\n`,
-          ),
-        );
-        controller.close();
+    const stream = createSSEStream([
+      {
+        type: "response.output_text.done",
+        text: "fresh provider answer",
       },
-    });
+    ]);
 
     vi.mocked(global.fetch).mockResolvedValue({
       ok: true,
@@ -452,14 +359,10 @@ describe("POST /api/chat", () => {
       set: vi.fn(),
     } as never);
 
-    const request = new Request("http://localhost/api/chat", {
-      method: "POST",
-      body: JSON.stringify({
-        threadId: "thread-1",
-        model: "pro-search",
-        messages: [{ role: "user", parts: [{ type: "text", text: "hello" }] }],
-      }),
-      headers: { "Content-Type": "application/json" },
+    const request = createPostRequest("http://localhost/api/chat", {
+      threadId: "thread-1",
+      model: "pro-search",
+      messages: [{ role: "user", parts: [{ type: "text", text: "hello" }] }],
     });
 
     const response = await POST(request);
@@ -482,14 +385,10 @@ describe("POST /api/chat", () => {
       throw new Error("provider exploded");
     });
 
-    const request = new Request("http://localhost/api/chat", {
-      method: "POST",
-      body: JSON.stringify({
-        threadId: "thread-1",
-        model: "pro-search",
-        messages: [{ role: "user", parts: [{ type: "text", text: "hello" }] }],
-      }),
-      headers: { "Content-Type": "application/json" },
+    const request = createPostRequest("http://localhost/api/chat", {
+      threadId: "thread-1",
+      model: "pro-search",
+      messages: [{ role: "user", parts: [{ type: "text", text: "hello" }] }],
     });
 
     const response = await POST(request);

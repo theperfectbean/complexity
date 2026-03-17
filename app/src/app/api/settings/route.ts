@@ -2,10 +2,10 @@ import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 
-import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 import { setSetting, getDetailedSettings } from "@/lib/settings";
+import { requireUser, requireAdmin } from "@/lib/auth-server";
 
 const ALLOWED_KEYS = [
   "ANTHROPIC_API_KEY",
@@ -31,21 +31,9 @@ const patchSchema = z.object({
 });
 
 export async function GET() {
-  const session = await auth();
-  const userEmail = session?.user?.email;
-  if (!userEmail) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const [user] = await db
-    .select({ id: users.id, memoryEnabled: users.memoryEnabled, isAdmin: users.isAdmin })
-    .from(users)
-    .where(eq(users.email, userEmail))
-    .limit(1);
-
-  if (!user) {
-    return NextResponse.json({ error: "User not found" }, { status: 404 });
-  }
+  const authResult = await requireUser();
+  if (authResult instanceof NextResponse) return authResult;
+  const { user } = authResult;
 
   const result: Record<string, unknown> = {
     memoryEnabled: user.memoryEnabled,
@@ -59,21 +47,8 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const session = await auth();
-  const userEmail = session?.user?.email;
-  if (!userEmail) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const [user] = await db
-    .select({ isAdmin: users.isAdmin })
-    .from(users)
-    .where(eq(users.email, userEmail))
-    .limit(1);
-
-  if (!user?.isAdmin) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const authResult = await requireAdmin();
+  if (authResult instanceof NextResponse) return authResult;
 
   const body = await request.json() as Record<string, string | undefined>;
 
@@ -88,26 +63,14 @@ export async function POST(request: Request) {
 
 
 export async function PATCH(request: Request) {
-  const session = await auth();
-  const userEmail = session?.user?.email;
-  if (!userEmail) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const authResult = await requireUser();
+  if (authResult instanceof NextResponse) return authResult;
+  const { user } = authResult;
 
   const body = await request.json();
   const parsed = patchSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
-  }
-
-  const [user] = await db
-    .select({ id: users.id })
-    .from(users)
-    .where(eq(users.email, userEmail))
-    .limit(1);
-
-  if (!user) {
-    return NextResponse.json({ error: "User not found" }, { status: 404 });
   }
 
   await db

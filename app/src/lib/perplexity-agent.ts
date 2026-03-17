@@ -3,6 +3,7 @@ import { Responses } from "@perplexity-ai/perplexity_ai/resources/responses";
 import { createPerplexityClient } from "./perplexity";
 import { isPresetModel } from "./models";
 import { safeParseJsonLine } from "./sse";
+import { asRecord } from "./extraction-utils";
 import { runtimeConfig } from "./config";
 import { env } from "./env";
 
@@ -38,10 +39,12 @@ interface AgentEvent {
 }
 
 export async function runPerplexityAgent(options: PerplexityAgentOptions) {
-  const { modelId: rawModelId, agentInput, instructions, webSearch, apiKey, writer, textId, requestId } = options;
+  const { modelId: rawModelId, agentInput, instructions, webSearch, apiKey, writer, textId } = options;
   
   // Map internal preset IDs to Perplexity preset names
   let modelId = rawModelId;
+  const isPreset = isPresetModel(rawModelId) || modelId === "sonar" || modelId === "sonar-pro" || modelId === "sonar-reasoning" || modelId === "sonar-reasoning-pro" || modelId === "sonar-deep-research";
+
   if (modelId === "fast-search") modelId = "sonar";
   if (modelId === "pro-search") modelId = "sonar-pro";
 
@@ -51,7 +54,7 @@ export async function runPerplexityAgent(options: PerplexityAgentOptions) {
   const PERPLEXITY_STREAM_TIMEOUT_MS = runtimeConfig.perplexity.streamTimeoutMs;
 
   const client = createPerplexityClient(apiKey);
-  const requestBodyBase = isPresetModel(modelId)
+  const requestBodyBase = isPreset
     ? {
         preset: modelId,
         input: agentInput,
@@ -71,8 +74,6 @@ export async function runPerplexityAgent(options: PerplexityAgentOptions) {
 
   let streamEventCount = 0;
   let streamingFailed = false;
-
-  const asRecord = (v: unknown) => (v && typeof v === "object" ? (v as Record<string, unknown>) : null);
 
   try {
     const controller = new AbortController();
@@ -111,140 +112,153 @@ export async function runPerplexityAgent(options: PerplexityAgentOptions) {
         buffer = lines.pop() || "";
         
         for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            const dataStr = line.slice(6).trim();
-            if (dataStr === '[DONE]' || !dataStr) continue;
-            
-            const eventRecord = safeParseJsonLine(dataStr) as AgentEvent | null;
-            if (!eventRecord) continue;
-            streamEventCount += 1;
-      
-            if (eventRecord.type === "response.reasoning.started") {
+          processLine(line);
+        }
+      }
+
+      // Process any remaining data in the buffer after the stream is closed
+      if (buffer.trim()) {
+        processLine(buffer);
+      }
+
+      function processLine(line: string) {
+        if (line.startsWith('data: ')) {
+          const dataStr = line.slice(6).trim();
+          if (dataStr === '[DONE]') {
+            streamingFailed = false; // Finished normally
+            return;
+          }
+          if (!dataStr) return;
+          
+          const eventRecord = safeParseJsonLine(dataStr) as AgentEvent | null;
+          if (!eventRecord) return;
+          streamEventCount += 1;
+    
+          if (eventRecord.type === "response.reasoning.started") {
+            writer.write({
+              type: "data-call-start",
+              data: { callId: "reasoning", toolName: "Searching", input: eventRecord.thought ? { thought: eventRecord.thought } : {} },
+            } as UIMessageChunk);
+            return;
+          }
+
+          if (eventRecord.type === "response.reasoning.search_queries") {
+            const queries = eventRecord.queries || [];
+            writer.write({
+              type: "data-call-start",
+              data: { callId: "reasoning", toolName: "Searching", input: { query: queries.join(", ") } },
+            } as UIMessageChunk);
+            return;
+          }
+
+          if (eventRecord.type === "response.reasoning.search_results") {
+            writer.write({
+              type: "data-call-result",
+              data: { callId: "reasoning", result: "Retrieved search results." },
+            } as UIMessageChunk);
+            return;
+          }
+
+          if (eventRecord.type === "response.reasoning.fetch_url_queries") {
+            const urls = eventRecord.urls || [];
+            writer.write({
+              type: "data-call-start",
+              data: { callId: "fetching", toolName: "Reading", input: { urls } },
+            } as UIMessageChunk);
+            return;
+          }
+
+          if (eventRecord.type === "response.reasoning.fetch_url_results") {
+            writer.write({
+              type: "data-call-result",
+              data: { callId: "fetching", result: "Finished reading URLs." },
+            } as UIMessageChunk);
+            return;
+          }
+
+          if (eventRecord.type === "response.reasoning.stopped") {
+            writer.write({
+              type: "data-call-result",
+              data: { callId: "reasoning", result: "Reasoning complete." },
+            } as UIMessageChunk);
+            return;
+          }
+
+          if (eventRecord.type === "response.output_item.added") {
+            const item = asRecord(eventRecord.item);
+            if (item?.type === "function_call") {
               writer.write({
                 type: "data-call-start",
-                data: { callId: "reasoning", toolName: "Searching", input: eventRecord.thought ? { thought: eventRecord.thought } : {} },
+                data: { callId: (item.id as string) || `tool-${Date.now()}`, toolName: (item.name as string) || "Tool", input: item.arguments as Record<string, unknown> },
               } as UIMessageChunk);
-              continue;
             }
+            return;
+          }
 
-            if (eventRecord.type === "response.reasoning.search_queries") {
-              const queries = eventRecord.queries || [];
-              writer.write({
-                type: "data-call-start",
-                data: { callId: "reasoning", toolName: "Searching", input: { query: queries.join(", ") } },
-              } as UIMessageChunk);
-              continue;
-            }
-
-            if (eventRecord.type === "response.reasoning.search_results") {
+          if (eventRecord.type === "response.output_item.done") {
+            const item = asRecord(eventRecord.item);
+            if (item?.type === "function_call") {
               writer.write({
                 type: "data-call-result",
-                data: { callId: "reasoning", result: "Retrieved search results." },
+                data: { callId: (item.id as string) || `tool-${Date.now()}`, result: "Completed." },
               } as UIMessageChunk);
-              continue;
             }
+            return;
+          }
 
-            if (eventRecord.type === "response.reasoning.fetch_url_queries") {
-              const urls = eventRecord.urls || [];
-              writer.write({
-                type: "data-call-start",
-                data: { callId: "fetching", toolName: "Reading", input: { urls } },
-              } as UIMessageChunk);
-              continue;
+          if (eventRecord.type === "response.output_text.delta") {
+            if (!hasWrittenTextDelta) {
+              writer.write({ type: "data-call-result", data: { callId: "model-gen", result: "Finished reasoning." } } as UIMessageChunk);
             }
-
-            if (eventRecord.type === "response.reasoning.fetch_url_results") {
-              writer.write({
-                type: "data-call-result",
-                data: { callId: "fetching", result: "Finished reading URLs." },
-              } as UIMessageChunk);
-              continue;
+            const delta = eventRecord.delta || eventRecord.output_text?.delta || "";
+            if (delta) {
+              assistantText += delta;
+              writer.write({ type: "text-delta", id: textId, delta });
+              hasWrittenTextDelta = true;
             }
+            return;
+          }
 
-            if (eventRecord.type === "response.reasoning.stopped") {
-              writer.write({
-                type: "data-call-result",
-                data: { callId: "reasoning", result: "Reasoning complete." },
-              } as UIMessageChunk);
-              continue;
-            }
-
-            if (eventRecord.type === "response.output_item.added") {
-              const item = asRecord(eventRecord.item);
-              if (item?.type === "function_call") {
-                writer.write({
-                  type: "data-call-start",
-                  data: { callId: (item.id as string) || `tool-${Date.now()}`, toolName: (item.name as string) || "Tool", input: item.arguments as Record<string, unknown> },
-                } as UIMessageChunk);
-              }
-              continue;
-            }
-
-            if (eventRecord.type === "response.output_item.done") {
-              const item = asRecord(eventRecord.item);
-              if (item?.type === "function_call") {
-                writer.write({
-                  type: "data-call-result",
-                  data: { callId: (item.id as string) || `tool-${Date.now()}`, result: "Completed." },
-                } as UIMessageChunk);
-              }
-              continue;
-            }
-
-            if (eventRecord.type === "response.output_text.delta") {
+          if (eventRecord.type === "response.output_text.done") {
+            const fullText = eventRecord.text || eventRecord.output_text?.text || null;
+            if (fullText !== null) {
+              assistantText = fullText;
               if (!hasWrittenTextDelta) {
-                writer.write({ type: "data-call-result", data: { callId: "model-gen", result: "Finished reasoning." } } as UIMessageChunk);
-              }
-              const delta = eventRecord.delta || eventRecord.output_text?.delta || "";
-              if (delta) {
-                assistantText += delta;
-                writer.write({ type: "text-delta", id: textId, delta });
+                writer.write({ type: "text-delta", id: textId, delta: fullText });
                 hasWrittenTextDelta = true;
               }
-              continue;
             }
+            return;
+          }
 
-            if (eventRecord.type === "response.output_text.done") {
-              const fullText = eventRecord.text || eventRecord.output_text?.text || null;
-              if (fullText !== null) {
-                assistantText = fullText;
-                if (!hasWrittenTextDelta) {
-                  writer.write({ type: "text-delta", id: textId, delta: fullText });
-                  hasWrittenTextDelta = true;
-                }
-              }
-              continue;
-            }
-
-            if (eventRecord.type === "response.completed") {
-              completedResponse = (eventRecord.response as Record<string, unknown>) || null;
-              if (!assistantText) {
-                const responseRecord = asRecord(completedResponse);
-                const output = Array.isArray(responseRecord?.output) ? responseRecord.output : [];
-                for (const item of output) {
-                  const itemRecord = asRecord(item);
-                  const content = Array.isArray(itemRecord?.content) ? itemRecord.content : [];
-                  for (const part of content) {
-                    const partRecord = asRecord(part);
-                    if (typeof partRecord?.text === "string" && partRecord.text) {
-                      assistantText = partRecord.text;
-                      break;
-                    }
+          if (eventRecord.type === "response.completed") {
+            completedResponse = (eventRecord.response as Record<string, unknown>) || null;
+            if (!assistantText) {
+              const responseRecord = asRecord(completedResponse);
+              const output = Array.isArray(responseRecord?.output) ? responseRecord.output : [];
+              for (const item of output) {
+                const itemRecord = asRecord(item);
+                const content = Array.isArray(itemRecord?.content) ? itemRecord.content : [];
+                for (const part of content) {
+                  const partRecord = asRecord(part);
+                  if (typeof partRecord?.text === "string" && partRecord.text) {
+                    assistantText = partRecord.text;
+                    break;
                   }
-                  if (assistantText) break;
                 }
+                if (assistantText) break;
               }
-              continue;
             }
+            return;
+          }
 
-            if (eventRecord.type === "response.failed") {
-              const message = eventRecord.error?.message || "";
-              if (!hasWrittenTextDelta) {
-                streamingFailed = true;
-                break;
-              }
-              throw new Error(message || "Agent API request failed");
+          if (eventRecord.type === "response.failed") {
+            const message = eventRecord.error?.message || "";
+            if (!hasWrittenTextDelta) {
+              streamingFailed = true;
+              return;
             }
+            throw new Error(message || "Agent API request failed");
           }
         }
       }
@@ -259,20 +273,27 @@ export async function runPerplexityAgent(options: PerplexityAgentOptions) {
   }
 
   // --- FALLBACK TO NON-STREAMING ---
-  if (streamingFailed || streamEventCount === 0 || (!assistantText && !completedResponse)) {
+  // We fall back if:
+  // 1. streamingFailed was set (e.g. 400 error or reasoning failure)
+  // 2. We got NO events at all
+  // 3. We finished the stream but still have no text (happens if reasoning finishes but generation doesn't start)
+  if (streamingFailed || streamEventCount === 0 || (!assistantText.trim() && !completedResponse)) {
     const nonStreamingResponse = await client.responses.create(
       requestBodyBase as Responses.ResponseCreateParamsNonStreaming,
     );
     completedResponse = (nonStreamingResponse as unknown) as Record<string, unknown>;
-    if (!assistantText) {
+    if (!assistantText.trim()) {
       assistantText = nonStreamingResponse.output_text || "";
       if (assistantText) {
-        writer.write({ type: "data-call-result", data: { callId: "model-gen", result: "Finished reasoning." } } as UIMessageChunk);
+        if (!hasWrittenTextDelta) {
+          writer.write({ type: "data-call-result", data: { callId: "model-gen", result: "Finished reasoning." } } as UIMessageChunk);
+        }
         writer.write({ type: "text-delta", id: textId, delta: assistantText });
         hasWrittenTextDelta = true;
       }
     }
   }
+
 
   return { text: assistantText, completedResponse };
 }

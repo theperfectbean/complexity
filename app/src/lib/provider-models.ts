@@ -13,7 +13,7 @@ export async function fetchProviderModels(): Promise<ProviderModel[]> {
   // 0. Perplexity (Sonar models and supported third-party models via Agent API)
   if (keys["PERPLEXITY_API_KEY"]) {
     try {
-      const res = await fetch("https://api.perplexity.ai/models", {
+      const res = await fetch("https://api.perplexity.ai/v1/models", {
         headers: { Authorization: `Bearer ${keys["PERPLEXITY_API_KEY"]}` },
       });
       if (res.ok) {
@@ -28,18 +28,18 @@ export async function fetchProviderModels(): Promise<ProviderModel[]> {
       console.warn("Falling back to static Perplexity model list", e);
       // Fallback to known stable models if dynamic discovery fails
       [
-        { id: "sonar", name: "Sonar", provider: "Perplexity" },
-        { id: "sonar-pro", name: "Sonar Pro", provider: "Perplexity" },
-        { id: "sonar-reasoning", name: "Sonar Reasoning", provider: "Perplexity" },
-        { id: "sonar-reasoning-pro", name: "Sonar Reasoning Pro", provider: "Perplexity" },
-        { id: "sonar-deep-research", name: "Sonar Deep Research", provider: "Perplexity" },
-        { id: "claude-opus-4-6", name: "Claude Opus 4.6 (via Perplexity)", provider: "Perplexity" },
-        { id: "claude-sonnet-4-6", name: "Claude Sonnet 4.6 (via Perplexity)", provider: "Perplexity" },
-        { id: "claude-haiku-4-5", name: "Claude Haiku 4.5 (via Perplexity)", provider: "Perplexity" },
-        { id: "gpt-5.4", name: "GPT-5.4 (via Perplexity)", provider: "Perplexity" },
-        { id: "gpt-4o", name: "GPT-4o (via Perplexity)", provider: "Perplexity" },
-        { id: "gemini-3.1-pro-preview", name: "Gemini 3.1 Pro (via Perplexity)", provider: "Perplexity" },
-        { id: "gemini-3-flash-preview", name: "Gemini 3 Flash (via Perplexity)", provider: "Perplexity" },
+        { id: "perplexity/sonar", name: "Sonar", provider: "Perplexity" },
+        { id: "perplexity/sonar-pro", name: "Sonar Pro", provider: "Perplexity" },
+        { id: "perplexity/sonar-reasoning", name: "Sonar Reasoning", provider: "Perplexity" },
+        { id: "perplexity/sonar-reasoning-pro", name: "Sonar Reasoning Pro", provider: "Perplexity" },
+        { id: "perplexity/sonar-deep-research", name: "Sonar Deep Research", provider: "Perplexity" },
+        { id: "perplexity/anthropic/claude-opus-4-6", name: "Claude Opus 4.6 (via Perplexity)", provider: "Perplexity" },
+        { id: "perplexity/anthropic/claude-sonnet-4-6", name: "Claude Sonnet 4.6 (via Perplexity)", provider: "Perplexity" },
+        { id: "perplexity/anthropic/claude-haiku-4-5", name: "Claude Haiku 4.5 (via Perplexity)", provider: "Perplexity" },
+        { id: "perplexity/openai/gpt-5.4", name: "GPT-5.4 (via Perplexity)", provider: "Perplexity" },
+        { id: "perplexity/openai/gpt-4o", name: "GPT-4o (via Perplexity)", provider: "Perplexity" },
+        { id: "perplexity/google/gemini-3.1-pro-preview", name: "Gemini 3.1 Pro (via Perplexity)", provider: "Perplexity" },
+        { id: "perplexity/google/gemini-3-flash-preview", name: "Gemini 3 Flash (via Perplexity)", provider: "Perplexity" },
       ].forEach((m) => allModels.push(m));
     }
   }

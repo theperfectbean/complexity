@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { registerUser } from "./helpers/auth";
 
 test.describe("Voice Input", () => {
   test.beforeEach(async ({ page }) => {
@@ -52,13 +53,7 @@ test.describe("Voice Input", () => {
     });
 
     // 3. Register/Login
-    const email = `voice-test-${Math.random().toString(36).slice(2, 10)}@example.com`;
-    await page.goto("/register");
-    await page.getByPlaceholder("Name").fill("Voice Tester");
-    await page.getByPlaceholder("Email").fill(email);
-    await page.getByPlaceholder("Password (min 8 chars)").fill("password123");
-    await page.getByRole("button", { name: "Create account" }).click();
-    await expect(page.getByPlaceholder("Ask anything...")).toBeVisible({ timeout: 10000 });
+    await registerUser(page, { emailPrefix: "voice-test", name: "Voice Tester" });
   });
 
   test("should record audio and receive transcription", async ({ page }) => {

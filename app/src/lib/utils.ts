@@ -1,44 +1,10 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 import type { ChatMessageItem, ChatCitation, ChatThinkingPart } from "@/components/chat/MessageList";
+import { asRecord, collectTextStrings } from "./extraction-utils";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
-}
-
-function asRecord(value: unknown): Record<string, unknown> | null {
-  if (typeof value !== "object" || value === null) {
-    return null;
-  }
-  return value as Record<string, unknown>;
-}
-
-function collectTextStrings(value: unknown): string[] {
-  if (typeof value === "string") {
-    const trimmed = value.trim();
-    return trimmed ? [trimmed] : [];
-  }
-
-  if (Array.isArray(value)) {
-    return value.flatMap((item) => collectTextStrings(item));
-  }
-
-  const record = asRecord(value);
-  if (!record) {
-    return [];
-  }
-
-  const directText = ["text", "output_text", "input_text"]
-    .flatMap((key) => collectTextStrings(record[key]))
-    .filter(Boolean);
-
-  if (directText.length > 0) {
-    return directText;
-  }
-
-  return ["content", "parts", "data"]
-    .flatMap((key) => collectTextStrings(record[key]))
-    .filter(Boolean);
 }
 
 export function normalizeUIMessage(message: unknown): ChatMessageItem {

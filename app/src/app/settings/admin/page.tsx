@@ -216,7 +216,7 @@ export default function AdminSettingsPage() {
   const addModel = (discovered: DiscoveredModel) => {
     const providerPrefix = discovered.provider.toLowerCase().replace(" (local)", "");
     const id = `${providerPrefix}/${discovered.id}`;
-    
+
     if (activeModels.some(m => m.id === id)) {
       toast.error("Model already in active list");
       return;
@@ -435,7 +435,7 @@ export default function AdminSettingsPage() {
               <div className="grid gap-3 sm:grid-cols-2">
                 {discoveredModels.map((m) => {
                   const providerPrefix = m.provider.toLowerCase().replace(" (local)", "");
-                  const fullId = providerPrefix === "perplexity" ? m.id : `${providerPrefix}/${m.id}`;
+                  const fullId = `${providerPrefix}/${m.id}`;
                   const isAdded = activeModels.some(am => am.id === fullId);
                   
                   return (

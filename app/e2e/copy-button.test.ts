@@ -1,21 +1,12 @@
 import { test, expect } from "@playwright/test";
+import { registerUser } from "./helpers/auth";
 
 test("copy button in markdown code blocks", async ({ page, context }) => {
   // Grant clipboard permissions
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
-  
-  const email = `copy-test-${Math.random().toString(36).slice(2, 10)}@example.com`;
-  const password = "password123";
-  const name = "Copy Tester";
 
-  // 1. Setup session
-  await page.goto("/register");
-  await page.getByPlaceholder("Name").fill(name);
-  await page.getByPlaceholder("Email").fill(email);
-  await page.getByPlaceholder("Password (min 8 chars)").fill(password);
-  await page.getByRole("button", { name: "Create account" }).click({ force: true });
-
-  await expect(page.getByPlaceholder("Ask anything...")).toBeVisible({ timeout: 15000 });
+  // Setup session
+  await registerUser(page, { emailPrefix: "copy-test", name: "Copy Tester" });
 
   // 2. Request a code block
   const searchInput = page.getByPlaceholder("Ask anything...");

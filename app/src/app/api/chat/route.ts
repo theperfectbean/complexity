@@ -65,9 +65,10 @@ export async function POST(request: Request) {
 
     const chatService = new ChatService(chatSession);
     return await chatService.execute();
-  } catch (error: any) {
-    log.error({ err: error }, "Chat API Error");
-    const status = error.status || (error.message === "Thread not found" ? 404 : 400);
-    return NextResponse.json({ error: error.message || "Internal server error" }, { status });
+  } catch (error: unknown) {
+    const err = error as { status?: number; message?: string };
+    log.error({ err }, "Chat API Error");
+    const status = err.status || (err.message === "Thread not found" ? 404 : 400);
+    return NextResponse.json({ error: err.message || "Internal server error" }, { status });
   }
 }

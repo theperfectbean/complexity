@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { registerUser } from "./helpers/auth";
 
 const TEST_PROMPT = "Create a markdown table comparing 3 fruits based on color, taste, and size.";
 
@@ -6,17 +7,7 @@ test.describe("Markdown Table Rendering", () => {
   test.slow();
   
   test.beforeEach(async ({ page }) => {
-    const email = `table-e2e-${Math.random().toString(36).slice(2, 10)}@example.com`;
-    const password = "password123";
-    const name = "Table E2E";
-
-    await page.goto("/register");
-    await page.getByPlaceholder("Name").fill(name);
-    await page.getByPlaceholder("Email").fill(email);
-    await page.getByPlaceholder("Password (min 8 chars)").fill(password);
-    await page.getByRole("button", { name: "Create account" }).click({ force: true });
-
-    await expect(page.getByPlaceholder("Ask anything...")).toBeVisible({ timeout: 30000 });
+    await registerUser(page, { emailPrefix: "table-e2e", name: "Table E2E" });
   });
 
   test("table should render with proper cell padding", async ({ page }) => {

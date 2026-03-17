@@ -1,20 +1,9 @@
 import { test, expect } from "@playwright/test";
+import { registerUser } from "./helpers/auth";
 
 test("chart rendering via markdown interception", async ({ page }) => {
-  // Use a unique email for each test run to ensure a fresh session
-  const email = `chart-test-${Math.random().toString(36).slice(2, 10)}@example.com`;
-  const password = "password123";
-  const name = "Chart Tester";
-
-  // 1. Setup user session via registration
-  await page.goto("/register");
-  await page.getByPlaceholder("Name").fill(name);
-  await page.getByPlaceholder("Email").fill(email);
-  await page.getByPlaceholder("Password (min 8 chars)").fill(password);
-  await page.getByRole("button", { name: "Create account" }).click({ force: true });
-
-  // 2. Ensure we're on the home page with search bar
-  await expect(page.getByPlaceholder("Ask anything...")).toBeVisible({ timeout: 15000 });
+  // Setup user session via registration
+  await registerUser(page, { emailPrefix: "chart-test", name: "Chart Tester" });
 
   // 3. Select a more capable model (Claude Sonnet 4.6) to ensure system prompt adherence
   await page.getByRole("button", { name: "Select model" }).click();

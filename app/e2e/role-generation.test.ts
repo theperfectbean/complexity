@@ -1,24 +1,11 @@
 import { test, expect } from "@playwright/test";
-
-async function registerAndLogin(page: import("@playwright/test").Page) {
-  const email = `gen-role-e2e-${Math.random().toString(36).slice(2, 10)}@example.com`;
-  const password = "password123";
-  const name = "Gen Role E2E";
-
-  await page.goto("/register");
-  await page.getByPlaceholder("Name").fill(name);
-  await page.getByPlaceholder("Email").fill(email);
-  await page.getByPlaceholder("Password (min 8 chars)").fill(password);
-  await page.getByRole("button", { name: "Create account" }).click({ force: true });
-
-  await expect(page.getByPlaceholder("Ask anything...")).toBeVisible({ timeout: 30000 });
-}
+import { registerUser } from "./helpers/auth";
 
 test.describe("Role instruction generation", () => {
   test.slow();
 
   test("should generate instructions using AI", async ({ page }) => {
-    await registerAndLogin(page);
+    await registerUser(page, { emailPrefix: "gen-role-e2e", name: "Gen Role E2E" });
 
     await page.goto("/roles/new");
     await expect(page.getByRole("heading", { name: "Create a new role" })).toBeVisible();

@@ -8,10 +8,12 @@ import { eq } from "drizzle-orm";
 const mockOn = vi.fn();
 vi.mock("bullmq", () => {
   return {
-    Worker: vi.fn().mockImplementation((name, processor) => ({
-      on: mockOn,
-      processor, // Expose processor for manual trigger in tests
-    })),
+    Worker: vi.fn().mockImplementation(function(name: string, processor: any) {
+      return {
+        on: mockOn,
+        processor, // Expose processor for manual trigger in tests
+      };
+    }),
     Job: vi.fn(),
   };
 });

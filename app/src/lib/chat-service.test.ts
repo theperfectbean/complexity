@@ -152,6 +152,15 @@ describe("ChatService", () => {
       const response = await service.execute();
       
       expect(response).toBeDefined();
+      expect(response.body).toBeDefined();
+
+      // Consume the stream to trigger execution
+      const reader = response.body!.getReader();
+      while (true) {
+        const { done } = await reader.read();
+        if (done) break;
+      }
+
       expect(runGeneration).toHaveBeenCalled();
       expect(db.insert).toHaveBeenCalled(); // Should persist messages
     });

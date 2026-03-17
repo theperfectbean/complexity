@@ -1,99 +1,35 @@
 {
-  "generatedAt": "2026-03-13T02:07:48.417Z",
-  "totalModels": 10,
-  "successfulModels": 9,
-  "failedModels": 1,
+  "generatedAt": "2026-03-17T03:01:39.263Z",
+  "totalModels": 3,
+  "successfulModels": 3,
+  "failedModels": 0,
   "results": [
     {
       "modelId": "fast-search",
       "modelLabel": "Fast Search",
       "requestType": "preset",
       "ok": true,
-      "durationMs": 1110,
-      "responseChars": 43,
-      "preview": "The model has responded with this sentence."
+      "durationMs": 738,
+      "responseChars": 57,
+      "preview": "The model responded with this sentence on March 17, 2026."
     },
     {
       "modelId": "pro-search",
       "modelLabel": "Pro Search",
       "requestType": "preset",
       "ok": true,
-      "durationMs": 1162,
-      "responseChars": 108,
-      "preview": "This sentence is the model’s response, demonstrating that the model has processed and replied to your query."
+      "durationMs": 2054,
+      "responseChars": 110,
+      "preview": "This sentence is the model’s response, demonstrating that it successfully processed and answered your request."
     },
     {
       "modelId": "perplexity/sonar",
       "modelLabel": "Perplexity Sonar",
       "requestType": "model",
       "ok": true,
-      "durationMs": 804,
+      "durationMs": 580,
       "responseChars": 38,
-      "preview": "The model has responded to your query."
-    },
-    {
-      "modelId": "anthropic/claude-opus-4-6",
-      "modelLabel": "Claude Opus 4.6",
-      "requestType": "model",
-      "ok": true,
-      "durationMs": 2630,
-      "responseChars": 54,
-      "preview": "This response was generated on Friday, March 13, 2026."
-    },
-    {
-      "modelId": "anthropic/claude-sonnet-4-6",
-      "modelLabel": "Claude Sonnet 4.6",
-      "requestType": "model",
-      "ok": true,
-      "durationMs": 1493,
-      "responseChars": 59,
-      "preview": "The model responded successfully on Friday, March 13, 2026."
-    },
-    {
-      "modelId": "anthropic/claude-haiku-4-5",
-      "modelLabel": "Claude Haiku 4.5",
-      "requestType": "model",
-      "ok": true,
-      "durationMs": 1415,
-      "responseChars": 65,
-      "preview": "I'm an AI assistant ready to help you with information and tasks."
-    },
-    {
-      "modelId": "openai/gpt-5.2",
-      "modelLabel": "GPT-5.2",
-      "requestType": "model",
-      "ok": true,
-      "durationMs": 1573,
-      "responseChars": 76,
-      "preview": "This single sentence confirms the model responded on Friday, March 13, 2026."
-    },
-    {
-      "modelId": "google/gemini-3.1-pro-preview",
-      "modelLabel": "Gemini 3.1 Pro Preview",
-      "requestType": "model",
-      "ok": false,
-      "durationMs": 254,
-      "responseChars": 0,
-      "preview": "",
-      "error": "400 {\"error\":{\"message\":\"invalid request\",\"type\":\"invalid_request\",\"code\":400}}"
-    },
-    {
-      "modelId": "google/gemini-3-flash-preview",
-      "modelLabel": "Gemini 3 Flash Preview",
-      "requestType": "model",
-      "ok": true,
-      "durationMs": 3213,
-      "responseChars": 78,
-      "preview": "This sentence confirms that the model has successfully processed your request."
-    },
-    {
-      "modelId": "xai/grok-4-1-fast-non-reasoning",
-      "modelLabel": "Grok 4.1 Fast",
-      "requestType": "model",
-      "ok": true,
-      "durationMs": 1978,
-      "responseChars": 57,
-      "preview": "The model responded with this sentence on March 13, 2026."
+      "preview": "The model responded on March 17, 2026."
     }
   ]
 }

@@ -2,6 +2,7 @@ import { UIMessage } from "ai";
 import { runtimeConfig } from "@/lib/config";
 import { extractTextFromDataUrl } from "@/lib/documents";
 import { logger } from "./logger";
+import { asRecord, collectTextStrings, extractCitationsFromResponse, extractAssistantText, type Citation } from "./extraction-utils";
 
 export class AttachmentTooLargeError extends Error {
   constructor(message: string) {
@@ -18,12 +19,6 @@ export type FilePart = {
   contentType?: string;
 };
 
-export type Citation = {
-  url?: string;
-  title?: string;
-  snippet?: string;
-};
-
 export function getBase64Payload(dataUrl: string): string | null {
   const commaIndex = dataUrl.indexOf(",");
   if (commaIndex === -1) return null;
@@ -33,13 +28,6 @@ export function getBase64Payload(dataUrl: string): string | null {
 export function getDecodedByteLength(base64: string): number {
   const padding = base64.endsWith("==") ? 2 : base64.endsWith("=") ? 1 : 0;
   return Math.max(0, Math.floor((base64.length * 3) / 4) - padding);
-}
-
-export function asRecord(value: unknown): Record<string, unknown> | null {
-  if (typeof value !== "object" || value === null) {
-    return null;
-  }
-  return value as Record<string, unknown>;
 }
 
 export function collectFileParts(message: UIMessage): FilePart[] {
@@ -163,66 +151,4 @@ ${content}
   }
 
   return finalText;
-}
-
-export function extractCitationsFromResponse(response: unknown): Citation[] {
-  const citations = new Map<string, Citation>();
-  const responseRecord = asRecord(response);
-  const outputItems = Array.isArray(responseRecord?.output) ? responseRecord.output : [];
-
-  for (const item of outputItems) {
-    const contentItems = Array.isArray(item?.content) ? item.content : [];
-    for (const content of contentItems) {
-      const annotations = Array.isArray(content?.annotations) ? content.annotations : [];
-      for (const annotation of annotations) {
-        const annotationRecord = asRecord(annotation);
-        const url = typeof annotationRecord?.url === "string" ? annotationRecord.url : undefined;
-        if (!url) continue;
-
-        citations.set(url, {
-          url,
-          title: typeof annotationRecord?.title === "string" ? annotationRecord.title : undefined,
-          snippet: typeof annotationRecord?.text === "string" ? annotationRecord.text : undefined,
-        });
-      }
-    }
-  }
-
-  return Array.from(citations.values());
-}
-
-export function collectTextStrings(value: unknown): string[] {
-  if (typeof value === "string") {
-    const trimmed = value.trim();
-    return trimmed ? [trimmed] : [];
-  }
-
-  if (Array.isArray(value)) {
-    return value.flatMap((item) => collectTextStrings(item));
-  }
-
-  const record = asRecord(value);
-  if (!record) {
-    return [];
-  }
-
-  const directText = ["text", "output_text", "input_text"]
-    .flatMap((key) => collectTextStrings(record[key]))
-    .filter(Boolean);
-
-  if (directText.length > 0) {
-    return directText;
-  }
-
-  const nestedText = ["output", "content", "response", "message", "data"]
-    .flatMap((key) => collectTextStrings(record[key]))
-    .filter(Boolean);
-
-  return nestedText;
-}
-
-export function extractAssistantTextFromCompletedResponse(response: unknown): string {
-  const strings = collectTextStrings(response);
-  if (strings.length === 0) return "";
-  return strings.sort((a, b) => b.length - a.length)[0].trim();
 }

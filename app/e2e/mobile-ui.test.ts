@@ -1,4 +1,5 @@
 import { test, expect, devices } from "@playwright/test";
+import { registerUser } from "./helpers/auth";
 
 // Test using Pixel 5 profile (Chromium-based mobile)
 test.use({
@@ -7,14 +8,7 @@ test.use({
 
 test.describe("Mobile UI Layout", () => {
   test.beforeEach(async ({ page }) => {
-    // Register/Login
-    const email = `mobile-ui-${Math.random().toString(36).slice(2, 10)}@example.com`;
-    await page.goto("/register");
-    await page.getByPlaceholder("Name").fill("Mobile User");
-    await page.getByPlaceholder("Email").fill(email);
-    await page.getByPlaceholder("Password (min 8 chars)").fill("password123");
-    await page.getByRole("button", { name: "Create account" }).click();
-    await expect(page.getByPlaceholder("Ask anything...")).toBeVisible({ timeout: 10000 });
+    await registerUser(page, { emailPrefix: "mobile-ui", name: "Mobile User" });
   });
 
   test("search bar buttons should be visible and not overflow", async ({ page }) => {

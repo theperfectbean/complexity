@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { MODELS } from "../src/lib/models";
+import { registerUser } from "./helpers/auth";
 
 const TEST_PROMPT = "What is the capital of Japan? Answer in one word.";
 const EXPECTED_KEYWORD = "Tokyo";
@@ -8,17 +9,7 @@ test.describe("Model Prompt & Response Browser Validation", () => {
   test.slow(); // Mark as slow to triple the timeout
   
   test.beforeEach(async ({ page }) => {
-    const email = `model-e2e-${Math.random().toString(36).slice(2, 10)}@example.com`;
-    const password = "password123";
-    const name = "Model E2E";
-
-    await page.goto("/register");
-    await page.getByPlaceholder("Name").fill(name);
-    await page.getByPlaceholder("Email").fill(email);
-    await page.getByPlaceholder("Password (min 8 chars)").fill(password);
-    await page.getByRole("button", { name: "Create account" }).click({ force: true });
-
-    await expect(page.getByPlaceholder("Ask anything...")).toBeVisible({ timeout: 30000 });
+    await registerUser(page, { emailPrefix: "model-e2e", name: "Model E2E" });
   });
 
   for (const model of MODELS) {

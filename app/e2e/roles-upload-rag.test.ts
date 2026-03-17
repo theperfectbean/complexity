@@ -1,18 +1,5 @@
 import { test, expect } from "@playwright/test";
-
-async function registerAndLogin(page: import("@playwright/test").Page) {
-  const email = `role-upload-${Math.random().toString(36).slice(2, 10)}@example.com`;
-  const password = "password123";
-  const name = "Role Upload E2E";
-
-  await page.goto("/register");
-  await page.getByPlaceholder("Name").fill(name);
-  await page.getByPlaceholder("Email").fill(email);
-  await page.getByPlaceholder("Password (min 8 chars)").fill(password);
-  await page.getByRole("button", { name: "Create account" }).click({ force: true });
-
-  await expect(page.getByPlaceholder("Ask anything...")).toBeVisible({ timeout: 30000 });
-}
+import { registerUser } from "./helpers/auth";
 
 test.describe("Role document upload + chat", () => {
   test.slow();
@@ -20,7 +7,7 @@ test.describe("Role document upload + chat", () => {
   test("uploads a document and starts a role chat", async ({ page }) => {
     const roleName = `E2E Role ${Math.random().toString(36).slice(2, 8)}`;
 
-    await registerAndLogin(page);
+    await registerUser(page, { emailPrefix: "role-upload", name: "Role Upload E2E" });
 
     await page.goto("/roles");
     await page.getByRole("link", { name: "New role" }).click();
@@ -55,7 +42,7 @@ test.describe("Role document upload + chat", () => {
   test("deletes an uploaded document", async ({ page }) => {
     const roleName = `Delete Test Role ${Math.random().toString(36).slice(2, 8)}`;
     
-    await registerAndLogin(page);
+    await registerUser(page, { emailPrefix: "role-upload", name: "Role Upload E2E" });
 
     await page.goto("/roles");
     await page.getByRole("link", { name: "New role" }).click();
@@ -96,7 +83,7 @@ test.describe("Role document upload + chat", () => {
     test.setTimeout(600000);
     const roleName = `Large File Role ${Math.random().toString(36).slice(2, 8)}`;
 
-    await registerAndLogin(page);
+    await registerUser(page, { emailPrefix: "role-upload", name: "Role Upload E2E" });
 
     await page.goto("/roles");
     await page.getByRole("link", { name: "New role" }).click();

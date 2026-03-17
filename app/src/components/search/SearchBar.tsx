@@ -1,21 +1,16 @@
 "use client";
 
-import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { ChevronDown, Globe, Paperclip, SendHorizontal, X, FileText, Mic, MicOff } from "lucide-react";
+import { Globe, Paperclip, SendHorizontal } from "lucide-react";
 import { motion } from "motion/react";
-import { useMemo, useRef, useState, useEffect } from "react";
+import { useRef, useState, useEffect } from "react";
 import TextareaAutosize from "react-textarea-autosize";
-import { toast } from "sonner";
 
-import { MODELS, getDefaultModel } from "@/lib/models";
+import { getDefaultModel } from "@/lib/models";
 import { cn } from "@/lib/utils";
 
-type SearchModelOption = {
-  id: string;
-  label: string;
-  category: string;
-  isPreset: boolean;
-};
+import { VoiceInput } from "./parts/VoiceInput";
+import { ModelSelector, SearchModelOption } from "./parts/ModelSelector";
+import { FileAttachments, FileAttachmentsHandle } from "./parts/FileAttachments";
 
 type SearchBarProps = {
   value: string;
@@ -51,9 +46,9 @@ export function SearchBar({
   compact,
   model = getDefaultModel(),
   onModelChange,
-  modelOptions: providedModelOptions,
+  modelOptions,
   onAttachClick,
-  attachments = EMPTY_ATTACHMENTS,
+  attachments: externalAttachments = EMPTY_ATTACHMENTS,
   onRemoveAttachment,
   webSearchEnabled = true,
   onWebSearchChange,
@@ -62,192 +57,15 @@ export function SearchBar({
   id,
   roleId,
 }: SearchBarProps) {
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const onChangeRef = useRef(onChange);
-  
-  // Keep onChangeRef up to date
-  useEffect(() => {
-    onChangeRef.current = onChange;
-  }, [onChange]);
-
-  const [internalAttachments, setInternalAttachments] = useState<File[]>(attachments);
-  const [imagePreviews, setImagePreviews] = useState<Record<string, string>>({});
-  const [availableModels, setAvailableModels] = useState<readonly SearchModelOption[]>(providedModelOptions || MODELS);
-  const [hasUserSelectedModel, setHasUserSelectedModel] = useState(false);
-  const [isListening, setIsListening] = useState(false);
-  const [isSpeechSupported, setIsSpeechSupported] = useState(false);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const chunksRef = useRef<Blob[]>([]);
+  const fileAttachmentsRef = useRef<FileAttachmentsHandle>(null);
+  const [internalAttachments, setInternalAttachments] = useState<File[]>(externalAttachments);
 
   useEffect(() => {
-    const isSupported = typeof window !== "undefined" && 
-      (!!window.navigator.mediaDevices?.getUserMedia || !!(window as any).webkitGetUserMedia);
-    setIsSpeechSupported(isSupported);
-  }, []);
-
-  const toggleVoiceInput = async () => {
-    if (!window.isSecureContext) {
-      toast.error("Microphone access requires a Secure Context (HTTPS or localhost).");
-      return;
-    }
-
-    if (isListening) {
-      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
-        mediaRecorderRef.current.stop();
-        // The rest is handled in onstop
-      }
-      return;
-    }
-
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
-      mediaRecorderRef.current = mediaRecorder;
-      chunksRef.current = [];
-
-      mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) {
-          chunksRef.current.push(e.data);
-        }
-      };
-
-      mediaRecorder.onstart = () => {
-        setIsListening(true);
-        toast.info("Listening...", { duration: 2000 });
-      };
-
-      mediaRecorder.onstop = async () => {
-        setIsListening(false);
-        stream.getTracks().forEach(track => track.stop());
-
-        if (chunksRef.current.length === 0) return;
-
-        const audioBlob = new Blob(chunksRef.current, { type: "audio/webm" });
-        const formData = new FormData();
-        formData.append("file", audioBlob, "audio.webm");
-
-        const loadingToast = toast.loading("Transcribing...");
-
-        try {
-          const response = await fetch("/api/transcribe", {
-            method: "POST",
-            body: formData,
-          });
-
-          if (!response.ok) throw new Error("Transcription failed");
-
-          const data = await response.json();
-          if (data.text) {
-            onChangeRef.current(value ? `${value} ${data.text}` : data.text);
-            toast.success("Transcribed", { id: loadingToast });
-          } else {
-            toast.dismiss(loadingToast);
-          }
-        } catch (err) {
-          console.error("Transcription error:", err);
-          toast.error("Failed to transcribe audio.", { id: loadingToast });
-        }
-      };
-
-      mediaRecorder.start();
-    } catch (err: any) {
-      console.error("Failed to start recording:", err);
-      const errMsg = err.name === "NotAllowedError" 
-        ? "Permission denied. Check browser settings." 
-        : err.name === "SecurityError"
-        ? "Security error. Origin must be 'Secure' (HTTPS or localhost)."
-        : `Could not access microphone: ${err.message || err.name}`;
-      
-      toast.error(errMsg);
-      setIsListening(false);
-    }
-  };
-
-  useEffect(() => {
-    setInternalAttachments(attachments);
-  }, [attachments]);
-
-  useEffect(() => {
-    if (autoFilter && !providedModelOptions) {
-      fetch("/api/models")
-        .then(res => res.json())
-        .then(data => {
-          if (data.models && data.models.length > 0) {
-            setAvailableModels(data.models);
-            
-            // Logic: if user hasn't explicitly clicked a model yet, 
-            // OR if current model is invalid, switch to the TOP model in the list.
-            const currentModelIsValid = data.models.some((m: SearchModelOption) => m.id === model);
-            const isInitialDefault = model === getDefaultModel();
-
-            if (!currentModelIsValid || (!hasUserSelectedModel && isInitialDefault)) {
-              const topModel = data.models[0].id;
-              if (topModel && topModel !== model) {
-                onModelChange?.(topModel);
-              }
-            }
-          }
-        })
-        .catch(err => console.error("Failed to fetch available models:", err));
-    }
-  }, [autoFilter, providedModelOptions, model, onModelChange, hasUserSelectedModel]);
-
-  const modelOptions = availableModels;
-
-  const groupedModels = useMemo(() => {
-    return modelOptions.reduce<Record<string, SearchModelOption[]>>((accumulator, option) => {
-      if (!accumulator[option.category]) {
-        accumulator[option.category] = [];
-      }
-      accumulator[option.category].push(option);
-      return accumulator;
-    }, {});
-  }, [modelOptions]);
-
-  const activeModelLabel = modelOptions.find((item) => item.id === model)?.label ?? model;
+    setInternalAttachments(externalAttachments);
+  }, [externalAttachments]);
 
   const handleAttachClick = () => {
-    fileInputRef.current?.click();
-  };
-
-  const handleModelSelect = (id: string) => {
-    setHasUserSelectedModel(true);
-    onModelChange?.(id);
-  };
-
-  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files;
-    if (!files || files.length === 0) return;
-
-    const filesArray = Array.from(files);
-    
-    for (const file of filesArray) {
-      if (file.type.startsWith("image/")) {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          const base64 = e.target?.result as string;
-          setImagePreviews((prev) => ({ ...prev, [file.name]: base64 }));
-        };
-        reader.readAsDataURL(file);
-      } else {
-        if (roleId) {
-          try {
-            const body = new FormData();
-            body.append("file", file);
-            await fetch(`/api/roles/${roleId}/upload`, {
-              method: "POST",
-              body,
-            });
-          } catch (error) {
-            console.error(error);
-          }
-        }
-      }
-      setInternalAttachments((prev) => [...prev, file]);
-    }
-    
-    onAttachClick?.(files);
-    event.target.value = "";
+    fileAttachmentsRef.current?.clickInput();
   };
 
   return (
@@ -261,68 +79,14 @@ export function SearchBar({
         "focus-within:border-primary/30 focus-within:ring-4 focus-within:ring-primary/5 focus-within:shadow-lg",
       )}
     >
-      <input
-        type="file"
-        ref={fileInputRef}
-        data-testid="file-upload-input"
-        className="hidden"
-        multiple
-        onChange={handleFileChange}
-        accept=".pdf,.docx,.txt,.md,image/jpeg,image/png,image/webp"
+      <FileAttachments
+        ref={fileAttachmentsRef}
+        attachments={internalAttachments}
+        onAttachmentsChange={setInternalAttachments}
+        onAttachClick={onAttachClick}
+        onRemoveAttachment={onRemoveAttachment}
+        roleId={roleId}
       />
-      
-      {internalAttachments.length > 0 && (
-        <div className="flex flex-wrap gap-2 pb-1.5 px-2" data-testid="attachments-container">
-          {internalAttachments.map((file, index) => {
-            const isImage = file.type.startsWith("image/");
-            const preview = imagePreviews[file.name];
-            
-            return (
-              <motion.div 
-                key={`${file.name}-${index}`} 
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                data-testid="file-chip"
-                className={cn(
-                  "group relative flex items-center rounded-xl bg-muted/40 border border-border/40 transition-colors hover:bg-muted/60",
-                  isImage ? "h-12 w-12 justify-center overflow-hidden" : "gap-1.5 pl-2.5 pr-1.5 py-1.5 text-[11px] text-muted-foreground max-w-[160px]"
-                )}
-              >
-                {isImage ? (
-                  preview ? (
-                    <img src={preview} alt={file.name} className="h-full w-full object-cover" />
-                  ) : (
-                    <span className="text-[10px] text-muted-foreground">Img</span>
-                  )
-                ) : (
-                  <>
-                    <FileText className="h-3 w-3 shrink-0 text-primary/60" />
-                    <span className="truncate font-medium">{file.name}</span>
-                  </>
-                )}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setInternalAttachments(prev => prev.filter((_, i) => i !== index));
-                    setImagePreviews(prev => {
-                      const copy = { ...prev };
-                      delete copy[file.name];
-                      return copy;
-                    });
-                    onRemoveAttachment?.(index);
-                  }}
-                  className={cn(
-                    "inline-flex items-center justify-center rounded-full hover:bg-foreground/10 shrink-0 transition-colors",
-                    isImage ? "absolute -right-1 -top-1 h-5 w-5 bg-background/80 shadow-sm" : "ml-1 h-4 w-4"
-                  )}
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              </motion.div>
-            );
-          })}
-        </div>
-      )}
 
       <div className="flex items-end gap-2 px-2">
         <TextareaAutosize
@@ -344,43 +108,12 @@ export function SearchBar({
 
       <div className="mt-1 flex items-center justify-between gap-2 px-1 pb-1">
         <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide">
-          <DropdownMenu.Root>
-            <DropdownMenu.Trigger asChild>
-              <button
-                type="button"
-                className="inline-flex h-8 items-center gap-1 rounded-xl bg-transparent px-2 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
-                aria-label="Select model"
-              >
-                <span className="hidden sm:inline max-w-32 truncate">{activeModelLabel}</span>
-                <span className="sm:hidden">Model</span>
-                <ChevronDown className="h-3.5 w-3.5 opacity-50" />
-              </button>
-            </DropdownMenu.Trigger>
-            <DropdownMenu.Portal>
-              <DropdownMenu.Content
-                sideOffset={8}
-                className="z-50 max-h-80 min-w-64 overflow-y-auto rounded-2xl border bg-popover/95 p-1.5 shadow-xl backdrop-blur-sm animate-in fade-in zoom-in-95"
-              >
-                {Object.entries(groupedModels).map(([category, options]) => (
-                  <div key={category} className="py-1">
-                    <p className="px-3 pb-1.5 pt-1 text-[11px] font-bold uppercase tracking-wider text-muted-foreground/50">{category}</p>
-                    {options.map((option) => (
-                      <DropdownMenu.Item
-                        key={option.id}
-                        onSelect={() => handleModelSelect(option.id)}
-                        className={cn(
-                          "flex cursor-pointer items-center rounded-lg px-3 py-2 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground",
-                          model === option.id && "bg-primary/5 text-primary font-medium"
-                        )}
-                      >
-                        {option.label}
-                      </DropdownMenu.Item>
-                    ))}
-                  </div>
-                ))}
-              </DropdownMenu.Content>
-            </DropdownMenu.Portal>
-          </DropdownMenu.Root>
+          <ModelSelector
+            model={model}
+            onModelChange={onModelChange}
+            modelOptions={modelOptions}
+            autoFilter={autoFilter}
+          />
 
           <div className="h-4 w-px bg-border/40 mx-0.5" />
 
@@ -411,21 +144,11 @@ export function SearchBar({
         </div>
 
         <div className="flex items-center gap-1.5">
-          {isSpeechSupported && (
-            <button
-              type="button"
-              onClick={toggleVoiceInput}
-              className={cn(
-                "inline-flex h-8 w-8 items-center justify-center rounded-xl transition-all active:scale-95",
-                isListening 
-                  ? "bg-red-500 text-white animate-pulse shadow-[0_0_12px_rgba(239,68,68,0.5)]" 
-                  : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
-              )}
-              aria-label={isListening ? "Stop listening" : "Start listening"}
-            >
-              {isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
-            </button>
-          )}
+          <VoiceInput
+            value={value}
+            onChange={onChange}
+            disabled={disabled}
+          />
 
           <button
             type="submit"

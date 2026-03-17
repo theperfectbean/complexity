@@ -304,14 +304,24 @@ DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose build app
 - **Verification**: Verified implementation with a new `encryption.test.ts` suite and confirmed all 107 application unit tests pass.
 
 ### Phase 2 Implementation: Refactoring & Type Safety (2026-03-17)
-- **Chat Route Decomposition**:
-  - Extracted core chat orchestration from `app/src/app/api/chat/route.ts` into a dedicated `ChatService` class in `app/src/lib/chat-service.ts`.
-  - The `POST` route is now a thin wrapper responsible for authentication, rate limiting, and session initialization.
-  - `ChatService` now manages thread validation, context assembly (RAG + Memory + External Data), LLM execution, and result persistence.
-- **Type Safety Hardening**:
-  - Eliminated extensive `as any` casts across `llm.ts`, `perplexity-agent.ts`, and `chat-service.ts`.
-  - Introduced formal TypeScript interfaces for `Citation`, `AgentEvent`, `ChatSession`, and `GenerationResult`.
-  - Refined Perplexity Agent event parsing to use discriminated unions and safe record casting.
-- **RAG Logic Hardening**:
-  - Implemented comprehensive unit tests for `app/src/lib/rag.ts` covering text chunking edge cases, overlap logic, and normalization.
+... (existing content) ...
 - **Verification**: Confirmed system stability with 109 passing unit tests, including regression tests for the refactored chat route and new RAG tests.
+
+### Phase 3 Implementation: Bloat Reduction & Modularization (2026-03-17)
+- **Bloat Reduction Plan**: Executed a comprehensive refactoring of the project's most complex modules to reduce technical debt and improve maintainability.
+- **Extraction Utilities**: Consolidated duplicated text and object extraction logic from across the codebase into a new, testable `app/src/lib/extraction-utils.ts`.
+- **UI Modularization**: Decomposed the monolithic `SearchBar.tsx` (445 lines) into focused components (`VoiceInput.tsx`, `FileAttachments.tsx`, `ModelSelector.tsx`) located in `app/src/components/search/parts/`. Reduced `SearchBar.tsx` to 168 lines.
+- **Service Decomposition**: 
+  - Refactored `ChatService` by extracting logic into `ChatSessionValidator`, `ContextAssembler`, and `ChatHistoryManager` within `app/src/lib/chat/`. Reduced `chat-service.ts` from 364 to 161 lines.
+  - Refactored the `memory` module by separating `MemoryStore` and `MemoryExtractor` into a dedicated `app/src/lib/memory/` directory. Reduced `memory.ts` from 323 lines to just 8 lines of exports.
+- **LLM Routing Simplification**:
+  - Implemented a map-driven provider routing factory in `llm.ts`, replacing complex if-else chains.
+  - Resolved a critical bug where Perplexity-hosted third-party models (e.g., `claude-sonnet-4-6`) were failing to return search results due to incorrect model ID prefixing and tool-call handling.
+  - Added robust model ID mapping (`mapToPerplexityModel`) to ensure the Perplexity Agent API receives IDs it understands.
+- **Streaming Reliability**: Fixed a bug in `runPerplexityAgent` where the final event in a stream was occasionally lost if the buffer didn't end with a newline character.
+- **Auth Hardening**: Created `app/src/lib/auth-server.ts` to centralize repetitive authentication and admin-check logic, simplifying API route implementations.
+- **Test Suite Modernization**:
+  - Streamlined `api/chat/route.test.ts` by extracting repetitive mock setups into shared helpers.
+  - Updated the test suite to support background document processing (BullMQ) and unified API response structures.
+- **Verification**: Confirmed system stability with 123 passing unit tests and resolved several long-standing linting issues related to `any` type usage.
+

@@ -1,20 +1,17 @@
 import { test, expect } from "@playwright/test";
 import { execSync } from "child_process";
+import { registerUser } from "./helpers/auth";
 
 test.describe("Full Password Reset Flow", () => {
   test("should complete the full password reset flow", async ({ page }) => {
-    const email = `test-reset-${Date.now()}@example.com`;
     const oldPassword = "old-password-123";
     const newPassword = "new-password-456";
+    const { email } = await registerUser(page, {
+      emailPrefix: "test-reset",
+      name: "Reset Test User",
+      password: oldPassword,
+    });
 
-    // 1. Register a new user
-    await page.goto("/register");
-    await page.fill('input[placeholder="Name"]', "Reset Test User");
-    await page.fill('input[type="email"]', email);
-    await page.fill('input[type="password"]', oldPassword);
-    await page.click('button[type="submit"]');
-    // Wait for navigation to complete
-    await expect(page).toHaveURL("/", { timeout: 10000 });
     // Ensure account menu is visible (confirming session)
     await expect(page.getByRole("button", { name: "Account menu" })).toBeVisible();
 

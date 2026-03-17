@@ -6,13 +6,19 @@ import { eq } from "drizzle-orm";
 
 // Mock BullMQ
 vi.mock("bullmq", () => {
-  const Queue = vi.fn().mockImplementation(() => ({
-    add: vi.fn().mockResolvedValue({ id: "job-1" }),
-  }));
-  const Worker = vi.fn().mockImplementation(() => ({
-    on: vi.fn(),
-  }));
-  return { Queue, Worker, Job: vi.fn() };
+  return {
+    Queue: vi.fn().mockImplementation(function() {
+      return {
+        add: vi.fn().mockResolvedValue({ id: "job-1" }),
+      };
+    }),
+    Worker: vi.fn().mockImplementation(function() {
+      return {
+        on: vi.fn(),
+      };
+    }),
+    Job: vi.fn(),
+  };
 });
 
 // Mock logger

@@ -21,9 +21,21 @@ Object.defineProperty(window, "matchMedia", {
 });
 
 // Mock global fetch
-global.fetch = vi.fn().mockImplementation(() => 
-  Promise.resolve({
-    json: () => Promise.resolve({ models: [] }),
-    ok: true,
-  })
-);
+const runLive = process.env.RUN_AGENT_SMOKE === "1" || process.env.RUN_LIVE_CHAT_ROUTE === "1";
+
+if (!runLive) {
+  global.fetch = vi.fn().mockImplementation(() => 
+    Promise.resolve({
+      json: () => Promise.resolve({ models: [] }),
+      headers: {
+        get: () => null,
+      },
+      body: {
+        getReader: () => ({
+          read: () => Promise.resolve({ done: true, value: undefined }),
+        }),
+      },
+      ok: true,
+    })
+  ) as any;
+}
