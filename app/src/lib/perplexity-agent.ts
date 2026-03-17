@@ -8,7 +8,7 @@ import { env } from "./env";
 
 export interface PerplexityAgentOptions {
   modelId: string;
-  agentInput: any[];
+  agentInput: Responses.InputItem[];
   instructions: string;
   webSearch: boolean;
   apiKey?: string;
@@ -19,9 +19,26 @@ export interface PerplexityAgentOptions {
   requestId: string;
 }
 
+interface AgentEvent {
+  type: string;
+  thought?: string;
+  queries?: string[];
+  urls?: string[];
+  item?: Record<string, unknown>;
+  delta?: string;
+  text?: string;
+  output_text?: {
+    delta?: string;
+    text?: string;
+  };
+  response?: Record<string, unknown>;
+  error?: {
+    message?: string;
+  };
+}
+
 export async function runPerplexityAgent(options: PerplexityAgentOptions) {
   const { modelId: rawModelId, agentInput, instructions, webSearch, apiKey, writer, textId, requestId } = options;
-  const startTime = Date.now();
   
   // Map internal preset IDs to Perplexity preset names
   let modelId = rawModelId;
@@ -29,7 +46,7 @@ export async function runPerplexityAgent(options: PerplexityAgentOptions) {
   if (modelId === "pro-search") modelId = "sonar-pro";
 
   let assistantText = "";
-  let completedResponse: any;
+  let completedResponse: Record<string, unknown> | null = null;
   let hasWrittenTextDelta = false;
   const PERPLEXITY_STREAM_TIMEOUT_MS = runtimeConfig.perplexity.streamTimeoutMs;
 
@@ -98,11 +115,11 @@ export async function runPerplexityAgent(options: PerplexityAgentOptions) {
             const dataStr = line.slice(6).trim();
             if (dataStr === '[DONE]' || !dataStr) continue;
             
-            const eventRecord = safeParseJsonLine(dataStr);
+            const eventRecord = safeParseJsonLine(dataStr) as AgentEvent | null;
             if (!eventRecord) continue;
             streamEventCount += 1;
       
-            if (eventRecord?.type === "response.reasoning.started") {
+            if (eventRecord.type === "response.reasoning.started") {
               writer.write({
                 type: "data-call-start",
                 data: { callId: "reasoning", toolName: "Searching", input: eventRecord.thought ? { thought: eventRecord.thought } : {} },
@@ -110,8 +127,8 @@ export async function runPerplexityAgent(options: PerplexityAgentOptions) {
               continue;
             }
 
-            if (eventRecord?.type === "response.reasoning.search_queries") {
-              const queries = (eventRecord as Record<string, unknown>).queries as string[];
+            if (eventRecord.type === "response.reasoning.search_queries") {
+              const queries = eventRecord.queries || [];
               writer.write({
                 type: "data-call-start",
                 data: { callId: "reasoning", toolName: "Searching", input: { query: queries.join(", ") } },
@@ -119,7 +136,7 @@ export async function runPerplexityAgent(options: PerplexityAgentOptions) {
               continue;
             }
 
-            if (eventRecord?.type === "response.reasoning.search_results") {
+            if (eventRecord.type === "response.reasoning.search_results") {
               writer.write({
                 type: "data-call-result",
                 data: { callId: "reasoning", result: "Retrieved search results." },
@@ -127,8 +144,8 @@ export async function runPerplexityAgent(options: PerplexityAgentOptions) {
               continue;
             }
 
-            if (eventRecord?.type === "response.reasoning.fetch_url_queries") {
-              const urls = (eventRecord as Record<string, unknown>).urls as string[];
+            if (eventRecord.type === "response.reasoning.fetch_url_queries") {
+              const urls = eventRecord.urls || [];
               writer.write({
                 type: "data-call-start",
                 data: { callId: "fetching", toolName: "Reading", input: { urls } },
@@ -136,7 +153,7 @@ export async function runPerplexityAgent(options: PerplexityAgentOptions) {
               continue;
             }
 
-            if (eventRecord?.type === "response.reasoning.fetch_url_results") {
+            if (eventRecord.type === "response.reasoning.fetch_url_results") {
               writer.write({
                 type: "data-call-result",
                 data: { callId: "fetching", result: "Finished reading URLs." },
@@ -144,7 +161,7 @@ export async function runPerplexityAgent(options: PerplexityAgentOptions) {
               continue;
             }
 
-            if (eventRecord?.type === "response.reasoning.stopped") {
+            if (eventRecord.type === "response.reasoning.stopped") {
               writer.write({
                 type: "data-call-result",
                 data: { callId: "reasoning", result: "Reasoning complete." },
@@ -152,18 +169,18 @@ export async function runPerplexityAgent(options: PerplexityAgentOptions) {
               continue;
             }
 
-            if (eventRecord?.type === "response.output_item.added") {
+            if (eventRecord.type === "response.output_item.added") {
               const item = asRecord(eventRecord.item);
               if (item?.type === "function_call") {
                 writer.write({
                   type: "data-call-start",
-                  data: { callId: (item.id as string) || `tool-${Date.now()}`, toolName: (item.name as string) || "Tool", input: item.arguments },
+                  data: { callId: (item.id as string) || `tool-${Date.now()}`, toolName: (item.name as string) || "Tool", input: item.arguments as Record<string, unknown> },
                 } as UIMessageChunk);
               }
               continue;
             }
 
-            if (eventRecord?.type === "response.output_item.done") {
+            if (eventRecord.type === "response.output_item.done") {
               const item = asRecord(eventRecord.item);
               if (item?.type === "function_call") {
                 writer.write({
@@ -174,12 +191,12 @@ export async function runPerplexityAgent(options: PerplexityAgentOptions) {
               continue;
             }
 
-            if (eventRecord?.type === "response.output_text.delta") {
+            if (eventRecord.type === "response.output_text.delta") {
               if (!hasWrittenTextDelta) {
                 writer.write({ type: "data-call-result", data: { callId: "model-gen", result: "Finished reasoning." } } as UIMessageChunk);
               }
               const outputText = asRecord(eventRecord.output_text);
-              const delta = (typeof eventRecord.delta === "string" && eventRecord.delta) || (typeof outputText?.delta === "string" && outputText.delta) || "";
+              const delta = eventRecord.delta || outputText?.delta || "";
               if (delta) {
                 assistantText += delta;
                 writer.write({ type: "text-delta", id: textId, delta });
@@ -188,9 +205,9 @@ export async function runPerplexityAgent(options: PerplexityAgentOptions) {
               continue;
             }
 
-            if (eventRecord?.type === "response.output_text.done") {
+            if (eventRecord.type === "response.output_text.done") {
               const outputText = asRecord(eventRecord.output_text);
-              const fullText = (typeof eventRecord.text === "string" ? eventRecord.text : null) || (typeof outputText?.text === "string" ? outputText.text : null);
+              const fullText = eventRecord.text || outputText?.text || null;
               if (fullText !== null) {
                 assistantText = fullText;
                 if (!hasWrittenTextDelta) {
@@ -201,8 +218,8 @@ export async function runPerplexityAgent(options: PerplexityAgentOptions) {
               continue;
             }
 
-            if (eventRecord?.type === "response.completed") {
-              completedResponse = eventRecord.response;
+            if (eventRecord.type === "response.completed") {
+              completedResponse = (eventRecord.response as Record<string, unknown>) || null;
               if (!assistantText) {
                 const responseRecord = asRecord(completedResponse);
                 const output = Array.isArray(responseRecord?.output) ? responseRecord.output : [];
@@ -222,9 +239,9 @@ export async function runPerplexityAgent(options: PerplexityAgentOptions) {
               continue;
             }
 
-            if (eventRecord?.type === "response.failed") {
+            if (eventRecord.type === "response.failed") {
               const errorRecord = asRecord(eventRecord.error);
-              const message = typeof errorRecord?.message === "string" ? errorRecord.message : "";
+              const message = errorRecord?.message || "";
               if (!hasWrittenTextDelta) {
                 streamingFailed = true;
                 break;
@@ -249,9 +266,9 @@ export async function runPerplexityAgent(options: PerplexityAgentOptions) {
     const nonStreamingResponse = await client.responses.create(
       requestBodyBase as Responses.ResponseCreateParamsNonStreaming,
     );
-    completedResponse = nonStreamingResponse;
+    completedResponse = (nonStreamingResponse as unknown) as Record<string, unknown>;
     if (!assistantText) {
-      assistantText = (nonStreamingResponse as any).output_text || "";
+      assistantText = (nonStreamingResponse as Record<string, any>).output_text || "";
       if (assistantText) {
         writer.write({ type: "data-call-result", data: { callId: "model-gen", result: "Finished reasoning." } } as UIMessageChunk);
         writer.write({ type: "text-delta", id: textId, delta: assistantText });

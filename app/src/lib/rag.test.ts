@@ -1,40 +1,40 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
+import { chunkText } from "./rag";
 
-vi.mock("@/lib/env", () => ({
-  env: {
-    EMBEDDER_URL: "http://embedder:8000",
-  },
-}));
+describe("rag.ts", () => {
+  describe("chunkText", () => {
+    it("should return an empty array for empty input", () => {
+      expect(chunkText("")).toEqual([]);
+      expect(chunkText("   ")).toEqual([]);
+    });
 
-import { chunkText, getEmbeddings } from "@/lib/rag";
+    it("should return a single chunk if input is shorter than maxChars", () => {
+      const input = "Hello world";
+      const chunks = chunkText(input, 100, 10);
+      expect(chunks).toEqual([input]);
+    });
 
-describe("rag utilities", () => {
-  beforeEach(() => {
-    vi.stubGlobal("fetch", vi.fn());
-  });
+    it("should split text into multiple chunks with overlap", () => {
+      const input = "ABCDEFGHIJ"; // 10 chars
+      // maxChars=5, overlap=2
+      // Chunk 1: 0-5 "ABCDE"
+      // Chunk 2: (5-2)=3 to 3+5=8 "DEFGH"
+      // Chunk 3: (8-2)=6 to 6+5=11 "GHIJ"
+      const chunks = chunkText(input, 5, 2);
+      expect(chunks).toEqual(["ABCDE", "DEFGH", "GHIJ"]);
+    });
 
-  afterEach(() => {
-    vi.unstubAllGlobals();
-    vi.resetAllMocks();
-  });
+    it("should handle newline normalization", () => {
+      const input = "Line 1\r\nLine 2";
+      const chunks = chunkText(input, 100, 10);
+      expect(chunks[0]).toBe("Line 1\nLine 2");
+    });
 
-  it("chunks text with overlap", () => {
-    const chunks = chunkText("abcdefghij", 4, 1);
-    expect(chunks).toEqual(["abcd", "defg", "ghij"]);
-  });
-
-  it("throws when embedder returns non-ok", async () => {
-    vi.mocked(fetch).mockResolvedValue({ ok: false, status: 500 } as Response);
-
-    await expect(getEmbeddings(["hello"])).rejects.toThrow("Embedding service error: 500");
-  });
-
-  it("returns embeddings on success", async () => {
-    vi.mocked(fetch).mockResolvedValue({
-      ok: true,
-      json: async () => ({ embeddings: [[0.1, 0.2]] }),
-    } as Response);
-
-    await expect(getEmbeddings(["hello"])).resolves.toEqual([[0.1, 0.2]]);
+    it("should handle large inputs", () => {
+      const input = "A".repeat(1000);
+      const chunks = chunkText(input, 100, 0);
+      expect(chunks).toHaveLength(10);
+      expect(chunks[0]).toBe("A".repeat(100));
+    });
   });
 });

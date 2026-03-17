@@ -5,11 +5,16 @@ import { createXai } from "@ai-sdk/xai";
 import { createOllama } from "ai-sdk-ollama";
 import { LanguageModel, streamText, convertToModelMessages, UIMessageChunk, UIMessage } from "ai";
 import type { Responses } from "@perplexity-ai/perplexity_ai/resources/responses";
-import { createPerplexityModel } from "./perplexity";
 import { runPerplexityAgent } from "./perplexity-agent";
 import { runtimeConfig } from "./config";
 
 export type ProviderType = "perplexity" | "anthropic" | "openai" | "google" | "xai" | "ollama" | "local-openai";
+
+export interface Citation {
+  url: string;
+  title?: string;
+  snippet?: string;
+}
 
 export interface GenerationOptions {
   modelId: string;
@@ -27,7 +32,7 @@ export interface GenerationOptions {
 
 export interface GenerationResult {
   text: string;
-  citations: Record<string, unknown>[];
+  citations: Citation[];
 }
 
 export function getProviderAndModel(modelId: string): { provider: ProviderType; model: string } {
@@ -54,18 +59,24 @@ export function getProviderAndModel(modelId: string): { provider: ProviderType; 
   return { provider: "perplexity", model };
 }
 
-function extractCitationsFromResponse(response: Record<string, unknown> | null): { url: string; title?: string }[] {
-  const citations: { url: string; title?: string }[] = [];
+function extractCitationsFromResponse(response: Record<string, unknown> | null): Citation[] {
+  const citations: Citation[] = [];
   if (!response) return citations;
 
-  // Handle Perplexity Agent API citations
   const responseCitations = response.citations;
   if (responseCitations && Array.isArray(responseCitations)) {
-    responseCitations.forEach((c: string | Record<string, unknown>) => {
+    responseCitations.forEach((c: unknown) => {
       if (typeof c === "string") {
         citations.push({ url: c });
-      } else if (c && typeof c === "object" && c.url) {
-        citations.push({ url: c.url as string, title: c.title as string });
+      } else if (c && typeof c === "object") {
+        const citationRecord = c as Record<string, unknown>;
+        if (typeof citationRecord.url === "string") {
+          citations.push({
+            url: citationRecord.url,
+            title: typeof citationRecord.title === "string" ? citationRecord.title : undefined,
+            snippet: typeof citationRecord.snippet === "string" ? citationRecord.snippet : undefined,
+          });
+        }
       }
     });
   }

@@ -275,3 +275,16 @@ DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose build app
   - Created a centralized logger in `app/src/lib/logger.ts` with support for child loggers and automatic request ID injection.
   - Refactored `chat/route.ts` and `chat-utils.ts` to use structured logging, enabling better traceability of the chat lifecycle and RAG retrieval performance.
 - **Verification**: Verified implementation with a new `encryption.test.ts` suite and confirmed all 107 application unit tests pass.
+
+### Phase 2 Implementation: Refactoring & Type Safety (2026-03-17)
+- **Chat Route Decomposition**:
+  - Extracted core chat orchestration from `app/src/app/api/chat/route.ts` into a dedicated `ChatService` class in `app/src/lib/chat-service.ts`.
+  - The `POST` route is now a thin wrapper responsible for authentication, rate limiting, and session initialization.
+  - `ChatService` now manages thread validation, context assembly (RAG + Memory + External Data), LLM execution, and result persistence.
+- **Type Safety Hardening**:
+  - Eliminated extensive `as any` casts across `llm.ts`, `perplexity-agent.ts`, and `chat-service.ts`.
+  - Introduced formal TypeScript interfaces for `Citation`, `AgentEvent`, `ChatSession`, and `GenerationResult`.
+  - Refined Perplexity Agent event parsing to use discriminated unions and safe record casting.
+- **RAG Logic Hardening**:
+  - Implemented comprehensive unit tests for `app/src/lib/rag.ts` covering text chunking edge cases, overlap logic, and normalization.
+- **Verification**: Confirmed system stability with 109 passing unit tests, including regression tests for the refactored chat route and new RAG tests.

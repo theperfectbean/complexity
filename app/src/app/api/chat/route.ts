@@ -1,34 +1,12 @@
-import { createUIMessageStream, createUIMessageStreamResponse, UIMessage, UIMessageChunk } from "ai";
-import { and, eq, desc } from "drizzle-orm";
 import { NextResponse } from "next/server";
-import { z } from "zod";
-import type { Responses } from "@perplexity-ai/perplexity_ai/resources/responses";
-import crypto from "node:crypto";
-import fs from "node:fs/promises";
-
 import { auth } from "@/auth";
-import { env } from "@/lib/env";
-import { db } from "@/lib/db";
 import { createId } from "@/lib/db/cuid";
-import { getDefaultModel, isPresetModel, isValidModelId } from "@/lib/models";
-import { messages, roles, threads, users } from "@/lib/db/schema";
-import { getMemoryPrompt, saveExtractedMemories } from "@/lib/memory";
-import { runGeneration } from "@/lib/llm";
-import { getApiKeys } from "@/lib/settings";
-import { extractTextFromDataUrl } from "@/lib/documents";
-import { getEmbeddings, similaritySearch } from "@/lib/rag";
 import { getRedisClient } from "@/lib/redis";
 import { runtimeConfig } from "@/lib/config";
 import { getLogger } from "@/lib/logger";
-import {
-  AttachmentTooLargeError,
-  Citation,
-  extractAssistantTextFromCompletedResponse,
-  extractCitationsFromResponse,
-  extractTextFromMessage,
-  collectFileParts,
-  asRecord,
-} from "@/lib/chat-utils";
+import { ChatService, ChatSession } from "@/lib/chat-service";
+import { z } from "zod";
+import { UIMessage } from "ai";
 
 const schema = z.object({
   threadId: z.string().min(1),
@@ -42,6 +20,7 @@ const schema = z.object({
 export async function POST(request: Request) {
   const requestId = createId();
   const log = getLogger(requestId);
+  
   const session = await auth();
   const userEmail = session?.user?.email;
   if (!userEmail) {
@@ -65,432 +44,30 @@ export async function POST(request: Request) {
     }
   }
 
-  const parsed = schema.safeParse(await request.json());
-  if (!parsed.success) {
-    return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
-  }
-
-  const inputMessages = parsed.data.messages as UIMessage[];
-  if (inputMessages.length === 0) {
-    return NextResponse.json({ error: "Messages required" }, { status: 400 });
-  }
-
-  const threadPromise = db
-    .select({
-      id: threads.id,
-      userId: threads.userId,
-      roleId: threads.roleId,
-      memoryEnabled: users.memoryEnabled,
-    })
-    .from(threads)
-    .innerJoin(users, eq(threads.userId, users.id))
-    .where(and(eq(threads.id, parsed.data.threadId), eq(users.email, userEmail)))
-    .limit(1);
-
-  const [[thread]] = await Promise.all([threadPromise]);
-
-  if (!thread) {
-    return NextResponse.json({ error: "Thread not found" }, { status: 404 });
-  }
-
-  // Use the thread's roleId as the primary source of truth for RAG activation
-  const activeRoleId = thread.roleId;
-
-  // Ensure client-requested role matches the thread's role (to prevent cross-role RAG leakage)
-  if (parsed.data.roleId && parsed.data.roleId !== activeRoleId) {
-    return NextResponse.json({ error: "Role mismatch for this thread" }, { status: 400 });
-  }
-
-  const rolePromise = activeRoleId
-    ? db
-        .select({ id: roles.id, instructions: roles.instructions })
-        .from(roles)
-        .innerJoin(users, eq(roles.userId, users.id))
-        .where(and(eq(roles.id, activeRoleId), eq(users.email, userEmail)))
-        .limit(1)
-    : Promise.resolve([]);
-
-  const [ownedRole] = await rolePromise;
-
-  let roleInstructions: string | null = null;
-  if (activeRoleId) {
-    if (!ownedRole) {
-      // Role associated with thread no longer exists or access lost
-      return NextResponse.json({ error: "Role not found" }, { status: 404 });
-    }
-    roleInstructions = ownedRole.instructions;
-  }
-
-  const isRegenerate = parsed.data.trigger === "regenerate-message";
-
-  if (isRegenerate) {
-    // Delete the last assistant message to allow it to be replaced
-    const [lastAssistantMessage] = await db
-      .select({ id: messages.id })
-      .from(messages)
-      .where(and(eq(messages.threadId, parsed.data.threadId), eq(messages.role, "assistant")))
-      .orderBy(desc(messages.createdAt))
-      .limit(1);
-
-    if (lastAssistantMessage) {
-      await db.delete(messages).where(eq(messages.id, lastAssistantMessage.id));
-    }
-  }
-
-  const lastMessage = inputMessages[inputMessages.length - 1];
-  let userText = "";
   try {
-    userText = await extractTextFromMessage(lastMessage);
-  } catch (error) {
-    if (error instanceof AttachmentTooLargeError) {
-      return NextResponse.json({ error: error.message }, { status: 400 });
+    const body = await request.json();
+    const parsed = schema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
     }
-    throw error;
+
+    const chatSession: ChatSession = {
+      requestId,
+      userEmail,
+      threadId: parsed.data.threadId,
+      model: parsed.data.model,
+      messages: parsed.data.messages as UIMessage[],
+      roleId: parsed.data.roleId,
+      webSearch: parsed.data.webSearch,
+      trigger: parsed.data.trigger,
+      redis,
+    };
+
+    const chatService = new ChatService(chatSession);
+    return await chatService.execute();
+  } catch (error: any) {
+    log.error({ err: error }, "Chat API Error");
+    const status = error.status || (error.message === "Thread not found" ? 404 : 400);
+    return NextResponse.json({ error: error.message || "Internal server error" }, { status });
   }
-  if (!userText) {
-    return NextResponse.json({ error: "Message text required" }, { status: 400 });
-  }
-
-  // Start persisting user message in background (skip if regenerating)
-  const persistUserMessage = !isRegenerate 
-    ? db.insert(messages).values({
-        id: createId(),
-        threadId: parsed.data.threadId,
-        role: "user",
-        content: userText,
-      })
-    : Promise.resolve();
-
-  const safeModel = isValidModelId(parsed.data.model) ? parsed.data.model : getDefaultModel();
-  const roleHash = roleInstructions ? crypto.createHash("sha256").update(roleInstructions).digest("hex").slice(0, 12) : "none";
-  const webSearchLabel = parsed.data.webSearch ? "web-on" : "web-off";
-  const cacheKey = `cache:chat:${userEmail}:${safeModel}:${parsed.data.roleId ?? "none"}:${thread.memoryEnabled ? "mem-on" : "mem-off"}:${webSearchLabel}:${roleHash}:${Buffer.from(userText).toString("base64")}`;
-
-  if (redis && !isRegenerate) {
-    try {
-      const cachedRaw = await redis.get(cacheKey);
-      if (cachedRaw) {
-        const cachedPayload = JSON.parse(cachedRaw) as CachedChatPayload;
-
-        if (cachedPayload.text.trim() === runtimeConfig.chat.emptyResponseFallbackText) {
-          await redis.del(cacheKey);
-        } else {
-          // Await user message persistence before finishing cached response if needed, 
-          // but we can just let it run.
-          await persistUserMessage;
-
-          // Cache hit: Persist assistant message and update thread model
-          await db.insert(messages).values({
-            id: createId(),
-            threadId: parsed.data.threadId,
-            role: "assistant",
-            content: cachedPayload.text,
-            model: safeModel,
-            citations: cachedPayload.citations.length > 0 ? JSON.parse(JSON.stringify(cachedPayload.citations)) : null,
-          });
-
-          await db
-            .update(threads)
-            .set({
-              model: safeModel,
-              updatedAt: new Date(),
-            })
-            .where(eq(threads.id, parsed.data.threadId));
-
-          const stream = createUIMessageStream({
-            execute: async ({ writer }) => {
-              const responseMessageId = createId();
-              const textId = createId();
-
-              writer.write({ type: "start", messageId: responseMessageId });
-              writer.write({ type: "text-start", id: textId });
-              writer.write({ type: "text-delta", id: textId, delta: cachedPayload.text });
-
-              cachedPayload.citations.forEach((citation, index) => {
-                writer.write({
-                  type: "source-url",
-                  sourceId: `source-${index}`,
-                  url: citation.url,
-                  title: citation.title,
-                } as UIMessageChunk);
-              });
-
-              if (thread.memoryEnabled) {
-                const memoryPromise = saveExtractedMemories({
-                  userId: thread.userId,
-                  threadId: parsed.data.threadId,
-                  userMessage: userText,
-                  assistantMessage: cachedPayload.text,
-                  conversationMessages: inputMessages.length + 1,
-                });
-
-                try {
-                  const memoryCount = await Promise.race([
-                    memoryPromise,
-                    new Promise<null>((resolve) => setTimeout(() => resolve(null), runtimeConfig.chat.memoryEventTimeoutMs)),
-                  ]);
-
-                  if (typeof memoryCount === "number" && memoryCount > 0) {
-                    writer.write({ type: "data-json", data: { kind: "memory-saved", count: memoryCount } } as UIMessageChunk);
-                  }
-                } catch {
-                  // Ignore memory extraction failures.
-                } finally {
-                  void memoryPromise.catch(() => {
-                    // Ignore memory extraction failures.
-                  });
-                }
-              }
-
-              writer.write({ type: "text-end", id: textId });
-              writer.write({ type: "finish" });
-            },
-          });
-
-          return createUIMessageStreamResponse({ stream });
-        }
-      }
-    } catch {
-      // Fail open if Redis cache fails.
-    }
-  }
-
-  let agentInput: Responses.InputItem[] = [];
-  try {
-    agentInput = (await Promise.all(inputMessages
-      .map(async (message) => {
-        const text = await extractTextFromMessage(message);
-        const content: Record<string, unknown>[] = [{ type: "input_text", text }];
-
-      const fileParts = collectFileParts(message);
-      fileParts.forEach((att) => {
-        const mediaType = att.mediaType || att.contentType || "";
-        if (att.url && att.url.startsWith("data:") && mediaType.startsWith("image/")) {
-          content.push({
-            type: "input_image",
-            image: att.url,
-          });
-        }
-        // Add other attachment types here if supported by the Perplexity API
-      });
-
-        return ({
-        type: "message",
-        role: message.role as "user" | "assistant",
-        content,
-        } as unknown) as Responses.InputItem;
-      })))
-      .filter((message) => {
-        const msg = message as unknown as Record<string, unknown>;
-        if (!Array.isArray(msg.content)) return false;
-        const contentArray = msg.content as Record<string, unknown>[];
-        const textContent = (contentArray.find((c) => c.type === "input_text")?.text as string) || "";
-        return textContent.length > 0 || contentArray.some((c) => c.type === "input_image");
-      });
-  } catch (error) {
-    if (error instanceof AttachmentTooLargeError) {
-      return NextResponse.json({ error: error.message }, { status: 400 });
-    }
-    throw error;
-  }
-
-  const stream = createUIMessageStream({
-    execute: async ({ writer }) => {
-      log.info(
-        { model: safeModel, threadId: parsed.data.threadId },
-        "Starting request"
-      );
-      const startTime = Date.now();
-
-      // Ensure user message is persisted
-      await persistUserMessage;
-      log.info({ duration: Date.now() - startTime }, "User message persisted");
-
-      const responseMessageId = createId();
-      const textId = createId();
-
-      // Start the UI stream IMMEDIATELY
-      writer.write({ type: "start", messageId: responseMessageId });
-      writer.write({ type: "text-start", id: textId });
-
-      let ragContext = "";
-      // ONLY perform RAG if the thread is associated with a role
-      if (activeRoleId) {
-        log.info("Starting RAG search...");
-        writer.write({
-          type: "data-call-start",
-          data: {
-            callId: "rag-search",
-            toolName: "Retrieval",
-            input: { query: userText },
-          },
-        } as UIMessageChunk);
-
-        // Keep connection alive
-        writer.write({
-          type: "text-delta",
-          id: textId,
-          delta: "",
-        });
-
-        try {
-          const [embedding] = await getEmbeddings([userText]);
-          log.info({ duration: Date.now() - startTime }, "Embeddings retrieved");
-          const topChunks = await similaritySearch(activeRoleId, embedding, runtimeConfig.rag.similarityTopK);
-          log.info({ duration: Date.now() - startTime, count: topChunks.length }, "Similarity search complete");
-          if (topChunks.length > 0) {
-            ragContext = topChunks.map((chunk, index) => `(${index + 1}) ${chunk.content}`).join("\n\n");
-          }
-
-          writer.write({
-            type: "data-call-result",
-            data: {
-              callId: "rag-search",
-              result: `Found ${topChunks.length} relevant context chunks.`,
-            },
-          } as UIMessageChunk);
-        } catch (error) {
-          console.error(`[Chat API:${requestId}] RAG Error:`, error);
-          writer.write({
-            type: "data-call-result",
-            data: {
-              callId: "rag-search",
-              result: "Search failed, continuing with web search only.",
-            },
-          } as UIMessageChunk);
-        }
-      }
-
-      let externalContext = "";
-      if (activeRoleId && env.ROLE_EXTERNAL_DATA) {
-        try {
-          const mapping = JSON.parse(env.ROLE_EXTERNAL_DATA) as Record<string, string | string[]>;
-          const files = mapping[activeRoleId];
-          if (files) {
-            const filePaths = Array.isArray(files) ? files : [files];
-            const contents = await Promise.all(
-              filePaths.map(async (filePath) => {
-                try {
-                  log.info({ filePath }, "Loading external data for role");
-                  const content = await fs.readFile(filePath, "utf-8");
-                  log.info({ filePath, bytes: content.length }, "Successfully loaded external data");
-                  return `File: ${filePath}\n---\n${content}`;
-                } catch (err) {
-                  console.error(`[Chat API:${requestId}] Failed to load external file ${filePath}:`, err);
-                  return "";
-                }
-              })
-            );
-            externalContext = contents.filter(Boolean).join("\n\n---\n\n");
-          }
-        } catch (err) {
-          console.error(`[Chat API:${requestId}] Failed to parse ROLE_EXTERNAL_DATA:`, err);
-        }
-      }
-
-      const memoryPrompt = thread.memoryEnabled ? await getMemoryPrompt(thread.userId, userText) : "";
-      const memoryBlock = memoryPrompt ? `${memoryPrompt}\n\n` : "";
-      const externalBlock = externalContext ? `\n\nExternal User Data (Always use this as primary context if relevant):\n${externalContext}\n\n` : "";
-      const chartInstructions = `\n\nCRITICAL: If the user asks to visualize data (like time-series or numerical tracking), you MUST output a JSON block wrapped in a markdown code block with the language "chart". NEVER use text-based bar charts or mermaid. ALWAYS follow this JSON format exactly: { "type": "line" | "bar", "data": [{ "name": "...", "value": 123 }], "xAxisKey": "name", "lines": ["value"] }.`;
-      const baseInstructions = memoryBlock + (roleInstructions ? roleInstructions + "\n\n" : "") + externalBlock + chartInstructions;
-      const instructions = ragContext
-        ? baseInstructions + `Use this local context if relevant:\n\n${ragContext}\n\nIf local context is insufficient, continue with normal web-grounded reasoning.`
-        : baseInstructions + (activeRoleId ? "Provide concise, accurate, citation-backed answers." : "Provide a concise and accurate response.");
-
-      // Gemini 3.1 Pro fails with 400 if it receives a completely empty system message or no instructions
-      // ensure we always send an instruction payload, even if it's generic, or explicitly push it into the input.
-      const safeInstructions = instructions.trim() ? instructions : "Provide a concise and accurate response.";
-
-      log.info({ model: safeModel, threadId: parsed.data.threadId }, "Calling generation");
-
-      const keys = await getApiKeys();
-
-      const result = await runGeneration({
-        modelId: safeModel,
-        messages: inputMessages,
-        agentInput,
-        system: safeInstructions,
-        keys,
-        requestId,
-        textId,
-        webSearch: !!parsed.data.webSearch,
-        writer,
-      });
-
-      const assistantText = result.text || runtimeConfig.chat.emptyResponseFallbackText;
-      const citations = result.citations || [];
-
-      citations.forEach((citation: any, index: number) => {
-        writer.write({
-          type: "source-url",
-          sourceId: `source-${index}`,
-          url: citation.url,
-          title: citation.title,
-        } as UIMessageChunk);
-      });
-
-      if (redis && assistantText && assistantText !== runtimeConfig.chat.emptyResponseFallbackText) {
-        try {
-          const payload: CachedChatPayload = {
-            text: assistantText,
-            citations,
-          };
-          await redis.set(cacheKey, JSON.stringify(payload), "EX", runtimeConfig.chat.cacheTtlSeconds);
-        } catch {
-          // Ignore cache write failures.
-        }
-      }
-
-      await db.insert(messages).values({
-        id: responseMessageId,
-        threadId: parsed.data.threadId,
-        role: "assistant",
-        content: assistantText,
-        model: safeModel,
-        citations: citations.length > 0 ? JSON.parse(JSON.stringify(citations)) : null,
-      });
-
-      await db
-        .update(threads)
-        .set({
-          model: safeModel,
-          updatedAt: new Date(),
-        })
-        .where(eq(threads.id, parsed.data.threadId));
-
-      if (thread.memoryEnabled) {
-        const memoryPromise = saveExtractedMemories({
-          userId: thread.userId,
-          threadId: parsed.data.threadId,
-          userMessage: userText,
-          assistantMessage: assistantText,
-          conversationMessages: inputMessages.length + 1,
-        });
-
-        try {
-          const memoryCount = await Promise.race([
-            memoryPromise,
-            new Promise<null>((resolve) => setTimeout(() => resolve(null), runtimeConfig.chat.memoryEventTimeoutMs)),
-          ]);
-
-          if (typeof memoryCount === "number" && memoryCount > 0) {
-            writer.write({ type: "data-json", data: { kind: "memory-saved", count: memoryCount } } as UIMessageChunk);
-          }
-        } catch {
-          // Ignore memory extraction failures.
-        } finally {
-          void memoryPromise.catch(() => {
-            // Ignore memory extraction failures.
-          });
-        }
-      }
-
-      log.info({ duration: Date.now() - startTime }, "Finished request");
-      writer.write({ type: "text-end", id: textId });
-      writer.write({ type: "finish" });
-    },
-  });
-
-  return createUIMessageStreamResponse({ stream });
 }
-
