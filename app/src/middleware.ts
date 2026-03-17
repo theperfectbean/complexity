@@ -25,7 +25,7 @@ export function middleware(request: NextRequest) {
   // CSP: Restrict sources for scripts, styles, etc.
   const cspHeader = `
     default-src 'self';
-    script-src 'self' 'unsafe-eval' 'unsafe-inline';
+    script-src 'self' 'nonce-${nonce}' 'strict-dynamic';
     style-src 'self' 'unsafe-inline';
     img-src 'self' blob: data:;
     font-src 'self';

@@ -5,10 +5,10 @@ import { ThemeProvider } from "next-themes";
 import { ReactNode } from "react";
 import { Toaster } from "sonner";
 
-export function AppProviders({ children }: { children: ReactNode }) {
+export function AppProviders({ children, nonce }: { children: ReactNode; nonce?: string }) {
   return (
     <SessionProvider basePath="/api/auth">
-      <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+      <ThemeProvider attribute="class" defaultTheme="system" enableSystem nonce={nonce}>
         {children}
         <Toaster richColors position="top-right" />
       </ThemeProvider>

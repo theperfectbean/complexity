@@ -14,7 +14,8 @@
     "test:smoke-models": "RUN_AGENT_SMOKE=1 vitest run src/test/agent-smoke.test.ts --reporter=verbose",
     "test:smoke-route": "RUN_LIVE_CHAT_ROUTE=1 vitest run src/test/live-chat-route.test.ts --reporter=verbose",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate"
+    "db:migrate": "drizzle-kit migrate",
+    "db:encrypt-keys": "tsx src/scripts/encrypt-existing-keys.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.58",
@@ -58,6 +59,8 @@
     "nodemailer": "^8.0.2",
     "ollama-ai-provider": "^1.2.0",
     "pdf-parse": "^2.4.5",
+    "pino": "^10.3.1",
+    "pino-pretty": "^13.1.3",
     "postgres": "^3.4.8",
     "react": "19.2.3",
     "react-dom": "19.2.3",

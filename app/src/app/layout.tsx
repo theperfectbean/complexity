@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { AppShell } from "@/components/layout/AppShell";
 import { AppProviders } from "@/lib/auth-client";
 import { GeistSans } from "geist/font/sans";
@@ -30,11 +31,13 @@ export const metadata: Metadata = {
   description: "Self-hosted Perplexity-style answer engine",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
+
   return (
     <html
       lang="en"
@@ -42,7 +45,7 @@ export default function RootLayout({
       className={`${GeistSans.variable} ${dmSans.variable} ${beVietnamPro.variable} ${sourceSerif.variable}`}
     >
       <body suppressHydrationWarning className="antialiased">
-        <AppProviders>
+        <AppProviders nonce={nonce}>
           <AppShell contentClassName="flex min-h-screen flex-1">{children}</AppShell>
         </AppProviders>
       </body>

@@ -1,6 +1,7 @@
 import { UIMessage } from "ai";
 import { runtimeConfig } from "@/lib/config";
 import { extractTextFromDataUrl } from "@/lib/documents";
+import { logger } from "./logger";
 
 export class AttachmentTooLargeError extends Error {
   constructor(message: string) {
@@ -148,7 +149,7 @@ export async function extractTextFromMessage(message: UIMessage): Promise<string
 ${content}
 --- END ATTACHED FILE: ${name} ---`;
         } catch (e) {
-          console.error("[Chat API] Error extracting attachment content:", e);
+          logger.error({ err: e, filename: name }, "Error extracting attachment content");
           return `[Error extracting file: ${name}]`;
         }
       })

@@ -85,6 +85,7 @@ const envSchema = z.object({
     ),
   AUTH_RESET_EMAIL_FROM_DEFAULT: z.string().default('"Complexity" <noreply@complexity.local>'),
   AUTH_LOCALHOST_BASE_URL: z.string().default("localhost:3002"),
+  ENCRYPTION_KEY: z.string().length(32, "ENCRYPTION_KEY must be exactly 32 characters").optional(),
   REDIS_MAX_RETRIES_PER_REQUEST: z.coerce.number().int().nonnegative().default(1),
   DOCUMENT_ALLOWED_EXTENSIONS: z.string().default(".pdf,.docx,.txt,.md"),
   EMBEDDER_MODEL_NAME: z.string().default("sentence-transformers/all-MiniLM-L6-v2"),

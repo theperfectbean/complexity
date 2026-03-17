@@ -19,6 +19,16 @@ import { extractTextFromDataUrl } from "@/lib/documents";
 import { getEmbeddings, similaritySearch } from "@/lib/rag";
 import { getRedisClient } from "@/lib/redis";
 import { runtimeConfig } from "@/lib/config";
+import { getLogger } from "@/lib/logger";
+import {
+  AttachmentTooLargeError,
+  Citation,
+  extractAssistantTextFromCompletedResponse,
+  extractCitationsFromResponse,
+  extractTextFromMessage,
+  collectFileParts,
+  asRecord,
+} from "@/lib/chat-utils";
 
 const schema = z.object({
   threadId: z.string().min(1),
@@ -29,9 +39,9 @@ const schema = z.object({
   trigger: z.string().optional(),
 });
 
-import { AttachmentTooLargeError, Citation, extractAssistantTextFromCompletedResponse, extractCitationsFromResponse, extractTextFromMessage, collectFileParts, asRecord } from "@/lib/chat-utils";
 export async function POST(request: Request) {
   const requestId = createId();
+  const log = getLogger(requestId);
   const session = await auth();
   const userEmail = session?.user?.email;
   if (!userEmail) {
@@ -286,12 +296,15 @@ export async function POST(request: Request) {
 
   const stream = createUIMessageStream({
     execute: async ({ writer }) => {
-      console.log(`[Chat API:${requestId}] Starting request for model: ${safeModel} (thread: ${parsed.data.threadId})`);
+      log.info(
+        { model: safeModel, threadId: parsed.data.threadId },
+        "Starting request"
+      );
       const startTime = Date.now();
 
       // Ensure user message is persisted
       await persistUserMessage;
-      console.log(`[Chat API:${requestId}] User message persisted (${Date.now() - startTime}ms)`);
+      log.info({ duration: Date.now() - startTime }, "User message persisted");
 
       const responseMessageId = createId();
       const textId = createId();
@@ -303,7 +316,7 @@ export async function POST(request: Request) {
       let ragContext = "";
       // ONLY perform RAG if the thread is associated with a role
       if (activeRoleId) {
-        console.log(`[Chat API:${requestId}] Starting RAG search...`);
+        log.info("Starting RAG search...");
         writer.write({
           type: "data-call-start",
           data: {
@@ -322,9 +335,9 @@ export async function POST(request: Request) {
 
         try {
           const [embedding] = await getEmbeddings([userText]);
-          console.log(`[Chat API:${requestId}] Embeddings retrieved (${Date.now() - startTime}ms)`);
+          log.info({ duration: Date.now() - startTime }, "Embeddings retrieved");
           const topChunks = await similaritySearch(activeRoleId, embedding, runtimeConfig.rag.similarityTopK);
-          console.log(`[Chat API:${requestId}] Similarity search complete: found ${topChunks.length} chunks (${Date.now() - startTime}ms)`);
+          log.info({ duration: Date.now() - startTime, count: topChunks.length }, "Similarity search complete");
           if (topChunks.length > 0) {
             ragContext = topChunks.map((chunk, index) => `(${index + 1}) ${chunk.content}`).join("\n\n");
           }
@@ -358,9 +371,9 @@ export async function POST(request: Request) {
             const contents = await Promise.all(
               filePaths.map(async (filePath) => {
                 try {
-                  console.log(`[Chat API:${requestId}] Loading external data for role from ${filePath}...`);
+                  log.info({ filePath }, "Loading external data for role");
                   const content = await fs.readFile(filePath, "utf-8");
-                  console.log(`[Chat API:${requestId}] Successfully loaded ${content.length} bytes from ${filePath}.`);
+                  log.info({ filePath, bytes: content.length }, "Successfully loaded external data");
                   return `File: ${filePath}\n---\n${content}`;
                 } catch (err) {
                   console.error(`[Chat API:${requestId}] Failed to load external file ${filePath}:`, err);
@@ -388,7 +401,7 @@ export async function POST(request: Request) {
       // ensure we always send an instruction payload, even if it's generic, or explicitly push it into the input.
       const safeInstructions = instructions.trim() ? instructions : "Provide a concise and accurate response.";
 
-      console.log(`[Chat API:${requestId}] Calling generation for model: ${safeModel} (thread: ${parsed.data.threadId})`);
+      log.info({ model: safeModel, threadId: parsed.data.threadId }, "Calling generation");
 
       const keys = await getApiKeys();
 
@@ -472,7 +485,7 @@ export async function POST(request: Request) {
         }
       }
 
-      console.log(`[Chat API:${requestId}] Finished request for model: ${safeModel} (thread: ${parsed.data.threadId}) in ${Date.now() - startTime}ms`);
+      log.info({ duration: Date.now() - startTime }, "Finished request");
       writer.write({ type: "text-end", id: textId });
       writer.write({ type: "finish" });
     },

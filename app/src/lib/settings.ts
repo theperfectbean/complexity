@@ -2,6 +2,16 @@ import { eq } from "drizzle-orm";
 import { db } from "./db";
 import { settings } from "./db/schema";
 import { getRedisClient } from "./redis";
+import { decrypt, encrypt, isEncrypted } from "./encryption";
+
+const SENSITIVE_KEYS = [
+  "ANTHROPIC_API_KEY",
+  "OPENAI_API_KEY",
+  "GOOGLE_GENERATIVE_AI_API_KEY",
+  "XAI_API_KEY",
+  "PERPLEXITY_API_KEY",
+  "LOCAL_OPENAI_API_KEY",
+];
 
 export async function getSetting(key: string): Promise<string | null> {
   const redis = getRedisClient();
@@ -11,7 +21,8 @@ export async function getSetting(key: string): Promise<string | null> {
     try {
       const cached = await redis.get(cacheKey);
       if (cached !== null) {
-        return cached === "__empty__" ? null : cached;
+        const value = cached === "__empty__" ? null : cached;
+        return value ? decrypt(value) : null;
       }
     } catch {
       // Fail open
@@ -34,16 +45,18 @@ export async function getSetting(key: string): Promise<string | null> {
     }
   }
 
-  return value;
+  return value ? decrypt(value) : null;
 }
 
 export async function setSetting(key: string, value: string): Promise<void> {
+  const finalValue = SENSITIVE_KEYS.includes(key) ? encrypt(value) : value;
+
   await db
     .insert(settings)
-    .values({ key, value, updatedAt: new Date() })
+    .values({ key, value: finalValue, updatedAt: new Date() })
     .onConflictDoUpdate({
       target: settings.key,
-      set: { value, updatedAt: new Date() },
+      set: { value: finalValue, updatedAt: new Date() },
     });
 
   const redis = getRedisClient();

@@ -260,3 +260,18 @@ DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose build app
 - **Database Terminology Alignment**: Migrated the legacy `spaces` database table and `space_id` foreign keys to explicitly use `roles` and `role_id`, matching the application's canonical business logic and Drizzle schema. Automated interactive prompts during `drizzle-kit generate` to safely orchestrate the rename without data loss.
 - **Optimization**: Added 5-minute Redis caching to `getSetting` (`app/src/lib/settings.ts`) with cache invalidation on `setSetting` to drastically reduce DB load during the core chat loop when fetching provider API keys.
 - **Testing**: Added rigorous unit tests for `llm.ts`, `memory.ts`, and `perplexity-agent.ts` with mocked dependencies. The full suite of 103 unit tests are fully passing.
+
+### Phase 1 Implementation: Security & Observability (2026-03-17)
+- **API Key Encryption at Rest**:
+  - Implemented authenticated encryption using `AES-256-GCM` via a new `app/src/lib/encryption.ts` utility.
+  - Sensitive configuration keys (`*_API_KEY`) are now automatically encrypted before being stored in the `settings` table and decrypted upon retrieval.
+  - Added a mandatory `ENCRYPTION_KEY` requirement (32 characters) to the environment.
+  - Provided a one-time migration script `app/src/scripts/encrypt-existing-keys.ts` (run via `npm run db:encrypt-keys`) to secure legacy plaintext keys.
+- **CSP Hardening (Nonce-based)**:
+  - Removed `'unsafe-eval'` from the CSP to prevent dynamic execution vulnerabilities.
+  - Replaced `'unsafe-inline'` for scripts with a dynamic **Nonce-based policy**. The nonce is generated per-request in `middleware.ts` and propagated through `layout.tsx` to `ThemeProvider` and other critical client-side components.
+- **Structured Logging (Observability)**:
+  - Integrated `pino` and `pino-pretty` for high-performance, structured JSON logging.
+  - Created a centralized logger in `app/src/lib/logger.ts` with support for child loggers and automatic request ID injection.
+  - Refactored `chat/route.ts` and `chat-utils.ts` to use structured logging, enabling better traceability of the chat lifecycle and RAG retrieval performance.
+- **Verification**: Verified implementation with a new `encryption.test.ts` suite and confirmed all 107 application unit tests pass.
