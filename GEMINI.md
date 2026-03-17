@@ -170,7 +170,7 @@ DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose build app
 - **Nodemailer in Docker**: When adding `nodemailer` to the project, ensured it was installed inside the Docker container by running `npm install` via `docker compose exec` and updated the `Dockerfile` with `--legacy-peer-deps` to resolve peer dependency conflicts with `next-auth`.
 
 ### Model Registry Update (2026-03-15)
-- **Anthropic 4.6 Generation**: Updated the model registry and aliases to support the latest Claude 4.6 family (`claude-opus-4-6`, `claude-4-6-sonnet-20260315`) and the high-speed `claude-4-5-haiku-20251001`.
+- **Anthropic 4.6 Generation**: Updated the model registry and aliases to support the latest Claude 4.6 family (`claude-opus-4-6`, `claude-4-6-sonnet-latest`) and the high-speed `claude-4-5-haiku-latest`.
 - **OpenAI GPT-5.4**: Updated OpenAI support to the latest `gpt-5.4` flagship.
 - **Google Gemini 3.1**: Verified and updated mappings for the `gemini-3.1-pro-preview` and `gemini-3-flash-preview` models.
 - **xAI Grok 4.20**: Upgraded xAI support to the agentic `grok-4.20-beta` architecture.
@@ -180,7 +180,7 @@ DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose build app
 - **Provider Toggles & Source Detection**: Enhanced the Admin Settings to support explicit enabling/disabling of LLM providers. The panel now automatically detects and visually indicates if an API key is sourced from the `.env` file or the database, preventing redundant entry fields.
 - **Dynamic Model Fetching**: Implemented a new utility and API (`/api/admin/fetch-provider-models`) that queries enabled providers directly for their available model lists. For Perplexity, it attempts to fetch the latest Agent API model list (Sonar and third-party) from their models endpoint with a curated fallback.
 - **Custom Model Management**: Added a "Manage Models" tab in the Admin Console, allowing administrators to discover provider models, add them to an active list, customize their display labels, and reorder them via drag-and-drop to control the user-facing dropdown sequence. Perplexity models are consistently prefixed with `perplexity/` for clear routing.
-- **Registry Synchronization**: Updated `app/src/lib/config.ts` to prioritize Perplexity models and set the first list item as the dynamic default. Synchronized unit tests to use latest March 2026 model identifiers (`gpt-5.4`, `claude-4-6-sonnet-20260315`).
+- **Registry Synchronization**: Updated `app/src/lib/config.ts` to prioritize Perplexity models and set the first list item as the dynamic default. Synchronized unit tests to use latest March 2026 model identifiers (`gpt-5.4`, `claude-4-6-sonnet-latest`).
 - **Dynamic Default Selection**: Refined the `SearchBar` component to automatically sync the selected model with the top item of the filtered/reordered list on initial load, ensuring that administrative sequence changes are immediately reflected as the default user experience. Explicit user selections are preserved within the session.
 - **Type Safety Improvements**: Refactored several core files (`SearchBar.tsx`, `llm.ts`, `api/settings/route.ts`, `provider-models.ts`) to replace `any` types with proper interfaces or `Record<string, unknown>`, significantly improving codebase maintainability and satisfy strict linting rules.
 - **Build & Integration Fixes**: Resolved several critical issues that were causing Docker build failures:
@@ -316,7 +316,7 @@ DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose build app
   - Refactored the `memory` module by separating `MemoryStore` and `MemoryExtractor` into a dedicated `app/src/lib/memory/` directory. Reduced `memory.ts` from 323 lines to just 8 lines of exports.
 - **LLM Routing Simplification**:
   - Implemented a map-driven provider routing factory in `llm.ts`, replacing complex if-else chains.
-  - Resolved a critical bug where Perplexity-hosted third-party models (e.g., `claude-4-6-sonnet-20260315`) were failing to return search results due to incorrect model ID prefixing and tool-call handling.
+  - Resolved a critical bug where Perplexity-hosted third-party models (e.g., `claude-4-6-sonnet-latest`) were failing to return search results due to incorrect model ID prefixing and tool-call handling.
   - Added robust model ID mapping (`mapToPerplexityModel`) to ensure the Perplexity Agent API receives IDs it understands.
 - **Streaming Reliability**: Fixed a bug in `runPerplexityAgent` where the final event in a stream was occasionally lost if the buffer didn't end with a newline character.
 - **Auth Hardening**: Created `app/src/lib/auth-server.ts` to centralize repetitive authentication and admin-check logic, simplifying API route implementations.
@@ -326,7 +326,7 @@ DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose build app
 - **Verification**: Confirmed system stability with 123 passing unit tests and resolved several long-standing linting issues related to `any` type usage.
 
 ### Model Validity Fix (2026-03-17)
-- **Validation Error Addressed**: Prevented `400 Bad Request` from AI providers by updating mock model identifiers (like `claude-sonnet-4-6`) to their official API names (`claude-4-6-sonnet-20260315`, `claude-4-5-haiku-20251001`, `claude-3-opus-20240229`).
+- **Validation Error Addressed**: Prevented `400 Bad Request` from AI providers by updating mock model identifiers (like `claude-sonnet-4-6`) to their official API names (`claude-4-6-sonnet-latest`, `claude-4-5-haiku-latest`, `claude-3-opus-20240229`).
 - **Configuration Cleanup**: Fixed a duplicate model ID mapping that triggered startup warnings and synchronized the test suites to assert against the corrected models.
-- **Model Version Correction**: Updated the resolved names to `claude-4-6-sonnet-20260315` and `claude-4-5-haiku-20251001` per the user's explicit correction that the current generation models in 2026 are version 4, not version 3.
+- **Model Version Correction & Standard Aliases**: Refactored the hardcoded model date strings to use Anthropic's standard `-latest` aliases (e.g., `claude-4-6-sonnet-latest`, `claude-4-5-haiku-latest`, `claude-4-6-opus-latest`) to decouple the application from frequent minor model version changes while incorporating the user's correction that the current generation models in 2026 are version 4.
 

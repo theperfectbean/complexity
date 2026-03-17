@@ -6,8 +6,8 @@
 Compare direct Anthropic Sonnet access vs. Perplexity Agent API for **Claude 4.6 Sonnet** (flagship as of Feb 2026).
 
 ### Setup
-- **Direct Anthropic**: `@ai-sdk/anthropic` (Vercel AI SDK), model: `claude-4-6-sonnet-20260315`
-- **Perplexity Agent API**: `@perplexity-ai/perplexity_ai`, model: `anthropic/claude-4-6-sonnet-20260315`
+- **Direct Anthropic**: `@ai-sdk/anthropic` (Vercel AI SDK), model: `claude-4-6-sonnet-latest`
+- **Perplexity Agent API**: `@perplexity-ai/perplexity_ai`, model: `anthropic/claude-4-6-sonnet-latest`
 
 ### Findings
 

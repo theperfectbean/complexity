@@ -11,9 +11,9 @@ const DEFAULT_MODELS: ModelOption[] = [
   { id: "fast-search", label: "Fast Search", category: "Presets", isPreset: true },
   { id: "pro-search", label: "Pro Search", category: "Presets", isPreset: true },
   { id: "perplexity/sonar", label: "Perplexity Sonar", category: "Perplexity", isPreset: false },
-  { id: "anthropic/claude-4-6-opus-20260315", label: "Claude 4.6 Opus", category: "Anthropic", isPreset: false },
-  { id: "anthropic/claude-4-6-sonnet-20260315", label: "Claude 4.6 Sonnet", category: "Anthropic", isPreset: false },
-  { id: "anthropic/claude-4-5-haiku-20251001", label: "Claude 4.5 Haiku", category: "Anthropic", isPreset: false },
+  { id: "anthropic/claude-4-6-opus-latest", label: "Claude 4.6 Opus", category: "Anthropic", isPreset: false },
+  { id: "anthropic/claude-4-6-sonnet-latest", label: "Claude 4.6 Sonnet", category: "Anthropic", isPreset: false },
+  { id: "anthropic/claude-4-5-haiku-latest", label: "Claude 4.5 Haiku", category: "Anthropic", isPreset: false },
   { id: "openai/gpt-5.4", label: "GPT-5.4", category: "OpenAI", isPreset: false },
   { id: "google/gemini-3.1-pro-preview", label: "Gemini 3.1 Pro Preview", category: "Google", isPreset: false },
   { id: "google/gemini-3-flash-preview", label: "Gemini 3 Flash Preview", category: "Google", isPreset: false },
@@ -59,9 +59,9 @@ export const runtimeConfig = {
   llm: {
     modelAliases: {
       anthropic: {
-        "claude-4-6-sonnet-20260315": "claude-4-6-sonnet-20260315",
-        "claude-4-5-haiku-20251001": "claude-4-5-haiku-20251001",
-        "claude-4-6-opus-20260315": "claude-4-6-opus-20260315",
+        "claude-4-6-sonnet-latest": "claude-4-6-sonnet-latest",
+        "claude-4-5-haiku-latest": "claude-4-5-haiku-latest",
+        "claude-4-6-opus-latest": "claude-4-6-opus-latest",
       },
       openai: {
         "gpt-5.4": "gpt-5.4",
@@ -99,7 +99,7 @@ export const runtimeConfig = {
   memory: {
     cacheTtlSeconds: env.MEMORY_CACHE_TTL_SECONDS ?? 60 * 5,
     cachePrefix: env.MEMORY_CACHE_PREFIX ?? "memories",
-    extractionModel: env.MEMORY_EXTRACTION_MODEL ?? "anthropic/claude-4-5-haiku-20251001",
+    extractionModel: env.MEMORY_EXTRACTION_MODEL ?? "anthropic/claude-4-5-haiku-latest",
     maxMemories: env.MEMORY_MAX_MEMORIES ?? 100,
     topK: env.MEMORY_TOP_K ?? 10,
     minExchanges: env.MEMORY_EXTRACTION_MIN_EXCHANGES ?? 3,

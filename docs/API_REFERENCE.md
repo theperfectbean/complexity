@@ -38,7 +38,7 @@ Body:
 ```json
 {
   "threadId": "thread_cuid",
-  "model": "anthropic/claude-4-6-sonnet-20260315",
+  "model": "anthropic/claude-4-6-sonnet-latest",
   "messages": [/* AI SDK UI messages */],
   "roleId": "optional_role_id",
   "webSearch": true,

@@ -32,9 +32,9 @@ describe("llm.ts", () => {
     });
 
     it("handles double-prefixed models for perplexity correctly", () => {
-      const { provider, model } = getProviderAndModel("perplexity/anthropic/claude-4-6-sonnet-20260315");
+      const { provider, model } = getProviderAndModel("perplexity/anthropic/claude-4-6-sonnet-latest");
       expect(provider).toBe("perplexity");
-      expect(model).toBe("anthropic/claude-4-6-sonnet-20260315");
+      expect(model).toBe("anthropic/claude-4-6-sonnet-latest");
     });
 
     it("defaults to perplexity for unknown models", () => {
@@ -59,7 +59,7 @@ describe("llm.ts", () => {
       const mockWriter = { write: vi.fn() };
 
       const result = await runGeneration({
-        modelId: "perplexity/anthropic/claude-4-6-sonnet-20260315",
+        modelId: "perplexity/anthropic/claude-4-6-sonnet-latest",
         messages: [{ role: "user", content: "hello" } as unknown as UIMessage],
         system: "System prompt",
         agentInput: [],
@@ -70,7 +70,7 @@ describe("llm.ts", () => {
       });
 
       expect(perplexityAgent.runPerplexityAgent).toHaveBeenCalledWith(expect.objectContaining({
-        modelId: "anthropic/claude-4-6-sonnet-20260315",
+        modelId: "anthropic/claude-4-6-sonnet-latest",
       }));
       expect(result.text).toBe("hello");
     });

@@ -21,7 +21,7 @@ describe("/api/models", () => {
       CUSTOM_MODEL_LIST: { 
         value: JSON.stringify([
           { id: "perplexity/sonar", label: "Sonar", category: "Perplexity", isPreset: false },
-          { id: "anthropic/claude-4-6-sonnet-20260315", label: "Claude", category: "Anthropic", isPreset: false },
+          { id: "anthropic/claude-4-6-sonnet-latest", label: "Claude", category: "Anthropic", isPreset: false },
           { id: "openai/gpt-5.4", label: "GPT5", category: "OpenAI", isPreset: false }
         ]), 
         source: "db" 
@@ -34,7 +34,7 @@ describe("/api/models", () => {
     expect(response.status).toBe(200);
     // Should have Perplexity and Anthropic, but NOT OpenAI
     expect(data.models.some((m) => m.id === "perplexity/sonar")).toBe(true);
-    expect(data.models.some((m) => m.id === "anthropic/claude-4-6-sonnet-20260315")).toBe(true);
+    expect(data.models.some((m) => m.id === "anthropic/claude-4-6-sonnet-latest")).toBe(true);
     expect(data.models.some((m) => m.id === "openai/gpt-5.4")).toBe(false);
   });
 
