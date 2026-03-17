@@ -9,6 +9,9 @@ const PREFIX = "v1:";
 export function encrypt(text: string): string {
   const key = env.ENCRYPTION_KEY;
   if (!key) {
+    if (env.NODE_ENV === "production") {
+      throw new Error("ENCRYPTION_KEY is required in production");
+    }
     return text;
   }
 
@@ -25,8 +28,15 @@ export function encrypt(text: string): string {
 }
 
 export function decrypt(encryptedText: string): string {
+  if (!isEncrypted(encryptedText)) {
+    return encryptedText;
+  }
+
   const key = env.ENCRYPTION_KEY;
-  if (!key || !encryptedText.startsWith(PREFIX)) {
+  if (!key) {
+    if (env.NODE_ENV === "production") {
+      throw new Error("ENCRYPTION_KEY is required in production to decrypt data");
+    }
     return encryptedText;
   }
 

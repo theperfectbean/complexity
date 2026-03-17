@@ -2,98 +2,92 @@
 
 ## Overview
 
-Complexity is a self-hosted, Docker Compose-based application with four services:
+Complexity is a self-hosted, Docker Compose-based application with five services:
 
-- `app` — Next.js web app and API routes
+- `app` — Next.js web app, API routes, and background worker
 - `postgres` — PostgreSQL 16 with `pgvector`
 - `embedder` — FastAPI embedding microservice using `all-MiniLM-L6-v2`
-- `redis` — rate limiting and response caching
+- `redis` — Rate limiting, job queue (BullMQ), and response caching
+- `postgres-backup` — Sidecar service for automated daily backups
 
-Terminology note: “Roles” is the canonical product term. For database compatibility, roles are stored in the `spaces` table and referenced via `space_id` foreign keys.
+Terminology note: “Roles” is the canonical product term (formerly “Spaces”). The database schema and API routes have been fully migrated to use `roles` and `role_id`.
 
-The platform supports authenticated chat, thread persistence, spaces for document-grounded retrieval, and streaming responses from Perplexity's Agent API.
+The platform supports authenticated chat, thread persistence, role-based document-grounded retrieval (RAG), and streaming responses from multiple LLM providers.
 
 ## Service Topology
 
 ```text
 Browser -> Next.js app (app:3000)
                     |-> PostgreSQL (postgres:5432)
-                    |-> Redis (redis:6379)
+                    |-> Redis (redis:6379) -- [Rate Limiting, BullMQ, Cache]
                     |-> Embedder service (embedder:8000)
-                    |-> Perplexity API (external)
+                    |-> External LLM APIs (Perplexity, Anthropic, OpenAI, etc.)
 ```
 
 ## Core Data Flow
 
-### Standard Chat
+### Standard Chat (Refactored)
 
 1. User sends prompt from `/search/[threadId]`.
-2. `POST /api/chat` authenticates session and validates payload.
-3. Optional Redis rate limit check and cache lookup.
-4. Request streams through Perplexity Agent API.
-5. User + assistant messages persist in Postgres.
-6. Streamed UI message response is returned to client.
+2. `POST /api/chat` authenticates session and enforces Redis-backed rate limits via `checkRateLimit`.
+3. Request is delegated to `ChatService` (`app/src/lib/chat-service.ts`).
+4. `ChatService` assembles context:
+    - Recent thread history.
+    - Relevant User Memories (if enabled).
+    - Role-specific instructions and RAG context (if applicable).
+    - External role data (if configured via `ROLE_EXTERNAL_DATA`).
+5. `ChatService` executes generation via the `LLM` registry, supporting Perplexity's Agent API or direct Vercel AI SDK providers.
+6. Assistant messages persist in Postgres once the stream completes.
 
-### Space-Scoped RAG Chat
+### Asynchronous Document Processing (RAG)
 
-1. User opens `/spaces/[spaceId]` and uploads documents.
-2. Upload route extracts text, chunks content, gets embeddings from embedder.
-3. Chunks are inserted into `chunks` table with vector embeddings.
-4. During `POST /api/chat` with `spaceId`, user prompt is embedded.
-5. Similar chunks are fetched by cosine similarity and injected into instructions.
-6. Model response streams and is persisted like standard chat.
+1. User uploads documents to a Role via `/api/roles/[roleId]/upload`.
+2. The API route creates a document record with `status: processing`.
+3. The file is queued for background processing via **BullMQ**:
+    - Small files (<1MB) are passed as base64 in the job payload.
+    - Large files are saved to temporary disk storage, and the path is passed to the worker.
+4. A background **Worker** (initialized via Next.js instrumentation) picks up the job:
+    - Extracts text, chunks content, and fetches embeddings from the `embedder` service.
+    - Chunks are inserted into the `chunks` table with vector embeddings.
+    - Document status is updated to `ready`.
+5. During chat, the user prompt is embedded and similar chunks are fetched via cosine similarity for RAG injection.
+
+## Security Hardening
+
+- **CSRF & CSP:** Implemented nonce-based Content Security Policy and strict Host/Origin validation in `middleware.ts`.
+- **Encryption:** Sensitive provider API keys are stored AES-256-GCM encrypted in the `settings` table, using a rotating IV and auth tag.
+- **Rate Limiting:** Generic Redis-backed rate limiter (`lib/rate-limit.ts`) prevents abuse on chat and sensitive endpoints.
+- **Admin UX:** Protected `/settings/admin` route provides a central panel for API keys, model management, and **User Management** (promoting/demoting admins).
 
 ## Streaming Protocol
 
-The application uses the AI SDK "v6" (SSE) protocol for real-time communication.
+The application uses the AI SDK "v6" (SSE) protocol.
 
-- **Text:** Streamed via `text-delta` chunks and accumulated in the client `parts` array.
-- **Citations:** Streamed via `source-url` chunks and parsed on the client to display source cards during the stream.
-- **Custom Data:** The frontend `useChat` utilizes `DefaultChatTransport` and local data state instead of the legacy `data` property. The backend writes custom stream chunks (e.g., memory events) using the `data-json` type to satisfy the `UIMessageChunk` discriminated union.
-- **Provider:** The Perplexity integration implements the `LanguageModelV3` interface from `@ai-sdk/provider`, supporting explicit `stream: boolean` parameters and properly typed `input` arrays (`type: 'message'`) required by the v0.26 SDK.
-- **Persistence:** Messages are saved to PostgreSQL once the server-side stream finishes or if a cached response is served.
-
-For details on the extraction logic and earlier fixes, see [Streaming UI Fix](./STREAMING_FIX.md).
+- **Standardization:** All API routes utilize the `ApiResponse` utility for consistent error structures and HTTP status codes.
+- **Custom Data:** The backend writes custom stream chunks (e.g., memory events, thinking steps) using the `data-json` type to satisfy the `UIMessageChunk` discriminated union.
 
 ## Key Source Locations
 
 - Auth config: `app/src/auth.ts`
-- Chat route: `app/src/app/api/chat/route.ts`
-- Threads routes: `app/src/app/api/threads/**`
-- Spaces routes: `app/src/app/api/spaces/**`
-- RAG logic: `app/src/lib/rag.ts`
-- Embedding extraction/parsing: `app/src/lib/documents.ts`
-- DB schema: `app/src/lib/db/schema.ts`
-- Embedder service: `embedder/main.py`
-- Playwright E2E Tests: `app/e2e/**`
+- Chat Service: `app/src/lib/chat-service.ts`
+- Background Worker: `app/src/lib/worker.ts` & `app/src/lib/queue.ts`
+- LLM Registry: `app/src/lib/llm.ts`
+- Roles/RAG: `app/src/lib/rag.ts` & `app/src/app/api/roles/**`
+- Admin API: `app/src/app/api/admin/**`
+- Security Middleware: `app/src/middleware.ts`
+- Encryption: `app/src/lib/encryption.ts`
 
 ## Database Model Summary
 
 Primary entities:
 
-- `users`
+- `users` (includes `isAdmin` and `memoryEnabled`)
 - `threads`
 - `messages`
-- `memories` (persisted user preferences)
-- `spaces`
+- `memories`
+- `roles` (formerly `spaces`)
 - `documents`
 - `chunks`
+- `settings` (Encrypted API keys and global config)
 
-Vector search is backed by `chunks.embedding vector(384)` with HNSW cosine index.
-
-## Frontend Structure
-
-Major routes:
-
-- `/` — landing + new search
-- `/search/[threadId]` — thread chat
-- `/recent` — thread management
-- `/settings/memory` — memory management
-- `/spaces` — space management
-- `/spaces/[spaceId]` — upload + space-scoped chat
-
-Reusable UI includes:
-
-- `AppShell` with sidebar/mobile nav
-- `SearchBar` with shared `layoutId` motion transition
-- `MessageList` with markdown, source cards, related questions, advanced thinking step visualizations (auto-hiding intermediate steps, checkmark completion), and Framer Motion-enhanced copy buttons (morphing icons, bounce animations).
+Vector search is backed by `chunks.embedding vector(384)` with an HNSW cosine index.

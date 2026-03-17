@@ -1,0 +1,159 @@
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { ChatService, ChatSession } from "./chat-service";
+import { db } from "./db";
+import { messages, roles, threads, users } from "./db/schema";
+import { runGeneration } from "./llm";
+import { getEmbeddings, similaritySearch } from "./rag";
+import { getMemoryPrompt, saveExtractedMemories } from "./memory";
+import { createId } from "./db/cuid";
+
+// Mock dependencies
+vi.mock("./db", () => ({
+  db: {
+    select: vi.fn(),
+    insert: vi.fn().mockReturnValue({ values: vi.fn().mockResolvedValue({}) }),
+    update: vi.fn().mockReturnValue({ set: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue({}) }) }),
+    delete: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue({}) }),
+    transaction: vi.fn((cb) => cb(db)),
+  },
+}));
+
+vi.mock("./llm", () => ({
+  runGeneration: vi.fn().mockResolvedValue({ text: "Hello", citations: [] }),
+}));
+
+vi.mock("./rag", () => ({
+  getEmbeddings: vi.fn().mockResolvedValue([[0.1, 0.2]]),
+  similaritySearch: vi.fn().mockResolvedValue([{ content: "RAG context" }]),
+}));
+
+vi.mock("./memory", () => ({
+  getMemoryPrompt: vi.fn().mockResolvedValue("User likes pizza"),
+  saveExtractedMemories: vi.fn().mockResolvedValue(1),
+}));
+
+vi.mock("./logger", () => ({
+  getLogger: vi.fn().mockReturnValue({
+    info: vi.fn(),
+    error: vi.fn(),
+    warn: vi.fn(),
+  }),
+}));
+
+vi.mock("./settings", () => ({
+  getApiKeys: vi.fn().mockResolvedValue({ PERPLEXITY_API_KEY: "test-key" }),
+}));
+
+describe("ChatService", () => {
+  const mockSession: ChatSession = {
+    requestId: "req-1",
+    userEmail: "test@example.com",
+    threadId: "thread-1",
+    model: "test-model",
+    messages: [{ id: "msg-1", role: "user", content: "Hello" }],
+    redis: null,
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  describe("validate", () => {
+    it("should throw error if thread not found", async () => {
+      (db.select as any).mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          innerJoin: vi.fn().mockReturnValue({
+            where: vi.fn().mockReturnValue({
+              limit: vi.fn().mockResolvedValue([]),
+            }),
+          }),
+        }),
+      });
+
+      const service = new ChatService(mockSession);
+      await expect(service.validate()).rejects.toThrow("Thread not found");
+    });
+
+    it("should return thread and role instructions", async () => {
+      // Mock thread select
+      (db.select as any).mockReturnValueOnce({
+        from: vi.fn().mockReturnValue({
+          innerJoin: vi.fn().mockReturnValue({
+            where: vi.fn().mockReturnValue({
+              limit: vi.fn().mockResolvedValue([{ id: "thread-1", userId: "user-1", roleId: "role-1", memoryEnabled: true }]),
+            }),
+          }),
+        }),
+      });
+
+      // Mock role select
+      (db.select as any).mockReturnValueOnce({
+        from: vi.fn().mockReturnValue({
+          innerJoin: vi.fn().mockReturnValue({
+            where: vi.fn().mockReturnValue({
+              limit: vi.fn().mockResolvedValue([{ instructions: "Be a helpful assistant" }]),
+            }),
+          }),
+        }),
+      });
+
+      const service = new ChatService(mockSession);
+      const result = await service.validate();
+      expect(result.id).toBe("thread-1");
+      expect(result.roleInstructions).toBe("Be a helpful assistant");
+    });
+  });
+
+  describe("handleRegeneration", () => {
+    it("should delete last assistant message on regeneration trigger", async () => {
+      const regenerateSession = { ...mockSession, trigger: "regenerate-message" };
+      
+      (db.select as any).mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            orderBy: vi.fn().mockReturnValue({
+              limit: vi.fn().mockResolvedValue([{ id: "last-msg-id" }]),
+            }),
+          }),
+        }),
+      });
+
+      const service = new ChatService(regenerateSession);
+      const isRegen = await service.handleRegeneration();
+      
+      expect(isRegen).toBe(true);
+      expect(db.delete).toHaveBeenCalled();
+    });
+  });
+
+  describe("execute", () => {
+    it("should orchestrate a full chat completion", async () => {
+      // Setup validation mocks
+      (db.select as any).mockReturnValueOnce({
+        from: vi.fn().mockReturnValue({
+          innerJoin: vi.fn().mockReturnValue({
+            where: vi.fn().mockReturnValue({
+              limit: vi.fn().mockResolvedValue([{ id: "thread-1", userId: "user-1", roleId: "role-1", memoryEnabled: true }]),
+            }),
+          }),
+        }),
+      });
+      (db.select as any).mockReturnValueOnce({
+        from: vi.fn().mockReturnValue({
+          innerJoin: vi.fn().mockReturnValue({
+            where: vi.fn().mockReturnValue({
+              limit: vi.fn().mockResolvedValue([{ instructions: "Role prompt" }]),
+            }),
+          }),
+        }),
+      });
+
+      const service = new ChatService(mockSession);
+      const response = await service.execute();
+      
+      expect(response).toBeDefined();
+      expect(runGeneration).toHaveBeenCalled();
+      expect(db.insert).toHaveBeenCalled(); // Should persist messages
+    });
+  });
+});

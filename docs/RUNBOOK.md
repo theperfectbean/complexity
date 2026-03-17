@@ -3,22 +3,21 @@
 ## Prerequisites
 
 - Docker + Docker Compose
-- Perplexity API key
+- PERPLEXITY_API_KEY
+- ENCRYPTION_KEY (Exactly 32 characters for AES-256)
+- NEXTAUTH_SECRET
 
 ## Environment Setup
 
 1. Copy env:
-
 ```bash
 cp .env.example .env
 ```
 
 2. Set required values:
-
 - `PERPLEXITY_API_KEY`
 - `NEXTAUTH_SECRET`
-
-*Note: There are many more configurable environment variables for RAG, Memory, and Chat limits. See `.env.example` or `app/src/lib/env.ts` for a full list of available knobs and their defaults.*
+- `ENCRYPTION_KEY` (e.g., `openssl rand -hex 16` for a 32-char string)
 
 ## Start System
 
@@ -26,85 +25,75 @@ cp .env.example .env
 docker compose up --build
 ```
 
-*(Note: In development, `docker-compose.dev.yml` is often used to mount a named volume for `node_modules` to prevent host pollution and resolve SWC binary mismatch issues between host and container).*
-
 ### Database Migrations
-If you encounter a `500` error or "failed to start thread" noting `relation "users" does not exist`, you need to apply database migrations.
-
-You can run them manually using:
+Migrations run automatically on container startup. To run them manually:
 ```bash
 docker exec complexity-app npm run db:migrate
 ```
-Or from the host (if `DATABASE_URL` is set to localhost):
+
+### Encryption Migration
+If you are upgrading from a version where API keys were stored in plaintext:
 ```bash
-cd app && npm run db:migrate
+docker exec complexity-app npm run db:encrypt-keys
 ```
 
-## Faster Docker Builds (BuildKit + buildx)
+---
 
-If you see `Docker Compose requires buildx plugin to be installed`, Compose is using the classic builder (slower, weaker caching).
+## Background Worker & Queues
 
-1. Install buildx plugin for your Docker distribution.
-2. Create/use a buildx builder:
+Complexity uses **BullMQ** for asynchronous document processing.
 
+- **Worker:** Automatically started by the `app` container via Next.js instrumentation.
+- **Queue:** Redis-backed `document-processing` queue.
+- **Monitoring:** Monitor queue health via `redis-cli`:
+    ```bash
+    # Check number of waiting jobs
+    docker exec complexity-redis redis-cli llen bull:document-processing:wait
+    ```
+
+---
+
+## Storage & Backups
+
+### Persistence
+The system uses local bind mounts in the `.data/` directory:
+- `.data/postgres`: Database files.
+- `.data/redis`: Cache and queue state.
+- `.data/models`: Downloaded embedding models.
+- `.data/external`: Role-specific external data.
+
+### Automated Backups
+A `postgres-backup` sidecar service performs a `pg_dump` every 24 hours to `backups/postgres/` and retains the last 7 snapshots.
+
+### Recovery
+Restore a SQL backup:
 ```bash
-docker buildx create --name complexity-builder --use
-docker buildx inspect --bootstrap
+cat backups/postgres/snapshot.sql | docker exec -i complexity-postgres psql -U postgres -d postgres
 ```
 
-3. Build with BuildKit enabled:
+---
 
+## Health & Verification
+
+- **Rate Limiting:** Trigger >20 chat requests/min to verify 429 responses.
+- **Worker:** Upload a large document and verify the status transitions from `processing` to `ready` in the UI.
+- **Encryption:** Verify that newly added API keys in the Admin Settings are stored with a `v1:` prefix in the database.
+
+---
+
+## Maintenance & Hygiene
+
+### Disk Space Cleanup
+To prevent disk exhaustion during heavy build/test cycles:
 ```bash
-DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose build app
+sudo rm -rf app/.next
+npm cache clean --force
+docker compose restart app
 ```
+*(Note: Always restart the app after deleting `.next` to restore build manifests).*
 
-The `app` service already includes local cache import/export in `docker-compose.yml`:
-
-- `cache_from: type=local,src=.docker-cache/app`
-- `cache_to: type=local,dest=.docker-cache/app,mode=min`
-
-`mode=min` is optimized for faster local incremental builds (lower cache export overhead).
-If you prefer maximal cache portability (typically CI), use `mode=max`.
-
-Default app URL:
-
-- `http://localhost:3002`
-
-## Health Verification
-
-- Postgres: `pg_isready`
-- Redis: `redis-cli ping`
-- Embedder: `GET /health`
-- App: load home/login pages successfully
-
-## Functional Verification
-
-1. Register + sign in
-2. Create thread and stream a response
-3. Reload thread and verify persisted messages
-4. Create space
-5. Upload a document and confirm `ready` status
-6. Ask a space-scoped question
-7. Trigger rate limiting (>20 requests/min)
-
-## Backups
-
-Ad-hoc backup:
-
+### Permissions
+If the database fails with "Permission denied":
 ```bash
-docker exec complexity-postgres pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" > backup-$(date +%F).sql
-```
-
-Daily cron example:
-
-```cron
-0 2 * * * cd /path/to/complexity && docker exec complexity-postgres pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" > backups/backup-$(date +\%F).sql
-```
-
-## Recovery
-
-Restore SQL backup into Postgres container:
-
-```bash
-cat backup-YYYY-MM-DD.sql | docker exec -i complexity-postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"
+sudo chown -R 999:999 .data/postgres
 ```

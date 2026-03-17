@@ -1,6 +1,8 @@
 import { DrizzleAdapter } from "@auth/drizzle-adapter";
 import * as bcrypt from "bcrypt-ts";
-import NextAuth from "next-auth";
+import NextAuth, { type DefaultSession } from "next-auth";
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+import { type JWT } from "next-auth/jwt";
 import Credentials from "next-auth/providers/credentials";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
@@ -9,6 +11,25 @@ import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 import { runtimeConfig } from "@/lib/config";
 import { getRedisClient } from "@/lib/redis";
+
+declare module "next-auth" {
+  interface Session {
+    user: {
+      id: string;
+      isAdmin?: boolean;
+    } & DefaultSession["user"];
+  }
+
+  interface User {
+    isAdmin?: boolean;
+  }
+}
+
+declare module "next-auth/jwt" {
+  interface JWT {
+    isAdmin?: boolean;
+  }
+}
 
 const signInSchema = z.object({
   email: z.string().email(),
@@ -50,9 +71,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
               // Limit to 10 attempts per 10 minutes per email
               throw new Error("Too many login attempts. Please try again in 10 minutes.");
             }
-          } catch (e: any) {
-            if (e.message.includes("Too many login attempts")) {
-              throw e;
+          } catch (e: unknown) {
+            const error = e as Error;
+            if (error.message.includes("Too many login attempts")) {
+              throw error;
             }
             // Fail open for Redis connection errors
           }
@@ -89,13 +111,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
-        token.isAdmin = (user as any).isAdmin;
+        token.isAdmin = user.isAdmin;
       }
       return token;
     },
     async session({ session, token }) {
       if (session.user) {
-        (session.user as any).isAdmin = token.isAdmin;
+        session.user.isAdmin = token.isAdmin;
       }
       return session;
     },

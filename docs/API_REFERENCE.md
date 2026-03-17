@@ -1,8 +1,8 @@
 # API Reference
 
-All API routes are served from the Next.js app under `app/src/app/api`.
+All API routes are served from the Next.js app under `app/src/app/api`. All routes utilize the `ApiResponse` utility for consistent JSON structures.
 
-Terminology note: “Roles” is the canonical product term. For database compatibility, roles are stored in the `spaces` table and referenced via `space_id` foreign keys.
+Terminology note: “Roles” is the canonical product term (formerly “Spaces”). The API reflects this transition.
 
 ## Auth
 
@@ -10,7 +10,6 @@ Terminology note: “Roles” is the canonical product term. For database compat
 Create a credentials-based user account.
 
 Body:
-
 ```json
 {
   "email": "user@example.com",
@@ -20,113 +19,108 @@ Body:
 ```
 
 Responses:
-
 - `200` success
 - `400` invalid payload
 - `409` email already exists
+- `429` rate limit exceeded
 
-### `/api/auth/[...nextauth]`
-Auth.js handler for credentials session management.
+### `POST /api/auth/login`
+Auth.js credentials provider sign-in. Rate-limited via Redis.
+
+---
 
 ## Chat
 
 ### `POST /api/chat`
-Primary streaming chat endpoint.
+Primary streaming chat endpoint. Orchestrated by `ChatService`.
 
 Body:
-
 ```json
 {
   "threadId": "thread_cuid",
-  "model": "pro-search",
+  "model": "anthropic/claude-sonnet-4-6",
   "messages": [/* AI SDK UI messages */],
-  "spaceId": "optional_space_id"
+  "roleId": "optional_role_id",
+  "webSearch": true,
+  "trigger": "optional_trigger"
 }
 ```
 
 Behavior:
-
-- Requires authenticated session
-- Enforces per-user rate limit via Redis
-- Uses Redis response caching for repeated prompts
-- Validates thread ownership and space ownership
-- Injects RAG context when `spaceId` is present
-- Streams assistant response and persists messages
+- Requires authenticated session.
+- Enforces per-user rate limit via Redis.
+- Streams assistant response and persists messages.
+- Supports triggers like `regenerate-message`.
 
 Responses:
+- `200` SSE streaming response.
+- `400` validation errors.
+- `401` unauthorized.
+- `429` rate limit exceeded.
 
-- `200` streaming response
-- `400` validation errors / thread-space mismatch
-- `401` unauthorized
-- `404` thread or space not found
-- `429` rate limit exceeded
+---
 
-## Threads
+## Roles (formerly Spaces)
 
-### `GET /api/threads`
-List current user's threads ordered by most recent update.
+### `GET /api/roles`
+List current user's roles.
 
-### `POST /api/threads`
-Create a new thread.
+### `POST /api/roles`
+Create a role.
+
+### `DELETE /api/roles/[roleId]`
+Delete a role and all dependent documents/chunks.
+
+---
+
+## Documents & Uploads
+
+### `POST /api/roles/[roleId]/upload`
+Upload a document (`pdf`, `docx`, `txt`, `md`, max 50MB).
+
+Behavior:
+- Validates ownership and file type.
+- Queues processing via BullMQ.
+- Returns immediately; processing happens in the background.
+
+Responses:
+- `202 Accepted` - Processing initiated.
+- `400` Validation error / file too large.
+- `401` Unauthorized.
+- `404` Role not found.
+
+### `GET /api/roles/[roleId]/documents`
+List documents and their processing status (`processing`, `ready`, `failed`).
+
+---
+
+## Admin
+
+### `GET /api/admin/users`
+List system users with pagination and search. (Admin only)
+
+Query Params:
+- `q`: Search query (email/name)
+- `page`: Page number (default 1)
+- `limit`: Results per page (default 20)
+
+### `PATCH /api/admin/users`
+Update user administrative privileges. (Admin only)
 
 Body:
-
 ```json
 {
-  "title": "Thread title",
-  "model": "pro-search",
-  "spaceId": "optional_space_id"
+  "userId": "user_id",
+  "isAdmin": true
 }
 ```
 
-### `GET /api/threads/[threadId]`
-Get thread metadata and all persisted messages.
+---
 
-### `PATCH /api/threads/[threadId]`
-Rename a thread.
+## Settings
 
-### `DELETE /api/threads/[threadId]`
-Delete a thread and related messages.
+### `GET /api/settings`
+Get global application settings and provider status.
 
-## Spaces
-
-### `GET /api/spaces`
-List current user's spaces.
-
-### `POST /api/spaces`
-Create a space.
-
-Body:
-
-```json
-{
-  "name": "Space name",
-  "description": "Optional"
-}
-```
-
-### `GET /api/spaces/[spaceId]`
-Get one space (owned by current user).
-
-### `PATCH /api/spaces/[spaceId]`
-Update space name/description.
-
-### `DELETE /api/spaces/[spaceId]`
-Delete a space and dependent documents/chunks.
-
-## Documents
-
-### `GET /api/spaces/[spaceId]/documents`
-List documents for a space.
-
-### `POST /api/spaces/[spaceId]/upload`
-Upload one document (`pdf`, `docx`, `txt`, `md`, max 20MB).
-
-Flow:
-
-1. Validate ownership and file
-2. Insert `documents` row (`processing`)
-3. Extract text and chunk
-4. Get embeddings from embedder service
-5. Insert chunk vectors
-6. Mark document `ready` or `failed`
+### `POST /api/settings`
+Update settings or API keys. API keys are encrypted at rest.

@@ -5,6 +5,7 @@ import { getRedisClient } from "@/lib/redis";
 import { runtimeConfig } from "@/lib/config";
 import { getLogger } from "@/lib/logger";
 import { ChatService, ChatSession } from "@/lib/chat-service";
+import { checkRateLimit } from "@/lib/rate-limit";
 import { z } from "zod";
 import { UIMessage } from "ai";
 
@@ -27,21 +28,19 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const redis = getRedisClient();
-  if (redis) {
-    try {
-      const rateWindow = Math.floor(Date.now() / 60000);
-      const rateKey = `rate:chat:${userEmail}:${rateWindow}`;
-      const current = await redis.incr(rateKey);
-      if (current === 1) {
-        await redis.expire(rateKey, runtimeConfig.chat.rateLimitTtlSeconds + 1);
-      }
-      if (current > runtimeConfig.chat.rateLimitPerMinute) {
-        return NextResponse.json({ error: "Rate limit exceeded. Try again in a minute." }, { status: 429 });
-      }
-    } catch {
-      // Fail open if Redis is unavailable.
-    }
+  // Rate Limiting
+  const rateLimitKey = `rate:chat:${userEmail}:${Math.floor(Date.now() / 60000)}`;
+  const isAllowed = await checkRateLimit({
+    key: rateLimitKey,
+    limit: runtimeConfig.chat.rateLimitPerMinute,
+    windowSeconds: runtimeConfig.chat.rateLimitTtlSeconds + 1,
+  });
+
+  if (!isAllowed) {
+    return NextResponse.json(
+      { error: "Rate limit exceeded. Try again in a minute." },
+      { status: 429 }
+    );
   }
 
   try {
@@ -51,6 +50,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
     }
 
+    const redis = getRedisClient();
     const chatSession: ChatSession = {
       requestId,
       userEmail,

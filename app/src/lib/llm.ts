@@ -97,8 +97,7 @@ export function getLanguageModel(modelId: string, keys: Record<string, string | 
     
     return createOpenAI({
       apiKey: perplexityKey,
-      baseURL: "https://api.perplexity.ai",
-      compatibility: "compatible",
+      baseURL: "https://api.perplexity.ai/v1",
     }).chat(mappedModelName);
   }
 

@@ -195,8 +195,7 @@ export async function runPerplexityAgent(options: PerplexityAgentOptions) {
               if (!hasWrittenTextDelta) {
                 writer.write({ type: "data-call-result", data: { callId: "model-gen", result: "Finished reasoning." } } as UIMessageChunk);
               }
-              const outputText = asRecord(eventRecord.output_text);
-              const delta = eventRecord.delta || outputText?.delta || "";
+              const delta = eventRecord.delta || eventRecord.output_text?.delta || "";
               if (delta) {
                 assistantText += delta;
                 writer.write({ type: "text-delta", id: textId, delta });
@@ -206,8 +205,7 @@ export async function runPerplexityAgent(options: PerplexityAgentOptions) {
             }
 
             if (eventRecord.type === "response.output_text.done") {
-              const outputText = asRecord(eventRecord.output_text);
-              const fullText = eventRecord.text || outputText?.text || null;
+              const fullText = eventRecord.text || eventRecord.output_text?.text || null;
               if (fullText !== null) {
                 assistantText = fullText;
                 if (!hasWrittenTextDelta) {
@@ -240,8 +238,7 @@ export async function runPerplexityAgent(options: PerplexityAgentOptions) {
             }
 
             if (eventRecord.type === "response.failed") {
-              const errorRecord = asRecord(eventRecord.error);
-              const message = errorRecord?.message || "";
+              const message = eventRecord.error?.message || "";
               if (!hasWrittenTextDelta) {
                 streamingFailed = true;
                 break;
@@ -268,7 +265,7 @@ export async function runPerplexityAgent(options: PerplexityAgentOptions) {
     );
     completedResponse = (nonStreamingResponse as unknown) as Record<string, unknown>;
     if (!assistantText) {
-      assistantText = (nonStreamingResponse as Record<string, any>).output_text || "";
+      assistantText = nonStreamingResponse.output_text || "";
       if (assistantText) {
         writer.write({ type: "data-call-result", data: { callId: "model-gen", result: "Finished reasoning." } } as UIMessageChunk);
         writer.write({ type: "text-delta", id: textId, delta: assistantText });

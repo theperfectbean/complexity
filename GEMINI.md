@@ -235,6 +235,33 @@ DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose build app
 - **Port Mapping Update**: Changed Docker port mapping from `127.0.0.1:3002:3000` to `3002:3000` (exposing on `0.0.0.0`). This allows the app to be accessed from any device on the local network (LAN) via the host's IP address.
 - **Voice Input Troubleshooting**: Enabled non-localhost HTTP access to allow the use of the `chrome://flags/#unsafely-treat-insecure-origin-as-secure` workaround. This is the most reliable way to enable the Web Speech API on local networks where HTTPS/SSL certificates might be untrusted, especially on mobile devices.
 
+### Administrative UX (Implemented 2026-03-17)
+- **User Management**: Added a "Users" tab to the Admin Console, allowing administrators to search for users by name/email and toggle `isAdmin` privileges.
+- **Safety**: Prevented self-demotion in the API to ensure administrators don't accidentally lock themselves out of the management panel.
+
+### Background Processing & Resilience (Implemented 2026-03-17)
+- **BullMQ Integration**: Offloaded resource-intensive document processing (text extraction, chunking, and embedding generation) to a background worker using BullMQ and Redis.
+- **Improved UX**: The upload API now returns a `220 Accepted` response immediately, while the UI displays a "processing" state until the background worker completes the task.
+- **Reliability**: Asynchronous processing prevents request timeouts on large files and allows for automatic retries via BullMQ on failure.
+- **Next.js Instrumentation**: Leveraged the `instrumentationHook` to initialize the background worker on application startup within the Node.js runtime.
+
+### Security & Architectural Hardening (Implemented 2026-03-17)
+- **Unified Rate Limiting**: Extracted rate-limiting logic into a reusable `checkRateLimit` utility backed by Redis. Applied to the Chat API to prevent abuse.
+- **Encryption Integrity**: Refactored the encryption service to throw fatal errors if `ENCRYPTION_KEY` is missing in production, preventing accidental plain-text storage.
+- **Standardized API Responses**: Implemented a consistent `ApiResponse` class for all API routes, ensuring uniform error structures and status codes across the platform.
+- **Queue Optimization**: Improved the BullMQ background worker to handle large file uploads via temporary disk storage (for files >1MB), preventing Redis memory exhaustion.
+- **Job Retention Policy**: Configured BullMQ to automatically clean up completed and failed jobs based on age and count, maintaining Redis performance.
+- **Enhanced Traceability**: Integrated more granular structured logging with Pino across API routes and the background worker for easier debugging and performance monitoring.
+
+### Next.js 16 Migration & Build Fixes (2026-03-17)
+- **Middleware Rename**: Migrated from `middleware.ts` to `proxy.ts` and renamed the export from `middleware` to `proxy` to align with Next.js 16 requirements. Combined security (CSRF/CSP) and authentication logic into this single file.
+- **Experimental Options**: Removed deprecated `experimental.instrumentationHook: true` from `next.config.ts` as it is now default in v16.
+- **Type Augmentation**: Added proper module augmentation for `next-auth` and `next-auth/jwt` in `src/auth.ts` to support the custom `isAdmin` property on user sessions, resolving TypeScript compilation errors.
+- **LLM Provider Compatibility**: Updated `app/src/lib/llm.ts` to remove the unsupported `compatibility: "compatible"` property from `createOpenAI` and corrected the Perplexity `baseURL` to include `/v1`.
+- **UI Component Resilience**: Refactored `UserManagement.tsx` to use native HTML/Tailwind elements, removing a broken dependency on missing `@/components/ui` components while maintaining consistent styling.
+- **Type Safety Hardening**: Resolved several `any` type issues in `perplexity-agent.ts` and `api-response.ts` by using proper interfaces and explicit type guards, satisfying strict linting rules.
+- **Build Performance**: Fixed build-time EACCES errors by ensuring proper cleanup of host-mapped `.next` directories.
+
 ## Workspace Hygiene & Maintenance
 - **Mandatory Cleanup**: To prevent disk space exhaustion, the agent MUST run `sudo rm -rf app/.next` and `npm cache clean --force` as a mandatory final step for every task execution. **If the `complexity-app` container is running, it MUST be restarted immediately after cleanup to restore missing build manifests.** This is critical in this environment where large E2E test runs and frequent builds can rapidly consume storage.
 

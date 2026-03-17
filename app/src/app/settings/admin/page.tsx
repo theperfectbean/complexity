@@ -5,9 +5,10 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { useSession } from "next-auth/react";
 import { LoadingSkeleton } from "@/components/shared/LoadingSkeleton";
-import { Check, Info, ShieldCheck, Zap, RefreshCw, Plus, Trash2, GripVertical, Settings2 } from "lucide-react";
+import { Check, Info, ShieldCheck, Zap, RefreshCw, Plus, Trash2, GripVertical, Settings2, Users } from "lucide-react";
 import { Reorder } from "motion/react";
 import { MODELS } from "@/lib/models";
+import { UserManagement } from "@/components/admin/UserManagement";
 
 type SettingInfo = {
   value: string | null;
@@ -99,7 +100,7 @@ export default function AdminSettingsPage() {
   const { data: session, status } = useSession();
   const [details, setDetails] = useState<Record<string, SettingInfo>>({});
   const [formData, setFormData] = useState<Record<string, string>>({});
-  const [activeTab, setActiveTab] = useState<"providers" | "models">("providers");
+  const [activeTab, setActiveTab] = useState<"providers" | "models" | "users">("providers");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -287,6 +288,15 @@ export default function AdminSettingsPage() {
           <Settings2 className="h-4 w-4" />
           Manage Models
         </button>
+        <button
+          onClick={() => setActiveTab("users")}
+          className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all ${
+            activeTab === "users" ? "bg-background shadow-sm" : "text-muted-foreground hover:bg-background/50"
+          }`}
+        >
+          <Users className="h-4 w-4" />
+          Users
+        </button>
       </div>
 
       {activeTab === "providers" ? (
@@ -364,7 +374,7 @@ export default function AdminSettingsPage() {
             );
           })}
         </div>
-      ) : (
+      ) : activeTab === "models" ? (
         <div className="mt-8 space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
           <section className="rounded-2xl border bg-card p-6 shadow-xs">
             <div className="flex items-center justify-between border-b pb-4 mb-6">
@@ -447,6 +457,12 @@ export default function AdminSettingsPage() {
               </div>
             </section>
           )}
+        </div>
+      ) : (
+        <div className="mt-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
+          <section className="rounded-2xl border bg-card p-6 shadow-xs">
+            <UserManagement />
+          </section>
         </div>
       )}
     </main>
