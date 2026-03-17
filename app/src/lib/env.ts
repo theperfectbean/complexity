@@ -42,7 +42,7 @@ const envSchema = z.object({
   RAG_SIMILARITY_TOP_K: z.coerce.number().int().positive().default(8),
   MEMORY_CACHE_TTL_SECONDS: z.coerce.number().int().positive().default(60 * 5),
   MEMORY_CACHE_PREFIX: z.string().default("memories"),
-  MEMORY_EXTRACTION_MODEL: z.string().default("anthropic/claude-haiku-4-5"),
+  MEMORY_EXTRACTION_MODEL: z.string().default("anthropic/claude-4-6-sonnet-latest"),
   MEMORY_MAX_MEMORIES: z.coerce.number().int().positive().default(100),
   MEMORY_TOP_K: z.coerce.number().int().positive().default(10),
   MEMORY_EXTRACTION_MIN_EXCHANGES: z.coerce.number().int().positive().default(3),

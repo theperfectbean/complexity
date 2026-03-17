@@ -19,5 +19,5 @@ export function getDefaultModel(): ModelId {
   if (defaultModelId && MODEL_IDS.includes(defaultModelId)) {
     return defaultModelId;
   }
-  return models[0]?.id || "perplexity/sonar";
+  return models[0]?.id || "anthropic/claude-4-6-sonnet-latest";
 }

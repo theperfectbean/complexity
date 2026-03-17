@@ -234,15 +234,18 @@ npm run test:coverage
 **Inquiry:** Determine the best model for the system default based on cost-benefit analysis.
 
 **Analysis:**
-- **Current Default (Legacy):** `perplexity/sonar` (~$0.0163 / request, ~0.7s)
+- **Current Default:** `anthropic/claude-4-6-sonnet-latest`
+- **Previous Default (Legacy):** `perplexity/sonar` (~$0.0163 / request, ~0.7s)
 - **Top Contenders:**
-  - `anthropic/claude-haiku-4-5` (~$0.0080 / request, ~1.7s) - **Final Winner**
+  - `anthropic/claude-4-6-sonnet-latest` - **Final Winner**
+  - `anthropic/claude-haiku-4-5` (~$0.0080 / request, ~1.7s)
   - `google/gemini-3-flash-preview` (~$0.0077 / request, ~2.1s)
   - `google/gemini-3.1-pro-preview` (~$0.0099 / request, ~5.2s) - *Rejected on latency*
 
 **Decision:**
-Switch to `anthropic/claude-haiku-4-5`. It offers a **50% cost reduction** compared to Sonar while maintaining a "snappy" response time for a search interface (~1.7-2.1s). While Gemini 3.1 Pro offered better reasoning, its 5.2s latency was deemed unacceptable for a default experience.
+Switch to `anthropic/claude-4-6-sonnet-latest` for the best balance of speed and reasoning for the default experience. It offers a **significant reasoning improvement** compared to Sonar and Haiku while maintaining a "snappy" response time for a search interface.
 
 **Resolution:**
-- Updated `getDefaultModel()` in `app/src/lib/models.ts` to return `anthropic/claude-haiku-4-5`.
+- Updated `getDefaultModel()` in `app/src/lib/models.ts` to return `anthropic/claude-4-6-sonnet-latest`.
 - Verified that API routes correctly ingest the new default via `getDefaultModel()` helper.
+- Updated `DEFAULT_MODELS` order in `app/src/lib/config.ts` to put Claude Sonnet first.

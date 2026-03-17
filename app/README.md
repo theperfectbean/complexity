@@ -17,14 +17,14 @@ Shared model registry is in `src/lib/models.ts`.
 
 Presets:
 - `fast-search`
-- `pro-search` (default)
+- `pro-search`
 - `deep-research`
 - `advanced-deep-research`
 
 Direct models:
+- `anthropic/claude-4-6-sonnet-latest` (default)
 - `perplexity/sonar`
 - `anthropic/claude-opus-4-6`
-- `anthropic/claude-4-6-sonnet-latest`
 - `anthropic/claude-haiku-4-5`
 - `openai/gpt-5.4`
 - `google/gemini-3.1-pro-preview`

@@ -76,7 +76,7 @@ export const proxy = auth(async (req) => {
     base-uri 'self';
     form-action 'self';
     frame-ancestors 'none';
-    upgrade-insecure-requests;
+    
   `.replace(/\s{2,}/g, " ").trim();
 
   // Set security headers on the response

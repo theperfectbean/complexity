@@ -8,11 +8,11 @@ export type ModelOption = {
 };
 
 const DEFAULT_MODELS: ModelOption[] = [
+  { id: "anthropic/claude-4-6-sonnet-latest", label: "Claude 4.6 Sonnet", category: "Anthropic", isPreset: false },
   { id: "fast-search", label: "Fast Search", category: "Presets", isPreset: true },
   { id: "pro-search", label: "Pro Search", category: "Presets", isPreset: true },
   { id: "perplexity/sonar", label: "Perplexity Sonar", category: "Perplexity", isPreset: false },
   { id: "anthropic/claude-4-6-opus-latest", label: "Claude 4.6 Opus", category: "Anthropic", isPreset: false },
-  { id: "anthropic/claude-4-6-sonnet-latest", label: "Claude 4.6 Sonnet", category: "Anthropic", isPreset: false },
   { id: "anthropic/claude-4-5-haiku-latest", label: "Claude 4.5 Haiku", category: "Anthropic", isPreset: false },
   { id: "openai/gpt-5.4", label: "GPT-5.4", category: "OpenAI", isPreset: false },
   { id: "google/gemini-3.1-pro-preview", label: "Gemini 3.1 Pro Preview", category: "Google", isPreset: false },
