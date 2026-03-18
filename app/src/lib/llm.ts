@@ -84,9 +84,8 @@ export function getProviderAndModel(modelId: string): { provider: ProviderType; 
  * (e.g. anthropic/openai/google) are preserved for Perplexity routing.
  */
 function mapToPerplexityModel(modelName: string): string {
-  if (modelName === "fast-search" || modelName === "sonar") return "sonar";
-  if (modelName === "pro-search" || modelName === "sonar-pro") return "sonar-pro";
-
+  // We no longer map fast-search to sonar because fast-search is the actual native preset name
+  // in the Perplexity Agent API.
   return modelName;
 }
 

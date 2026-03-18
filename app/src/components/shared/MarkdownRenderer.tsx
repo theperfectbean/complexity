@@ -4,6 +4,7 @@ import rehypeHighlight from "rehype-highlight";
 import remarkGfm from "remark-gfm";
 import { ChartRenderer } from "./ChartRenderer";
 import { Copy, Check } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 type MarkdownRendererProps = {
   content: string;
@@ -65,16 +66,23 @@ const components: Components = {
 
     const content = extractText(children).trim();
     
-    // Most resilient detection: 
-    if (!inline && content.startsWith('{') && content.endsWith('}')) {
+    // Most resilient detection for chart data: 
+    if (content.startsWith('{') && content.endsWith('}')) {
       if (content.includes('"type"') && content.includes('"data"')) {
         return <ChartRenderer data={content} />;
       }
     }
 
-    if (inline) {
+    // In react-markdown v9+, inline is no longer passed. 
+    // We check if it's a block by looking for language- in className
+    const isBlock = className?.includes("language-");
+
+    if (!isBlock) {
+      // Destructure node to prevent it from being passed to the code element
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { node: _node, ...rest } = props as any;
       return (
-        <code className={className} {...props}>
+        <code className={cn("px-1.5 py-0.5 rounded-md bg-muted/60 text-foreground font-medium text-[0.9em]", className)} {...rest}>
           {children}
         </code>
       );
@@ -84,24 +92,36 @@ const components: Components = {
     const language = match ? match[1] : "";
 
     return (
-      <div className="relative group/code">
+      <div className="relative group/code my-4">
         {language && (
           <div className="absolute top-0 right-12 px-2 py-1 text-[10px] font-bold uppercase text-muted-foreground/50 select-none pointer-events-none z-20">
             {language}
           </div>
         )}
         <CopyButton content={content} />
-        <code className={className} {...props}>
-          {children}
-        </code>
+        {/* Destructure node to prevent it from being passed to the code element */}
+        {(() => {
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          const { node: _node, ...rest } = props as any;
+          return (
+            <code className={cn("block w-full overflow-x-auto", className)} {...rest}>
+              {children}
+            </code>
+          );
+        })()}
       </div>
     );
   },
   table({ children, ...props }: React.ComponentPropsWithoutRef<"table">) {
+    // Destructure node to prevent it from being passed to the table element
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { node, ...rest } = props as any;
     return (
-      <table {...props}>
-        {children}
-      </table>
+      <div className="my-6 w-full overflow-x-auto rounded-xl border border-border/40 shadow-sm bg-card/40">
+        <table {...rest}>
+          {children}
+        </table>
+      </div>
     );
   }
 };

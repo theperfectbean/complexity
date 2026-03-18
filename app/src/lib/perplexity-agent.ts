@@ -42,10 +42,10 @@ export async function runPerplexityAgent(options: PerplexityAgentOptions) {
 
   // Map internal preset IDs to Perplexity preset names
   let modelId = rawModelId;
-  const isPreset = isPresetModel(rawModelId) || modelId === "sonar" || modelId === "sonar-pro" || modelId === "sonar-reasoning" || modelId === "sonar-reasoning-pro" || modelId === "sonar-deep-research";
+  const isPreset = isPresetModel(rawModelId) || ["fast-search", "pro-search", "deep-research", "advanced-deep-research"].includes(modelId);
 
-  if (modelId === "fast-search") modelId = "sonar";
-  if (modelId === "pro-search") modelId = "sonar-pro";
+  // We no longer map fast-search to sonar because fast-search is the actual native preset name
+  // in the Perplexity Agent API, which includes built-in web_search.
 
   let assistantText = "";
 
@@ -54,18 +54,19 @@ export async function runPerplexityAgent(options: PerplexityAgentOptions) {
   const PERPLEXITY_STREAM_TIMEOUT_MS = runtimeConfig.perplexity.streamTimeoutMs;
 
   const client = createPerplexityClient(apiKey);
-  const requestBodyBase = isPreset
-    ? {
-        preset: modelId,
-        input: agentInput,
-        instructions: instructions,
-      }
-    : {
-        model: modelId,
-        input: agentInput,
-        instructions: instructions,
-        tools: webSearch ? runtimeConfig.perplexity.webTools : [],
-      };
+  
+  // Filter out system messages from input to avoid redundancy with instructions
+  const filteredInput = agentInput.filter(item => {
+    if (item.type === "message" && item.role === "system") return false;
+    return true;
+  });
+
+  const requestBodyBase = {
+    ...(isPreset ? { preset: modelId } : { model: modelId }),
+    input: filteredInput,
+    instructions: instructions,
+    tools: webSearch ? runtimeConfig.perplexity.webTools : [],
+  };
 
   const requestBody: Responses.ResponseCreateParamsStreaming = {
     ...requestBodyBase,

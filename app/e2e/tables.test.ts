@@ -39,9 +39,9 @@ test.describe("Markdown Table Rendering", () => {
     const thPadding = await firstTh.evaluate((el) => window.getComputedStyle(el).padding);
     const tdPadding = await firstTd.evaluate((el) => window.getComputedStyle(el).padding);
 
-    // Our CSS adds 0.5rem (8px) top/bottom and 0.75rem (12px) left/right
-    // getComputedStyle often returns this as "8px 12px"
-    expect(thPadding).toContain("8px 12px");
-    expect(tdPadding).toContain("8px 12px");
+    // Our CSS adds 0.75rem (12px) top/bottom and 1rem (16px) left/right
+    // getComputedStyle often returns this as "12px 16px"
+    expect(thPadding).toContain("12px 16px");
+    expect(tdPadding).toContain("12px 16px");
   });
 });

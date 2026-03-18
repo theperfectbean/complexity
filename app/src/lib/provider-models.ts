@@ -10,6 +10,9 @@ export type ProviderModel = {
 };
 
 function normalizePerplexityModelId(id: string): string {
+  if (["fast-search", "pro-search", "deep-research", "advanced-deep-research"].includes(id)) {
+    return id;
+  }
   return id.startsWith("perplexity/") ? id : `perplexity/${id}`;
 }
 
@@ -71,6 +74,19 @@ export async function fetchProviderModelsWithStatus(): Promise<ProviderDiscovery
   // 0. Perplexity (Sonar models and supported third-party models via Agent API)
   if (keys["PERPLEXITY_API_KEY"]) {
     promises.push((async () => {
+      // Core presets that we know exist on the Agent API
+      const corePresets = [
+        { id: "fast-search", name: "Fast Search", provider: "Perplexity" },
+        { id: "pro-search", name: "Pro Search", provider: "Perplexity" },
+        { id: "deep-research", name: "Deep Research", provider: "Perplexity" },
+        { id: "advanced-deep-research", name: "Advanced Deep Research", provider: "Perplexity" },
+        { id: "perplexity/sonar", name: "Sonar", provider: "Perplexity" },
+        { id: "perplexity/sonar-pro", name: "Sonar Pro", provider: "Perplexity" },
+        { id: "perplexity/sonar-reasoning", name: "Sonar Reasoning", provider: "Perplexity" },
+        { id: "perplexity/sonar-reasoning-pro", name: "Sonar Reasoning Pro", provider: "Perplexity" },
+        { id: "perplexity/sonar-deep-research", name: "Sonar Deep Research", provider: "Perplexity" },
+      ];
+
       try {
         const res = await fetch("https://api.perplexity.ai/v1/models", {
           headers: { Authorization: `Bearer ${keys["PERPLEXITY_API_KEY"]}` },
@@ -78,9 +94,16 @@ export async function fetchProviderModelsWithStatus(): Promise<ProviderDiscovery
         });
         if (res.ok) {
           const data = await res.json() as { data?: { id: string }[] };
+          
+          // Add core presets first
+          corePresets.forEach((m) => allModels.push(createProviderModel("perplexity", m.provider, m.id, m.name)));
+
           data.data?.forEach((m) => {
             const normalized = normalizePerplexityModelId(m.id);
-            allModels.push(createProviderModel("perplexity", "Perplexity", normalized, normalized));
+            // Skip if already added via presets
+            if (!corePresets.some(p => p.id === normalized)) {
+              allModels.push(createProviderModel("perplexity", "Perplexity", normalized, normalized));
+            }
           });
           statuses.perplexity = { state: "ok" };
         } else {
@@ -90,11 +113,7 @@ export async function fetchProviderModelsWithStatus(): Promise<ProviderDiscovery
         console.warn("Falling back to static Perplexity model list", e);
         // Fallback to known stable models if dynamic discovery fails
         [
-          { id: "perplexity/sonar", name: "Sonar", provider: "Perplexity" },
-          { id: "perplexity/sonar-pro", name: "Sonar Pro", provider: "Perplexity" },
-          { id: "perplexity/sonar-reasoning", name: "Sonar Reasoning", provider: "Perplexity" },
-          { id: "perplexity/sonar-reasoning-pro", name: "Sonar Reasoning Pro", provider: "Perplexity" },
-          { id: "perplexity/sonar-deep-research", name: "Sonar Deep Research", provider: "Perplexity" },
+          ...corePresets,
           { id: "perplexity/anthropic/claude-4-6-opus-latest", name: "Claude 4.6 Opus (via Perplexity)", provider: "Perplexity" },
           { id: "perplexity/anthropic/claude-4-6-sonnet-latest", name: "Claude 4.6 Sonnet (via Perplexity)", provider: "Perplexity" },
           { id: "perplexity/anthropic/claude-4-5-haiku-latest", name: "Claude 4.5 Haiku (via Perplexity)", provider: "Perplexity" },

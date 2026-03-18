@@ -135,8 +135,8 @@ export function getModelProvider(model: Pick<ModelLike, "id" | "isPreset">): Mod
 }
 
 export function getModelHealthTargetId(modelId: string): string {
-  if (modelId === "fast-search") return "perplexity/sonar";
-  if (modelId === "pro-search") return "perplexity/sonar-pro";
+  // We no longer map presets to underlying models for health checks,
+  // as the presets themselves are evaluated.
   return modelId;
 }
 
