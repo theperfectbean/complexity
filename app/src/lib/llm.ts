@@ -154,8 +154,16 @@ export async function runGeneration(options: GenerationOptions): Promise<Generat
 
   if (provider === "perplexity") {
     try {
+      // Build a fallback chain: primary model -> standard models -> fast model
+      const primaryModel = mapToPerplexityModel(modelName);
+      const fallbackChain = Array.from(new Set([
+        primaryModel,
+        "sonar-pro",
+        "sonar"
+      ])).slice(0, 5); // Agent API allows up to 5 models
+
       const result = await runSearchAgent({
-        modelId: mapToPerplexityModel(modelName),
+        modelId: fallbackChain,
         agentInput: options.agentInput,
         instructions: options.system || "",
         webSearch: !!options.webSearch,

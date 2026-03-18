@@ -8,7 +8,7 @@ import { runtimeConfig } from "./config";
 import { env } from "./env";
 
 export interface SearchAgentOptions {
-  modelId: string;
+  modelId: string | string[];
   agentInput: Responses.InputItem[];
   instructions: string;
   webSearch: boolean;
@@ -40,9 +40,15 @@ interface AgentEvent {
 export async function runSearchAgent(options: SearchAgentOptions) {
   const { modelId: rawModelId, agentInput, instructions, webSearch, apiKey, writer, textId } = options;
 
-  // Map internal preset IDs to Perplexity preset names
-  const modelId = rawModelId;
-  const isPreset = isPresetModel(rawModelId) || ["fast-search", "pro-search", "deep-research", "advanced-deep-research"].includes(modelId);
+  let modelConfig: Record<string, unknown> = {};
+  if (Array.isArray(rawModelId)) {
+    // If it's an array, we pass it as 'models' for fallback
+    modelConfig = { models: rawModelId };
+  } else {
+    // Single model logic
+    const isPreset = isPresetModel(rawModelId) || ["fast-search", "pro-search", "deep-research", "advanced-deep-research"].includes(rawModelId);
+    modelConfig = isPreset ? { preset: rawModelId } : { model: rawModelId };
+  }
 
   // We no longer map fast-search to sonar because fast-search is the actual native preset name
   // in the Perplexity Agent API, which includes built-in web_search.
@@ -62,7 +68,7 @@ export async function runSearchAgent(options: SearchAgentOptions) {
   });
 
   const requestBodyBase = {
-    ...(isPreset ? { preset: modelId } : { model: modelId }),
+    ...modelConfig,
     input: filteredInput,
     instructions: instructions,
     tools: webSearch ? runtimeConfig.perplexity.webTools : [],
