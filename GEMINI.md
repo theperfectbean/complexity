@@ -342,6 +342,21 @@ DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose build app
   - **Layout Stability**: Added `min-h` reservations for `SourceCarousel` and `MarkdownRenderer` containers to minimize sudden jumps when these elements first appear or start growing.
 - **Result**: Significant reduction in perceived jitter and smoother visual flow during long response streaming.
 
+### Markdown Polish & Aesthetic Enhancements (2026-03-18)
+- **Tables**:
+  - Implemented zebra-striping (alternating row colors) for better readability.
+  - Switched to `border-collapse: separate` with rounded corners (0.75rem) and refined borders.
+  - Added uppercase, bolded headers with a subtle background tint.
+  - Improved padding and ensured 100% width with horizontal overflow support.
+- **Code Blocks**:
+  - Added automatic language labels in the top-right corner, extracted from the Markdown language identifier.
+  - Refined the "Copy" button positioning and visibility.
+  - Improved padding and spacing inside `pre` and `code` tags.
+- **Typography & Lists**:
+  - Enhanced list item spacing and replaced standard bullets with custom colored markers.
+  - Added support for GFM task lists with styled checkboxes.
+  - Refined blockquote styling with a primary-color accent border.
+
 ### Model Identity Hallucination Fix (2026-03-18)
 - **Problem**: Users reported that selecting "Pro Search" resulted in the assistant identifying itself as "Claude Haiku" when asked "Which model are you?".
 - **Finding**: Investigative tests confirmed that Perplexity's `sonar-pro` (and potentially other models) can hallucinate their identity based on the conversation context. If the history contains mentions of "Claude Haiku", the model may adopt that persona when questioned about its identity.

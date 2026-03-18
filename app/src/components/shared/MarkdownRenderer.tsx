@@ -41,13 +41,16 @@ function CopyButton({ content }: { content: string }) {
 const components: Components = {
   pre({ children, ...props }: React.ComponentPropsWithoutRef<"pre">) {
     return (
-      <pre {...props} className={`${props.className || ""} group relative`}>
+      <pre 
+        {...props} 
+        className={`${props.className || ""} group relative`}
+      >
         {children}
       </pre>
     );
   },
   code({ inline, className, children, ...props }: React.ComponentPropsWithoutRef<"code"> & { inline?: boolean }) {
-    // Extract text content from children (which might be an array or nested elements due to rehype-highlight)
+    // Extract text content from children
     const extractText = (node: unknown): string => {
       if (typeof node === "string") return node;
       if (Array.isArray(node)) return node.map(extractText).join("");
@@ -77,13 +80,28 @@ const components: Components = {
       );
     }
 
+    const match = /language-(\w+)/.exec(className || "");
+    const language = match ? match[1] : "";
+
     return (
-      <>
+      <div className="relative group/code">
+        {language && (
+          <div className="absolute top-0 right-12 px-2 py-1 text-[10px] font-bold uppercase text-muted-foreground/50 select-none pointer-events-none z-20">
+            {language}
+          </div>
+        )}
         <CopyButton content={content} />
         <code className={className} {...props}>
           {children}
         </code>
-      </>
+      </div>
+    );
+  },
+  table({ children, ...props }: React.ComponentPropsWithoutRef<"table">) {
+    return (
+      <table {...props}>
+        {children}
+      </table>
     );
   }
 };
