@@ -60,7 +60,7 @@ const PROVIDERS: ProviderConfig[] = [
     keyName: "ANTHROPIC_API_KEY",
     toggleName: "PROVIDER_ANTHROPIC_ENABLED",
     placeholder: "sk-ant-...",
-    description: "Enables Claude 4.6 and 4.5 models.",
+    description: "Enables Claude models (e.g., Sonnet, Opus, Haiku).",
   },
   {
     id: "openai",
@@ -68,7 +68,7 @@ const PROVIDERS: ProviderConfig[] = [
     keyName: "OPENAI_API_KEY",
     toggleName: "PROVIDER_OPENAI_ENABLED",
     placeholder: "sk-...",
-    description: "Enables GPT-5.4 and other OpenAI models.",
+    description: "Enables GPT models (e.g., GPT-4o).",
   },
   {
     id: "google",
@@ -76,7 +76,7 @@ const PROVIDERS: ProviderConfig[] = [
     keyName: "GOOGLE_GENERATIVE_AI_API_KEY",
     toggleName: "PROVIDER_GOOGLE_ENABLED",
     placeholder: "AIza...",
-    description: "Enables Gemini 3.1 Pro and Flash models.",
+    description: "Enables Gemini models (e.g., Pro, Flash).",
   },
   {
     id: "xai",
@@ -84,7 +84,7 @@ const PROVIDERS: ProviderConfig[] = [
     keyName: "XAI_API_KEY",
     toggleName: "PROVIDER_XAI_ENABLED",
     placeholder: "xai-...",
-    description: "Enables Grok 4.20 models.",
+    description: "Enables Grok models.",
   },
   {
     id: "ollama",
