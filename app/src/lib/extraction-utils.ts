@@ -127,7 +127,7 @@ export function extractCitationsFromResponse(response: unknown): Citation[] {
     });
   }
 
-  // 2. Handle nested Perplexity-style annotations
+  // 2. Handle nested Agent-style annotations
   const outputItems = Array.isArray(responseRecord.output) ? responseRecord.output : [];
   for (const item of outputItems) {
     const itemRecord = asRecord(item);

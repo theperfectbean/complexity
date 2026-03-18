@@ -50,7 +50,7 @@ export function RoleCard({
               "relative z-20 inline-flex h-8 w-8 items-center justify-center rounded-full transition-all duration-200",
               pinned 
                 ? "bg-primary/10 text-primary opacity-100" 
-                : "text-muted-foreground/40 hover:bg-muted/60 hover:text-foreground opacity-0 group-hover:opacity-100"
+                : "text-muted-foreground/40 hover:bg-muted/60 hover:text-foreground md:opacity-0 md:group-hover:opacity-100"
             )}
             title={pinned ? "Unpin from sidebar" : "Pin to sidebar"}
           >
@@ -64,7 +64,7 @@ export function RoleCard({
           Updated {new Date(updatedAt).toLocaleDateString()}
         </p>
         {(onRename || onDelete) && (
-          <div className="z-20 flex opacity-0 transition-opacity group-hover:opacity-100">
+          <div className="z-20 flex transition-opacity md:opacity-0 md:group-hover:opacity-100">
             {onRename ? (
               <button
                 type="button"

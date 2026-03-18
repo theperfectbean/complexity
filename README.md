@@ -1,6 +1,6 @@
 # Complexity
 
-Self-hosted Perplexity-style AI search and RAG workspace.
+Self-hosted Agentic AI search and RAG workspace.
 
 ## Implementation Summary
 
@@ -53,7 +53,7 @@ Self-hosted Perplexity-style AI search and RAG workspace.
 ### Refactor Note: Perplexity SDK → Agent API
 - **What changed**
   - Chat backend moved from provider-style model resolution to direct Agent API calls.
-  - Perplexity client is now initialized via `@perplexity-ai/perplexity_ai` implementing `LanguageModelV3` in [app/src/lib/perplexity.ts](app/src/lib/perplexity.ts).
+  - Agent client is now initialized via `@perplexity-ai/perplexity_ai` implementing `LanguageModelV3` in [app/src/lib/agent-client.ts](app/src/lib/agent-client.ts).
   - Chat streaming now processes Agent API response events via `data-json` chunk types.
 - **Modeling changes**
   - Default thread model changed from Sonar-style IDs to Agent preset IDs (default: `pro-search`).

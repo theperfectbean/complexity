@@ -451,7 +451,7 @@ export default function AdminSettingsPage() {
                   })()}
                   <button 
                     onClick={() => removeModel(model.id)}
-                    className="rounded-lg p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors opacity-0 group-hover:opacity-100"
+                    className="rounded-lg p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors md:opacity-0 md:group-hover:opacity-100"
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>

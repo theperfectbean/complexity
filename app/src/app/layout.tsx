@@ -28,7 +28,7 @@ const sourceSerif = Source_Serif_4({
 
 export const metadata: Metadata = {
   title: "Complexity",
-  description: "Self-hosted Perplexity-style answer engine",
+  description: "Self-hosted Agentic answer engine",
 };
 
 export default async function RootLayout({

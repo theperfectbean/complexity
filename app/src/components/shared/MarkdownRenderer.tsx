@@ -27,7 +27,7 @@ function CopyButton({ content }: { content: string }) {
   return (
     <button
       onClick={handleCopy}
-      className="absolute top-2 right-2 p-1.5 rounded-md border border-border bg-background/80 hover:bg-background text-muted-foreground hover:text-foreground transition-all opacity-0 group-hover:opacity-100 focus:opacity-100 z-10"
+      className="absolute top-2 right-2 p-1.5 rounded-md border border-border bg-background/80 hover:bg-background text-muted-foreground hover:text-foreground transition-all md:opacity-0 md:group-hover:opacity-100 md:focus:opacity-100 z-10"
       title="Copy to clipboard"
     >
       {copied ? (
@@ -50,7 +50,7 @@ const components: Components = {
       </pre>
     );
   },
-  code({ inline, className, children, ...props }: React.ComponentPropsWithoutRef<"code"> & { inline?: boolean }) {
+  code({ className, children, ...props }: React.ComponentPropsWithoutRef<"code">) {
     // Extract text content from children
     const extractText = (node: unknown): string => {
       if (typeof node === "string") return node;
@@ -80,7 +80,7 @@ const components: Components = {
     if (!isBlock) {
       // Destructure node to prevent it from being passed to the code element
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { node: _node, ...rest } = props as any;
+      const { node: _node, ...rest } = props as Record<string, unknown>;
       return (
         <code className={cn("px-1.5 py-0.5 rounded-md bg-muted/60 text-foreground font-medium text-[0.9em]", className)} {...rest}>
           {children}
@@ -102,7 +102,7 @@ const components: Components = {
         {/* Destructure node to prevent it from being passed to the code element */}
         {(() => {
           // eslint-disable-next-line @typescript-eslint/no-unused-vars
-          const { node: _node, ...rest } = props as any;
+          const { node: _node, ...rest } = props as Record<string, unknown>;
           return (
             <code className={cn("block w-full overflow-x-auto", className)} {...rest}>
               {children}
@@ -115,7 +115,7 @@ const components: Components = {
   table({ children, ...props }: React.ComponentPropsWithoutRef<"table">) {
     // Destructure node to prevent it from being passed to the table element
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { node, ...rest } = props as any;
+    const { node, ...rest } = props as Record<string, unknown>;
     return (
       <div className="my-6 w-full overflow-x-auto rounded-xl border border-border/40 shadow-sm bg-card/40">
         <table {...rest}>

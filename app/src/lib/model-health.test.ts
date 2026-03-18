@@ -50,6 +50,13 @@ describe("model-health", () => {
     vi.mocked(fetchProviderModelsWithStatus).mockResolvedValue({
       models: [
         {
+          id: "fast-search",
+          name: "Fast Search",
+          provider: "Perplexity",
+          providerId: "perplexity",
+          normalizedId: "fast-search",
+        },
+        {
           id: "perplexity/sonar",
           name: "Sonar",
           provider: "Perplexity",
@@ -109,6 +116,13 @@ describe("model-health", () => {
 
     vi.mocked(fetchProviderModelsWithStatus).mockResolvedValue({
       models: [
+        {
+          id: "fast-search",
+          name: "Fast Search",
+          provider: "Perplexity",
+          providerId: "perplexity",
+          normalizedId: "fast-search",
+        },
         {
           id: "perplexity/sonar",
           name: "Sonar",

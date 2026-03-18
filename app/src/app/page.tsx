@@ -67,7 +67,7 @@ export default function Home() {
     return (
       <main className="mx-auto flex min-h-screen w-full max-w-3xl flex-col items-center justify-center gap-4 px-6">
         <h1 className="font-[var(--font-accent)] text-4xl font-semibold tracking-tight">Complexity</h1>
-        <p className="text-sm text-muted-foreground">Self-hosted Perplexity-style search and RAG workspace.</p>
+        <p className="text-sm text-muted-foreground">Self-hosted AI search and RAG workspace.</p>
         <div className="flex gap-3">
           <Link className="rounded-md border bg-card px-4 py-2 hover:bg-accent" href="/login">
             Sign in

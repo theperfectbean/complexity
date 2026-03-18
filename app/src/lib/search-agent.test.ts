@@ -1,28 +1,28 @@
 import { describe, expect, it, vi } from "vitest";
-import { runPerplexityAgent } from "./perplexity-agent";
-import { createPerplexityClient } from "./perplexity";
+import { runSearchAgent } from "./search-agent";
+import { createAgentClient } from "./agent-client";
 import type { Responses } from "@perplexity-ai/perplexity_ai/resources/responses";
 
-vi.mock("./perplexity", () => ({
-  createPerplexityClient: vi.fn(),
+vi.mock("./agent-client", () => ({
+  createAgentClient: vi.fn(),
 }));
 
-describe("perplexity-agent.ts", () => {
-  describe("runPerplexityAgent", () => {
+describe("search-agent.ts", () => {
+  describe("runSearchAgent", () => {
     it("throws an error if client fails immediately", async () => {
       const mockClient = {
         responses: {
           create: vi.fn().mockRejectedValue(new Error("API Error")),
         },
       };
-      vi.mocked(createPerplexityClient).mockReturnValue(mockClient as ReturnType<typeof createPerplexityClient>);
+      vi.mocked(createAgentClient).mockReturnValue(mockClient as ReturnType<typeof createAgentClient>);
 
       const agentInput: Responses.InputItem[] = [
         { type: "message", role: "user", content: [{ type: "input_text", text: "hello" }] },
       ];
 
       await expect(
-        runPerplexityAgent({
+        runSearchAgent({
           modelId: "sonar-pro",
           agentInput,
           instructions: "System",

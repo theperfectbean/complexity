@@ -1,4 +1,4 @@
-import { createPerplexityClient } from "@/lib/perplexity";
+import { createAgentClient } from "@/lib/agent-client";
 import { runtimeConfig } from "../config";
 import { extractJsonObject, extractAssistantText } from "../extraction-utils";
 import * as MemoryStore from "./MemoryStore";
@@ -42,7 +42,7 @@ export async function extractMemories({
   existingMemories,
 }: ExtractMemoriesInput): Promise<ExtractionResult> {
   const existingNormalized = new Set(existingMemories.map((item) => normalizeMemory(item.content)));
-  const client = createPerplexityClient();
+  const client = createAgentClient();
 
   const response = await client.responses.create({
     model: runtimeConfig.memory.extractionModel,

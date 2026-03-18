@@ -1,10 +1,10 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { runGeneration, getProviderAndModel, getLanguageModel, GenerationOptions } from "./llm";
-import * as perplexityAgent from "./perplexity-agent";
+import * as searchAgent from "./search-agent";
 import { UIMessage } from "ai";
 
-vi.mock("./perplexity-agent", () => ({
-  runPerplexityAgent: vi.fn(),
+vi.mock("./search-agent", () => ({
+  runSearchAgent: vi.fn(),
 }));
 
 describe("llm.ts", () => {
@@ -52,9 +52,9 @@ describe("llm.ts", () => {
   });
 
   describe("runGeneration", () => {
-    it("routes perplexity agent models to runPerplexityAgent and maps model ID", async () => {
+    it("routes perplexity agent models to runSearchAgent and maps model ID", async () => {
       const mockResult = { text: "hello", completedResponse: {} };
-      vi.mocked(perplexityAgent.runPerplexityAgent).mockResolvedValue(mockResult);
+      vi.mocked(searchAgent.runSearchAgent).mockResolvedValue(mockResult);
 
       const mockWriter = { write: vi.fn() };
 
@@ -69,7 +69,7 @@ describe("llm.ts", () => {
         keys: { "PERPLEXITY_API_KEY": "test" },
       });
 
-      expect(perplexityAgent.runPerplexityAgent).toHaveBeenCalledWith(expect.objectContaining({
+      expect(searchAgent.runSearchAgent).toHaveBeenCalledWith(expect.objectContaining({
         modelId: "anthropic/claude-4-6-sonnet-latest",
       }));
       expect(result.text).toBe("hello");

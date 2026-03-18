@@ -5,7 +5,7 @@ import type { Responses } from "@perplexity-ai/perplexity_ai/resources/responses
 import { describe, expect, it } from "vitest";
 
 import { MODELS } from "@/lib/models";
-import { createPerplexityClient } from "@/lib/perplexity";
+import { createAgentClient } from "@/lib/agent-client";
 import { extractAssistantText } from "@/lib/extraction-utils";
 
 type SmokeResult = {
@@ -60,7 +60,7 @@ smokeDescribe("Perplexity Agent SMOKE", () => {
       throw new Error("PERPLEXITY_API_KEY is required");
     }
 
-    const client = createPerplexityClient();
+    const client = createAgentClient();
     const results: SmokeResult[] = [];
 
     const activeModels = MODELS.filter((m) => !m.id.startsWith("ollama/") && !m.id.startsWith("local-openai/"));

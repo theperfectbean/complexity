@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import type { Responses } from "@perplexity-ai/perplexity_ai/resources/responses";
 import { describe, it } from "vitest";
 import { MODELS } from "@/lib/models";
-import { createPerplexityClient } from "@/lib/perplexity";
+import { createAgentClient } from "@/lib/agent-client";
 import { extractAssistantText } from "@/lib/extraction-utils";
 
 // Run this with: RUN_MODEL_PROMPTS=1 vitest run src/test/model-prompts.test.ts
@@ -40,7 +40,7 @@ promptDescribe("Model Prompt & Response Validation", () => {
       throw new Error("PERPLEXITY_API_KEY is required");
     }
 
-    const client = createPerplexityClient();
+    const client = createAgentClient();
     const allResults: {
       modelId: string;
       modelLabel: string;

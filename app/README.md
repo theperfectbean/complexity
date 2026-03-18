@@ -38,7 +38,7 @@ For direct models, the chat route enables Agent API tools:
 ## Key files
 
 - `src/app/api/chat/route.ts`: Agent API streaming bridge + persistence
-- `src/lib/perplexity.ts`: server-side Perplexity client factory
+- `src/lib/agent-client.ts`: server-side agent client factory
 - `src/lib/models.ts`: shared curated model list and helpers
 - `src/lib/rag.ts`: retrieval logic for local space-scoped context
 - `src/app/page.tsx`: home model selector + thread creation

@@ -213,7 +213,7 @@ const MessageItem = memo(function MessageItem({
             />
           </div>
 
-          <div className="mt-4 flex items-center justify-start opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+          <div className="mt-4 flex items-center justify-start transition-opacity md:opacity-0 md:group-hover:opacity-100 md:focus-within:opacity-100">
             <div className="flex items-center gap-1.5">
               <button
                 className="relative inline-flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-black/5 dark:hover:bg-white/5 active:scale-95"

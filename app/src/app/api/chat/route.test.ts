@@ -16,8 +16,8 @@ vi.mock("@/lib/redis", () => ({
   getRedisClient: vi.fn(),
 }));
 
-vi.mock("@/lib/perplexity", () => ({
-  createPerplexityClient: vi.fn(),
+vi.mock("@/lib/agent-client", () => ({
+  createAgentClient: vi.fn(),
 }));
 
 vi.mock("@/lib/memory", () => ({
@@ -36,7 +36,7 @@ vi.mock("@/lib/settings", () => ({
 
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
-import { createPerplexityClient } from "@/lib/perplexity";
+import { createAgentClient } from "@/lib/agent-client";
 import { getRedisClient } from "@/lib/redis";
 import {
   mockSelectResult,
@@ -53,7 +53,7 @@ describe("POST /api/chat", () => {
     vi.clearAllMocks();
     vi.mocked(getRedisClient).mockReturnValue(null);
     vi.mocked(auth).mockResolvedValue({ user: { email: "gary@example.com" } } as never);
-    vi.mocked(createPerplexityClient).mockReturnValue({
+    vi.mocked(createAgentClient).mockReturnValue({
       responses: {
         create: vi.fn().mockResolvedValue({ output_text: "" }),
       },
@@ -151,7 +151,7 @@ describe("POST /api/chat", () => {
     const response = await POST(request);
     expect(response.status).toBe(200);
     expect(db.insert).toHaveBeenCalledTimes(2);
-    expect(createPerplexityClient).not.toHaveBeenCalled();
+    expect(createAgentClient).not.toHaveBeenCalled();
   });
 
   it("fails open when redis rate-limit call throws", async () => {
@@ -295,7 +295,7 @@ describe("POST /api/chat", () => {
       ],
     });
 
-    vi.mocked(createPerplexityClient).mockReturnValue({
+    vi.mocked(createAgentClient).mockReturnValue({
       responses: {
         create,
       },
@@ -381,7 +381,7 @@ describe("POST /api/chat", () => {
     mockSelectResults([[{ id: "thread-1", userId: "user-1", roleId: null }]]);
     const { values } = mockMutationChains();
 
-    vi.mocked(createPerplexityClient).mockImplementation(() => {
+    vi.mocked(createAgentClient).mockImplementation(() => {
       throw new Error("provider exploded");
     });
 

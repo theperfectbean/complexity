@@ -47,6 +47,40 @@ test.describe("Mobile UI Layout", () => {
     }
   });
 
+  test("copy and retry buttons should be visible on assistant messages without hover", async ({ page }) => {
+    // 1. Send a simple message to get an assistant response
+    const searchBar = page.locator('textarea[placeholder*="Ask"]').first();
+    await searchBar.fill("hello");
+    await page.keyboard.press("Enter");
+
+    // 2. Wait for the assistant message to appear
+    const assistantArticle = page.locator('article.group').first();
+    await expect(assistantArticle).toBeVisible({ timeout: 30000 });
+
+    // 3. Wait for streaming to finish (checking for the Copy/Retry buttons)
+    const copyButton = assistantArticle.getByRole("button", { name: "Copy message" });
+    const retryButton = assistantArticle.getByRole("button", { name: "Retry" });
+
+    // 4. Verify they are visible WITHOUT any hover action
+    await expect(copyButton).toBeVisible({ timeout: 45000 });
+    await expect(retryButton).toBeVisible();
+
+    // 5. Test with a code block to verify code copy button visibility
+    // The placeholder changes to "Ask a follow-up..." on the thread page
+    await searchBar.fill("give me a simple code block with javascript");
+    await page.keyboard.press("Enter");
+
+    // We look for the newest pre block
+    const codePre = page.locator('pre.group').last();
+    await expect(codePre).toBeVisible({ timeout: 45000 });
+
+    const codeCopyButton = codePre.locator("button[title='Copy to clipboard']");
+    await expect(codeCopyButton).toBeVisible();
+
+    // Take a screenshot for verification
+    await page.screenshot({ path: 'test-results/mobile-message-actions.png' });
+  });
+
   test("sidebar should be toggleable on mobile", async ({ page }) => {
     // On mobile, sidebar is usually hidden behind a hamburger menu
     const menuButton = page.getByRole("button", { name: /open menu/i });

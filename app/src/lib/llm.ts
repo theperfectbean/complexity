@@ -5,7 +5,7 @@ import { createXai } from "@ai-sdk/xai";
 import { createOllama } from "ai-sdk-ollama";
 import { LanguageModel, streamText, convertToModelMessages, UIMessageChunk, UIMessage } from "ai";
 import type { Responses } from "@perplexity-ai/perplexity_ai/resources/responses";
-import { runPerplexityAgent } from "./perplexity-agent";
+import { runSearchAgent } from "./search-agent";
 import { runtimeConfig } from "./config";
 import { extractCitationsFromResponse, type Citation } from "./extraction-utils";
 import { isPresetModel } from "./models";
@@ -154,7 +154,7 @@ export async function runGeneration(options: GenerationOptions): Promise<Generat
 
   if (provider === "perplexity") {
     try {
-      const result = await runPerplexityAgent({
+      const result = await runSearchAgent({
         modelId: mapToPerplexityModel(modelName),
         agentInput: options.agentInput,
         instructions: options.system || "",

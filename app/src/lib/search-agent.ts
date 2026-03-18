@@ -1,13 +1,13 @@
 import { UIMessageChunk } from "ai";
 import { Responses } from "@perplexity-ai/perplexity_ai/resources/responses";
-import { createPerplexityClient } from "./perplexity";
+import { createAgentClient } from "./agent-client";
 import { isPresetModel } from "./models";
 import { safeParseJsonLine } from "./sse";
 import { asRecord } from "./extraction-utils";
 import { runtimeConfig } from "./config";
 import { env } from "./env";
 
-export interface PerplexityAgentOptions {
+export interface SearchAgentOptions {
   modelId: string;
   agentInput: Responses.InputItem[];
   instructions: string;
@@ -37,11 +37,11 @@ interface AgentEvent {
     message?: string;
   };
 }
-export async function runPerplexityAgent(options: PerplexityAgentOptions) {
+export async function runSearchAgent(options: SearchAgentOptions) {
   const { modelId: rawModelId, agentInput, instructions, webSearch, apiKey, writer, textId } = options;
 
   // Map internal preset IDs to Perplexity preset names
-  let modelId = rawModelId;
+  const modelId = rawModelId;
   const isPreset = isPresetModel(rawModelId) || ["fast-search", "pro-search", "deep-research", "advanced-deep-research"].includes(modelId);
 
   // We no longer map fast-search to sonar because fast-search is the actual native preset name
@@ -53,7 +53,7 @@ export async function runPerplexityAgent(options: PerplexityAgentOptions) {
   let hasWrittenTextDelta = false;
   const PERPLEXITY_STREAM_TIMEOUT_MS = runtimeConfig.perplexity.streamTimeoutMs;
 
-  const client = createPerplexityClient(apiKey);
+  const client = createAgentClient(apiKey);
   
   // Filter out system messages from input to avoid redundancy with instructions
   const filteredInput = agentInput.filter(item => {
@@ -94,7 +94,7 @@ export async function runPerplexityAgent(options: PerplexityAgentOptions) {
     if (!res.ok) {
       const errText = await res.text();
       if (res.status === 400) {
-        console.error(`[runPerplexityAgent] Perplexity 400: ${errText}`);
+        console.error(`[runSearchAgent] Perplexity 400: ${errText}`);
         streamingFailed = true;
       } else {
         throw new Error(`Perplexity API Error: ${res.status} ${errText}`);
