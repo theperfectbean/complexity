@@ -7,7 +7,7 @@ const mockToastError = vi.fn();
 const mockSendMessage = vi.fn();
 
 vi.mock("@ai-sdk/react", () => ({
-  useChat: (...args: unknown[]) => mockUseChat(...args),
+  useChat: (options: any) => mockUseChat(options),
 }));
 
 vi.mock("next/navigation", () => ({
@@ -22,7 +22,7 @@ vi.mock("sonner", () => ({
   },
 }));
 
-import ThreadPage from "./page";
+import ThreadPage, { ThreadChat } from "./page";
 
 describe("ThreadPage", () => {
   beforeEach(() => {
@@ -31,6 +31,8 @@ describe("ThreadPage", () => {
     mockUseChat.mockReturnValue({
       messages: [],
       sendMessage: mockSendMessage,
+      regenerate: vi.fn(),
+      setMessages: vi.fn(),
       status: "ready",
       error: undefined,
     });
@@ -45,7 +47,7 @@ describe("ThreadPage", () => {
         },
         messages: [],
       }),
-    } as never);
+    } as any);
   });
 
   it("submits with the currently selected model in request body", async () => {
@@ -78,6 +80,8 @@ describe("ThreadPage", () => {
     mockUseChat.mockReturnValue({
       messages: [],
       sendMessage: vi.fn(),
+      regenerate: vi.fn(),
+      setMessages: vi.fn(),
       status: "error",
       error: new Error('{"error":"PERPLEXITY_API_KEY is not set"}'),
     });
@@ -111,6 +115,8 @@ describe("ThreadPage", () => {
         },
       ],
       sendMessage: vi.fn(),
+      regenerate: vi.fn(),
+      setMessages: vi.fn(),
       status: "ready",
       error: undefined,
     });
@@ -119,6 +125,127 @@ describe("ThreadPage", () => {
 
     await waitFor(() => {
       expect(screen.getByText(/AI chip demand rose this week/i)).toBeInTheDocument();
+    });
+  });
+
+  it("passes trigger: 'regenerate-message' during onRetry in ThreadChat", async () => {
+    const mockRegenerate = vi.fn();
+    const mockSetMessages = vi.fn();
+    let capturedBodyFn: (() => Record<string, unknown>) | undefined = undefined;
+
+    mockUseChat.mockImplementation((options: any) => {
+      if (options?.transport?.body) {
+        capturedBodyFn = options.transport.body;
+      }
+      return {
+        messages: [
+          { id: "msg-1", role: "user", content: "hello", parts: [{ type: "text", text: "hello" }] },
+          { id: "msg-2", role: "assistant", content: "world", parts: [{ type: "text", text: "world" }] },
+        ],
+        sendMessage: vi.fn(),
+        regenerate: mockRegenerate,
+        setMessages: mockSetMessages,
+        status: "ready",
+        error: undefined,
+      };
+    });
+
+    render(
+      <ThreadChat
+        threadId="thread-1"
+        initialModel="pro-search"
+        initialRoleId={null}
+        initialHistory={[
+          { id: "msg-1", role: "user", content: "hello" },
+          { id: "msg-2", role: "assistant", content: "world" },
+        ]}
+        initialWebSearch={true}
+        attachments={[]}
+        setAttachments={vi.fn()}
+      />
+    );
+
+    const user = userEvent.setup();
+    const retryButtons = await screen.findAllByRole("button", { name: "Retry" });
+    await user.click(retryButtons[retryButtons.length - 1]);
+
+    await waitFor(() => {
+      expect(mockSetMessages).toHaveBeenCalled();
+      expect(mockRegenerate).toHaveBeenCalledWith({ messageId: "msg-2" });
+      
+      if (!capturedBodyFn) throw new Error("Body function not captured");
+      const body = capturedBodyFn();
+      expect(body).toMatchObject({
+        trigger: "regenerate-message",
+      });
+    });
+  });
+
+  it("passes trigger: 'regenerate-message' and new model during onRewrite in ThreadChat", async () => {
+    const mockRegenerate = vi.fn();
+    const mockSetMessages = vi.fn();
+    let capturedBodyFn: (() => Record<string, unknown>) | undefined = undefined;
+
+    mockUseChat.mockImplementation((options: any) => {
+      if (options?.transport?.body) {
+        capturedBodyFn = options.transport.body;
+      }
+      return {
+        messages: [
+          { id: "msg-1", role: "user", content: "hello", parts: [{ type: "text", text: "hello" }] },
+          { id: "msg-2", role: "assistant", content: "world", parts: [{ type: "text", text: "world" }] },
+        ],
+        sendMessage: vi.fn(),
+        regenerate: mockRegenerate,
+        setMessages: mockSetMessages,
+        status: "ready",
+        error: undefined,
+      };
+    });
+
+    // Mock models API for the rewrite dropdown
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        models: [
+          { id: "model-a", label: "Model A", category: "Test", isPreset: true },
+          { id: "model-b", label: "Model B", category: "Test", isPreset: true },
+        ],
+      }),
+    } as any);
+
+    render(
+      <ThreadChat
+        threadId="thread-1"
+        initialModel="model-a"
+        initialRoleId={null}
+        initialHistory={[
+          { id: "msg-1", role: "user", content: "hello" },
+          { id: "msg-2", role: "assistant", content: "world" },
+        ]}
+        initialWebSearch={true}
+        attachments={[]}
+        setAttachments={vi.fn()}
+      />
+    );
+
+    const user = userEvent.setup();
+    const rewriteButtons = await screen.findAllByRole("button", { name: "Rewrite with another model" });
+    await user.click(rewriteButtons[rewriteButtons.length - 1]);
+
+    const modelBItem = await screen.findByRole("menuitem", { name: "Model B" });
+    await user.click(modelBItem);
+
+    await waitFor(() => {
+      expect(mockSetMessages).toHaveBeenCalled();
+      expect(mockRegenerate).toHaveBeenCalledWith({ messageId: "msg-2" });
+
+      if (!capturedBodyFn) throw new Error("Body function not captured");
+      const body = capturedBodyFn();
+      expect(body).toMatchObject({
+        trigger: "regenerate-message",
+        model: "model-b",
+      });
     });
   });
 });

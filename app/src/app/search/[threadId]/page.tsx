@@ -69,7 +69,7 @@ type ThreadChatProps = {
   setAttachments: React.Dispatch<React.SetStateAction<File[]>>;
 };
 
-function ThreadChat({
+export function ThreadChat({
   threadId,
   initialModel,
   initialRoleId,
@@ -85,6 +85,7 @@ function ThreadChat({
   const [roleId] = useState<string | null>(initialRoleId);
   const [webSearchEnabled, setWebSearchEnabled] = useState(initialWebSearch);
   const hasSubmittedInitialQuery = useRef(false);
+  const triggerRef = useRef<string | undefined>(undefined);
 
   const [data, setData] = useState<Record<string, unknown>[]>([]);
   const { messages, setMessages, sendMessage, regenerate, status, error } = useChat({
@@ -102,12 +103,18 @@ function ThreadChat({
     }),
     transport: new DefaultChatTransport({
       api: "/api/chat",
-      body: () => ({
-        threadId,
-        model,
-        roleId,
-        webSearch: webSearchEnabled,
-      }),
+      body: () => {
+        const body = {
+          threadId,
+          model,
+          roleId,
+          webSearch: webSearchEnabled,
+          trigger: triggerRef.current,
+        };
+        // Reset trigger after use
+        triggerRef.current = undefined;
+        return body;
+      },
     }),
     onData(part: UIMessageChunk) {
       if (part.type === "data-json") {
@@ -261,10 +268,36 @@ function ThreadChat({
               }),
             );
 
+            triggerRef.current = "regenerate-message";
             void regenerate({ messageId: lastMessage.id });
           }}
-        />
-      </div>
+          onRewrite={(newModelId) => {
+            const lastMessage = mergedMessages[mergedMessages.length - 1];
+            if (!lastMessage) return;
+
+            // Update local model state so the next request uses it
+            setModel(newModelId);
+
+            // Sync state
+            setMessages(
+              mergedMessages.map((m) => {
+                const uiMsg = {
+                  id: m.id,
+                  role: m.role as "user" | "assistant" | "system",
+                  content: m.content,
+                  parts: [{ type: "text", text: m.content }],
+                };
+                if (m.citations && m.citations.length > 0) {
+                  (uiMsg as Record<string, unknown>).citations = m.citations;
+                }
+                return uiMsg as unknown as UIMessage;
+              }),
+            );
+
+            triggerRef.current = "regenerate-message";
+            void regenerate({ messageId: lastMessage.id });
+          }}
+        />      </div>
 
       <div className="fixed inset-x-0 bottom-0 z-20 bg-gradient-to-t from-background via-background/95 to-transparent pb-6 pt-10 md:left-[278px]">
         <form onSubmit={onSubmit} className="mx-auto max-w-3xl px-4">

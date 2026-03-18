@@ -1,13 +1,15 @@
 "use client";
 
-import { Check, Copy, RotateCcw, ArrowDown, Globe, Search, Brain, Database } from "lucide-react";
+import { Check, Copy, RotateCcw, ArrowDown, Globe, Search, Brain, Database, Pencil } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
-import { useState, useRef, useEffect, useCallback, memo } from "react";
+import { useState, useRef, useEffect, useCallback, memo, useMemo } from "react";
+import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 
 import { RelatedQuestions } from "@/components/chat/RelatedQuestions";
 import { SourceCarousel } from "@/components/chat/SourceCarousel";
 import { MarkdownRenderer } from "@/components/shared/MarkdownRenderer";
 import { cn } from "@/lib/utils";
+import { MODELS, SearchModelOption } from "@/lib/models";
 
 export type ChatCitation = {
   url?: string;
@@ -35,6 +37,7 @@ type MessageListProps = {
   emptyLabel: string;
   onRelatedQuestionClick?: (question: string) => void;
   onRetry?: () => void;
+  onRewrite?: (modelId: string) => void;
   isStreaming?: boolean;
 };
 
@@ -78,6 +81,7 @@ const MessageItem = memo(function MessageItem({
   isStreaming, 
   onRelatedQuestionClick, 
   onRetry, 
+  onRewrite,
   onCopy, 
   copiedId 
 }: {
@@ -87,6 +91,7 @@ const MessageItem = memo(function MessageItem({
   isStreaming?: boolean;
   onRelatedQuestionClick?: (question: string) => void;
   onRetry?: () => void;
+  onRewrite?: (modelId: string) => void;
   onCopy: (id: string, content: string) => void;
   copiedId: string | null;
 }) {
@@ -95,6 +100,31 @@ const MessageItem = memo(function MessageItem({
   const relatedQuestions = message.role === "assistant" ? extractRelatedQuestions(message.content) : [];
   const isUser = message.role === "user";
   const isLastAssistantMessage = !isUser && index === totalMessages - 1;
+
+  const [availableModels, setAvailableModels] = useState<readonly SearchModelOption[]>(MODELS);
+
+  useEffect(() => {
+    if (isLastAssistantMessage && onRewrite) {
+      fetch("/api/models")
+        .then(res => res.json())
+        .then(data => {
+          if (data.models && data.models.length > 0) {
+            setAvailableModels(data.models);
+          }
+        })
+        .catch(err => console.error("Failed to fetch available models:", err));
+    }
+  }, [isLastAssistantMessage, onRewrite]);
+
+  const groupedModels = useMemo(() => {
+    return availableModels.reduce<Record<string, SearchModelOption[]>>((accumulator, option) => {
+      if (!accumulator[option.category]) {
+        accumulator[option.category] = [];
+      }
+      accumulator[option.category].push(option);
+      return accumulator;
+    }, {});
+  }, [availableModels]);
 
   return (
     <article 
@@ -224,6 +254,43 @@ const MessageItem = memo(function MessageItem({
                   <RotateCcw className="h-3.5 w-3.5 text-muted-foreground/60" strokeWidth={1.5} />
                 </button>
               )}
+
+              {isLastAssistantMessage && onRewrite && (
+                <DropdownMenu.Root>
+                  <DropdownMenu.Trigger asChild>
+                    <button
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-black/5 dark:hover:bg-white/5 active:scale-95"
+                      title="Rewrite with another model"
+                    >
+                      <Pencil className="h-3.5 w-3.5 text-muted-foreground/60" strokeWidth={1.5} />
+                    </button>
+                  </DropdownMenu.Trigger>
+                  <DropdownMenu.Portal>
+                    <DropdownMenu.Content
+                      sideOffset={8}
+                      align="start"
+                      className="z-50 max-h-80 min-w-64 overflow-y-auto rounded-2xl border bg-popover/95 p-1.5 shadow-xl backdrop-blur-sm animate-in fade-in zoom-in-95"
+                    >
+                      {Object.entries(groupedModels).map(([category, options]) => (
+                        <div key={category} className="py-1">
+                          <p className="px-3 pb-1.5 pt-1 text-[11px] font-bold uppercase tracking-wider text-muted-foreground/50">{category}</p>
+                          {options.map((option) => (
+                            <DropdownMenu.Item
+                              key={option.id}
+                              onSelect={() => onRewrite(option.id)}
+                              className={cn(
+                                "flex cursor-pointer items-center rounded-lg px-3 py-2 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground"
+                              )}
+                            >
+                              {option.label}
+                            </DropdownMenu.Item>
+                          ))}
+                        </div>
+                      ))}
+                    </DropdownMenu.Content>
+                  </DropdownMenu.Portal>
+                </DropdownMenu.Root>
+              )}
             </div>
           </div>
 
@@ -238,7 +305,7 @@ const MessageItem = memo(function MessageItem({
   );
 });
 
-export function MessageList({ messages, emptyLabel, onRelatedQuestionClick, onRetry, isStreaming }: MessageListProps) {
+export function MessageList({ messages, emptyLabel, onRelatedQuestionClick, onRetry, onRewrite, isStreaming }: MessageListProps) {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [showScrollButton, setShowScrollButton] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -330,6 +397,7 @@ export function MessageList({ messages, emptyLabel, onRelatedQuestionClick, onRe
           isStreaming={isStreaming}
           onRelatedQuestionClick={onRelatedQuestionClick}
           onRetry={onRetry}
+          onRewrite={onRewrite}
           onCopy={copyMessage}
           copiedId={copiedId}
         />
