@@ -24,7 +24,7 @@ export function AppShell({ children, contentClassName }: AppShellProps) {
   return (
     <div className="relative flex min-h-[100dvh] bg-background text-foreground">
       {isAuthenticated && (
-        <div className="sticky top-0 hidden h-[100dvh] w-[278px] shrink-0 border-r border-sidebar-border bg-sidebar md:block">
+        <div className="sticky top-0 z-50 hidden h-[100dvh] w-[278px] shrink-0 border-r border-sidebar-border bg-sidebar md:block">
           <Sidebar collapsed={false} />
         </div>
       )}
