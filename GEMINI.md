@@ -330,6 +330,18 @@ DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose build app
 - **Configuration Cleanup**: Fixed a duplicate model ID mapping that triggered startup warnings and synchronized the test suites to assert against the corrected models.
 - **Model Version Correction & Standard Aliases**: Refactored the hardcoded model date strings to use Anthropic's standard `-latest` aliases (e.g., `claude-4-6-sonnet-latest`, `claude-4-5-haiku-latest`, `claude-4-6-opus-latest`) to decouple the application from frequent minor model version changes while incorporating the user's correction that the current generation models in 2026 are version 4.
 
+### Streaming Smoothness & Performance Optimizations (2026-03-18)
+- **Problem**: Responses appeared "jerkily" during streaming, with visible jitter and layout shifts.
+- **Investigation**: E2E tests using the Layout Instability API confirmed a high Cumulative Layout Shift (CLS) during streaming. The primary cause was the combination of rapid DOM updates from `react-markdown` and high-frequency auto-scrolling fighting with browser layout engines.
+- **Optimizations Implemented**:
+  - **Component Memoization**: Extracted `MessageItem` into a dedicated `memo` component to prevent the entire message list from re-rendering on every streaming chunk.
+  - **Content Debouncing**: Implemented a 100ms debounce in `MarkdownRenderer` specifically during active streaming. This reduces the number of expensive markdown-to-React transformations while the response is growing.
+  - **Syntax Highlighting Deferral**: Deactivated `rehype-highlight` during active streaming. Large code blocks were causing significant re-parsing overhead; they are now highlighted only once the stream is complete.
+  - **Auto-Scroll Throttling**: Added a 33ms (30fps) throttle to `scrollIntoView` calls to prevent scroll-jitter. Switched to `block: "nearest"` and `behavior: "instant"` for more stable positioning during rapid growth.
+  - **Layout Anchoring**: Added `overflow-anchor: none` to the `MessageList` container to prevent browser-native scroll-anchoring from conflicting with the manual "scroll-to-bottom" logic.
+  - **Layout Stability**: Added `min-h` reservations for `SourceCarousel` and `MarkdownRenderer` containers to minimize sudden jumps when these elements first appear or start growing.
+- **Result**: Significant reduction in perceived jitter and smoother visual flow during long response streaming.
+
 ### Model Identity Hallucination Fix (2026-03-18)
 - **Problem**: Users reported that selecting "Pro Search" resulted in the assistant identifying itself as "Claude Haiku" when asked "Which model are you?".
 - **Finding**: Investigative tests confirmed that Perplexity's `sonar-pro` (and potentially other models) can hallucinate their identity based on the conversation context. If the history contains mentions of "Claude Haiku", the model may adopt that persona when questioned about its identity.

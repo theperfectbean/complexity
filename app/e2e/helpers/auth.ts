@@ -31,7 +31,7 @@ export async function registerUser(page: Page, options: RegisterOptions = {}): P
   await page.getByRole("button", { name: "Create account" }).click({ force: true });
 
   if (options.waitForHome !== false) {
-    await expect(page.getByPlaceholder("Ask anything...")).toBeVisible({ timeout: 30000 });
+    await expect(page.getByPlaceholder("Ask anything...").first()).toBeVisible({ timeout: 30000 });
   }
 
   return { email, password, name };

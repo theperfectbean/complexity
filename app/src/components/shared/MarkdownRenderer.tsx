@@ -1,4 +1,4 @@
-import React, { memo, useState } from "react";
+import React, { memo, useState, useEffect } from "react";
 import ReactMarkdown, { Components } from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
 import remarkGfm from "remark-gfm";
@@ -7,6 +7,7 @@ import { Copy, Check } from "lucide-react";
 
 type MarkdownRendererProps = {
   content: string;
+  isStreaming?: boolean;
 };
 
 function CopyButton({ content }: { content: string }) {
@@ -87,15 +88,31 @@ const components: Components = {
   }
 };
 
-export const MarkdownRenderer = memo(function MarkdownRenderer({ content }: MarkdownRendererProps) {
+export const MarkdownRenderer = memo(function MarkdownRenderer({ content, isStreaming }: MarkdownRendererProps) {
+  const [displayContent, setDisplayContent] = useState(content);
+
+  useEffect(() => {
+    if (!isStreaming) {
+      setDisplayContent(content);
+      return;
+    }
+
+    // Debounce updates during streaming to 100ms to reduce re-render frequency and jitter
+    const timer = setTimeout(() => {
+      setDisplayContent(content);
+    }, 100);
+
+    return () => clearTimeout(timer);
+  }, [content, isStreaming]);
+
   return (
-    <div className="markdown-body max-w-none">
+    <div className={`markdown-body max-w-none ${isStreaming ? "min-h-[100px]" : ""}`}>
       <ReactMarkdown 
         remarkPlugins={[remarkGfm]} 
-        rehypePlugins={[rehypeHighlight]}
+        rehypePlugins={isStreaming ? [] : [rehypeHighlight]}
         components={components}
       >
-        {content}
+        {displayContent}
       </ReactMarkdown>
     </div>
   );

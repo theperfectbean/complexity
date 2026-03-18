@@ -236,6 +236,10 @@
   @apply rounded-lg border bg-card shadow-sm;
 }
 
+@utility overflow-anchor-none {
+  overflow-anchor: none;
+}
+
 /* Markdown Content Styles - Visual Parity Refinement */
 div.markdown-body {
   font-size: 1.0625rem !important;

@@ -2,7 +2,7 @@
 
 import { Check, Copy, RotateCcw, ArrowDown, Globe, Search, Brain, Database } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, memo } from "react";
 
 import { RelatedQuestions } from "@/components/chat/RelatedQuestions";
 import { SourceCarousel } from "@/components/chat/SourceCarousel";
@@ -71,23 +71,194 @@ function StatusIcon({ name, active }: { name: string; active?: boolean }) {
   return <Search {...iconProps} />;
 }
 
+const MessageItem = memo(function MessageItem({ 
+  message, 
+  index, 
+  totalMessages, 
+  isStreaming, 
+  onRelatedQuestionClick, 
+  onRetry, 
+  onCopy, 
+  copiedId 
+}: {
+  message: ChatMessageItem;
+  index: number;
+  totalMessages: number;
+  isStreaming?: boolean;
+  onRelatedQuestionClick?: (question: string) => void;
+  onRetry?: () => void;
+  onCopy: (id: string, content: string) => void;
+  copiedId: string | null;
+}) {
+  const urlsFromCitations = (message.citations ?? []).map((citation) => citation.url).filter(Boolean) as string[];
+  const urls = message.role === "assistant" ? (urlsFromCitations.length > 0 ? urlsFromCitations : extractUrls(message.content)) : [];
+  const relatedQuestions = message.role === "assistant" ? extractRelatedQuestions(message.content) : [];
+  const isUser = message.role === "user";
+  const isLastAssistantMessage = !isUser && index === totalMessages - 1;
+
+  return (
+    <article 
+      className={isUser ? "flex flex-col items-end py-2" : "group relative flex flex-col gap-0 pt-2 pb-10"}
+      style={{ overflowAnchor: "auto" }}
+    >
+      {isUser ? (
+        <div className="w-fit max-w-[85%] rounded-2xl bg-muted/60 px-5 py-3.5 text-left md:max-w-[75%]">
+          {(() => {
+            const msgRecord = message as Record<string, unknown>;
+            const attachments = (msgRecord.experimental_attachments || msgRecord.attachments || []) as Array<{ url?: string; contentType?: string; name?: string }>;
+            const images = attachments.filter((a) => a.contentType?.startsWith("image/") || a.url?.startsWith("data:image/"));
+            
+            return images.length > 0 ? (
+              <div className="flex flex-wrap gap-2 mb-2">
+                {images.map((img, idx) => (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img 
+                    key={idx} 
+                    src={img.url} 
+                    alt={img.name || "Attachment"} 
+                    className="max-h-48 rounded-lg object-cover shadow-sm border border-border/50" 
+                  />
+                ))}
+              </div>
+            ) : null;
+          })()}
+          <p className="whitespace-pre-wrap text-[0.9375rem] font-medium leading-[1.6] text-foreground">
+            {message.content}
+          </p>
+        </div>
+      ) : (
+        <div className="flex w-full flex-col">
+          {message.thinking && message.thinking.length > 0 && (!message.content || message.content.trim().length < 5 || message.content === "\u200B") && (
+            <div className="mb-6 flex flex-col gap-3">
+              {message.thinking.map((part) => {
+                const isActive = !part.result;
+                return (
+                  <motion.div
+                    key={part.callId}
+                    initial={{ opacity: 0, x: -5 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    className="flex items-center gap-3 text-[13px] text-muted-foreground/90"
+                  >
+                    <div className={cn(
+                      "flex h-6 w-6 items-center justify-center rounded-full border bg-background/50 shadow-sm transition-all",
+                      isActive ? "border-primary/20 bg-primary/5" : "border-emerald-500/20 bg-emerald-500/5"
+                    )}>
+                      {isActive ? (
+                        <div className="h-2 w-2 animate-pulse rounded-full bg-primary" />
+                      ) : (
+                        <StatusIcon name={part.toolName} />
+                      )}
+                    </div>
+                    
+                    <div className="flex flex-col">
+                      <span className={cn("font-medium transition-colors", isActive ? "text-foreground" : "text-muted-foreground")}>
+                        {part.toolName}{isActive ? "..." : ""}
+                      </span>
+                      {isActive && part.input && typeof part.input === "object" && "query" in (part.input as Record<string, unknown>) && typeof (part.input as Record<string, unknown>).query === "string" ? (
+                        <span className="text-[11px] opacity-60 line-clamp-1">
+                          Searching for: {(part.input as Record<string, string>).query}
+                        </span>
+                      ) : null}
+                      {part.result && (
+                        <span className="text-[11px] opacity-60">
+                          {part.result}
+                        </span>
+                      )}
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </div>
+          )}
+
+          <div className="max-w-none break-words">
+            {urls.length > 0 ? (
+              <div className="my-6 min-h-[100px]">
+                <SourceCarousel urls={urls} />
+              </div>
+            ) : null}
+            <MarkdownRenderer 
+              content={message.content} 
+              isStreaming={isStreaming && index === totalMessages - 1} 
+            />
+          </div>
+
+          <div className="mt-4 flex items-center justify-start opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+            <div className="flex items-center gap-1.5">
+              <button
+                className="relative inline-flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-black/5 dark:hover:bg-white/5 active:scale-95"
+                onClick={() => onCopy(message.id, message.content)}
+                title="Copy message"
+              >
+                <AnimatePresence mode="wait" initial={false}>
+                  {copiedId === message.id ? (
+                    <motion.div
+                      key="check"
+                      initial={{ scale: 0.8, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      exit={{ scale: 0.8, opacity: 0 }}
+                      transition={{ duration: 0.1 }}
+                    >
+                      <Check className="h-4 w-4 text-emerald-500" strokeWidth={2} />
+                    </motion.div>
+                  ) : (
+                    <motion.div
+                      key="copy"
+                      initial={{ scale: 0.8, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      exit={{ scale: 0.8, opacity: 0 }}
+                      transition={{ duration: 0.1 }}
+                    >
+                      <Copy className="h-3.5 w-3.5 text-muted-foreground/60" strokeWidth={1.5} />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </button>
+
+              {isLastAssistantMessage && onRetry && (
+                <button
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-black/5 dark:hover:bg-white/5 active:scale-95"
+                  onClick={onRetry}
+                  title="Retry"
+                >
+                  <RotateCcw className="h-3.5 w-3.5 text-muted-foreground/60" strokeWidth={1.5} />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {relatedQuestions.length > 0 && (
+            <div className="mt-12 border-t border-border/40 pt-8">
+              <RelatedQuestions questions={relatedQuestions} onSelect={onRelatedQuestionClick} />
+            </div>
+          )}
+        </div>
+      )}
+    </article>
+  );
+});
+
 export function MessageList({ messages, emptyLabel, onRelatedQuestionClick, onRetry, isStreaming }: MessageListProps) {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [showScrollButton, setShowScrollButton] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const hasAutoScrolledRef = useRef(false);
+  const lastScrollTimeRef = useRef(0);
 
   const lastMessageContent = messages[messages.length - 1]?.content;
   const lastMessageThinkingLength = messages[messages.length - 1]?.thinking?.length;
 
   const scrollToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {
-    window.scrollTo({
-      top: document.documentElement.scrollHeight,
-      behavior,
-    });
+    // Throttle scroll events to at most 30fps (33ms) to prevent jitter
+    const now = Date.now();
+    if (now - lastScrollTimeRef.current < 33) return;
+    lastScrollTimeRef.current = now;
+    
+    bottomRef.current?.scrollIntoView({ behavior, block: "nearest" });
   }, []);
 
   const handleScroll = useCallback(() => {
+    // Check if we are near the bottom to hide/show the "scroll to bottom" button
     const isAtBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 200;
     setShowScrollButton(!isAtBottom && (isStreaming ?? false));
   }, [isStreaming]);
@@ -104,16 +275,19 @@ export function MessageList({ messages, emptyLabel, onRelatedQuestionClick, onRe
       return;
     }
 
+    // Initial scroll when messages arrive
     if (!hasAutoScrolledRef.current) {
       hasAutoScrolledRef.current = true;
-      requestAnimationFrame(() => scrollToBottom("auto"));
+      requestAnimationFrame(() => scrollToBottom("instant" as ScrollBehavior));
       return;
     }
 
-    const isNearBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 150;
+    // Smart auto-scroll: only scroll if the user was already near the bottom
+    const isNearBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 200;
 
     if (isNearBottom) {
-      requestAnimationFrame(() => scrollToBottom("auto"));
+      // Use "instant" (auto) instead of smooth during active streaming to prevent animation jitter
+      requestAnimationFrame(() => scrollToBottom("instant" as ScrollBehavior));
     }
   }, [messages, lastMessageContent, lastMessageThinkingLength, scrollToBottom]);
 
@@ -132,7 +306,7 @@ export function MessageList({ messages, emptyLabel, onRelatedQuestionClick, onRe
   }
 
   return (
-    <div className="relative space-y-6 pb-4">
+    <div className="relative space-y-6 pb-4 overflow-anchor-none">
       <AnimatePresence>
         {showScrollButton && (
           <motion.button
@@ -147,153 +321,19 @@ export function MessageList({ messages, emptyLabel, onRelatedQuestionClick, onRe
         )}
       </AnimatePresence>
 
-      {messages.map((message, index) => {
-        const urlsFromCitations = (message.citations ?? []).map((citation) => citation.url).filter(Boolean) as string[];
-        const urls = message.role === "assistant" ? (urlsFromCitations.length > 0 ? urlsFromCitations : extractUrls(message.content)) : [];
-        const relatedQuestions = message.role === "assistant" ? extractRelatedQuestions(message.content) : [];
-        const isUser = message.role === "user";
-        const isLastAssistantMessage = !isUser && index === messages.length - 1;
-
-        return (
-          <motion.article 
-            key={message.id} 
-            initial={isStreaming && index === messages.length - 1 ? { opacity: 0, y: 5 } : false}
-            animate={{ opacity: 1, y: 0 }}
-            className={isUser ? "flex flex-col items-end py-2" : "group relative flex flex-col gap-0 pt-2 pb-10"}
-          >
-            {isUser ? (
-              <div className="w-fit max-w-[85%] rounded-2xl bg-muted/60 px-5 py-3.5 text-left md:max-w-[75%]">
-                {(() => {
-                  const msgRecord = message as Record<string, unknown>;
-                  const attachments = (msgRecord.experimental_attachments || msgRecord.attachments || []) as Array<{ url?: string; contentType?: string; name?: string }>;
-                  const images = attachments.filter((a) => a.contentType?.startsWith("image/") || a.url?.startsWith("data:image/"));
-                  
-                  return images.length > 0 ? (
-                    <div className="flex flex-wrap gap-2 mb-2">
-                      {images.map((img, idx) => (
-                        /* eslint-disable-next-line @next/next/no-img-element */
-                        <img 
-                          key={idx} 
-                          src={img.url} 
-                          alt={img.name || "Attachment"} 
-                          className="max-h-48 rounded-lg object-cover shadow-sm border border-border/50" 
-                        />
-                      ))}
-                    </div>
-                  ) : null;
-                })()}
-                <p className="whitespace-pre-wrap text-[0.9375rem] font-medium leading-[1.6] text-foreground">
-                  {message.content}
-                </p>
-              </div>
-            ) : (
-              <div className="flex w-full flex-col">
-                {message.thinking && message.thinking.length > 0 && (!message.content || message.content.trim().length < 5 || message.content === "\u200B") && (
-                  <div className="mb-6 flex flex-col gap-3">
-                    {message.thinking.map((part) => {
-                      const isActive = !part.result;
-                      return (
-                        <motion.div
-                          key={part.callId}
-                          initial={{ opacity: 0, x: -5 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          className="flex items-center gap-3 text-[13px] text-muted-foreground/90"
-                        >
-                          <div className={cn(
-                            "flex h-6 w-6 items-center justify-center rounded-full border bg-background/50 shadow-sm transition-all",
-                            isActive ? "border-primary/20 bg-primary/5" : "border-emerald-500/20 bg-emerald-500/5"
-                          )}>
-                            {isActive ? (
-                              <div className="h-2 w-2 animate-pulse rounded-full bg-primary" />
-                            ) : (
-                              <StatusIcon name={part.toolName} />
-                            )}
-                          </div>
-                          
-                          <div className="flex flex-col">
-                            <span className={cn("font-medium transition-colors", isActive ? "text-foreground" : "text-muted-foreground")}>
-                              {part.toolName}{isActive ? "..." : ""}
-                            </span>
-                            {isActive && part.input && typeof part.input === "object" && "query" in (part.input as Record<string, unknown>) && typeof (part.input as Record<string, unknown>).query === "string" ? (
-                              <span className="text-[11px] opacity-60 line-clamp-1">
-                                Searching for: {(part.input as Record<string, string>).query}
-                              </span>
-                            ) : null}
-                            {part.result && (
-                              <span className="text-[11px] opacity-60">
-                                {part.result}
-                              </span>
-                            )}
-                          </div>
-                        </motion.div>
-                      );
-                    })}
-                  </div>
-                )}
-
-                <div className="max-w-none break-words">
-                  {urls.length > 0 ? (
-                    <div className="my-6">
-                      <SourceCarousel urls={urls} />
-                    </div>
-                  ) : null}
-                  <MarkdownRenderer content={message.content} />
-                </div>
-
-                <div className="mt-4 flex items-center justify-start opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      className="relative inline-flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-black/5 dark:hover:bg-white/5 active:scale-95"
-                      onClick={() => void copyMessage(message.id, message.content)}
-                      title="Copy message"
-                    >
-                      <AnimatePresence mode="wait" initial={false}>
-                        {copiedId === message.id ? (
-                          <motion.div
-                            key="check"
-                            initial={{ scale: 0.8, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            exit={{ scale: 0.8, opacity: 0 }}
-                            transition={{ duration: 0.1 }}
-                          >
-                            <Check className="h-4 w-4 text-emerald-500" strokeWidth={2} />
-                          </motion.div>
-                        ) : (
-                          <motion.div
-                            key="copy"
-                            initial={{ scale: 0.8, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            exit={{ scale: 0.8, opacity: 0 }}
-                            transition={{ duration: 0.1 }}
-                          >
-                            <Copy className="h-3.5 w-3.5 text-muted-foreground/60" strokeWidth={1.5} />
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                    </button>
-
-                    {isLastAssistantMessage && onRetry && (
-                      <button
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-black/5 dark:hover:bg-white/5 active:scale-95"
-                        onClick={onRetry}
-                        title="Retry"
-                      >
-                        <RotateCcw className="h-3.5 w-3.5 text-muted-foreground/60" strokeWidth={1.5} />
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {relatedQuestions.length > 0 && (
-                  <div className="mt-12 border-t border-border/40 pt-8">
-                    <RelatedQuestions questions={relatedQuestions} onSelect={onRelatedQuestionClick} />
-                  </div>
-                )}
-              </div>
-            )}
-          </motion.article>
-        );
-      })}
+      {messages.map((message, index) => (
+        <MessageItem
+          key={message.id}
+          message={message}
+          index={index}
+          totalMessages={messages.length}
+          isStreaming={isStreaming}
+          onRelatedQuestionClick={onRelatedQuestionClick}
+          onRetry={onRetry}
+          onCopy={copyMessage}
+          copiedId={copiedId}
+        />
+      ))}
       <div ref={bottomRef} className="h-px w-full scroll-mt-40" />
     </div>
   );
