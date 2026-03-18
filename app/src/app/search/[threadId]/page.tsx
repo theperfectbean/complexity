@@ -249,7 +249,6 @@ export function ThreadChat({
           messages={mergedMessages}
           isStreaming={status === "streaming"}
           emptyLabel="Start this thread with your first question."
-          onRelatedQuestionClick={(question) => setPrompt(question)}
           onRetry={() => {
             const lastMessage = mergedMessages[mergedMessages.length - 1];
             if (!lastMessage) return;

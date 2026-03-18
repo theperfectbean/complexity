@@ -5,7 +5,6 @@ import { motion, AnimatePresence } from "motion/react";
 import { useState, useRef, useEffect, useCallback, memo, useMemo } from "react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 
-import { RelatedQuestions } from "@/components/chat/RelatedQuestions";
 import { SourceCarousel } from "@/components/chat/SourceCarousel";
 import { MarkdownRenderer } from "@/components/shared/MarkdownRenderer";
 import { cn } from "@/lib/utils";
@@ -35,7 +34,6 @@ export type ChatMessageItem = {
 type MessageListProps = {
   messages: ChatMessageItem[];
   emptyLabel: string;
-  onRelatedQuestionClick?: (question: string) => void;
   onRetry?: () => void;
   onRewrite?: (modelId: string) => void;
   isStreaming?: boolean;
@@ -46,22 +44,6 @@ const urlPattern = /(https?:\/\/[\w\-._~:/?#\[\]@!$&'()*+,;=%]+)/g;
 function extractUrls(text: string): string[] {
   const matches = text.match(urlPattern) ?? [];
   return Array.from(new Set(matches)).slice(0, 6);
-}
-
-function extractRelatedQuestions(text: string): string[] {
-  const compact = text.replace(/\s+/g, " ").trim();
-  if (!compact) {
-    return [];
-  }
-
-  const sentenceCandidates = compact
-    .split(/(?<=[?!.])\s+/)
-    .map((item) => item.trim())
-    .filter((item) => item.endsWith("?"))
-    .map((item) => item.replace(/^[\-\d.)\s]+/, ""))
-    .filter((item) => item.length >= 14 && item.length <= 140);
-
-  return Array.from(new Set(sentenceCandidates)).slice(0, 3);
 }
 
 function StatusIcon({ name, active }: { name: string; active?: boolean }) {
@@ -79,7 +61,6 @@ const MessageItem = memo(function MessageItem({
   index, 
   totalMessages, 
   isStreaming, 
-  onRelatedQuestionClick, 
   onRetry, 
   onRewrite,
   onCopy, 
@@ -89,7 +70,6 @@ const MessageItem = memo(function MessageItem({
   index: number;
   totalMessages: number;
   isStreaming?: boolean;
-  onRelatedQuestionClick?: (question: string) => void;
   onRetry?: () => void;
   onRewrite?: (modelId: string) => void;
   onCopy: (id: string, content: string) => void;
@@ -97,7 +77,6 @@ const MessageItem = memo(function MessageItem({
 }) {
   const urlsFromCitations = (message.citations ?? []).map((citation) => citation.url).filter(Boolean) as string[];
   const urls = message.role === "assistant" ? (urlsFromCitations.length > 0 ? urlsFromCitations : extractUrls(message.content)) : [];
-  const relatedQuestions = message.role === "assistant" ? extractRelatedQuestions(message.content) : [];
   const isUser = message.role === "user";
   const isLastAssistantMessage = !isUser && index === totalMessages - 1;
 
@@ -293,19 +272,13 @@ const MessageItem = memo(function MessageItem({
               )}
             </div>
           </div>
-
-          {relatedQuestions.length > 0 && (
-            <div className="mt-12 border-t border-border/40 pt-8">
-              <RelatedQuestions questions={relatedQuestions} onSelect={onRelatedQuestionClick} />
-            </div>
-          )}
         </div>
       )}
     </article>
   );
 });
 
-export function MessageList({ messages, emptyLabel, onRelatedQuestionClick, onRetry, onRewrite, isStreaming }: MessageListProps) {
+export function MessageList({ messages, emptyLabel, onRetry, onRewrite, isStreaming }: MessageListProps) {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [showScrollButton, setShowScrollButton] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -395,7 +368,6 @@ export function MessageList({ messages, emptyLabel, onRelatedQuestionClick, onRe
           index={index}
           totalMessages={messages.length}
           isStreaming={isStreaming}
-          onRelatedQuestionClick={onRelatedQuestionClick}
           onRetry={onRetry}
           onRewrite={onRewrite}
           onCopy={copyMessage}
