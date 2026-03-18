@@ -3,15 +3,8 @@
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { ChevronDown } from "lucide-react";
 import { useMemo, useState, useEffect } from "react";
-import { MODELS, getDefaultModel } from "@/lib/models";
+import { MODELS, getDefaultModel, SearchModelOption } from "@/lib/models";
 import { cn } from "@/lib/utils";
-
-export type SearchModelOption = {
-  id: string;
-  label: string;
-  category: string;
-  isPreset: boolean;
-};
 
 type ModelSelectorProps = {
   model?: string;

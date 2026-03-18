@@ -9,7 +9,8 @@ import { getDefaultModel } from "@/lib/models";
 import { cn } from "@/lib/utils";
 
 import { VoiceInput } from "./parts/VoiceInput";
-import { ModelSelector, SearchModelOption } from "./parts/ModelSelector";
+import { ModelSelector } from "./parts/ModelSelector";
+import { SearchModelOption } from "@/lib/models";
 import { FileAttachments, FileAttachmentsHandle } from "./parts/FileAttachments";
 
 type SearchBarProps = {
