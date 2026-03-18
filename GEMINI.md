@@ -370,3 +370,11 @@ DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose build app
 - **Fix 2**: Updated `provider-models.ts` to hardcode core Perplexity presets (including `fast-search` and `pro-search`) into the discovered list, ensuring they remain healthy and available in the UI regardless of the dynamic API response.
 - **Fix 3**: Removed the `identityGuidelines` for Perplexity models in `ContextAssembler.ts` to prevent "competence hallucination" where the model skips searching because it incorrectly assumes it knows the answer based on its identity prompt.
 
+### Architectural Decoupling from Perplexity (2026-03-19)
+- **Motivation**: The project expanded beyond its initial scope as purely a frontend for the Perplexity Agent API. The core abstractions and UI text were overly coupled to the "Perplexity" name, rather than accurately reflecting a generic "Agentic" or "Answer Engine" workspace.
+- **Implementation**: 
+  - Renamed `perplexity-agent.ts` to `search-agent.ts` and `perplexity.ts` to `agent-client.ts` to generalize the core AI routing abstractions.
+  - Updated UI copy in `layout.tsx` and `page.tsx` from "Perplexity-style" to "Agentic" and "AI search".
+  - Refactored `llm.ts` and `MemoryExtractor.ts` to consume the renamed generic client abstractions.
+- **Preservation**: Crucially, left `.env` variables (`PERPLEXITY_API_KEY`), model ID prefixes (`perplexity/sonar`), database columns (`perplexity_api_key`), and test artifacts untouched to preserve fully functional connectivity with the Perplexity API without breaking backwards compatibility.
+
