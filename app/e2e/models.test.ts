@@ -21,14 +21,12 @@ test.describe("Model Prompt & Response Browser Validation", () => {
       const modelOption = page.getByRole("menuitem", { name: model.label });
       
       // Retry logic for clicking the model option
-      let clicked = false;
       for (let i = 0; i < 3; i++) {
         try {
           await modelOption.waitFor({ state: 'visible', timeout: 3000 });
           await modelOption.click({ timeout: 3000 });
-          clicked = true;
           break;
-        } catch (e) {
+        } catch {
           if (i === 2) {
             const items = await page.getByRole("menuitem").allInnerTexts();
             console.log(`Available menu items after 3 attempts: ${items.join(", ")}`);

@@ -35,6 +35,14 @@ type DiscoveredModel = {
   id: string;
   name: string;
   provider: string;
+  normalizedId: string;
+};
+
+type ModelHealthEntry = {
+  status: "healthy" | "unavailable" | "disabled" | "unknown";
+  reason: string | null;
+  checkedAt: string;
+  targetId: string;
 };
 
 const PROVIDERS: ProviderConfig[] = [
@@ -107,7 +115,9 @@ export default function AdminSettingsPage() {
   // Model Management State
   const [activeModels, setActiveModels] = useState<ModelOption[]>([]);
   const [discoveredModels, setDiscoveredModels] = useState<DiscoveredModel[]>([]);
+  const [modelHealth, setModelHealth] = useState<Record<string, ModelHealthEntry>>({});
   const [fetchingModels, setFetchingModels] = useState(false);
+  const [hasFetchedModelData, setHasFetchedModelData] = useState(false);
 
   useEffect(() => {
     if (status !== "authenticated") {
@@ -200,6 +210,8 @@ export default function AdminSettingsPage() {
       if (!res.ok) throw new Error();
       const data = await res.json();
       setDiscoveredModels(data.models || []);
+      setModelHealth(data.health?.models || {});
+      setHasFetchedModelData(true);
       toast.success(`Discovered ${data.models?.length || 0} models from enabled providers`);
     } catch (error) {
       console.error("Failed to fetch models", error);
@@ -214,8 +226,7 @@ export default function AdminSettingsPage() {
   };
 
   const addModel = (discovered: DiscoveredModel) => {
-    const providerPrefix = discovered.provider.toLowerCase().replace(" (local)", "");
-    const id = `${providerPrefix}/${discovered.id}`;
+    const id = discovered.normalizedId;
 
     if (activeModels.some(m => m.id === id)) {
       toast.error("Model already in active list");
@@ -237,6 +248,19 @@ export default function AdminSettingsPage() {
 
   const updateModelLabel = (id: string, label: string) => {
     setActiveModels(activeModels.map(m => m.id === id ? { ...m, label } : m));
+  };
+
+  useEffect(() => {
+    if (activeTab === "models" && !hasFetchedModelData && !fetchingModels) {
+      void fetchModels();
+    }
+  }, [activeTab, hasFetchedModelData, fetchingModels]);
+
+  const healthBadgeStyles: Record<ModelHealthEntry["status"], string> = {
+    healthy: "bg-emerald-500/10 text-emerald-600",
+    unknown: "bg-amber-500/10 text-amber-600",
+    unavailable: "bg-destructive/10 text-destructive",
+    disabled: "bg-slate-500/10 text-slate-600 dark:text-slate-300",
   };
 
   if (status === "loading" || loading) {
@@ -400,18 +424,31 @@ export default function AdminSettingsPage() {
                   className="group flex items-center gap-3 rounded-xl border bg-background/50 p-3 shadow-2xs hover:shadow-sm transition-all"
                 >
                   <GripVertical className="h-4 w-4 cursor-grab text-muted-foreground/40 group-active:cursor-grabbing" />
-                  <div className="flex-1 space-y-1">
-                    <div className="flex items-center gap-2">
-                      <input 
-                        type="text" 
-                        value={model.label} 
-                        onChange={(e) => updateModelLabel(model.id, e.target.value)}
-                        className="bg-transparent text-sm font-semibold outline-hidden focus:text-primary"
-                      />
-                      <span className="rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">{model.category}</span>
-                    </div>
-                    <p className="text-[10px] font-mono text-muted-foreground/60">{model.id}</p>
-                  </div>
+                  {(() => {
+                    const health = modelHealth[model.id];
+                    return (
+                      <div className="flex-1 space-y-1">
+                        <div className="flex items-center gap-2">
+                          <input 
+                            type="text" 
+                            value={model.label} 
+                            onChange={(e) => updateModelLabel(model.id, e.target.value)}
+                            className="bg-transparent text-sm font-semibold outline-hidden focus:text-primary"
+                          />
+                          <span className="rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">{model.category}</span>
+                          {health && (
+                            <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${healthBadgeStyles[health.status]}`}>
+                              {health.status}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[10px] font-mono text-muted-foreground/60">{model.id}</p>
+                        {health?.reason && (
+                          <p className="text-[11px] text-muted-foreground">{health.reason}</p>
+                        )}
+                      </div>
+                    );
+                  })()}
                   <button 
                     onClick={() => removeModel(model.id)}
                     className="rounded-lg p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors opacity-0 group-hover:opacity-100"
@@ -434,15 +471,14 @@ export default function AdminSettingsPage() {
               <h2 className="text-lg font-bold text-foreground mb-4">Discovered Models</h2>
               <div className="grid gap-3 sm:grid-cols-2">
                 {discoveredModels.map((m) => {
-                  const providerPrefix = m.provider.toLowerCase().replace(" (local)", "");
-                  const fullId = `${providerPrefix}/${m.id}`;
-                  const isAdded = activeModels.some(am => am.id === fullId);
+                  const isAdded = activeModels.some(am => am.id === m.normalizedId);
                   
                   return (
                     <div key={m.id + m.provider} className="flex items-center justify-between rounded-xl border p-3 bg-muted/10">
                       <div className="min-w-0">
                         <p className="truncate text-sm font-semibold">{m.name}</p>
                         <p className="text-[10px] text-muted-foreground">{m.provider}</p>
+                        <p className="text-[10px] font-mono text-muted-foreground/70">{m.normalizedId}</p>
                       </div>
                       <button
                         onClick={() => addModel(m)}

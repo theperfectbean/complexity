@@ -22,7 +22,6 @@ describe("encryption.ts", () => {
 
   it("should return original text if ENCRYPTION_KEY is missing", () => {
     // Override mock for this test
-    const originalKey = process.env.ENCRYPTION_KEY;
     // In actual app, env.ts handles this, but here we just test logic
     // But since we mocked it globally above, we might need a different approach 
     // or just trust the mock logic.

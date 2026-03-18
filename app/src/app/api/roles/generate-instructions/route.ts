@@ -3,9 +3,9 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { auth } from "@/auth";
+import { resolveRequestedModel } from "@/lib/available-models";
 import { getLanguageModel } from "@/lib/llm";
 import { getApiKeys } from "@/lib/settings";
-import { getDefaultModel, isValidModelId } from "@/lib/models";
 
 const schema = z.object({
   prompt: z.string().min(1),
@@ -25,7 +25,7 @@ export async function POST(request: Request) {
   }
 
   const { prompt, model: requestedModel } = parsed.data;
-  const safeModel = isValidModelId(requestedModel ?? "") ? requestedModel! : getDefaultModel();
+  const safeModel = await resolveRequestedModel(requestedModel);
   const keys = await getApiKeys();
 
   const systemInstructions = `You are an expert at creating system prompts and AI personas. 

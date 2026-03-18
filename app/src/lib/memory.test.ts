@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { buildMemoryPrompt } from "./memory";
 import { runtimeConfig } from "./config";
 

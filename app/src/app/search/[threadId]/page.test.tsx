@@ -7,7 +7,7 @@ const mockToastError = vi.fn();
 const mockSendMessage = vi.fn();
 
 vi.mock("@ai-sdk/react", () => ({
-  useChat: (options: any) => mockUseChat(options),
+  useChat: (options: Record<string, unknown>) => mockUseChat(options),
 }));
 
 vi.mock("next/navigation", () => ({
@@ -47,7 +47,7 @@ describe("ThreadPage", () => {
         },
         messages: [],
       }),
-    } as any);
+    } as unknown as Response);
   });
 
   it("submits with the currently selected model in request body", async () => {
@@ -133,7 +133,7 @@ describe("ThreadPage", () => {
     const mockSetMessages = vi.fn();
     let capturedBodyFn: (() => Record<string, unknown>) | undefined = undefined;
 
-    mockUseChat.mockImplementation((options: any) => {
+    mockUseChat.mockImplementation((options: { transport?: { body?: () => Record<string, unknown> } }) => {
       if (options?.transport?.body) {
         capturedBodyFn = options.transport.body;
       }
@@ -186,7 +186,7 @@ describe("ThreadPage", () => {
     const mockSetMessages = vi.fn();
     let capturedBodyFn: (() => Record<string, unknown>) | undefined = undefined;
 
-    mockUseChat.mockImplementation((options: any) => {
+    mockUseChat.mockImplementation((options: { transport?: { body?: () => Record<string, unknown> } }) => {
       if (options?.transport?.body) {
         capturedBodyFn = options.transport.body;
       }
@@ -212,7 +212,7 @@ describe("ThreadPage", () => {
           { id: "model-b", label: "Model B", category: "Test", isPreset: true },
         ],
       }),
-    } as any);
+    } as unknown as Response);
 
     render(
       <ThreadChat

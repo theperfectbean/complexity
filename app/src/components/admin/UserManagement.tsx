@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Loader2, Search, User, Shield, ShieldAlert, ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -23,7 +23,7 @@ export function UserManagement() {
 
   const limit = 10;
 
-  async function fetchUsers() {
+  const fetchUsers = useCallback(async () => {
     setLoading(true);
     try {
       const res = await fetch(`/api/admin/users?q=${encodeURIComponent(search)}&page=${page}&limit=${limit}`);
@@ -34,19 +34,19 @@ export function UserManagement() {
       } else {
         toast.error(data.error || "Failed to fetch users");
       }
-    } catch (error) {
+    } catch {
       toast.error("An error occurred while fetching users");
     } finally {
       setLoading(false);
     }
-  }
+  }, [search, page, limit]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
       fetchUsers();
     }, 300);
     return () => clearTimeout(timer);
-  }, [search, page]);
+  }, [fetchUsers]);
 
   async function toggleAdmin(userId: string, currentStatus: boolean) {
     setUpdatingId(userId);
@@ -63,7 +63,7 @@ export function UserManagement() {
       } else {
         toast.error(data.error || "Failed to update user");
       }
-    } catch (error) {
+    } catch {
       toast.error("An error occurred while updating user");
     } finally {
       setUpdatingId(null);

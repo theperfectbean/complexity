@@ -111,7 +111,6 @@ export const MarkdownRenderer = memo(function MarkdownRenderer({ content, isStre
 
   useEffect(() => {
     if (!isStreaming) {
-      setDisplayContent(content);
       return;
     }
 
@@ -123,6 +122,8 @@ export const MarkdownRenderer = memo(function MarkdownRenderer({ content, isStre
     return () => clearTimeout(timer);
   }, [content, isStreaming]);
 
+  const finalContent = isStreaming ? displayContent : content;
+
   return (
     <div className={`markdown-body max-w-none ${isStreaming ? "min-h-[100px]" : ""}`}>
       <ReactMarkdown 
@@ -130,7 +131,7 @@ export const MarkdownRenderer = memo(function MarkdownRenderer({ content, isStre
         rehypePlugins={isStreaming ? [] : [rehypeHighlight]}
         components={components}
       >
-        {displayContent}
+        {finalContent}
       </ReactMarkdown>
     </div>
   );

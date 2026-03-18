@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 import { db } from "./db";
 import { settings } from "./db/schema";
 import { getRedisClient } from "./redis";
-import { decrypt, encrypt, isEncrypted } from "./encryption";
+import { decrypt, encrypt } from "./encryption";
 
 const SENSITIVE_KEYS = [
   "ANTHROPIC_API_KEY",

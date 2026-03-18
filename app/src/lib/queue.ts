@@ -1,6 +1,5 @@
-import { Queue, Worker, Job } from "bullmq";
+import { Queue } from "bullmq";
 import { env } from "./env";
-import { runtimeConfig } from "./config";
 import { logger } from "./logger";
 
 const REDIS_URL = env.REDIS_URL;

@@ -1,7 +1,8 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { GET } from "./route";
 import { auth } from "@/auth";
-import { fetchProviderModels } from "@/lib/provider-models";
+import { refreshModelHealthSnapshot } from "@/lib/model-health";
+import { fetchProviderModelsWithStatus } from "@/lib/provider-models";
 import { db } from "@/lib/db";
 
 vi.mock("@/auth", () => ({
@@ -9,7 +10,11 @@ vi.mock("@/auth", () => ({
 }));
 
 vi.mock("@/lib/provider-models", () => ({
-  fetchProviderModels: vi.fn(),
+  fetchProviderModelsWithStatus: vi.fn(),
+}));
+
+vi.mock("@/lib/model-health", () => ({
+  refreshModelHealthSnapshot: vi.fn(),
 }));
 
 vi.mock("@/lib/db", () => ({
@@ -30,17 +35,40 @@ describe("/api/admin/fetch-provider-models", () => {
 
   it("returns models when user is admin", async () => {
     vi.mocked(auth).mockResolvedValue({ user: { email: "admin@example.com", isAdmin: true } } as never);
-    vi.mocked(fetchProviderModels).mockResolvedValue([
-      { id: "gpt-5.4", name: "GPT-5.4", provider: "OpenAI" }
-    ]);
+    vi.mocked(fetchProviderModelsWithStatus).mockResolvedValue({
+      models: [
+        {
+          id: "gpt-5.4",
+          name: "GPT-5.4",
+          provider: "OpenAI",
+          providerId: "openai",
+          normalizedId: "openai/gpt-5.4",
+        },
+      ],
+      statuses: {
+        perplexity: { state: "disabled" },
+        anthropic: { state: "disabled" },
+        openai: { state: "ok" },
+        google: { state: "disabled" },
+        xai: { state: "disabled" },
+        ollama: { state: "disabled" },
+        "local-openai": { state: "disabled" },
+      },
+    });
+    vi.mocked(refreshModelHealthSnapshot).mockResolvedValue({
+      checkedAt: "2026-03-18T00:00:00.000Z",
+      expiresAt: "2026-03-18T06:00:00.000Z",
+      models: {},
+    });
     dbLimitMock.mockResolvedValue([{ isAdmin: true }]);
 
     const response = await GET();
-    const data = (await response.json()) as { models: { id: string }[] };
+    const data = (await response.json()) as { models: { id: string }[]; health: { models: Record<string, unknown> } };
 
     expect(response.status).toBe(200);
     expect(data.models).toHaveLength(1);
     expect(data.models[0].id).toBe("gpt-5.4");
+    expect(data.health.models).toEqual({});
   });
 
   it("returns 401 when user is not admin", async () => {

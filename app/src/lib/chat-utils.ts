@@ -2,7 +2,7 @@ import { UIMessage } from "ai";
 import { runtimeConfig } from "@/lib/config";
 import { extractTextFromDataUrl } from "@/lib/documents";
 import { logger } from "./logger";
-import { asRecord, collectTextStrings, extractCitationsFromResponse, extractAssistantText, type Citation } from "./extraction-utils";
+import { asRecord } from "./extraction-utils";
 
 export class AttachmentTooLargeError extends Error {
   constructor(message: string) {

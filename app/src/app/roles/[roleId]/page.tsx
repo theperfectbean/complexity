@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useState } from "react";
 import { MoreHorizontal, Pin } from "lucide-react";
 import { toast } from "sonner";
 
@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
 import { DocumentList, RoleDocument } from "@/components/roles/DocumentList";
 import { FileUploader } from "@/components/roles/FileUploader";
 import { LoadingSkeleton } from "@/components/shared/LoadingSkeleton";
-import { MODELS, getDefaultModel } from "@/lib/models";
+import { getDefaultModel } from "@/lib/models";
 import { SearchBar } from "@/components/search/SearchBar";
 
 type Role = {

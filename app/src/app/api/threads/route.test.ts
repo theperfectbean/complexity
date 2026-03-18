@@ -20,7 +20,12 @@ vi.mock("@/lib/db/cuid", () => ({
   createId: vi.fn(() => "thread-1"),
 }));
 
+vi.mock("@/lib/available-models", () => ({
+  resolveRequestedModel: vi.fn(),
+}));
+
 import { auth } from "@/auth";
+import { resolveRequestedModel } from "@/lib/available-models";
 import { db } from "@/lib/db";
 
 import { GET, POST } from "@/app/api/threads/route";
@@ -36,6 +41,7 @@ describe("/api/threads", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(auth).mockResolvedValue({ user: { email: "gary@example.com" } } as never);
+    vi.mocked(resolveRequestedModel).mockResolvedValue("pro-search");
   });
 
   describe("GET", () => {
@@ -128,6 +134,36 @@ describe("/api/threads", () => {
         thread: { id: "thread-1", title: "Hello", model: "pro-search", userId: "user-1" },
       });
       expect(db.insert).toHaveBeenCalledTimes(1);
+    });
+
+    it("falls back to a safe available model when the requested model is stale", async () => {
+      vi.mocked(db.query.users.findFirst).mockResolvedValue({ id: "user-1" } as never);
+      vi.mocked(resolveRequestedModel).mockResolvedValue("anthropic/claude-4-6-sonnet-latest");
+
+      const values = vi.fn().mockResolvedValue(undefined);
+      vi.mocked(db.insert).mockReturnValue({ values } as never);
+      mockThreadSelect([
+        { id: "thread-1", title: "Hello", model: "anthropic/claude-4-6-sonnet-latest", userId: "user-1" },
+      ]);
+
+      const request = new Request("http://localhost/api/threads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: "Hello", model: "openai/retired-model" }),
+      });
+
+      const response = await POST(request);
+
+      expect(response.status).toBe(201);
+      expect(resolveRequestedModel).toHaveBeenCalledWith("openai/retired-model");
+      await expect(response.json()).resolves.toEqual({
+        thread: {
+          id: "thread-1",
+          title: "Hello",
+          model: "anthropic/claude-4-6-sonnet-latest",
+          userId: "user-1",
+        },
+      });
     });
   });
 

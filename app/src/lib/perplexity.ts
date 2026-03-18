@@ -1,5 +1,5 @@
 import Perplexity from "@perplexity-ai/perplexity_ai";
-import { LanguageModelV3, LanguageModelV3CallOptions, LanguageModelV3GenerateResult, LanguageModelV3StreamResult } from "@ai-sdk/provider";
+import { LanguageModelV3CallOptions, LanguageModelV3GenerateResult, LanguageModelV3StreamResult } from "@ai-sdk/provider";
 import { LanguageModel } from "ai";
 import { ResponseStreamChunk, ResponseCreateResponse } from "@perplexity-ai/perplexity_ai/resources/responses";
 

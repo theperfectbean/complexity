@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useState, useEffect, useRef } from "react";
-import { Sparkles, ChevronDown, Wand2, Loader2, X } from "lucide-react";
+import { Sparkles, ChevronDown, Wand2, Loader2 } from "lucide-react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { motion, AnimatePresence } from "motion/react";
 import { toast } from "sonner";

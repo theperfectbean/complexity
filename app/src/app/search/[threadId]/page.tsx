@@ -3,7 +3,7 @@
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, UIMessageChunk, UIMessage } from "ai";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { ChatCitation, ChatMessageItem, MessageList } from "@/components/chat/MessageList";
@@ -87,6 +87,19 @@ export function ThreadChat({
   const hasSubmittedInitialQuery = useRef(false);
   const triggerRef = useRef<string | undefined>(undefined);
 
+  const getBody = useCallback(() => {
+    const body = {
+      threadId,
+      model,
+      roleId,
+      webSearch: webSearchEnabled,
+      trigger: triggerRef.current,
+    };
+    // Reset trigger after use
+    triggerRef.current = undefined;
+    return body;
+  }, [threadId, model, roleId, webSearchEnabled]);
+
   const [data, setData] = useState<Record<string, unknown>[]>([]);
   const { messages, setMessages, sendMessage, regenerate, status, error } = useChat({
     messages: initialHistory.map((msg) => {
@@ -101,20 +114,10 @@ export function ThreadChat({
       }
       return uiMsg as unknown as UIMessage;
     }),
+    // eslint-disable-next-line react-hooks/refs
     transport: new DefaultChatTransport({
       api: "/api/chat",
-      body: () => {
-        const body = {
-          threadId,
-          model,
-          roleId,
-          webSearch: webSearchEnabled,
-          trigger: triggerRef.current,
-        };
-        // Reset trigger after use
-        triggerRef.current = undefined;
-        return body;
-      },
+      body: getBody,
     }),
     onData(part: UIMessageChunk) {
       if (part.type === "data-json") {

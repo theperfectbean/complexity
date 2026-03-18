@@ -1,7 +1,7 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 import type { ChatMessageItem, ChatCitation, ChatThinkingPart } from "@/components/chat/MessageList";
-import { asRecord, collectTextStrings } from "./extraction-utils";
+import { collectTextStrings } from "./extraction-utils";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));

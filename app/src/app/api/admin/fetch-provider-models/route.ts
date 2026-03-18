@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { auth } from "@/auth";
-import { fetchProviderModels } from "@/lib/provider-models";
+import { refreshModelHealthSnapshot } from "@/lib/model-health";
+import { fetchProviderModelsWithStatus } from "@/lib/provider-models";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 
@@ -23,8 +24,9 @@ export async function GET() {
   }
 
   try {
-    const models = await fetchProviderModels();
-    return NextResponse.json({ models });
+    const discovery = await fetchProviderModelsWithStatus();
+    const health = await refreshModelHealthSnapshot({ discovery });
+    return NextResponse.json({ models: discovery.models, discovery: discovery.statuses, health });
   } catch (error) {
     console.error("Failed to fetch provider models API", error);
     return NextResponse.json({ error: "Failed to fetch models" }, { status: 500 });

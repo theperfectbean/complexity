@@ -1,8 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { queueDocumentProcessing } from "./queue";
-import { db } from "./db";
-import { documents, chunks } from "./db/schema";
-import { eq } from "drizzle-orm";
 
 // Mock BullMQ
 vi.mock("bullmq", () => {
