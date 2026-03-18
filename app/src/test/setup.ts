@@ -22,6 +22,7 @@ Object.defineProperty(window, "matchMedia", {
 });
 
 window.HTMLElement.prototype.scrollIntoView = function() {};
+window.scrollTo = vi.fn();
 
 // Mock global fetch
 const runLive = process.env.RUN_AGENT_SMOKE === "1" || process.env.RUN_LIVE_CHAT_ROUTE === "1";

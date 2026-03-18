@@ -288,18 +288,20 @@ export function MessageList({ messages, emptyLabel, onRetry, onRewrite, isStream
   const lastMessageContent = messages[messages.length - 1]?.content;
   const lastMessageThinkingLength = messages[messages.length - 1]?.thinking?.length;
 
+  const previousMessagesLengthRef = useRef(messages.length);
+
   const scrollToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {
     // Throttle scroll events to at most 30fps (33ms) to prevent jitter
     const now = Date.now();
     if (now - lastScrollTimeRef.current < 33) return;
     lastScrollTimeRef.current = now;
     
-    bottomRef.current?.scrollIntoView({ behavior, block: "nearest" });
+    window.scrollTo({ top: document.documentElement.scrollHeight, behavior });
   }, []);
 
   const handleScroll = useCallback(() => {
     // Check if we are near the bottom to hide/show the "scroll to bottom" button
-    const isAtBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 200;
+    const isAtBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 300;
     setShowScrollButton(!isAtBottom && (isStreaming ?? false));
   }, [isStreaming]);
 
@@ -315,6 +317,9 @@ export function MessageList({ messages, emptyLabel, onRetry, onRewrite, isStream
       return;
     }
 
+    const isNewMessage = messages.length > previousMessagesLengthRef.current;
+    previousMessagesLengthRef.current = messages.length;
+
     // Initial scroll when messages arrive
     if (!hasAutoScrolledRef.current) {
       hasAutoScrolledRef.current = true;
@@ -322,8 +327,14 @@ export function MessageList({ messages, emptyLabel, onRetry, onRewrite, isStream
       return;
     }
 
+    if (isNewMessage) {
+      // Force scroll on new message
+      requestAnimationFrame(() => scrollToBottom("instant" as ScrollBehavior));
+      return;
+    }
+
     // Smart auto-scroll: only scroll if the user was already near the bottom
-    const isNearBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 200;
+    const isNearBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 300;
 
     if (isNearBottom) {
       // Use "instant" (auto) instead of smooth during active streaming to prevent animation jitter
