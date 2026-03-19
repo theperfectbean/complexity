@@ -453,6 +453,29 @@ DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose build app
   - Added configurable environment variables: `RAG_RERANK_ENABLED` and `EMBEDDER_RERANK_MODEL`.
 - **Testing**: Added unit tests for the `rerank` utility and verified service integration.
 
+### Web Search for Direct Providers (2026-03-19)
+- **Feature**: Added web search capabilities to non-Perplexity LLMs (Anthropic, OpenAI, etc.) using tool calling (H2).
+- **Implementation**:
+  - Developed a `webSearchTool` using the **Tavily Search API** to fetch real-time information and context.
+  - Integrated the tool into the `runGeneration` function in `llm.ts`, allowing models to autonomously decide when to perform a web search.
+  - Added visual streaming feedback for tool calls, showing "Web Search..." and the query in the UI while the search is in progress.
+  - Configured `maxSteps` to allow models to reason about search results and perform follow-up actions in a single response.
+
+### Advanced Chunking & Retrieval (2026-03-19)
+- **Feature**: Implemented Sliding Window Chunking for improved context coverage.
+- **Implementation**:
+  - Replaced basic token-window chunking with an intelligent sliding window algorithm in `rag.ts`.
+  - Added **boundary detection** that prioritizes splitting at paragraphs (`\n\n`) or sentence ends (`. `, `! `, `? `) within a tolerance range.
+  - This ensures that chunks are semantically coherent and don't cut off mid-sentence, leading to significantly higher retrieval quality.
+
+### Thread UI & Sidebar Refinements (2026-03-19)
+- **Feature**: Enhanced navigation and media visibility within threads.
+- **Implementation**:
+  - **Branch Browser**: Added a dedicated family/branch browser to the `Sidebar` that appears when viewing a thread, allowing users to see and jump between all related conversation paths.
+  - **Image Gallery**: Developed a thread-level Image Gallery component that automatically extracts all user attachments and AI-generated images.
+  - **Lightbox**: Included a full-screen lightbox for the gallery with support for high-resolution viewing and direct downloads.
+
+
 
 
 

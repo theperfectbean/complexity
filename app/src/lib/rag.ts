@@ -12,7 +12,7 @@ import { runtimeConfig } from "./config";
  * Each chunk is at most `maxTokens` tokens wide; consecutive chunks share
  * `overlapTokens` tokens so context carries over sentence boundaries.
  * Sentence/paragraph boundaries are preferred as split points when they fall
- * near the window edge (within a 10 % tolerance).
+ * near the window edge (within a 15 % tolerance).
  */
 export function chunkText(
   input: string,
@@ -28,19 +28,37 @@ export function chunkText(
   // If the whole text fits in one chunk, return it as-is.
   if (tokens.length <= maxTokens) return [text];
 
-  const result: string[] = [];
-  let start = 0;
-
-  while (start < tokens.length) {
-    const end = Math.min(start + maxTokens, tokens.length);
-    const chunkTokens = tokens.slice(start, end);
-    const chunkStr = decode(chunkTokens).trim();
-    if (chunkStr) result.push(chunkStr);
-    if (end >= tokens.length) break;
-    start = end - overlapTokens;
+  const finalResult: string[] = [];
+  let currentStart = 0;
+  while (currentStart < tokens.length) {
+    let currentEnd = Math.min(currentStart + maxTokens, tokens.length);
+    
+    if (currentEnd < tokens.length) {
+      const tolerance = Math.floor(maxTokens * 0.15);
+      const slice = tokens.slice(currentEnd - tolerance, currentEnd);
+      const sliceText = decode(slice);
+      
+      const breakIdx = Math.max(
+        sliceText.lastIndexOf("\n\n"),
+        sliceText.lastIndexOf(". "),
+        sliceText.lastIndexOf("! "),
+        sliceText.lastIndexOf("? ")
+      );
+      
+      if (breakIdx !== -1) {
+        currentEnd = currentEnd - tolerance + encode(sliceText.slice(0, breakIdx + 1)).length;
+      }
+    }
+    
+    const chunk = decode(tokens.slice(currentStart, currentEnd)).trim();
+    if (chunk) finalResult.push(chunk);
+    
+    if (currentEnd >= tokens.length) break;
+    currentStart = currentEnd - overlapTokens;
+    if (currentStart >= currentEnd) currentStart = currentEnd - 1;
   }
 
-  return result;
+  return finalResult;
 }
 
 export async function getEmbeddings(texts: string[]) {

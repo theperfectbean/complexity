@@ -8,8 +8,10 @@ import { LanguageModel, streamText, convertToModelMessages, UIMessageChunk, UIMe
 import type { Responses } from "@perplexity-ai/perplexity_ai/resources/responses";
 import { runSearchAgent } from "./search-agent";
 import { runtimeConfig } from "./config";
+import { env } from "./env";
 import { extractCitationsFromResponse, type Citation } from "./extraction-utils";
 import { isPresetModel } from "./models";
+import { webSearchTool } from "./tools/search";
 
 export type ProviderType = "perplexity" | "anthropic" | "openai" | "google" | "xai" | "ollama" | "local-openai";
 
@@ -214,10 +216,24 @@ export async function runGeneration(options: GenerationOptions): Promise<Generat
       model,
       system: options.system,
       messages: coreMessages,
+      tools: options.webSearch && env.TAVILY_API_KEY ? {
+        web_search: webSearchTool,
+      } : undefined,
+      maxSteps: options.webSearch ? 5 : 1,
     });
 
     for await (const part of result.fullStream) {
-      if (part.type === "text-delta") {
+      if (part.type === "tool-call") {
+        options.writer.write({
+          type: "data-call-start",
+          data: { callId: part.toolCallId, toolName: "Web Search", input: part.args },
+        } as UIMessageChunk);
+      } else if (part.type === "tool-result") {
+        options.writer.write({
+          type: "data-call-result",
+          data: { callId: part.toolCallId, result: "Search completed." },
+        } as UIMessageChunk);
+      } else if (part.type === "text-delta") {
         if (!hasSentConnected) {
           options.writer.write({
             type: "data-call-result",

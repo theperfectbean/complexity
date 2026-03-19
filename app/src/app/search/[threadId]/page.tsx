@@ -9,6 +9,7 @@ import { toast } from "sonner";
 
 import { ChatCitation, ChatMessageItem, MessageList } from "@/components/chat/MessageList";
 import { SearchBar } from "@/components/search/SearchBar";
+import { ImageGallery } from "@/components/chat/ImageGallery";
 import { getDefaultModel } from "@/lib/models";
 
 import { normalizeUIMessage } from "@/lib/utils";
@@ -317,15 +318,18 @@ export function ThreadChat({
         <h1 className="text-xl font-semibold leading-snug tracking-tight text-foreground line-clamp-2">
           {initialTitle}
         </h1>
-        {mergedMessages.length > 0 && (
-          <button
-            onClick={() => exportMessagesAsMarkdown(initialTitle, mergedMessages)}
-            title="Export conversation as Markdown"
-            className="flex-shrink-0 flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground/50 transition-colors hover:bg-muted hover:text-foreground"
-          >
-            <Download className="h-4 w-4" />
-          </button>
-        )}
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <ImageGallery messages={mergedMessages} />
+          {mergedMessages.length > 0 && (
+            <button
+              onClick={() => exportMessagesAsMarkdown(initialTitle, mergedMessages)}
+              title="Export conversation as Markdown"
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground/50 transition-colors hover:bg-muted hover:text-foreground"
+            >
+              <Download className="h-4 w-4" />
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="flex-1 space-y-12">
