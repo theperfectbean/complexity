@@ -544,6 +544,15 @@ DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose build app
   - **UI**: Created a comprehensive **Webhooks** management page in User Settings for creating hooks and inspecting delivery logs.
 - **Benefit**: Enables seamless integration with tools like n8n, Zapier, and custom dashboards, turning Complexity into a trigger for larger automated workflows.
 
+### Major Plan Update & Roadmap (2026-03-19)
+- **Status**: Re-evaluated the project plan to reflect massive recent progress (all Tier 1 and most Tier 2 tasks completed).
+- **Roadmap Refinement**:
+  - Categorized remaining tasks into **Short-term** (Polish & Transparency), **Mid-term** (Governance & Scale), and **Long-term** (Operational Excellence).
+  - Moved **Conversation Templates (I4)** and **Session Management (F4)** to a "Future Roadmap" list to prioritize UI simplicity and v1.0 stability.
+  - Synchronized the `claude_plan.md` work log with the latest 30+ implemented features.
+- **Goal**: Focused the next 2 weeks on RAG precision (Chunk Attribution) and Memory transparency.
+
+
 
 
 
