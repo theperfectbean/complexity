@@ -427,4 +427,13 @@ DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose build app
   - Integrated branching into the "Edit Message" flow, redirecting users to a new branched thread upon editing a prior message.
 - **Testing**: Added unit tests for the new branches API endpoint.
 
+### Streaming Request Cancellation (2026-03-19)
+- **Feature**: Added the ability to stop an in-progress AI response generation (I2).
+- **Implementation**:
+  - Updated the `SearchBar` component to support an optional `onStop` callback and display a "Stop" button (Square icon) when it is provided.
+  - Leveraged the `stop` function from the Vercel AI SDK's `useChat` hook in the `ThreadChat` component.
+  - Configured the UI to replace the "Send" button with the "Stop" button specifically when the chat status is "streaming".
+  - Ensured that stopping a request gracefully halts the stream and allows the user to immediately send a new message or edit the previous one.
+
+
 

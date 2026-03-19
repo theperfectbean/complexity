@@ -1,6 +1,6 @@
 "use client";
 
-import { Globe, Paperclip, SendHorizontal } from "lucide-react";
+import { Globe, Paperclip, SendHorizontal, Square } from "lucide-react";
 import { motion } from "motion/react";
 import { useRef, useState, useEffect } from "react";
 import TextareaAutosize from "react-textarea-autosize";
@@ -19,6 +19,7 @@ type SearchBarProps = {
   placeholder: string;
   submitLabel: string;
   disabled?: boolean;
+  onStop?: () => void;
   layoutId?: string;
   compact?: boolean;
   model?: string;
@@ -43,6 +44,7 @@ export function SearchBar({
   placeholder,
   submitLabel,
   disabled,
+  onStop,
   layoutId = "searchbar",
   compact,
   model = getDefaultModel(),
@@ -148,20 +150,31 @@ export function SearchBar({
           <VoiceInput
             value={value}
             onChange={onChange}
-            disabled={disabled}
+            disabled={disabled && !onStop}
           />
 
-          <button
-            type="submit"
-            className={cn(
-              "inline-flex h-8 w-8 items-center justify-center rounded-xl bg-primary text-primary-foreground transition-all active:scale-95 disabled:opacity-30",
-              !value.trim() && internalAttachments.length === 0 && "bg-muted text-muted-foreground"
-            )}
-            disabled={disabled || (!value.trim() && internalAttachments.length === 0)}
-            aria-label={submitLabel}
-          >
-            <SendHorizontal className="h-4 w-4" />
-          </button>
+          {onStop ? (
+            <button
+              type="button"
+              onClick={onStop}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-foreground text-background transition-all active:scale-95"
+              aria-label="Stop generation"
+            >
+              <Square className="h-3 w-3 fill-current" />
+            </button>
+          ) : (
+            <button
+              type="submit"
+              className={cn(
+                "inline-flex h-8 w-8 items-center justify-center rounded-xl bg-primary text-primary-foreground transition-all active:scale-95 disabled:opacity-30",
+                !value.trim() && internalAttachments.length === 0 && "bg-muted text-muted-foreground"
+              )}
+              disabled={disabled || (!value.trim() && internalAttachments.length === 0)}
+              aria-label={submitLabel}
+            >
+              <SendHorizontal className="h-4 w-4" />
+            </button>
+          )}
         </div>
       </div>
     </motion.div>

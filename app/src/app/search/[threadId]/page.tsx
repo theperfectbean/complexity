@@ -141,7 +141,7 @@ export function ThreadChat({
   }, [threadId, model, roleId, webSearchEnabled]);
 
   const [data, setData] = useState<Record<string, unknown>[]>([]);
-  const { messages, setMessages, sendMessage, regenerate, status, error } = useChat({
+  const { messages, setMessages, sendMessage, regenerate, stop, status, error } = useChat({
     messages: initialHistory.map((msg) => {
       const uiMsg = {
         id: msg.id,
@@ -400,6 +400,7 @@ export function ThreadChat({
               placeholder="Ask a follow-up..."
               submitLabel={status === "streaming" ? "Thinking..." : "Send"}
               disabled={status === "streaming"}
+              onStop={status === "streaming" ? stop : undefined}
               layoutId="searchbar"
               compact
               model={model}
