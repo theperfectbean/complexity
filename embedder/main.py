@@ -5,6 +5,9 @@ from pydantic import BaseModel
 from sentence_transformers import SentenceTransformer, CrossEncoder
 from faster_whisper import WhisperModel
 import torch
+import pytesseract
+from pdf2image import convert_from_path
+from PIL import Image
 
 app_title = os.environ.get("EMBEDDER_APP_TITLE", "Complexity Embedder")
 app_version = os.environ.get("EMBEDDER_APP_VERSION", "1.0.0")
@@ -90,6 +93,34 @@ def rerank(request: RerankRequest):
     results.sort(key=lambda x: x["score"], reverse=True)
     
     return {"results": results[:request.top_k]}
+
+
+@app.post("/ocr")
+async def ocr(file: UploadFile = File(...)) -> dict[str, str]:
+    # Save the uploaded file to a temporary file
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+        content = await file.read()
+        tmp.write(content)
+        tmp_path = tmp.name
+
+    try:
+        # Convert PDF to images
+        # 300 DPI is usually good for OCR
+        images = convert_from_path(tmp_path, dpi=300)
+        
+        full_text = []
+        for i, image in enumerate(images):
+            # Perform OCR on each page
+            text = pytesseract.image_to_string(image)
+            full_text.append(f"--- Page {i+1} ---\n{text}")
+            
+        return {"text": "\n\n".join(full_text).strip()}
+    except Exception as e:
+        return {"text": f"OCR Error: {str(e)}"}
+    finally:
+        # Clean up the temporary file
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
 
 
 @app.post("/transcribe")

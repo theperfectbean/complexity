@@ -493,6 +493,15 @@ DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose build app
   - Integrated match counting and visual feedback in the thread header.
 - **Benefit**: Allows users to quickly locate specific information or keywords in very long conversation histories.
 
+### OCR for Scanned PDFs (2026-03-19)
+- **Feature**: Added OCR support for image-based/scanned PDF files (H5).
+- **Implementation**:
+  - Updated the `embedder` microservice with Tesseract OCR and Poppler dependencies.
+  - Added a new `/ocr` endpoint to the Python service that converts PDF pages to images and extracts text.
+  - Enhanced the BullMQ `document-processing` worker in the Next.js app to automatically fall back to OCR if a PDF yields no text through standard extraction.
+- **Benefit**: Allows the RAG system to index and search content within scanned documents and image-heavy PDFs that were previously unreadable.
+
+
 
 ### Context Window Transparency (2026-03-19)
 - **Feature**: Displayed indicators for token consumption and usage for the current thread (A5/A6).

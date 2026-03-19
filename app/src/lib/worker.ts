@@ -5,7 +5,7 @@ import { db } from "./db";
 import { chunks, documents } from "./db/schema";
 import { eq } from "drizzle-orm";
 import { createId } from "./db/cuid";
-import { extractTextFromFile, type DocumentFileLike } from "./documents";
+import { extractTextFromFile, performOcr, type DocumentFileLike } from "./documents";
 import { chunkText, getEmbeddings } from "./rag";
 import fs from "fs/promises";
 
@@ -55,7 +55,14 @@ export function startWorker() {
           },
         };
 
-        const text = await extractTextFromFile(file);
+        let text = await extractTextFromFile(file);
+        
+        // OCR Fallback for PDFs with no text
+        if (!text.trim() && (fileType === "application/pdf" || fileName.toLowerCase().endsWith(".pdf"))) {
+          log.info("No text extracted, attempting OCR fallback");
+          text = await performOcr(buffer, fileName);
+        }
+
         const splitChunks = chunkText(text);
         
         if (splitChunks.length === 0) {

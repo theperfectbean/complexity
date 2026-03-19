@@ -1,8 +1,27 @@
 import mammoth from "mammoth";
 import { PDFParse } from "pdf-parse";
 import { runtimeConfig } from "./config";
+import { env } from "./env";
 
 export type DocumentFileLike = Pick<File, "name" | "type" | "arrayBuffer">;
+
+export async function performOcr(buffer: Buffer, fileName: string) {
+  const formData = new FormData();
+  const blob = new Blob([buffer], { type: "application/pdf" });
+  formData.append("file", blob, fileName);
+
+  const response = await fetch(`${env.EMBEDDER_URL}/ocr`, {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!response.ok) {
+    throw new Error(`OCR service failed: ${response.statusText}`);
+  }
+
+  const data = await response.json();
+  return data.text as string;
+}
 
 export async function extractTextFromFile(file: DocumentFileLike) {
   const buffer = Buffer.from(await file.arrayBuffer());
