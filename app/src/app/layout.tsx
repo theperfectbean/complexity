@@ -29,6 +29,16 @@ const sourceSerif = Source_Serif_4({
 export const metadata: Metadata = {
   title: "Complexity",
   description: "Self-hosted Agentic answer engine",
+  manifest: "/manifest.json",
+  themeColor: "#000000",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Complexity",
+  },
+  formatDetection: {
+    telephone: false,
+  },
 };
 
 export default async function RootLayout({

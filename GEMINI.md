@@ -492,6 +492,16 @@ DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose build app
   - Added a visual usage breakdown in the settings modal, showing both raw token count and estimated word count (using a 0.75 tokens/word ratio).
 - **Benefit**: Provides users with immediate visibility into how much of the LLM context window is being consumed.
 
+### PWA Support (2026-03-19)
+- **Feature**: Made the application a Progressive Web App (G5) for installability on mobile and desktop.
+- **Implementation**:
+  - Integrated `@ducanh2912/next-pwa` for robust service worker management in Next.js 16.
+  - Created `public/manifest.json` defining app identity, standalone display mode, and theme colors.
+  - Updated `next.config.ts` to wrap the configuration with PWA support.
+  - Enhanced `app/layout.tsx` with PWA-specific metadata (manifest link, apple-mobile-web-app tags).
+- **Benefit**: Users can "install" Complexity as a native-like application with its own icon and splash screen, improving accessibility on all devices.
+
+
 
 
 
