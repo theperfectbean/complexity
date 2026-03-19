@@ -1,14 +1,16 @@
-import { and, asc, eq, gte } from "drizzle-orm";
+import { and, asc, eq, gte, sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
+import { createId } from "@/lib/db/cuid";
 import { messages, threads, users } from "@/lib/db/schema";
 
 const patchSchema = z.union([
   z.object({ title: z.string().min(1).max(200) }),
   z.object({ action: z.literal("truncate-from"), messageId: z.string().min(1) }),
+  z.object({ action: z.literal("branch"), messageId: z.string().min(1) }),
 ]);
 
 export async function GET(_: Request, { params }: { params: Promise<{ threadId: string }> }) {
@@ -71,7 +73,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ th
   }
 
   // Truncate thread from the given message (inclusive) onward
-  if ("action" in parsed.data) {
+  if ("action" in parsed.data && parsed.data.action === "truncate-from") {
     const { messageId } = parsed.data;
 
     const [targetMsg] = await db
@@ -89,6 +91,67 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ th
       .where(and(eq(messages.threadId, threadId), gte(messages.createdAt, targetMsg.createdAt)));
 
     return NextResponse.json({ ok: true });
+  }
+
+  // Branch thread from the given message (exclusive) onward
+  if ("action" in parsed.data && parsed.data.action === "branch") {
+    const { messageId } = parsed.data;
+
+    const [targetMsg] = await db
+      .select({ createdAt: messages.createdAt })
+      .from(messages)
+      .where(and(eq(messages.id, messageId), eq(messages.threadId, threadId)))
+      .limit(1);
+
+    if (!targetMsg) {
+      return NextResponse.json({ error: "Message not found" }, { status: 404 });
+    }
+
+    // Get current thread info
+    const currentThread = await db.query.threads.findFirst({
+      where: eq(threads.id, threadId),
+    });
+
+    if (!currentThread) {
+      return NextResponse.json({ error: "Thread not found" }, { status: 404 });
+    }
+
+    // Create new thread
+    const newThreadId = createId();
+    const parentId = currentThread.parentThreadId || currentThread.id;
+
+    await db.insert(threads).values({
+      id: newThreadId,
+      title: currentThread.title,
+      userId: currentThread.userId,
+      roleId: currentThread.roleId,
+      model: currentThread.model,
+      parentThreadId: parentId,
+      branchPointMessageId: messageId,
+    });
+
+    // Copy prior messages
+    const priorMessages = await db
+      .select()
+      .from(messages)
+      .where(and(eq(messages.threadId, threadId), sql`${messages.createdAt} < ${targetMsg.createdAt}`))
+      .orderBy(asc(messages.createdAt));
+
+    if (priorMessages.length > 0) {
+      await db.insert(messages).values(
+        priorMessages.map((m) => ({
+          id: createId(),
+          threadId: newThreadId,
+          role: m.role,
+          content: m.content,
+          model: m.model,
+          citations: m.citations,
+          createdAt: m.createdAt,
+        }))
+      );
+    }
+
+    return NextResponse.json({ ok: true, threadId: newThreadId });
   }
 
   // Rename thread

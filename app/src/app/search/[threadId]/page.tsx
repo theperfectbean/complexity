@@ -107,8 +107,25 @@ export function ThreadChat({
   const [model, setModel] = useState<string>(initialModel);
   const [roleId] = useState<string | null>(initialRoleId);
   const [webSearchEnabled, setWebSearchEnabled] = useState(initialWebSearch);
+  const [branches, setBranches] = useState<Array<{ id: string; title: string; branchPointMessageId: string | null }>>([]);
   const hasSubmittedInitialQuery = useRef(false);
   const triggerRef = useRef<string | undefined>(undefined);
+
+  const fetchBranches = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/threads/${threadId}/branches`);
+      if (res.ok) {
+        const payload = await res.json();
+        setBranches(payload.branches);
+      }
+    } catch (err) {
+      console.error("Failed to fetch branches:", err);
+    }
+  }, [threadId]);
+
+  useEffect(() => {
+    void fetchBranches();
+  }, [fetchBranches]);
 
   const getBody = useCallback(() => {
     const body = {
@@ -167,43 +184,28 @@ export function ThreadChat({
       const res = await fetch(`/api/threads/${threadId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "truncate-from", messageId }),
+        body: JSON.stringify({ action: "branch", messageId }),
       });
 
       if (!res.ok) {
-        toast.error("Failed to edit message");
+        toast.error("Failed to branch conversation");
         return;
       }
 
-      // Reset SDK state to messages that precede the edited one
-      const msgIndex = mergedMessages.findIndex((m) => m.id === messageId);
-      const prior = mergedMessages.slice(0, msgIndex);
+      const payload = await res.json();
+      const newThreadId = payload.threadId;
 
-      setMessages(
-        prior.map((m) => {
-          const uiMsg = {
-            id: m.id,
-            role: m.role as "user" | "assistant" | "system",
-            content: m.content,
-            parts: [{ type: "text" as const, text: m.content }],
-          };
-          if (m.citations && m.citations.length > 0) {
-            (uiMsg as Record<string, unknown>).citations = m.citations;
-          }
-          return uiMsg as UIMessage;
-        }),
-      );
-
-      try {
-        await sendMessage(
-          { parts: [{ type: "text", text: newContent }] },
-          { body: { threadId, model, roleId } },
-        );
-      } catch {
-        toast.error("Failed to send edited message");
-      }
+      // Redirect to the new thread with the edit content as the initial query
+      router.push(`/search/${newThreadId}?q=${encodeURIComponent(newContent)}&web=${webSearchEnabled}`);
     },
-    [mergedMessages, threadId, model, roleId, setMessages, sendMessage],
+    [threadId, router, webSearchEnabled],
+  );
+
+  const handleBranchChange = useCallback(
+    (newThreadId: string) => {
+      router.push(`/search/${newThreadId}`);
+    },
+    [router],
   );
 
   useEffect(() => {
@@ -329,6 +331,8 @@ export function ThreadChat({
       <div className="flex-1 space-y-12">
         <MessageList
           messages={mergedMessages}
+          branches={branches}
+          onBranchChange={handleBranchChange}
           isStreaming={status === "streaming"}
           emptyLabel="Start this thread with your first question."
           onRetry={() => {

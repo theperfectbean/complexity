@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Copy, RotateCcw, ArrowDown, Globe, Search, Brain, Database, Pencil } from "lucide-react";
+import { Check, Copy, RotateCcw, ArrowDown, Globe, Search, Brain, Database, Pencil, ChevronLeft, ChevronRight } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { useState, useRef, useEffect, useCallback, memo, useMemo } from "react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
@@ -31,8 +31,16 @@ export type ChatMessageItem = {
   thinking?: ChatThinkingPart[];
 };
 
+export type ChatBranch = {
+  id: string;
+  title: string;
+  branchPointMessageId: string | null;
+};
+
 type MessageListProps = {
   messages: ChatMessageItem[];
+  branches?: ChatBranch[];
+  onBranchChange?: (threadId: string) => void;
   emptyLabel: string;
   onRetry?: () => void;
   onRewrite?: (modelId: string) => void;
@@ -61,6 +69,8 @@ const MessageItem = memo(function MessageItem({
   message, 
   index, 
   totalMessages, 
+  branches,
+  onBranchChange,
   isStreaming, 
   onRetry, 
   onRewrite,
@@ -71,6 +81,8 @@ const MessageItem = memo(function MessageItem({
   message: ChatMessageItem;
   index: number;
   totalMessages: number;
+  branches?: ChatBranch[];
+  onBranchChange?: (threadId: string) => void;
   isStreaming?: boolean;
   onRetry?: () => void;
   onRewrite?: (modelId: string) => void;
@@ -142,6 +154,15 @@ const MessageItem = memo(function MessageItem({
     }, {});
   }, [availableModels]);
 
+  const relevantBranches = useMemo(() => {
+    if (!branches || !onBranchChange) return [];
+    // A branch is relevant if its branchPointMessageId matches THIS message's ID
+    return branches.filter(b => b.branchPointMessageId === message.id);
+  }, [branches, message.id, onBranchChange]);
+
+  const currentThreadId = typeof window !== 'undefined' ? window.location.pathname.split('/').pop() : '';
+  const currentBranchIndex = relevantBranches.findIndex(b => b.id === currentThreadId);
+
   return (
     <article 
       className={isUser ? "flex flex-col items-end py-2" : "group relative flex flex-col gap-0 pt-2 pb-10"}
@@ -149,6 +170,29 @@ const MessageItem = memo(function MessageItem({
     >
       {isUser ? (
         <div className="group/user relative w-fit max-w-[85%] md:max-w-[75%]">
+          {relevantBranches.length > 1 && onBranchChange && (
+            <div className="absolute -left-20 top-1/2 -translate-y-1/2 flex items-center gap-1.5 opacity-0 group-hover/user:opacity-100 transition-opacity bg-background/80 backdrop-blur-sm px-2 py-1 rounded-full border border-border/40 shadow-sm text-[11px] font-medium text-muted-foreground whitespace-nowrap">
+              <button 
+                onClick={() => {
+                  const prev = relevantBranches[currentBranchIndex - 1] || relevantBranches[relevantBranches.length - 1];
+                  onBranchChange(prev.id);
+                }}
+                className="hover:text-foreground transition-colors"
+              >
+                <ChevronLeft className="h-3 w-3" />
+              </button>
+              <span>{currentBranchIndex + 1} / {relevantBranches.length}</span>
+              <button 
+                onClick={() => {
+                  const next = relevantBranches[currentBranchIndex + 1] || relevantBranches[0];
+                  onBranchChange(next.id);
+                }}
+                className="hover:text-foreground transition-colors"
+              >
+                <ChevronRight className="h-3 w-3" />
+              </button>
+            </div>
+          )}
           {isEditing ? (
             <div className="flex flex-col gap-2 rounded-2xl bg-muted/60 px-5 py-3.5">
               <textarea
@@ -359,7 +403,7 @@ const MessageItem = memo(function MessageItem({
   );
 });
 
-export function MessageList({ messages, emptyLabel, onRetry, onRewrite, onEditMessage, isStreaming }: MessageListProps) {
+export function MessageList({ messages, branches, onBranchChange, emptyLabel, onRetry, onRewrite, onEditMessage, isStreaming }: MessageListProps) {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [showScrollButton, setShowScrollButton] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -460,6 +504,8 @@ export function MessageList({ messages, emptyLabel, onRetry, onRewrite, onEditMe
           message={message}
           index={index}
           totalMessages={messages.length}
+          branches={branches}
+          onBranchChange={onBranchChange}
           isStreaming={isStreaming}
           onRetry={onRetry}
           onRewrite={onRewrite}

@@ -418,3 +418,13 @@ DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose build app
   - Included real-time chunk filtering/search within the dialog for easier navigation of large documents.
 - **Testing**: Added unit tests for the chunks API route to verify authentication, ownership checks, and correct data retrieval.
 
+### Conversation Branching (2026-03-19)
+- **Feature**: Implemented non-destructive message editing through conversation branching (A2).
+- **Implementation**:
+  - Enhanced `PATCH /api/threads/[threadId]` with a `branch` action that clones the current thread and its messages up to the point of divergence.
+  - Created `GET /api/threads/[threadId]/branches` to discover all threads within the same family (sharing a `parentThreadId`).
+  - Updated `MessageList` and `MessageItem` to include a branch navigation UI (e.g., "1 / 2") on user messages that have been branched.
+  - Integrated branching into the "Edit Message" flow, redirecting users to a new branched thread upon editing a prior message.
+- **Testing**: Added unit tests for the new branches API endpoint.
+
+
