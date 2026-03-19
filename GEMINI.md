@@ -501,6 +501,18 @@ DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose build app
   - Enhanced the BullMQ `document-processing` worker in the Next.js app to automatically fall back to OCR if a PDF yields no text through standard extraction.
 - **Benefit**: Allows the RAG system to index and search content within scanned documents and image-heavy PDFs that were previously unreadable.
 
+### Enhanced Usage Analytics (2026-03-19)
+- **Feature**: Implemented deeper per-user and per-model reporting in the Admin Console (E2).
+- **Implementation**:
+  - Expanded the `/api/admin/analytics` endpoint to perform multi-table joins for user message counts and role usage frequency.
+  - Added aggregate token estimation based on character-to-token proxies across all assistant messages.
+  - Updated `AnalyticsDashboard.tsx` with new visual sections:
+    - **Top Users**: Ranked by total messages sent.
+    - **Popular Roles**: Identified which spaces/roles are most active.
+    - **Token Usage**: Model-by-model breakdown of estimated resource consumption.
+- **Benefit**: Provides administrators with clear visibility into platform growth, resource hotspots, and user engagement levels.
+
+
 
 
 ### Context Window Transparency (2026-03-19)

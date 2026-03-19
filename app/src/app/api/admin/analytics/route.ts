@@ -19,7 +19,10 @@ export async function GET() {
     [documentCount],
     [chunkCount],
     modelBreakdown,
+    userActivity,
+    roleActivity,
     dailyActivity,
+    tokenEstimation,
   ] = await Promise.all([
     db.select({ count: sql<number>`count(*)::int` }).from(users),
     db.select({ count: sql<number>`count(*)::int` }).from(threads),
@@ -33,6 +36,28 @@ export async function GET() {
       .groupBy(threads.model)
       .orderBy(desc(sql`count(*)`))
       .limit(10),
+    db
+      .select({ 
+        email: users.email, 
+        name: users.name, 
+        count: sql<number>`count(messages.id)::int` 
+      })
+      .from(users)
+      .leftJoin(threads, eq(users.id, threads.userId))
+      .leftJoin(messages, eq(threads.id, messages.threadId))
+      .groupBy(users.id)
+      .orderBy(desc(sql`count(messages.id)`))
+      .limit(10),
+    db
+      .select({ 
+        roleName: roles.name, 
+        count: sql<number>`count(threads.id)::int` 
+      })
+      .from(roles)
+      .leftJoin(threads, eq(roles.id, threads.roleId))
+      .groupBy(roles.id)
+      .orderBy(desc(sql`count(threads.id)`))
+      .limit(10),
     db.execute(sql`
       SELECT
         date_trunc('day', created_at)::date AS day,
@@ -42,6 +67,14 @@ export async function GET() {
       GROUP BY 1
       ORDER BY 1
     `),
+    db.select({ 
+      model: messages.model, 
+      totalChars: sql<number>`sum(length(content))::int` 
+    })
+    .from(messages)
+    .where(eq(messages.role, 'assistant'))
+    .groupBy(messages.model)
+    .orderBy(desc(sql`sum(length(content))`)),
   ]);
 
   return NextResponse.json({
@@ -54,6 +87,12 @@ export async function GET() {
       chunks: chunkCount.count,
     },
     modelBreakdown,
+    userActivity,
+    roleActivity,
     dailyActivity: dailyActivity.rows,
+    tokens: tokenEstimation.map(t => ({
+      model: t.model,
+      estimatedTokens: Math.round((t.totalChars || 0) / 4) // Rough proxy: 4 chars per token
+    })),
   });
 }

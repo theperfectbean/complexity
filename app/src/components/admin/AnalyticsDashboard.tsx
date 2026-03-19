@@ -13,7 +13,10 @@ type AnalyticsData = {
     chunks: number;
   };
   modelBreakdown: { model: string; count: number }[];
+  userActivity: { email: string; name: string | null; count: number }[];
+  roleActivity: { roleName: string | null; count: number }[];
   dailyActivity: { day: string; threads: number }[];
+  tokens: { model: string | null; estimatedTokens: number }[];
 };
 
 const STAT_META = [
@@ -152,36 +155,113 @@ export function AnalyticsDashboard() {
         )}
       </div>
 
-      {/* Model usage breakdown */}
-      <div className="rounded-2xl border bg-card p-6 shadow-xs">
-        <h3 className="mb-4 text-sm font-semibold">Model Usage</h3>
-        {loading ? (
-          <div className="space-y-2">
-            {[...Array(3)].map((_, i) => <div key={i} className="h-8 animate-pulse rounded bg-muted/40" />)}
-          </div>
-        ) : data?.modelBreakdown && data.modelBreakdown.length > 0 ? (
-          <div className="space-y-2">
-            {data.modelBreakdown.map(({ model, count }) => {
-              const total = data.modelBreakdown.reduce((s, m) => s + m.count, 0);
-              const pct = total > 0 ? Math.round((count / total) * 100) : 0;
-              return (
-                <div key={model} className="flex items-center gap-3">
-                  <span className="w-48 truncate text-xs text-muted-foreground" title={model}>{model}</span>
-                  <div className="flex-1 rounded-full bg-muted/40 h-2 overflow-hidden">
-                    <div
-                      className="h-full rounded-full bg-primary transition-all"
-                      style={{ width: `${pct}%` }}
-                    />
+      {/* Model and Token usage */}
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+        <div className="rounded-2xl border bg-card p-6 shadow-xs">
+          <h3 className="mb-4 text-sm font-semibold">Model Usage (Threads)</h3>
+          {loading ? (
+            <div className="space-y-2">
+              {[...Array(3)].map((_, i) => <div key={i} className="h-8 animate-pulse rounded bg-muted/40" />)}
+            </div>
+          ) : data?.modelBreakdown && data.modelBreakdown.length > 0 ? (
+            <div className="space-y-2">
+              {data.modelBreakdown.map(({ model, count }) => {
+                const total = data.modelBreakdown.reduce((s, m) => s + m.count, 0);
+                const pct = total > 0 ? Math.round((count / total) * 100) : 0;
+                return (
+                  <div key={model} className="flex items-center gap-3">
+                    <span className="w-32 truncate text-xs text-muted-foreground" title={model}>{model}</span>
+                    <div className="flex-1 rounded-full bg-muted/40 h-2 overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-primary transition-all"
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                    <span className="w-12 text-right text-xs font-medium tabular-nums">{count.toLocaleString()}</span>
                   </div>
-                  <span className="w-12 text-right text-xs font-medium tabular-nums">{count.toLocaleString()}</span>
-                  <span className="w-8 text-right text-xs text-muted-foreground">{pct}%</span>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">No model data.</p>
+          )}
+        </div>
+
+        <div className="rounded-2xl border bg-card p-6 shadow-xs">
+          <h3 className="mb-4 text-sm font-semibold">Estimated Tokens (Assistant)</h3>
+          {loading ? (
+            <div className="space-y-2">
+              {[...Array(3)].map((_, i) => <div key={i} className="h-8 animate-pulse rounded bg-muted/40" />)}
+            </div>
+          ) : data?.tokens && data.tokens.length > 0 ? (
+            <div className="space-y-2">
+              {data.tokens.map(({ model, estimatedTokens }) => {
+                const total = data.tokens.reduce((s, m) => s + m.estimatedTokens, 0);
+                const pct = total > 0 ? Math.round((estimatedTokens / total) * 100) : 0;
+                return (
+                  <div key={model || "unknown"} className="flex items-center gap-3">
+                    <span className="w-32 truncate text-xs text-muted-foreground" title={model || "Default"}>{model || "Default"}</span>
+                    <div className="flex-1 rounded-full bg-muted/40 h-2 overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-amber-500 transition-all"
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                    <span className="w-16 text-right text-xs font-medium tabular-nums">{(estimatedTokens / 1000).toFixed(1)}k</span>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">No token data.</p>
+          )}
+        </div>
+      </div>
+
+      {/* User and Role activity */}
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+        <div className="rounded-2xl border bg-card p-6 shadow-xs">
+          <h3 className="mb-4 text-sm font-semibold">Top Users (Messages)</h3>
+          <div className="divide-y divide-border/50">
+            {loading ? (
+              [...Array(3)].map((_, i) => <div key={i} className="py-2 animate-pulse h-10 bg-muted/20" />)
+            ) : data?.userActivity && data.userActivity.length > 0 ? (
+              data.userActivity.map((user) => (
+                <div key={user.email} className="flex items-center justify-between py-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-xs font-medium">{user.name || user.email}</p>
+                    {user.name && <p className="truncate text-[10px] text-muted-foreground">{user.email}</p>}
+                  </div>
+                  <span className="ml-4 text-xs font-semibold bg-muted px-2 py-0.5 rounded-full tabular-nums">
+                    {user.count.toLocaleString()}
+                  </span>
                 </div>
-              );
-            })}
+              ))
+            ) : (
+              <p className="py-4 text-center text-xs text-muted-foreground">No user activity.</p>
+            )}
           </div>
-        ) : (
-          <p className="text-sm text-muted-foreground">No thread data yet.</p>
-        )}
+        </div>
+
+        <div className="rounded-2xl border bg-card p-6 shadow-xs">
+          <h3 className="mb-4 text-sm font-semibold">Popular Roles</h3>
+          <div className="divide-y divide-border/50">
+            {loading ? (
+              [...Array(3)].map((_, i) => <div key={i} className="py-2 animate-pulse h-10 bg-muted/20" />)
+            ) : data?.roleActivity && data.roleActivity.length > 0 ? (
+              data.roleActivity.map((role, idx) => (
+                <div key={idx} className="flex items-center justify-between py-2">
+                  <span className="truncate text-xs font-medium">{role.roleName || "No Role"}</span>
+                  <span className="ml-4 text-xs font-semibold text-primary tabular-nums">
+                    {role.count.toLocaleString()} threads
+                  </span>
+                </div>
+              ))
+            ) : (
+              <p className="py-4 text-center text-xs text-muted-foreground">No role data.</p>
+            )}
+          </div>
+        </div>
       </div>
     </section>
   );
