@@ -4,6 +4,7 @@ import rehypeHighlight from "rehype-highlight";
 import remarkGfm from "remark-gfm";
 import { ChartRenderer } from "./ChartRenderer";
 import ArtifactRenderer from "./ArtifactRenderer";
+import PythonExecutor from "./PythonExecutor";
 import { Copy, Check } from "lucide-react";
 import { cn, copyToClipboard } from "@/lib/utils";
 
@@ -99,6 +100,11 @@ const components: Components = {
 
     const match = /language-(\w+)/.exec(className || "");
     const language = match ? match[1] : "";
+
+    // Python Sandbox interception
+    if (language === "python") {
+      return <PythonExecutor code={content} />;
+    }
 
     // Artifact interception: HTML or explicit "artifact" language tag
     if (language === "html" || language === "artifact") {

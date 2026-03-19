@@ -435,5 +435,15 @@ DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose build app
   - Configured the UI to replace the "Send" button with the "Stop" button specifically when the chat status is "streaming".
   - Ensured that stopping a request gracefully halts the stream and allows the user to immediately send a new message or edit the previous one.
 
+### Code Execution Sandbox (2026-03-19)
+- **Feature**: Added a client-side Python execution environment for code blocks (H3).
+- **Implementation**:
+  - Developed a `PythonExecutor` component that integrates **Pyodide** (Python in WebAssembly) to execute code directly in the user's browser.
+  - Intercepted `language-python` code blocks in `MarkdownRenderer` to display the sandbox UI instead of a static code block.
+  - Provided "Run" and "Reset" controls with real-time `stdout` capture and error reporting.
+  - Used a lazy-loading strategy for the Pyodide runtime to maintain fast initial page loads.
+- **Security**: Execution is fully isolated within the browser's WebAssembly sandbox, protecting the server and other users from malicious code.
+
+
 
 
