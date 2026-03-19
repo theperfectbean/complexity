@@ -534,6 +534,17 @@ DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose build app
   - **Admin UI**: Added a dedicated **Audit Log** tab to the Admin Console with chronological event browsing and metadata inspection.
 - **Benefit**: Provides a verifiable paper trail for accountability, especially important for public or multi-user self-hosted instances.
 
+### Webhooks & Automation (2026-03-19)
+- **Feature**: Implemented an outgoing webhook system for real-time automation (G2).
+- **Implementation**:
+  - **Database**: Added `webhooks` and `webhook_deliveries` tables to store endpoints, signing secrets, and delivery history.
+  - **Background Worker**: Developed a new BullMQ `webhooks` queue and worker to handle outgoing POST requests with automatic retries and exponential backoff.
+  - **Security**: Implemented HMAC SHA-256 signatures (included in `X-Complexity-Signature` header) to allow receiving servers to verify payload integrity.
+  - **Trigger**: Integrated `thread.completed` event into `ChatService`, which fires as soon as an AI response is finished and persisted.
+  - **UI**: Created a comprehensive **Webhooks** management page in User Settings for creating hooks and inspecting delivery logs.
+- **Benefit**: Enables seamless integration with tools like n8n, Zapier, and custom dashboards, turning Complexity into a trigger for larger automated workflows.
+
+
 
 
 ### Message Pagination (2026-03-19)

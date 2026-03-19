@@ -3,6 +3,10 @@ import { getLogger } from "./logger";
 import { saveExtractedMemories } from "./memory";
 import { runGeneration, generateImage } from "./llm";
 import { getApiKeys } from "./settings";
+import { triggerWebhook } from "./webhooks";
+import { db } from "./db";
+import { threads } from "./db/schema";
+import { eq } from "drizzle-orm";
 import { extractTextFromMessage, collectFileParts } from "./chat-utils";
 import { runtimeConfig } from "./config";
 import { createId } from "./db/cuid";
@@ -41,6 +45,12 @@ export class ChatService {
     
     const thread = await this.validator.validate(this.session);
     const isRegenerate = await this.history.handleRegeneration(this.session);
+    
+    // Fetch thread title for webhook/notifications
+    const threadTitle = thread.id ? (await db.query.threads.findFirst({
+      where: eq(threads.id, thread.id),
+      columns: { title: true }
+    }))?.title || "Untitled" : "Untitled";
     
     const lastMessage = inputMessages[inputMessages.length - 1];
     const userText = await extractTextFromMessage(lastMessage);
@@ -179,6 +189,17 @@ export class ChatService {
           }
 
           this.log.info({ duration: Date.now() - startTime }, "Finished request");
+
+          // Trigger Webhooks
+          void triggerWebhook(thread.userId, "thread.completed", {
+            threadId,
+            roleId: thread.roleId,
+            title: threadTitle,
+            model,
+            prompt: userText,
+            response: assistantText,
+            citations,
+          });
         },
       }),
     });

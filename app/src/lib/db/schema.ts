@@ -112,6 +112,41 @@ export const roles = pgTable("roles", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+export const webhooks = pgTable(
+  "webhooks",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    url: text("url").notNull(),
+    secret: text("secret").notNull(),
+    events: jsonb("events").$type<string[]>().notNull().default([]),
+    isActive: boolean("is_active").notNull().default(true),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("webhooks_user_idx").on(table.userId)],
+);
+
+export const webhookDeliveries = pgTable(
+  "webhook_deliveries",
+  {
+    id: text("id").primaryKey(),
+    webhookId: text("webhook_id")
+      .notNull()
+      .references(() => webhooks.id, { onDelete: "cascade" }),
+    eventId: text("event_id").notNull(),
+    eventType: varchar("event_type", { length: 50 }).notNull(),
+    status: integer("status"),
+    payload: jsonb("payload"),
+    response: text("response"),
+    durationMs: integer("duration_ms"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("webhook_deliveries_webhook_idx").on(table.webhookId)],
+);
+
 export const roleAccess = pgTable(
   "role_access",
   {
@@ -223,6 +258,7 @@ export const usersRelations = relations(users, ({ many }) => ({
   apiTokens: many(apiTokens),
   roleAccess: many(roleAccess),
   auditLogs: many(auditLogs),
+  webhooks: many(webhooks),
 }));
 
 export const threadsRelations = relations(threads, ({ one, many }) => ({
@@ -307,5 +343,20 @@ export const auditLogsRelations = relations(auditLogs, ({ one }) => ({
   user: one(users, {
     fields: [auditLogs.userId],
     references: [users.id],
+  }),
+}));
+
+export const webhooksRelations = relations(webhooks, ({ one, many }) => ({
+  user: one(users, {
+    fields: [webhooks.userId],
+    references: [users.id],
+  }),
+  deliveries: many(webhookDeliveries),
+}));
+
+export const webhookDeliveriesRelations = relations(webhookDeliveries, ({ one }) => ({
+  webhook: one(webhooks, {
+    fields: [webhookDeliveries.webhookId],
+    references: [webhooks.id],
   }),
 }));
