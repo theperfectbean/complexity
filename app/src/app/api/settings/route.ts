@@ -6,6 +6,7 @@ import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 import { setSetting, getDetailedSettings } from "@/lib/settings";
 import { requireUser, requireAdmin } from "@/lib/auth-server";
+import { logAuditEvent } from "@/lib/audit";
 
 const ALLOWED_KEYS = [
   "ANTHROPIC_API_KEY",
@@ -51,11 +52,17 @@ export async function POST(request: Request) {
   if (authResult instanceof NextResponse) return authResult;
 
   const body = await request.json() as Record<string, string | undefined>;
+  const updatedKeys: string[] = [];
 
   for (const key of ALLOWED_KEYS) {
     if (body[key] !== undefined) {
       await setSetting(key, body[key] as string);
+      updatedKeys.push(key);
     }
+  }
+
+  if (updatedKeys.length > 0) {
+    await logAuditEvent(authResult.user.id, "update_setting", null, { keys: updatedKeys });
   }
 
   return NextResponse.json({ success: true });

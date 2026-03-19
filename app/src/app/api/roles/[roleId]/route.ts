@@ -4,7 +4,8 @@ import { z } from "zod";
 
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
-import { roles, users } from "@/lib/db/schema";
+import { roles, users, roleAccess } from "@/lib/db/schema";
+import { logAuditEvent } from "@/lib/audit";
 
 const patchSchema = z.object({
   name: z.string().min(1).max(100).optional(),
@@ -133,5 +134,8 @@ export async function DELETE(_: Request, { params }: { params: Promise<{ roleId:
   }
 
   await db.delete(roles).where(eq(roles.id, roleId));
+
+  await logAuditEvent(session.user.id, "delete_role", roleId, { name: row.role.name });
+
   return NextResponse.json({ ok: true });
 }

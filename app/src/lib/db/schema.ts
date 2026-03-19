@@ -23,22 +23,13 @@ export const users = pgTable(
     name: varchar("name", { length: 100 }),
     image: text("image"),
     theme: varchar("theme", { length: 50 }),
-    defaultModel: varchar("default_model", { length: 100 }),
-    memoryEnabled: boolean("memory_enabled").notNull().default(true),
-    isAdmin: boolean("is_admin").notNull().default(false),
-    totpSecret: text("totp_secret"),
-    totpEnabled: boolean("totp_enabled").notNull().default(false),
+    memoryEnabled: boolean("memory_enabled").default(true),
+    isAdmin: boolean("is_admin").default(false).notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [unique("users_email_unique").on(table.email)],
 );
-
-export const settings = pgTable("settings", {
-  key: varchar("key", { length: 255 }).primaryKey(),
-  value: text("value"),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-});
 
 export const accounts = pgTable(
   "accounts",
@@ -46,16 +37,16 @@ export const accounts = pgTable(
     userId: text("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    type: text("type").notNull(),
-    provider: text("provider").notNull(),
-    providerAccountId: text("provider_account_id").notNull(),
-    refreshToken: text("refresh_token"),
-    accessToken: text("access_token"),
-    expiresAt: integer("expires_at"),
-    tokenType: text("token_type"),
-    scope: text("scope"),
-    idToken: text("id_token"),
-    sessionState: text("session_state"),
+    type: varchar("type", { length: 255 }).notNull(),
+    provider: varchar("provider", { length: 255 }).notNull(),
+    providerAccountId: varchar("provider_account_id", { length: 255 }).notNull(),
+    refresh_token: text("refresh_token"),
+    access_token: text("access_token"),
+    expires_at: integer("expires_at"),
+    token_type: varchar("token_type", { length: 255 }),
+    scope: varchar("scope", { length: 255 }),
+    id_token: text("id_token"),
+    session_state: varchar("session_state", { length: 255 }),
   },
   (table) => [primaryKey({ columns: [table.provider, table.providerAccountId] })],
 );
@@ -90,6 +81,21 @@ export const apiTokens = pgTable(
     expiresAt: timestamp("expires_at", { withTimezone: true }),
   },
   (table) => [index("api_tokens_user_idx").on(table.userId), index("api_tokens_hash_idx").on(table.tokenHash)],
+);
+
+export const auditLogs = pgTable(
+  "audit_logs",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id").references(() => users.id, { onDelete: "set null" }),
+    action: varchar("action", { length: 100 }).notNull(),
+    targetId: text("target_id"),
+    metadata: jsonb("metadata"),
+    ipAddress: varchar("ip_address", { length: 45 }),
+    userAgent: text("user_agent"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("audit_logs_user_idx").on(table.userId), index("audit_logs_created_idx").on(table.createdAt)],
 );
 
 export const roles = pgTable("roles", {
@@ -165,15 +171,15 @@ export const memories = pgTable(
     userId: text("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
+    threadId: text("thread_id")
+      .notNull()
+      .references(() => threads.id, { onDelete: "cascade" }),
     content: text("content").notNull(),
-    embedding: vector("embedding", { dimensions: 384 }),
-    source: varchar("source", { length: 20 }).notNull(),
-    threadId: text("thread_id").references(() => threads.id, { onDelete: "set null" }),
+    embedding: vector("embedding", { dimensions: 384 }).notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
-    index("memories_user_created_idx").on(table.userId, table.createdAt),
+    index("memories_user_idx").on(table.userId),
     index("memories_embedding_hnsw_idx").using("hnsw", table.embedding.op("vector_cosine_ops")),
   ],
 );
@@ -181,12 +187,10 @@ export const memories = pgTable(
 export const documents = pgTable("documents", {
   id: text("id").primaryKey(),
   filename: varchar("filename", { length: 255 }).notNull(),
-  mimeType: varchar("mime_type", { length: 100 }).notNull(),
-  sizeBytes: integer("size_bytes").notNull(),
+  status: varchar("status", { length: 20 }).notNull().default("processing"), // 'processing', 'ready', 'error'
   roleId: text("role_id")
     .notNull()
     .references(() => roles.id, { onDelete: "cascade" }),
-  status: varchar("status", { length: 20 }).notNull().default("processing"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -212,13 +216,13 @@ export const chunks = pgTable(
   ],
 );
 
-
 export const usersRelations = relations(users, ({ many }) => ({
   threads: many(threads),
   roles: many(roles),
   memories: many(memories),
   apiTokens: many(apiTokens),
   roleAccess: many(roleAccess),
+  auditLogs: many(auditLogs),
 }));
 
 export const threadsRelations = relations(threads, ({ one, many }) => ({
@@ -295,6 +299,13 @@ export const chunksRelations = relations(chunks, ({ one }) => ({
 export const apiTokensRelations = relations(apiTokens, ({ one }) => ({
   user: one(users, {
     fields: [apiTokens.userId],
+    references: [users.id],
+  }),
+}));
+
+export const auditLogsRelations = relations(auditLogs, ({ one }) => ({
+  user: one(users, {
+    fields: [auditLogs.userId],
     references: [users.id],
   }),
 }));

@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 import { ApiResponse } from "@/lib/api-response";
+import { logAuditEvent } from "@/lib/audit";
 
 export async function GET(request: Request) {
   const session = await auth();
@@ -74,6 +75,8 @@ export async function PATCH(request: Request) {
     }
 
     await db.update(users).set({ isAdmin }).where(eq(users.id, userId));
+
+    await logAuditEvent(session.user.id, "update_user_role", userId, { isAdmin });
 
     return ApiResponse.success({ success: true });
   } catch (error) {

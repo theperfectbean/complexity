@@ -525,6 +525,16 @@ DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose build app
     - Updated Roles gallery to categorize into "Your Roles" and "Shared & Public".
 - **Benefit**: Transforms the platform into a collaborative environment where knowledge bases (Spaces) can be shared across the entire self-hosted instance or with specific team members.
 
+### System Audit Log (2026-03-19)
+- **Feature**: Implemented a comprehensive audit trail for administrative and security-sensitive actions (E4).
+- **Implementation**:
+  - **Database**: Added `audit_logs` table to store events, user IDs, actions, metadata (JSON), and request context (IP/UA).
+  - **Core Utility**: Created `logAuditEvent` helper in `app/src/lib/audit.ts` using Next.js `headers()` for secure context extraction.
+  - **Logging Coverage**: Injected audit triggers into Settings updates, User role changes, Role sharing, and Role deletion.
+  - **Admin UI**: Added a dedicated **Audit Log** tab to the Admin Console with chronological event browsing and metadata inspection.
+- **Benefit**: Provides a verifiable paper trail for accountability, especially important for public or multi-user self-hosted instances.
+
+
 
 ### Message Pagination (2026-03-19)
 - **Feature**: Implemented cursor-based pagination for long conversation threads (I1).

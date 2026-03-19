@@ -5,6 +5,7 @@ import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { roles, users, roleAccess } from "@/lib/db/schema";
 import { ApiResponse } from "@/lib/api-response";
+import { logAuditEvent } from "@/lib/audit";
 
 const shareSchema = z.object({
   email: z.string().email(),
@@ -93,6 +94,11 @@ export async function POST(
       set: { permission: parsed.data.permission },
     });
 
+  await logAuditEvent(session.user.id, "share_role", roleId, { 
+    targetEmail: parsed.data.email, 
+    permission: parsed.data.permission 
+  });
+
   return ApiResponse.success({ ok: true });
 }
 
@@ -123,6 +129,8 @@ export async function DELETE(
   await db
     .delete(roleAccess)
     .where(and(eq(roleAccess.roleId, roleId), eq(roleAccess.userId, targetUserId)));
+
+  await logAuditEvent(session.user.id, "unshare_role", roleId, { targetUserId });
 
   return ApiResponse.success({ ok: true });
 }
