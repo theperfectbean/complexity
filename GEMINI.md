@@ -444,6 +444,16 @@ DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose build app
   - Used a lazy-loading strategy for the Pyodide runtime to maintain fast initial page loads.
 - **Security**: Execution is fully isolated within the browser's WebAssembly sandbox, protecting the server and other users from malicious code.
 
+### Hybrid Search Refinements (2026-03-19)
+- **Feature**: Significantly improved RAG retrieval quality using Cross-Encoder reranking (B3).
+- **Implementation**:
+  - Updated the `embedder` microservice to include a `/rerank` endpoint using the `cross-encoder/ms-marco-MiniLM-L-6-v2` model.
+  - Enhanced the `hybridSearch` logic in `app/src/lib/rag.ts` to perform a second-stage reranking after the initial RRF (Reciprocal Rank Fusion) step.
+  - The reranker re-scores the top candidates using the full query context, providing much more accurate relevance sorting before the final MMR (Maximal Marginal Relevance) diversification.
+  - Added configurable environment variables: `RAG_RERANK_ENABLED` and `EMBEDDER_RERANK_MODEL`.
+- **Testing**: Added unit tests for the `rerank` utility and verified service integration.
+
+
 
 
 

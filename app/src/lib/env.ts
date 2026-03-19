@@ -47,6 +47,7 @@ const envSchema = z.object({
   RAG_SIMILARITY_TOP_K: z.coerce.number().int().positive().default(8),
   RAG_HYBRID_SEARCH: z.enum(["true", "false"]).default("true"),
   RAG_HYBRID_CANDIDATES: z.coerce.number().int().positive().default(20),
+  RAG_RERANK_ENABLED: z.enum(["true", "false"]).default("true"),
   RAG_MMR_LAMBDA: z.coerce.number().min(0).max(1).default(0.6),
   MEMORY_CACHE_TTL_SECONDS: z.coerce.number().int().positive().default(60 * 5),
   MEMORY_CACHE_PREFIX: z.string().default("memories"),
@@ -101,6 +102,7 @@ const envSchema = z.object({
   REDIS_MAX_RETRIES_PER_REQUEST: z.coerce.number().int().nonnegative().default(1),
   DOCUMENT_ALLOWED_EXTENSIONS: z.string().default(".pdf,.docx,.txt,.md"),
   EMBEDDER_MODEL_NAME: z.string().default("sentence-transformers/all-MiniLM-L6-v2"),
+  EMBEDDER_RERANK_MODEL: z.string().default("cross-encoder/ms-marco-MiniLM-L-6-v2"),
   EMBEDDER_APP_TITLE: z.string().default("Complexity Embedder"),
   EMBEDDER_APP_VERSION: z.string().default("1.0.0"),
 });

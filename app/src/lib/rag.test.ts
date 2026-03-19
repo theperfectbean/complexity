@@ -1,8 +1,48 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi, beforeEach } from "vitest";
 import { encode } from "gpt-tokenizer";
-import { chunkText } from "./rag";
+import { chunkText, rerank } from "./rag";
 
 describe("rag.ts", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // Mock global fetch
+    global.fetch = vi.fn();
+  });
+
+  describe("rerank", () => {
+    it("should call the embedder service and return results", async () => {
+      const mockResults = [
+        { index: 0, score: 0.9 },
+        { index: 1, score: 0.1 }
+      ];
+
+      vi.mocked(fetch).mockResolvedValue({
+        ok: true,
+        json: async () => ({ results: mockResults }),
+      } as Response);
+
+      const results = await rerank("query", ["doc1", "doc2"], 2);
+
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining("/rerank"),
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({ query: "query", documents: ["doc1", "doc2"], top_k: 2 }),
+        })
+      );
+      expect(results).toEqual(mockResults);
+    });
+
+    it("should throw an error if reranker service fails", async () => {
+      vi.mocked(fetch).mockResolvedValue({
+        ok: false,
+        status: 500,
+      } as Response);
+
+      await expect(rerank("query", ["doc"], 1)).rejects.toThrow("Reranker service error: 500");
+    });
+  });
+
   describe("chunkText", () => {
     it("should return an empty array for empty input", () => {
       expect(chunkText("")).toEqual([]);

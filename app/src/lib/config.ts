@@ -93,10 +93,12 @@ export const runtimeConfig = {
     embedderBatchSize: env.RAG_EMBEDDER_BATCH_SIZE ?? 200,
     embedderConcurrency: env.RAG_EMBEDDER_CONCURRENCY ?? 4,
     embedderPath: env.RAG_EMBEDDER_PATH ?? "/embed",
+    rerankerPath: "/rerank",
     similarityLimit: env.RAG_SIMILARITY_LIMIT ?? 5,
     similarityTopK: env.RAG_SIMILARITY_TOP_K ?? 8,
     hybridSearch: (env.RAG_HYBRID_SEARCH ?? "true") === "true",
     hybridCandidates: env.RAG_HYBRID_CANDIDATES ?? 20,
+    rerankEnabled: (env.RAG_RERANK_ENABLED ?? "true") === "true",
     mmrLambda: env.RAG_MMR_LAMBDA ?? 0.6,
   },
   memory: {
@@ -149,6 +151,7 @@ export const runtimeConfig = {
   },
   embedder: {
     modelName: env.EMBEDDER_MODEL_NAME ?? "sentence-transformers/all-MiniLM-L6-v2",
+    rerankModel: env.EMBEDDER_RERANK_MODEL ?? "cross-encoder/ms-marco-MiniLM-L-6-v2",
     appTitle: env.EMBEDDER_APP_TITLE ?? "Complexity Embedder",
     appVersion: env.EMBEDDER_APP_VERSION ?? "1.0.0",
   },

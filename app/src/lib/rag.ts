@@ -92,6 +92,32 @@ export async function getEmbeddings(texts: string[]) {
   return allEmbeddings;
 }
 
+export async function rerank(query: string, documents: string[], topK: number) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), runtimeConfig.rag.embedderTimeoutMs);
+
+  try {
+    const response = await fetch(`${env.EMBEDDER_URL}${runtimeConfig.rag.rerankerPath}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ query, documents, top_k: topK }),
+      cache: "no-store",
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      throw new Error(`Reranker service error: ${response.status}`);
+    }
+
+    const payload = (await response.json()) as { results: Array<{ index: number; score: number }> };
+    return payload.results;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 export async function similaritySearch(roleId: string, embedding: number[], limit = runtimeConfig.rag.similarityLimit) {
   const distance = cosineDistance(chunks.embedding, embedding);
 
@@ -222,12 +248,34 @@ export async function hybridSearch(
     }
   });
 
-  // Sort by combined RRF score, take top `candidates` for MMR
-  const merged = Array.from(scores.entries())
+  // Sort by combined RRF score, take top `candidates` for potential reranking
+  let merged = Array.from(scores.entries())
     .map(([id, v]) => ({ id, ...v }))
     .sort((a, b) => b.score - a.score)
     .slice(0, candidates);
 
-  // 4. MMR reranking for diversity
+  // 4. Optional Cross-Encoder Reranking
+  if (runtimeConfig.rag.rerankEnabled && merged.length > 0) {
+    try {
+      const rerankResults = await rerank(
+        queryText,
+        merged.map((m) => m.content),
+        candidates
+      );
+
+      // Map reranked scores back to the items
+      const rerankedMap = new Map(rerankResults.map((r) => [r.index, r.score]));
+      merged = merged
+        .map((item, idx) => ({
+          ...item,
+          score: rerankedMap.get(idx) ?? -100, // Fallback for safety
+        }))
+        .sort((a, b) => b.score - a.score);
+    } catch (error) {
+      console.error("Reranking failed, falling back to RRF scores:", error);
+    }
+  }
+
+  // 5. MMR reranking for diversity
   return mmrRerank(merged, embedding, topK);
 }
