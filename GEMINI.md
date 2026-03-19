@@ -475,6 +475,16 @@ DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose build app
   - **Image Gallery**: Developed a thread-level Image Gallery component that automatically extracts all user attachments and AI-generated images.
   - **Lightbox**: Included a full-screen lightbox for the gallery with support for high-resolution viewing and direct downloads.
 
+### Per-Thread System Prompt Override (2026-03-19)
+- **Feature**: Allowed users to add custom system instructions specifically for a single thread (A4).
+- **Implementation**:
+  - Updated the database schema (`threads` table) to include a `systemPrompt` column.
+  - Enhanced the `PATCH /api/threads/[threadId]` API to allow updating the thread-specific prompt.
+  - Refactored `ContextAssembler.ts` and `ChatSessionValidator.ts` to fetch and inject this prompt into the LLM instructions.
+  - Added a "Thread Settings" dialog (Gear icon) in the thread header for editing instructions.
+- **Testing**: Verified end-to-end flow from UI update to LLM prompt injection.
+
+
 
 
 

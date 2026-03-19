@@ -117,6 +117,7 @@ export const threads = pgTable(
     model: varchar("model", { length: 50 }).notNull().default("anthropic/claude-4-6-sonnet-latest"),
     parentThreadId: text("parent_thread_id"),
     branchPointMessageId: text("branch_point_message_id"),
+    systemPrompt: text("system_prompt"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },

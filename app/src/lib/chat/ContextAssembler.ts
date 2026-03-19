@@ -92,6 +92,8 @@ CRITICAL: If the user asks to visualize data (like time-series or numerical trac
       agenticGuidelines,
       memoryPrompt,
       roleInstructions,
+      thread.systemPrompt ? `User's Thread-Specific Instructions:
+${thread.systemPrompt}` : "",
       externalContext ? `External User Data:
 ${externalContext}` : "",
       chartInstructions,

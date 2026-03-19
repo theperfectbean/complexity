@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { ChatCitation, ChatMessageItem, MessageList } from "@/components/chat/MessageList";
 import { SearchBar } from "@/components/search/SearchBar";
 import { ImageGallery } from "@/components/chat/ImageGallery";
+import { ThreadSettingsDialog } from "./ThreadSettingsDialog";
 import { getDefaultModel } from "@/lib/models";
 
 import { normalizeUIMessage } from "@/lib/utils";
@@ -20,6 +21,7 @@ type ThreadPayload = {
     title: string;
     model: string;
     roleId: string | null;
+    systemPrompt: string | null;
   };
   messages: Array<{
     id: string;
@@ -86,6 +88,7 @@ type ThreadChatProps = {
   initialTitle: string;
   initialModel: string;
   initialRoleId: string | null;
+  initialSystemPrompt: string | null;
   initialHistory: ChatMessageItem[];
   initialWebSearch: boolean;
   attachments: File[];
@@ -97,6 +100,7 @@ export function ThreadChat({
   initialTitle,
   initialModel,
   initialRoleId,
+  initialSystemPrompt,
   initialHistory,
   initialWebSearch,
   attachments,
@@ -107,6 +111,8 @@ export function ThreadChat({
   const initialQuery = searchParams.get("q")?.trim() ?? "";
   const [model, setModel] = useState<string>(initialModel);
   const [roleId] = useState<string | null>(initialRoleId);
+  const [threadTitle] = useState(initialTitle);
+  const [threadSystemPrompt, setThreadSystemPrompt] = useState(initialSystemPrompt);
   const [webSearchEnabled, setWebSearchEnabled] = useState(initialWebSearch);
   const [branches, setBranches] = useState<Array<{ id: string; title: string; branchPointMessageId: string | null }>>([]);
   const hasSubmittedInitialQuery = useRef(false);
@@ -316,13 +322,18 @@ export function ThreadChat({
 
       <div className="mb-8 flex items-start justify-between gap-4">
         <h1 className="text-xl font-semibold leading-snug tracking-tight text-foreground line-clamp-2">
-          {initialTitle}
+          {threadTitle}
         </h1>
         <div className="flex items-center gap-2 flex-shrink-0">
+          <ThreadSettingsDialog 
+            threadId={threadId} 
+            initialSystemPrompt={threadSystemPrompt} 
+            onUpdate={setThreadSystemPrompt} 
+          />
           <ImageGallery messages={mergedMessages} />
           {mergedMessages.length > 0 && (
             <button
-              onClick={() => exportMessagesAsMarkdown(initialTitle, mergedMessages)}
+              onClick={() => exportMessagesAsMarkdown(threadTitle, mergedMessages)}
               title="Export conversation as Markdown"
               className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground/50 transition-colors hover:bg-muted hover:text-foreground"
             >
@@ -436,6 +447,7 @@ export default function ThreadPage() {
     title: string;
     model: string;
     roleId: string | null;
+    systemPrompt: string | null;
     history: ChatMessageItem[];
   } | null>(null);
   const [loading, setLoading] = useState(true);
@@ -455,6 +467,7 @@ export default function ThreadPage() {
           title: payload.thread.title,
           model: payload.thread.model || getDefaultModel(),
           roleId: payload.thread.roleId,
+          systemPrompt: payload.thread.systemPrompt,
           history: payload.messages.map((message) => ({
             id: message.id,
             role: message.role,
@@ -494,6 +507,7 @@ export default function ThreadPage() {
           initialTitle={threadData.title}
           initialModel={threadData.model}
           initialRoleId={threadData.roleId}
+          initialSystemPrompt={threadData.systemPrompt}
           initialHistory={threadData.history}
           initialWebSearch={webSearchDefault}
           attachments={attachments}

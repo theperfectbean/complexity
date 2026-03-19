@@ -9,6 +9,7 @@ import { messages, threads, users } from "@/lib/db/schema";
 
 const patchSchema = z.union([
   z.object({ title: z.string().min(1).max(200) }),
+  z.object({ systemPrompt: z.string().max(2000).optional().nullable() }),
   z.object({ action: z.literal("truncate-from"), messageId: z.string().min(1) }),
   z.object({ action: z.literal("branch"), messageId: z.string().min(1) }),
 ]);
@@ -152,6 +153,14 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ th
     }
 
     return NextResponse.json({ ok: true, threadId: newThreadId });
+  }
+
+  if ("systemPrompt" in parsed.data) {
+    await db
+      .update(threads)
+      .set({ systemPrompt: parsed.data.systemPrompt, updatedAt: new Date() })
+      .where(eq(threads.id, threadId));
+    return NextResponse.json({ ok: true });
   }
 
   // Rename thread

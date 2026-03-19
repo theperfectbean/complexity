@@ -30,4 +30,5 @@ export interface ThreadInfo {
   roleId: string | null;
   memoryEnabled: boolean | null;
   roleInstructions: string;
+  systemPrompt?: string | null;
 }
