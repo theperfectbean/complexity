@@ -1,7 +1,7 @@
 "use client";
 
 import { useTheme } from "next-themes";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Moon, Sun, Monitor, Palette } from "lucide-react";
 
 const COLOR_THEMES = [
@@ -26,23 +26,32 @@ export function ThemeToggle() {
     setMounted(true);
   }, []);
 
+  const persistTheme = useCallback((newTheme: string) => {
+    setTheme(newTheme);
+    fetch("/api/profile", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ theme: newTheme }),
+    }).catch(() => undefined);
+  }, [setTheme]);
+
   if (!mounted) return null;
 
   const handleBaseThemeChange = (newBase: string) => {
     const mode = isDark ? "dark" : "light";
     if (newBase === "default") {
-      setTheme(mode);
+      persistTheme(mode);
     } else {
-      setTheme(`${newBase}-${mode}`);
+      persistTheme(`${newBase}-${mode}`);
     }
   };
 
   const toggleMode = () => {
     const newMode = isDark ? "light" : "dark";
     if (currentBaseTheme === "default") {
-      setTheme(newMode);
+      persistTheme(newMode);
     } else {
-      setTheme(`${currentBaseTheme}-${newMode}`);
+      persistTheme(`${currentBaseTheme}-${newMode}`);
     }
   };
 
