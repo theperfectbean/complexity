@@ -1,5 +1,6 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { encode } from "gpt-tokenizer";
 import type { ChatMessageItem, ChatCitation, ChatThinkingPart } from "@/components/chat/MessageList";
 import { collectTextStrings } from "./extraction-utils";
 
@@ -51,6 +52,20 @@ export function cleanMarkdownForCopy(content: string): string {
   // Remove ```chart ... ``` blocks
   return content.replace(/```chart[\s\S]*?```/g, "").trim();
 }
+
+/**
+ * Estimates the number of tokens in a string using gpt-tokenizer.
+ */
+export function countTokens(text: string): number {
+  if (!text) return 0;
+  try {
+    return encode(text).length;
+  } catch (err) {
+    console.error("Token counting failed:", err);
+    return 0;
+  }
+}
+
 
 export function normalizeUIMessage(message: unknown): ChatMessageItem {
   const msg = message as Record<string, unknown>;

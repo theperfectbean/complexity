@@ -484,6 +484,15 @@ DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose build app
   - Added a "Thread Settings" dialog (Gear icon) in the thread header for editing instructions.
 - **Testing**: Verified end-to-end flow from UI update to LLM prompt injection.
 
+### Context Window Transparency (2026-03-19)
+- **Feature**: Displayed indicators for token consumption and usage for the current thread (A5/A6).
+- **Implementation**:
+  - Integrated `gpt-tokenizer` in `app/src/lib/utils.ts` with a new `countTokens` utility.
+  - Updated `ThreadSettingsDialog` to calculate and display the total estimated tokens for the entire conversation.
+  - Added a visual usage breakdown in the settings modal, showing both raw token count and estimated word count (using a 0.75 tokens/word ratio).
+- **Benefit**: Provides users with immediate visibility into how much of the LLM context window is being consumed.
+
+
 
 
 

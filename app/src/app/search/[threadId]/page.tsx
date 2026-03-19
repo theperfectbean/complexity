@@ -328,6 +328,7 @@ export function ThreadChat({
           <ThreadSettingsDialog 
             threadId={threadId} 
             initialSystemPrompt={threadSystemPrompt} 
+            messages={mergedMessages}
             onUpdate={setThreadSystemPrompt} 
           />
           <ImageGallery messages={mergedMessages} />

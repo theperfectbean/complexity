@@ -1,20 +1,27 @@
 "use client";
 
 import * as Dialog from "@radix-ui/react-dialog";
-import { X, Settings, Loader2, Info } from "lucide-react";
-import { useState } from "react";
+import { X, Settings, Loader2, Info, Cpu } from "lucide-react";
+import { useState, useMemo } from "react";
 import { toast } from "sonner";
+import { countTokens } from "@/lib/utils";
+import { ChatMessageItem } from "@/components/chat/MessageList";
 
 interface ThreadSettingsDialogProps {
   threadId: string;
   initialSystemPrompt: string | null;
+  messages: ChatMessageItem[];
   onUpdate: (newPrompt: string | null) => void;
 }
 
-export function ThreadSettingsDialog({ threadId, initialSystemPrompt, onUpdate }: ThreadSettingsDialogProps) {
+export function ThreadSettingsDialog({ threadId, initialSystemPrompt, messages, onUpdate }: ThreadSettingsDialogProps) {
   const [open, setOpen] = useState(false);
   const [prompt, setPrompt] = useState(initialSystemPrompt || "");
   const [isSaving, setIsSaving] = useState(false);
+
+  const totalTokens = useMemo(() => {
+    return messages.reduce((acc, msg) => acc + countTokens(msg.content), 0);
+  }, [messages]);
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -74,6 +81,35 @@ export function ThreadSettingsDialog({ threadId, initialSystemPrompt, onUpdate }
               <div className="mt-2 flex items-start gap-2 text-[11px] text-muted-foreground bg-primary/5 p-2 rounded-lg border border-primary/10">
                 <Info className="h-3 w-3 mt-0.5 shrink-0" />
                 <p>These instructions apply only to this thread and are added to the AI&apos;s base instructions.</p>
+              </div>
+            </div>
+
+            <div className="pt-2">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium">Conversation Usage</span>
+                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <Cpu className="h-3 w-3" />
+                  <span>Estimated Tokens</span>
+                </div>
+              </div>
+              <div className="flex items-center gap-3 rounded-xl border border-border bg-muted/20 p-3">
+                <div className="flex-1">
+                  <div className="text-2xl font-bold tracking-tight">
+                    {totalTokens.toLocaleString()}
+                  </div>
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mt-0.5">
+                    Current Context
+                  </p>
+                </div>
+                <div className="h-10 w-px bg-border/50" />
+                <div className="flex-1 text-right">
+                  <div className="text-xs font-medium text-muted-foreground">
+                    ~{(totalTokens / 750).toFixed(2)}k words
+                  </div>
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mt-0.5">
+                    Estimated Length
+                  </p>
+                </div>
               </div>
             </div>
 
