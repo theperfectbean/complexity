@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { ExternalLink, Search } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { useSession } from "next-auth/react";
@@ -94,6 +95,16 @@ function MemoryItem({
               {memory.source}
             </span>
             <span>{new Date(memory.createdAt).toLocaleString()}</span>
+            {memory.threadId ? (
+              <Link
+                href={`/search/${memory.threadId}`}
+                className="inline-flex items-center gap-1 text-primary/70 hover:text-primary transition-colors"
+                title="View source conversation"
+              >
+                <ExternalLink className="h-3 w-3" />
+                <span>View thread</span>
+              </Link>
+            ) : null}
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
@@ -153,6 +164,13 @@ export default function MemorySettingsPage() {
   const [toggleBusy, setToggleBusy] = useState(false);
   const [createBusy, setCreateBusy] = useState(false);
   const [isConfirmingClearAll, setIsConfirmingClearAll] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const filteredMemories = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return memories;
+    return memories.filter((m) => m.content.toLowerCase().includes(q));
+  }, [memories, searchQuery]);
 
   useEffect(() => {
     if (status !== "authenticated") {
@@ -369,7 +387,11 @@ export default function MemorySettingsPage() {
         <div className="mb-3 flex items-center justify-between gap-3">
           <div>
             <p className="text-sm font-semibold">Stored memories</p>
-            <p className="text-xs text-muted-foreground">{memories.length} total</p>
+            <p className="text-xs text-muted-foreground">
+              {searchQuery.trim()
+                ? `${filteredMemories.length} of ${memories.length}`
+                : `${memories.length} total`}
+            </p>
           </div>
           {isConfirmingClearAll ? (
             <div className="flex items-center gap-2">
@@ -403,13 +425,29 @@ export default function MemorySettingsPage() {
           )}
         </div>
 
+        {memories.length > 0 && (
+          <div className="relative mb-4">
+            <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground/50 pointer-events-none" />
+            <input
+              type="text"
+              placeholder="Search memories…"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full rounded-lg border bg-background py-2 pl-9 pr-3 text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-primary/30"
+            />
+          </div>
+        )}
+
         {loading ? <LoadingSkeleton lines={4} /> : null}
         {!loading && memories.length === 0 ? (
           <EmptyState title="No memories yet" description="Memories extracted from chats will appear here." />
         ) : null}
+        {!loading && memories.length > 0 && filteredMemories.length === 0 ? (
+          <EmptyState title="No matches" description={`No memories match "${searchQuery}".`} />
+        ) : null}
 
         <div className="space-y-3">
-          {memories.map((memory) => (
+          {filteredMemories.map((memory) => (
             <MemoryItem
               key={memory.id}
               memory={memory}

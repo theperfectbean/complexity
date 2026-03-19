@@ -108,6 +108,7 @@ export const runtimeConfig = {
     promptFooter: env.MEMORY_PROMPT_FOOTER ?? "Use these memories to personalize your responses. Do not explicitly mention that you have memories unless asked.",
     extractionInstructions: env.MEMORY_EXTRACTION_INSTRUCTIONS ?? "Given the conversation and existing memories, extract NEW user facts and IDENTIFY outdated ones. Only include durable preferences, personal details, work context, or recurring needs. Return a JSON object with two keys: `added` (array of strings for new facts) and `deleted_ids` (array of strings for IDs of existing memories that are now outdated or contradicted). Return { \"added\": [], \"deleted_ids\": [] } if nothing new/changed. Do not include duplicates or trivial facts.",
     failurePrefix: env.MEMORY_FAILURE_PREFIX ?? "Model request failed:",
+    dedupThreshold: env.MEMORY_DEDUP_THRESHOLD ?? 0.92,
   },
   chat: {
     rateLimitPerMinute: env.CHAT_RATE_LIMIT_PER_MINUTE ?? 20,

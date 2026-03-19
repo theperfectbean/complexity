@@ -89,7 +89,7 @@ export async function searchMemories(userId: string, userText?: string, topK?: n
 
 export async function getExistingMemories(userId: string) {
   return db
-    .select({ id: memories.id, content: memories.content })
+    .select({ id: memories.id, content: memories.content, embedding: memories.embedding })
     .from(memories)
     .where(eq(memories.userId, userId))
     .orderBy(desc(memories.createdAt))

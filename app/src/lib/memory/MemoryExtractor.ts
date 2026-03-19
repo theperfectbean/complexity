@@ -9,6 +9,35 @@ export type ExtractMemoriesInput = {
   existingMemories: { id: string; content: string }[];
 };
 
+/** Dot product of two equal-length vectors (cosine similarity for L2-normalised embeddings). */
+function cosineSimilarity(a: number[], b: number[]): number {
+  let sum = 0;
+  for (let i = 0; i < a.length; i++) sum += a[i] * b[i];
+  return sum;
+}
+
+/**
+ * Filter candidate embeddings against existing embeddings.
+ * Returns only the candidates whose max cosine similarity to any existing
+ * embedding is below `threshold`.
+ */
+function semanticDedup(
+  candidates: { content: string; embedding: number[] }[],
+  existing: { embedding: number[] | null }[],
+  threshold: number,
+): { content: string; embedding: number[] }[] {
+  const existingEmbeddings = existing
+    .map((e) => e.embedding)
+    .filter((e): e is number[] => Array.isArray(e) && e.length > 0);
+
+  if (existingEmbeddings.length === 0) return candidates;
+
+  return candidates.filter(({ embedding }) => {
+    const maxSim = Math.max(...existingEmbeddings.map((e) => cosineSimilarity(embedding, e)));
+    return maxSim < threshold;
+  });
+}
+
 export type ExtractionResult = {
   added: string[];
   deletedIds: string[];
@@ -134,28 +163,44 @@ export async function saveExtractedMemories(params: {
   }
 
   if (added.length > 0) {
-    const availableSlots = runtimeConfig.memory.maxMemories - (existingRows.length - deletedIds.length);
-    const insertMemoriesList = added.slice(0, Math.max(0, availableSlots));
-    if (insertMemoriesList.length > 0) {
-      let embeddings: number[][] = [];
-      try {
-        const { getEmbeddings } = await import("@/lib/rag");
-        embeddings = await getEmbeddings(insertMemoriesList);
-      } catch (error) {
-        console.error("[Memory] Failed to generate embeddings for auto-extracted memories:", error);
-      }
+      const availableSlots = runtimeConfig.memory.maxMemories - (existingRows.length - deletedIds.length);
+      const candidates = added.slice(0, Math.max(0, availableSlots));
+      if (candidates.length > 0) {
+        let embeddings: number[][] = [];
+        try {
+          const { getEmbeddings } = await import("@/lib/rag");
+          embeddings = await getEmbeddings(candidates);
+        } catch (error) {
+          console.error("[Memory] Failed to generate embeddings for auto-extracted memories:", error);
+        }
 
-      await MemoryStore.insertMemories(
-        userId,
-        threadId,
-        insertMemoriesList.map((content, index) => ({
-          content,
-          embedding: embeddings[index] ?? null,
-        }))
-      );
-      totalChanges += insertMemoriesList.length;
+        // Semantic deduplication: skip candidates too similar to existing memories
+        const withEmbeddings = candidates
+          .map((content, i) => ({ content, embedding: embeddings[i] ?? [] }))
+          .filter((c) => c.embedding.length > 0);
+
+        const dedupedByEmbedding = semanticDedup(
+          withEmbeddings,
+          existingRows,
+          runtimeConfig.memory.dedupThreshold,
+        );
+
+        // Also include any candidates that had no embedding (couldn't embed → insert anyway)
+        const noEmbedding = candidates
+          .filter((_, i) => !embeddings[i] || embeddings[i].length === 0)
+          .map((content) => ({ content, embedding: null as number[] | null }));
+
+        const insertList = [
+          ...dedupedByEmbedding,
+          ...noEmbedding,
+        ];
+
+        if (insertList.length > 0) {
+          await MemoryStore.insertMemories(userId, threadId, insertList);
+          totalChanges += insertList.length;
+        }
+      }
     }
-  }
 
   if (totalChanges > 0) {
     await MemoryStore.invalidateMemoryCache(userId);

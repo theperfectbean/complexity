@@ -61,6 +61,7 @@ const envSchema = z.object({
         "Return a JSON object with two keys: `added` (array of strings for new facts) and `deleted_ids` (array of strings for IDs of existing memories that are now outdated or contradicted). Return { \"added\": [], \"deleted_ids\": [] } if nothing new/changed. Do not include duplicates or trivial facts."
     ),
   MEMORY_FAILURE_PREFIX: z.string().default("Model request failed:"),
+  MEMORY_DEDUP_THRESHOLD: z.coerce.number().min(0).max(1).default(0.92),
   CHAT_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(20),
   CHAT_RATE_LIMIT_TTL_SECONDS: z.coerce.number().int().positive().default(60),
   CHAT_CACHE_TTL_SECONDS: z.coerce.number().int().positive().default(60 * 60),
