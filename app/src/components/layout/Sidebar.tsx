@@ -86,7 +86,7 @@ export function Sidebar({ collapsed = false, onToggle, onNavigate }: SidebarProp
     let active = true;
 
     // Determine if we are in a thread
-    const threadMatch = pathname.match(/^\/search\/([a-zA-Z0-9_-]+)$/);
+    const threadMatch = pathname?.match(/^\/search\/([a-zA-Z0-9_-]+)$/);
     const activeThreadId = threadMatch ? threadMatch[1] : null;
 
     fetch("/api/threads")
@@ -282,7 +282,7 @@ export function Sidebar({ collapsed = false, onToggle, onNavigate }: SidebarProp
                       key={branch.id}
                       className={cn(
                         "flex items-center gap-2 rounded-lg px-2 py-1.5 transition-colors",
-                        pathname.includes(branch.id) 
+                        pathname?.includes(branch.id)
                           ? "bg-primary/10 text-primary" 
                           : "hover:bg-black/5 dark:hover:bg-white/5 text-muted-foreground"
                       )}
