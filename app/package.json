@@ -50,6 +50,7 @@
     "drizzle-kit": "^0.31.9",
     "drizzle-orm": "^0.45.1",
     "geist": "^1.7.0",
+    "gpt-tokenizer": "^3.4.0",
     "ioredis": "^5.10.0",
     "lucide-react": "^0.577.0",
     "mammoth": "^1.11.0",

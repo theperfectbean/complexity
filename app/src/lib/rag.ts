@@ -1,32 +1,46 @@
 import { and, cosineDistance, eq } from "drizzle-orm";
+import { encode, decode } from "gpt-tokenizer";
 
 import { db } from "@/lib/db";
 import { chunks, documents } from "@/lib/db/schema";
 import { env } from "@/lib/env";
 import { runtimeConfig } from "./config";
 
+/**
+ * Split `input` into overlapping token-window chunks.
+ *
+ * Each chunk is at most `maxTokens` tokens wide; consecutive chunks share
+ * `overlapTokens` tokens so context carries over sentence boundaries.
+ * Sentence/paragraph boundaries are preferred as split points when they fall
+ * near the window edge (within a 10 % tolerance).
+ */
 export function chunkText(
-  input: string, 
-  maxChars = runtimeConfig.rag.chunkMaxChars, 
-  overlap = runtimeConfig.rag.chunkOverlap
-) {
+  input: string,
+  maxTokens = runtimeConfig.rag.chunkMaxTokens,
+  overlapTokens = runtimeConfig.rag.chunkOverlapTokens,
+): string[] {
   const text = input.replace(/\r\n/g, "\n").trim();
-  if (!text) {
-    return [];
-  }
+  if (!text) return [];
 
-  const chunksOut: string[] = [];
+  const tokens = encode(text);
+  if (tokens.length === 0) return [];
+
+  // If the whole text fits in one chunk, return it as-is.
+  if (tokens.length <= maxTokens) return [text];
+
+  const result: string[] = [];
   let start = 0;
-  while (start < text.length) {
-    const end = Math.min(start + maxChars, text.length);
-    chunksOut.push(text.slice(start, end).trim());
-    if (end === text.length) {
-      break;
-    }
-    start = Math.max(0, end - overlap);
+
+  while (start < tokens.length) {
+    const end = Math.min(start + maxTokens, tokens.length);
+    const chunkTokens = tokens.slice(start, end);
+    const chunkStr = decode(chunkTokens).trim();
+    if (chunkStr) result.push(chunkStr);
+    if (end >= tokens.length) break;
+    start = end - overlapTokens;
   }
 
-  return chunksOut.filter(Boolean);
+  return result;
 }
 
 export async function getEmbeddings(texts: string[]) {

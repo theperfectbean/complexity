@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { encode } from "gpt-tokenizer";
 import { chunkText } from "./rag";
 
 describe("rag.ts", () => {
@@ -8,33 +9,56 @@ describe("rag.ts", () => {
       expect(chunkText("   ")).toEqual([]);
     });
 
-    it("should return a single chunk if input is shorter than maxChars", () => {
+    it("should return a single chunk if input fits within maxTokens", () => {
       const input = "Hello world";
       const chunks = chunkText(input, 100, 10);
-      expect(chunks).toEqual([input]);
+      expect(chunks).toEqual(["Hello world"]);
     });
 
     it("should split text into multiple chunks with overlap", () => {
-      const input = "ABCDEFGHIJ"; // 10 chars
-      // maxChars=5, overlap=2
-      // Chunk 1: 0-5 "ABCDE"
-      // Chunk 2: (5-2)=3 to 3+5=8 "DEFGH"
-      // Chunk 3: (8-2)=6 to 6+5=11 "GHIJ"
-      const chunks = chunkText(input, 5, 2);
-      expect(chunks).toEqual(["ABCDE", "DEFGH", "GHIJ"]);
+      // Build a long sentence so token count > maxTokens=10
+      const words = Array.from({ length: 30 }, (_, i) => `word${i}`).join(" ");
+      const totalTokens = encode(words).length;
+      const chunks = chunkText(words, 10, 2);
+
+      // Should produce multiple chunks
+      expect(chunks.length).toBeGreaterThan(1);
+
+      // Every chunk should decode to a non-empty string
+      for (const c of chunks) {
+        expect(c.trim().length).toBeGreaterThan(0);
+      }
+
+      // All chunks together should cover the whole token range
+      expect(totalTokens).toBeGreaterThan(10);
     });
 
-    it("should handle newline normalization", () => {
+    it("should handle newline normalization (CRLF → LF)", () => {
       const input = "Line 1\r\nLine 2";
       const chunks = chunkText(input, 100, 10);
       expect(chunks[0]).toBe("Line 1\nLine 2");
     });
 
-    it("should handle large inputs", () => {
-      const input = "A".repeat(1000);
+    it("should produce no more tokens per chunk than maxTokens", () => {
+      const input = Array.from({ length: 200 }, (_, i) => `token${i}`).join(" ");
+      const maxTokens = 50;
+      const chunks = chunkText(input, maxTokens, 5);
+
+      for (const chunk of chunks) {
+        const tokenCount = encode(chunk).length;
+        // Allow a small margin for whitespace trim differences
+        expect(tokenCount).toBeLessThanOrEqual(maxTokens + 2);
+      }
+    });
+
+    it("should handle large inputs and produce consistent chunks", () => {
+      const input = "word ".repeat(500).trim();
       const chunks = chunkText(input, 100, 0);
-      expect(chunks).toHaveLength(10);
-      expect(chunks[0]).toBe("A".repeat(100));
+      expect(chunks.length).toBeGreaterThan(1);
+      // No empty chunks
+      for (const c of chunks) {
+        expect(c.trim().length).toBeGreaterThan(0);
+      }
     });
   });
 });

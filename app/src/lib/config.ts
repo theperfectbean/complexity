@@ -87,8 +87,8 @@ export const runtimeConfig = {
       .map((tool) => ({ type: tool })),
   },
   rag: {
-    chunkMaxChars: env.RAG_CHUNK_MAX_CHARS ?? 2200,
-    chunkOverlap: env.RAG_CHUNK_OVERLAP ?? 200,
+    chunkMaxTokens: env.RAG_CHUNK_MAX_TOKENS ?? 600,
+    chunkOverlapTokens: env.RAG_CHUNK_OVERLAP_TOKENS ?? 40,
     embedderTimeoutMs: env.RAG_EMBEDDER_TIMEOUT_MS ?? 1000 * 600,
     embedderBatchSize: env.RAG_EMBEDDER_BATCH_SIZE ?? 200,
     embedderConcurrency: env.RAG_EMBEDDER_CONCURRENCY ?? 4,
