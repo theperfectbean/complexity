@@ -484,6 +484,16 @@ DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose build app
   - Added a "Thread Settings" dialog (Gear icon) in the thread header for editing instructions.
 - **Testing**: Verified end-to-end flow from UI update to LLM prompt injection.
 
+### Search Within Thread (2026-03-19)
+- **Feature**: Added client-side keyword search specifically for the current conversation (A7).
+- **Implementation**:
+  - Developed a `ThreadSearchBar` component with keyboard shortcut support (Cmd/Ctrl + F) and automatic focus.
+  - Updated `MessageList` and `MessageItem` to support real-time highlighting of search matches.
+  - Implemented automatic "scroll to match" logic using `scrollIntoView` when keywords are found.
+  - Integrated match counting and visual feedback in the thread header.
+- **Benefit**: Allows users to quickly locate specific information or keywords in very long conversation histories.
+
+
 ### Context Window Transparency (2026-03-19)
 - **Feature**: Displayed indicators for token consumption and usage for the current thread (A5/A6).
 - **Implementation**:

@@ -11,6 +11,7 @@ import { ChatCitation, ChatMessageItem, MessageList } from "@/components/chat/Me
 import { SearchBar } from "@/components/search/SearchBar";
 import { ImageGallery } from "@/components/chat/ImageGallery";
 import { ThreadSettingsDialog } from "./ThreadSettingsDialog";
+import { ThreadSearchBar } from "./ThreadSearchBar";
 import { getDefaultModel } from "@/lib/models";
 
 import { normalizeUIMessage } from "@/lib/utils";
@@ -115,6 +116,8 @@ export function ThreadChat({
   const [threadSystemPrompt, setThreadSystemPrompt] = useState(initialSystemPrompt);
   const [webSearchEnabled, setWebSearchEnabled] = useState(initialWebSearch);
   const [branches, setBranches] = useState<Array<{ id: string; title: string; branchPointMessageId: string | null }>>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchMatches, setSearchMatches] = useState(0);
   const hasSubmittedInitialQuery = useRef(false);
   const triggerRef = useRef<string | undefined>(undefined);
 
@@ -214,6 +217,18 @@ export function ThreadChat({
     },
     [router],
   );
+
+  const handleSearch = useCallback((query: string) => {
+    setSearchQuery(query);
+    if (!query.trim() || query.length < 2) {
+      setSearchMatches(0);
+      return;
+    }
+    const count = mergedMessages.filter(m => 
+      m.content.toLowerCase().includes(query.toLowerCase())
+    ).length;
+    setSearchMatches(count);
+  }, [mergedMessages]);
 
   useEffect(() => {
     if (!initialQuery || hasSubmittedInitialQuery.current) {
@@ -325,6 +340,7 @@ export function ThreadChat({
           {threadTitle}
         </h1>
         <div className="flex items-center gap-2 flex-shrink-0">
+          <ThreadSearchBar onSearch={handleSearch} matchCount={searchMatches} />
           <ThreadSettingsDialog 
             threadId={threadId} 
             initialSystemPrompt={threadSystemPrompt} 
@@ -349,6 +365,7 @@ export function ThreadChat({
           messages={mergedMessages}
           branches={branches}
           onBranchChange={handleBranchChange}
+          searchQuery={searchQuery}
           isStreaming={status === "streaming"}
           emptyLabel="Start this thread with your first question."
           onRetry={() => {

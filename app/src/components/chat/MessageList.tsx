@@ -41,6 +41,7 @@ type MessageListProps = {
   messages: ChatMessageItem[];
   branches?: ChatBranch[];
   onBranchChange?: (threadId: string) => void;
+  searchQuery?: string;
   emptyLabel: string;
   onRetry?: () => void;
   onRewrite?: (modelId: string) => void;
@@ -71,6 +72,7 @@ const MessageItem = memo(function MessageItem({
   totalMessages, 
   branches,
   onBranchChange,
+  searchQuery,
   isStreaming, 
   onRetry, 
   onRewrite,
@@ -83,6 +85,7 @@ const MessageItem = memo(function MessageItem({
   totalMessages: number;
   branches?: ChatBranch[];
   onBranchChange?: (threadId: string) => void;
+  searchQuery?: string;
   isStreaming?: boolean;
   onRetry?: () => void;
   onRewrite?: (modelId: string) => void;
@@ -163,11 +166,35 @@ const MessageItem = memo(function MessageItem({
   const currentThreadId = typeof window !== 'undefined' ? window.location.pathname.split('/').pop() : '';
   const currentBranchIndex = relevantBranches.findIndex(b => b.id === currentThreadId);
 
+  const isSearchMatch = useMemo(() => {
+    if (!searchQuery?.trim() || searchQuery.length < 2) return false;
+    return message.content.toLowerCase().includes(searchQuery.toLowerCase());
+  }, [message.content, searchQuery]);
+
+  const itemRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (isSearchMatch && searchQuery) {
+      // Small delay to ensure rendering is complete
+      const timer = setTimeout(() => {
+        itemRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [isSearchMatch, searchQuery]);
+
   return (
-    <article 
-      className={isUser ? "flex flex-col items-end py-2" : "group relative flex flex-col gap-0 pt-2 pb-10"}
-      style={{ overflowAnchor: "auto" }}
+    <div 
+      ref={itemRef} 
+      className={cn(
+        "transition-all duration-500 rounded-2xl",
+        isSearchMatch ? "bg-primary/10 ring-2 ring-primary/20 p-2 -mx-2" : ""
+      )}
     >
+      <article 
+        className={isUser ? "flex flex-col items-end py-2" : "group relative flex flex-col gap-0 pt-2 pb-10"}
+        style={{ overflowAnchor: "auto" }}
+      >
       {isUser ? (
         <div className="group/user relative w-fit max-w-[85%] md:max-w-[75%]">
           {relevantBranches.length > 1 && onBranchChange && (
@@ -400,10 +427,11 @@ const MessageItem = memo(function MessageItem({
         </div>
       )}
     </article>
+    </div>
   );
 });
 
-export function MessageList({ messages, branches, onBranchChange, emptyLabel, onRetry, onRewrite, onEditMessage, isStreaming }: MessageListProps) {
+export function MessageList({ messages, branches, onBranchChange, searchQuery, emptyLabel, onRetry, onRewrite, onEditMessage, isStreaming }: MessageListProps) {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [showScrollButton, setShowScrollButton] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -506,6 +534,7 @@ export function MessageList({ messages, branches, onBranchChange, emptyLabel, on
           totalMessages={messages.length}
           branches={branches}
           onBranchChange={onBranchChange}
+          searchQuery={searchQuery}
           isStreaming={isStreaming}
           onRetry={onRetry}
           onRewrite={onRewrite}
