@@ -55,7 +55,7 @@ export function getProviderAndModel(modelId: string): { provider: ProviderType; 
   }
 
   // 3. Handle specific un-prefixed models
-  const knownPerplexityModels = ["sonar", "sonar-pro", "sonar-reasoning", "sonar-reasoning-pro", "sonar-deep-research"];
+  const knownPerplexityModels = ["sonar"];
   if (knownPerplexityModels.includes(modelId)) {
     return { provider: "perplexity", model: modelId };
   }
@@ -80,13 +80,17 @@ export function getProviderAndModel(modelId: string): { provider: ProviderType; 
 
 /**
  * Maps internal model IDs to IDs that Perplexity API understands.
- * Preset aliases are normalized, while third-party provider prefixes
- * (e.g. anthropic/openai/google) are preserved for Perplexity routing.
+ * Native models (sonar) require the 'perplexity/' prefix in the Agent API,
+ * while presets (fast-search) and third-party models (anthropic/claude-...) do not.
  */
 function mapToPerplexityModel(modelName: string): string {
-  // We no longer map fast-search to sonar because fast-search is the actual native preset name
-  // in the Perplexity Agent API.
-  return modelName;
+  if (["fast-search", "pro-search", "deep-research", "advanced-deep-research"].includes(modelName)) {
+    return modelName;
+  }
+  if (modelName.includes("/")) {
+    return modelName;
+  }
+  return `perplexity/${modelName}`;
 }
 
 export function getLanguageModel(modelId: string, keys: Record<string, string | null>): LanguageModel {
@@ -154,16 +158,21 @@ export async function runGeneration(options: GenerationOptions): Promise<Generat
 
   if (provider === "perplexity") {
     try {
-      // Build a fallback chain: primary model -> standard models -> fast model
       const primaryModel = mapToPerplexityModel(modelName);
-      const fallbackChain = Array.from(new Set([
+      
+      // Determine if it's a preset. Presets should not use a fallback chain
+      // as they handle their own internal routing and tools in the Agent API.
+      const isPreset = isPresetModel(options.modelId) || 
+                       ["fast-search", "pro-search", "deep-research", "advanced-deep-research"].includes(options.modelId);
+
+      // Build a fallback chain ONLY for non-preset models: primary model -> standard model
+      const modelId = isPreset ? primaryModel : Array.from(new Set([
         primaryModel,
-        "sonar-pro",
-        "sonar"
-      ])).slice(0, 5); // Agent API allows up to 5 models
+        "perplexity/sonar" // Ensure prefix is here for fallback too
+      ])).slice(0, 5);
 
       const result = await runSearchAgent({
-        modelId: fallbackChain,
+        modelId,
         agentInput: options.agentInput,
         instructions: options.system || "",
         webSearch: !!options.webSearch,

@@ -4,7 +4,7 @@ import rehypeHighlight from "rehype-highlight";
 import remarkGfm from "remark-gfm";
 import { ChartRenderer } from "./ChartRenderer";
 import { Copy, Check } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, copyToClipboard } from "@/lib/utils";
 
 type MarkdownRendererProps = {
   content: string;
@@ -15,12 +15,10 @@ function CopyButton({ content }: { content: string }) {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(content);
+    const success = await copyToClipboard(content);
+    if (success) {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
-      console.error("Failed to copy text: ", err);
     }
   };
 
@@ -40,6 +38,16 @@ function CopyButton({ content }: { content: string }) {
 }
 
 const components: Components = {
+  a({ children, href, ...props }: React.ComponentPropsWithoutRef<"a">) {
+    // Destructure node to prevent it from being passed to the a element
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { node, ...rest } = props as Record<string, unknown>;
+    return (
+      <a href={href} target="_blank" rel="noopener noreferrer" {...rest}>
+        {children}
+      </a>
+    );
+  },
   pre({ children, ...props }: React.ComponentPropsWithoutRef<"pre">) {
     return (
       <pre 

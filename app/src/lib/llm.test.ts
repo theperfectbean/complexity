@@ -70,7 +70,7 @@ describe("llm.ts", () => {
       });
 
       expect(searchAgent.runSearchAgent).toHaveBeenCalledWith(expect.objectContaining({
-        modelId: ["anthropic/claude-4-6-sonnet-latest", "sonar-pro", "sonar"],
+        modelId: ["anthropic/claude-4-6-sonnet-latest", "perplexity/sonar"],
       }));
       expect(result.text).toBe("hello");
     });

@@ -81,10 +81,6 @@ export async function fetchProviderModelsWithStatus(): Promise<ProviderDiscovery
         { id: "deep-research", name: "Deep Research", provider: "Perplexity" },
         { id: "advanced-deep-research", name: "Advanced Deep Research", provider: "Perplexity" },
         { id: "perplexity/sonar", name: "Sonar", provider: "Perplexity" },
-        { id: "perplexity/sonar-pro", name: "Sonar Pro", provider: "Perplexity" },
-        { id: "perplexity/sonar-reasoning", name: "Sonar Reasoning", provider: "Perplexity" },
-        { id: "perplexity/sonar-reasoning-pro", name: "Sonar Reasoning Pro", provider: "Perplexity" },
-        { id: "perplexity/sonar-deep-research", name: "Sonar Deep Research", provider: "Perplexity" },
       ];
 
       try {

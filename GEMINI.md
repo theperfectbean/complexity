@@ -378,3 +378,33 @@ DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose build app
   - Refactored `llm.ts` and `MemoryExtractor.ts` to consume the renamed generic client abstractions.
 - **Preservation**: Crucially, left `.env` variables (`PERPLEXITY_API_KEY`), model ID prefixes (`perplexity/sonar`), database columns (`perplexity_api_key`), and test artifacts untouched to preserve fully functional connectivity with the Perplexity API without breaking backwards compatibility.
 
+### Perplexity Agent API Preset and Prefix Fix (2026-03-19)
+- **Problem**: Users encountered `400 Bad Request` with `validation failed: model "sonar-pro" is not supported` when using presets like "Pro Search" or direct Perplexity models.
+- **Root Cause 1 (Preset Misplacement)**: Presets like `pro-search` and `fast-search` were being included in the `models` fallback array. The Perplexity Agent API (`/v1/responses`) requires presets to be passed via the `preset` parameter as a single string, and it does not allow them in the `models` array.
+- **Root Cause 2 (Missing Prefix)**: Native Perplexity models (e.g., `sonar`) require the `perplexity/` prefix (i.e., `perplexity/sonar`) in the `model` or `models` field of the Agent API, unlike third-party models which are passed as-is (e.g., `anthropic/claude-...`).
+- **Root Cause 3 (Deprecated Models)**: Model IDs like `sonar-pro`, `sonar-reasoning`, and `sonar-reasoning-pro` are no longer supported by the `/v1/responses` endpoint in the current API version; `perplexity/sonar` is the only valid native model ID found in the `/v1/models` list.
+- **Fixes**:
+  - Updated `runGeneration` in `app/src/lib/llm.ts` to skip the fallback chain for presets, passing them as single strings to trigger the `preset` logic in `runSearchAgent`.
+  - Updated `mapToPerplexityModel` in `app/src/lib/llm.ts` to automatically re-add the `perplexity/` prefix to native models before they are sent to the Agent API.
+  - Removed unsupported `sonar-pro` and other non-existent models from the fallback chain and the UI's `corePresets` list in `app/src/lib/provider-models.ts`.
+  - Verified that `preset: "pro-search"` and `model: "perplexity/sonar"` are fully functional and correctly return grounded responses with citations.
+
+### Clipboard Copy Robustness & LAN Support (2026-03-19)
+- **Problem**: The "Copy" buttons (for both messages and code blocks) were failing for users accessing the application over a local network (LAN) via an IP address.
+- **Root Cause**: The modern `navigator.clipboard` API is restricted to "secure contexts" (HTTPS or localhost). Accessing the app via a LAN IP (e.g., `http://192.168.1.50:3002`) is considered an insecure context, causing `navigator.clipboard` to be undefined or throw permission errors.
+- **Fix**: 
+  - Implemented a centralized `copyToClipboard` utility in `app/src/lib/utils.ts`.
+  - The utility uses a **hybrid approach**: it attempts to use the modern `navigator.clipboard` API first (if in a secure context), and falls back to a hidden `textarea` with `document.execCommand('copy')` for insecure contexts.
+  - Updated `MarkdownRenderer.tsx` and `MessageList.tsx` to use this new utility, ensuring the "Copy" feature works across all deployment scenarios.
+  - Added unit tests in `app/src/lib/utils.test.ts` to verify both the modern and fallback paths.
+
+### Copy Feature Markdown Cleaning (2026-03-19)
+- **Problem**: When copying a full assistant message, internal UI-only markup (specifically ` ```chart ... ``` ` blocks) was included in the clipboard content.
+- **Fix**: 
+  - Implemented `cleanMarkdownForCopy` in `app/src/lib/utils.ts` to strip out ` ```chart ``` ` blocks using regex.
+  - Updated `MessageList.tsx` to pass the message content through this cleaner before sending it to the clipboard.
+  - Added unit tests to ensure chart blocks are removed while standard code blocks remain intact.
+
+
+
+\n### External Links Update (2026-03-19)\n- **Feature**: All markdown links now open in a new browser tab/window.\n- **Implementation**: Added a custom anchor (`a`) handler to `react-markdown` components in `app/src/components/shared/MarkdownRenderer.tsx` that automatically applies `target="_blank"` and `rel="noopener noreferrer"`.

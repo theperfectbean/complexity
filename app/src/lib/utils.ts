@@ -7,6 +7,51 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+/**
+ * Copies text to the clipboard with a fallback for non-secure contexts (HTTP).
+ */
+export async function copyToClipboard(text: string): Promise<boolean> {
+  // 1. Try the modern Clipboard API first (requires secure context)
+  if (typeof navigator !== "undefined" && navigator.clipboard && window.isSecureContext) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch (err) {
+      console.error("Modern clipboard copy failed, trying fallback:", err);
+    }
+  }
+
+  // 2. Fallback to textarea + execCommand (works in non-secure contexts)
+  try {
+    const textArea = document.createElement("textarea");
+    textArea.value = text;
+    
+    // Ensure textarea is not visible but part of the DOM
+    textArea.style.position = "fixed";
+    textArea.style.left = "-9999px";
+    textArea.style.top = "0";
+    document.body.appendChild(textArea);
+    
+    textArea.focus();
+    textArea.select();
+    
+    const successful = document.execCommand("copy");
+    document.body.removeChild(textArea);
+    return successful;
+  } catch (err) {
+    console.error("Fallback clipboard copy failed:", err);
+    return false;
+  }
+}
+
+/**
+ * Cleans markdown content for copying by removing UI-only blocks like charts.
+ */
+export function cleanMarkdownForCopy(content: string): string {
+  // Remove ```chart ... ``` blocks
+  return content.replace(/```chart[\s\S]*?```/g, "").trim();
+}
+
 export function normalizeUIMessage(message: unknown): ChatMessageItem {
   const msg = message as Record<string, unknown>;
   let text = "";

@@ -7,7 +7,7 @@ import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 
 import { SourceCarousel } from "@/components/chat/SourceCarousel";
 import { MarkdownRenderer } from "@/components/shared/MarkdownRenderer";
-import { cn } from "@/lib/utils";
+import { cn, copyToClipboard, cleanMarkdownForCopy } from "@/lib/utils";
 import { MODELS, SearchModelOption } from "@/lib/models";
 
 export type ChatCitation = {
@@ -81,6 +81,7 @@ const MessageItem = memo(function MessageItem({
   const isLastAssistantMessage = !isUser && index === totalMessages - 1;
 
   const [availableModels, setAvailableModels] = useState<readonly SearchModelOption[]>(MODELS);
+  const [isRewriteMenuOpen, setIsRewriteMenuOpen] = useState(false);
 
   useEffect(() => {
     if (isLastAssistantMessage && onRewrite) {
@@ -192,7 +193,10 @@ const MessageItem = memo(function MessageItem({
             />
           </div>
 
-          <div className="mt-4 flex items-center justify-start transition-opacity md:opacity-0 md:group-hover:opacity-100 md:focus-within:opacity-100">
+          <div className={cn(
+            "mt-4 flex items-center justify-start transition-opacity md:group-hover:opacity-100 md:focus-within:opacity-100",
+            isRewriteMenuOpen ? "opacity-100" : "md:opacity-0"
+          )}>
             <div className="flex items-center gap-1.5">
               <button
                 className="relative inline-flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-black/5 dark:hover:bg-white/5 active:scale-95"
@@ -235,7 +239,7 @@ const MessageItem = memo(function MessageItem({
               )}
 
               {isLastAssistantMessage && onRewrite && (
-                <DropdownMenu.Root>
+                <DropdownMenu.Root open={isRewriteMenuOpen} onOpenChange={setIsRewriteMenuOpen}>
                   <DropdownMenu.Trigger asChild>
                     <button
                       className="inline-flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-black/5 dark:hover:bg-white/5 active:scale-95"
@@ -343,11 +347,12 @@ export function MessageList({ messages, emptyLabel, onRetry, onRewrite, isStream
   }, [messages, lastMessageContent, lastMessageThinkingLength, scrollToBottom]);
 
   async function copyMessage(messageId: string, content: string) {
-    try {
-      await navigator.clipboard.writeText(content);
+    const cleaned = cleanMarkdownForCopy(content);
+    const success = await copyToClipboard(cleaned);
+    if (success) {
       setCopiedId(messageId);
       setTimeout(() => setCopiedId((current) => (current === messageId ? null : current)), 2000);
-    } catch {
+    } else {
       setCopiedId(null);
     }
   }
