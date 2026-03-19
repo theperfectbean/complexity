@@ -1,4 +1,4 @@
-import { and, cosineDistance, eq } from "drizzle-orm";
+import { and, cosineDistance, eq, sql } from "drizzle-orm";
 import { encode, decode } from "gpt-tokenizer";
 
 import { db } from "@/lib/db";
@@ -106,4 +106,128 @@ export async function similaritySearch(roleId: string, embedding: number[], limi
     .where(and(eq(chunks.roleId, roleId), eq(documents.status, "ready")))
     .orderBy(distance)
     .limit(limit);
+}
+
+/** Dot-product between two equal-length vectors (cosine sim when L2-normalised). */
+function dotProduct(a: number[], b: number[]): number {
+  let sum = 0;
+  for (let i = 0; i < a.length; i++) sum += a[i] * b[i];
+  return sum;
+}
+
+/**
+ * Maximal Marginal Relevance reranking.
+ *
+ * Iteratively selects the candidate that maximises:
+ *   λ * sim(query, candidate) − (1−λ) * max_sim(selected, candidate)
+ *
+ * λ = 1 → pure relevance; λ = 0 → pure diversity.
+ */
+function mmrRerank(
+  candidates: Array<{ id: string; content: string; embedding: number[]; score: number }>,
+  queryEmbedding: number[],
+  topK: number,
+  lambda = runtimeConfig.rag.mmrLambda,
+): Array<{ id: string; content: string; score: number }> {
+  if (candidates.length === 0) return [];
+
+  const selected: typeof candidates = [];
+  const remaining = [...candidates];
+
+  while (selected.length < topK && remaining.length > 0) {
+    let bestIdx = 0;
+    let bestScore = -Infinity;
+
+    for (let i = 0; i < remaining.length; i++) {
+      const relevance = dotProduct(queryEmbedding, remaining[i].embedding);
+      let maxSim = 0;
+      for (const s of selected) {
+        const sim = dotProduct(s.embedding, remaining[i].embedding);
+        if (sim > maxSim) maxSim = sim;
+      }
+      const mmrScore = lambda * relevance - (1 - lambda) * maxSim;
+      if (mmrScore > bestScore) {
+        bestScore = mmrScore;
+        bestIdx = i;
+      }
+    }
+
+    selected.push(remaining[bestIdx]);
+    remaining.splice(bestIdx, 1);
+  }
+
+  return selected.map(({ id, content, score }) => ({ id, content, score }));
+}
+
+/**
+ * Hybrid BM25 + vector search with Reciprocal Rank Fusion (RRF) and MMR reranking.
+ *
+ * When `RAG_HYBRID_SEARCH=false`, falls back to pure vector similarity.
+ * The query text is used for BM25 (via PostgreSQL full-text search) while the
+ * embedding drives vector search. RRF combines both ranked lists before MMR
+ * diversification is applied to the final top-K.
+ */
+export async function hybridSearch(
+  roleId: string,
+  queryText: string,
+  embedding: number[],
+  topK = runtimeConfig.rag.similarityLimit,
+): Promise<Array<{ id: string; content: string; score: number }>> {
+  const candidates = runtimeConfig.rag.hybridCandidates;
+
+  if (!runtimeConfig.rag.hybridSearch) {
+    const rows = await similaritySearch(roleId, embedding, topK);
+    return rows.map((r) => ({ id: r.id, content: r.content, score: 1 - Number(r.distance) }));
+  }
+
+  // 1. Vector search — top `candidates` by cosine distance
+  const distance = cosineDistance(chunks.embedding, embedding);
+  const vectorRows = await db
+    .select({ id: chunks.id, content: chunks.content, embedding: chunks.embedding, distance })
+    .from(chunks)
+    .innerJoin(documents, eq(chunks.documentId, documents.id))
+    .where(and(eq(chunks.roleId, roleId), eq(documents.status, "ready")))
+    .orderBy(distance)
+    .limit(candidates);
+
+  // 2. BM25 keyword search via PostgreSQL full-text search
+  const bm25Rows = await db
+    .select({ id: chunks.id, content: chunks.content, embedding: chunks.embedding, rank: sql<number>`ts_rank_cd(to_tsvector('english', ${chunks.content}), plainto_tsquery('english', ${queryText}))` })
+    .from(chunks)
+    .innerJoin(documents, eq(chunks.documentId, documents.id))
+    .where(and(
+      eq(chunks.roleId, roleId),
+      eq(documents.status, "ready"),
+      sql`to_tsvector('english', ${chunks.content}) @@ plainto_tsquery('english', ${queryText})`,
+    ))
+    .orderBy(sql`rank DESC`)
+    .limit(candidates);
+
+  // 3. RRF: build rank maps and merge scores (k=60 is standard RRF constant)
+  const RRF_K = 60;
+  const scores = new Map<string, { content: string; embedding: number[]; score: number }>();
+
+  vectorRows.forEach((row, rank) => {
+    const rrf = 1 / (RRF_K + rank + 1);
+    scores.set(row.id, { content: row.content, embedding: row.embedding as number[], score: rrf });
+  });
+
+  bm25Rows.forEach((row, rank) => {
+    const rrf = 1 / (RRF_K + rank + 1);
+    const existing = scores.get(row.id);
+    if (existing) {
+      existing.score += rrf;
+    } else {
+      scores.set(row.id, { content: row.content, embedding: row.embedding as number[], score: rrf });
+    }
+  });
+
+  // Sort by combined RRF score, take top `candidates` for MMR
+  const merged = Array.from(scores.entries())
+    .map(([id, v]) => ({ id, ...v }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, candidates);
+
+  // 4. MMR reranking for diversity
+  return mmrRerank(merged, embedding, topK);
 }

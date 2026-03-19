@@ -1,6 +1,6 @@
 import fs from "node:fs/promises";
 import { getLogger } from "../logger";
-import { getEmbeddings, similaritySearch } from "../rag";
+import { getEmbeddings, hybridSearch } from "../rag";
 import { getMemoryPrompt } from "../memory";
 import { runtimeConfig } from "../config";
 import { env } from "../env";
@@ -56,10 +56,10 @@ ${content}`;
       writer.write({ type: "data-call-start", data: { callId: "rag-search", toolName: "Retrieval", input: { query: userText } } } as UIMessageChunk);
       try {
         const [embedding] = await getEmbeddings([userText]);
-        const chunks = await similaritySearch(roleId, embedding, runtimeConfig.rag.similarityTopK);
-        this.log.info({ count: chunks.length }, "Similarity search complete");
-        if (chunks.length > 0) {
-          ragContext = chunks.map((c, i) => `(${i + 1}) ${c.content}`).join("\n\n");
+        const results = await hybridSearch(roleId, userText, embedding, runtimeConfig.rag.similarityTopK);
+        this.log.info({ count: results.length }, "Hybrid search complete");
+        if (results.length > 0) {
+          ragContext = results.map((c, i) => `(${i + 1}) ${c.content}`).join("\n\n");
         }
         writer.write({ type: "data-call-result", data: { callId: "rag-search", result: `Found ${chunks.length} context chunks.` } } as UIMessageChunk);
       } catch (error) {

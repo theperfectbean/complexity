@@ -1,5 +1,6 @@
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createOpenAI } from "@ai-sdk/openai";
+import OpenAI from "openai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createXai } from "@ai-sdk/xai";
 import { createOllama } from "ai-sdk-ollama";
@@ -247,4 +248,28 @@ export async function runGeneration(options: GenerationOptions): Promise<Generat
 export function isPerplexityProvider(modelId: string): boolean {
   const { provider } = getProviderAndModel(modelId);
   return provider === "perplexity";
+}
+
+/**
+ * Generate an image using DALL-E 3 via the OpenAI API.
+ * Returns a markdown image string on success, or an error message.
+ */
+export async function generateImage(prompt: string, keys: Record<string, string | null>): Promise<string> {
+  const apiKey = keys["OPENAI_API_KEY"];
+  if (!apiKey) {
+    return "⚠️ Image generation requires an OpenAI API key. Please add it in Admin Settings.";
+  }
+
+  const client = new OpenAI({ apiKey });
+  const response = await client.images.generate({
+    model: "dall-e-3",
+    prompt,
+    n: 1,
+    size: "1024x1024",
+  });
+
+  const url = response.data?.[0]?.url;
+  if (!url) return "⚠️ Image generation returned no result.";
+
+  return `![Generated image: ${prompt}](${url})`;
 }

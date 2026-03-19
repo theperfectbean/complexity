@@ -1,7 +1,7 @@
 import { createUIMessageStream, createUIMessageStreamResponse, UIMessageChunk } from "ai";
 import { getLogger } from "./logger";
 import { saveExtractedMemories } from "./memory";
-import { runGeneration } from "./llm";
+import { runGeneration, generateImage } from "./llm";
 import { getApiKeys } from "./settings";
 import { extractTextFromMessage, collectFileParts } from "./chat-utils";
 import { runtimeConfig } from "./config";
@@ -45,6 +45,28 @@ export class ChatService {
     const lastMessage = inputMessages[inputMessages.length - 1];
     const userText = await extractTextFromMessage(lastMessage);
     if (!userText) throw new Error("Message text required");
+
+    // /image <prompt> shortcut — generate an image instead of text
+    if (userText.trimStart().startsWith("/image ")) {
+      const imagePrompt = userText.trimStart().slice("/image ".length).trim();
+      await persistUserMessage;
+      const responseMessageId = createId();
+      const textId = createId();
+      const keys = await getApiKeys();
+      const imageMarkdown = await generateImage(imagePrompt, keys);
+      await this.history.saveAssistantMessage(this.session, responseMessageId, imageMarkdown, []);
+      return createUIMessageStreamResponse({
+        stream: createUIMessageStream({
+          execute: async ({ writer }) => {
+            writer.write({ type: "start", messageId: responseMessageId });
+            writer.write({ type: "text-start", id: textId });
+            writer.write({ type: "text-delta", id: textId, delta: imageMarkdown });
+            writer.write({ type: "text-end", id: textId });
+            writer.write({ type: "finish" });
+          },
+        }),
+      });
+    }
 
     const persistUserMessage = this.history.saveUserMessage(this.session, userText, isRegenerate);
 

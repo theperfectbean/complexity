@@ -3,6 +3,7 @@ import ReactMarkdown, { Components } from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
 import remarkGfm from "remark-gfm";
 import { ChartRenderer } from "./ChartRenderer";
+import ArtifactRenderer from "./ArtifactRenderer";
 import { Copy, Check } from "lucide-react";
 import { cn, copyToClipboard } from "@/lib/utils";
 
@@ -98,6 +99,11 @@ const components: Components = {
 
     const match = /language-(\w+)/.exec(className || "");
     const language = match ? match[1] : "";
+
+    // Artifact interception: HTML or explicit "artifact" language tag
+    if (language === "html" || language === "artifact") {
+      return <ArtifactRenderer code={content} language={language} />;
+    }
 
     return (
       <div className="relative group/code my-4">

@@ -95,6 +95,9 @@ export const runtimeConfig = {
     embedderPath: env.RAG_EMBEDDER_PATH ?? "/embed",
     similarityLimit: env.RAG_SIMILARITY_LIMIT ?? 5,
     similarityTopK: env.RAG_SIMILARITY_TOP_K ?? 8,
+    hybridSearch: (env.RAG_HYBRID_SEARCH ?? "true") === "true",
+    hybridCandidates: env.RAG_HYBRID_CANDIDATES ?? 20,
+    mmrLambda: env.RAG_MMR_LAMBDA ?? 0.6,
   },
   memory: {
     cacheTtlSeconds: env.MEMORY_CACHE_TTL_SECONDS ?? 60 * 5,
