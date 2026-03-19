@@ -2,8 +2,8 @@
 
 import { useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
+import { Copy, KeyRound, Plus, Save, Trash2, User } from "lucide-react";
 import { toast } from "sonner";
-import { User, Save } from "lucide-react";
 
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
 
@@ -13,6 +13,14 @@ type ProfileData = {
   name: string | null;
   image: string | null;
   theme: string | null;
+};
+
+type ApiToken = {
+  id: string;
+  name: string;
+  lastUsedAt: string | null;
+  createdAt: string;
+  expiresAt: string | null;
 };
 
 function AvatarInitials({ name, email }: { name: string | null; email: string }) {
@@ -34,6 +42,10 @@ export default function ProfilePage() {
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [name, setName] = useState("");
   const [saving, setSaving] = useState(false);
+  const [tokens, setTokens] = useState<ApiToken[]>([]);
+  const [tokenName, setTokenName] = useState("");
+  const [tokenCreating, setTokenCreating] = useState(false);
+  const [newToken, setNewToken] = useState<{ id: string; name: string; rawToken: string } | null>(null);
 
   useEffect(() => {
     fetch("/api/profile")
@@ -45,6 +57,17 @@ export default function ProfilePage() {
         }
       })
       .catch(() => toast.error("Failed to load profile"));
+  }, []);
+
+  useEffect(() => {
+    fetch("/api/tokens")
+      .then(r => r.ok ? r.json() as Promise<{ tokens: ApiToken[] }> : null)
+      .then(data => {
+        if (data) {
+          setTokens(data.tokens);
+        }
+      })
+      .catch(() => toast.error("Failed to load API tokens"));
   }, []);
 
   const handleSave = async () => {
@@ -62,6 +85,66 @@ export default function ProfilePage() {
       toast.error("Failed to save profile");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const refreshTokens = async () => {
+    const res = await fetch("/api/tokens");
+    if (!res.ok) throw new Error("Failed to load tokens");
+    const data = await res.json() as { tokens: ApiToken[] };
+    setTokens(data.tokens);
+  };
+
+  const createToken = async () => {
+    const trimmedName = tokenName.trim();
+    if (!trimmedName) {
+      toast.error("Token name is required");
+      return;
+    }
+
+    setTokenCreating(true);
+    try {
+      const res = await fetch("/api/tokens", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: trimmedName }),
+      });
+      if (!res.ok) throw new Error("Failed");
+
+      const data = await res.json() as { token: { id: string; name: string; rawToken: string } };
+      setNewToken(data.token);
+      setTokenName("");
+      await refreshTokens();
+      toast.success("Token created");
+    } catch {
+      toast.error("Failed to create token");
+    } finally {
+      setTokenCreating(false);
+    }
+  };
+
+  const revokeToken = async (tokenId: string) => {
+    if (!window.confirm("Revoke this token? This cannot be undone.")) return;
+
+    try {
+      const res = await fetch(`/api/tokens/${tokenId}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Failed");
+      if (newToken?.id === tokenId) {
+        setNewToken(null);
+      }
+      await refreshTokens();
+      toast.success("Token revoked");
+    } catch {
+      toast.error("Failed to revoke token");
+    }
+  };
+
+  const copyToken = async (value: string) => {
+    try {
+      await navigator.clipboard.writeText(value);
+      toast.success("Copied token");
+    } catch {
+      toast.error("Failed to copy token");
     }
   };
 
@@ -126,6 +209,82 @@ export default function ProfilePage() {
           Your theme preference is saved to your account and syncs across devices.
         </p>
         <ThemeToggle />
+      </section>
+
+      {/* API Tokens */}
+      <section className="mt-8 rounded-xl border bg-card p-6">
+        <h2 className="mb-3 flex items-center gap-2 text-base font-semibold">
+          <KeyRound className="h-4 w-4 text-muted-foreground" />
+          API Tokens
+        </h2>
+        <p className="mb-4 text-sm text-muted-foreground">
+          Create personal API tokens for programmatic access. The token value is shown only once.
+        </p>
+
+        {newToken ? (
+          <div className="mb-5 rounded-lg border border-amber-500/40 bg-amber-500/10 p-4">
+            <p className="mb-2 text-sm font-medium">Copy this token now</p>
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <input
+                readOnly
+                value={newToken.rawToken}
+                className="flex-1 rounded-lg border bg-background px-3 py-2 text-sm font-mono"
+              />
+              <button
+                onClick={() => copyToken(newToken.rawToken)}
+                className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
+              >
+                <Copy className="h-4 w-4" />
+                Copy
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        <div className="mb-6 flex flex-col gap-3 sm:flex-row">
+          <input
+            type="text"
+            value={tokenName}
+            onChange={e => setTokenName(e.target.value)}
+            placeholder="e.g. Cursor, CLI script, integration"
+            maxLength={100}
+            className="flex-1 rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/50"
+          />
+          <button
+            onClick={createToken}
+            disabled={tokenCreating}
+            className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
+          >
+            <Plus className="h-4 w-4" />
+            {tokenCreating ? "Creating…" : "Create Token"}
+          </button>
+        </div>
+
+        <div className="space-y-3">
+          {tokens.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No personal API tokens yet.</p>
+          ) : (
+            tokens.map(token => (
+              <div key={token.id} className="flex flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="font-medium">{token.name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    Created {new Date(token.createdAt).toLocaleString()}
+                    {token.lastUsedAt ? ` • Last used ${new Date(token.lastUsedAt).toLocaleString()}` : ""}
+                    {token.expiresAt ? ` • Expires ${new Date(token.expiresAt).toLocaleString()}` : ""}
+                  </p>
+                </div>
+                <button
+                  onClick={() => revokeToken(token.id)}
+                  className="inline-flex items-center justify-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium text-destructive hover:bg-destructive/5"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Revoke
+                </button>
+              </div>
+            ))
+          )}
+        </div>
       </section>
     </div>
   );

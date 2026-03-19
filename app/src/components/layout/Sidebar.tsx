@@ -15,7 +15,8 @@ import {
   Keyboard,
   Moon,
   Shield,
-  User
+  User,
+  FileCode2,
 } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
 import Link from "next/link";
@@ -109,6 +110,7 @@ export function Sidebar({ collapsed = false, onToggle, onNavigate }: SidebarProp
   const navItems = [
     { href: "/", label: "Home", icon: Home },
     { href: "/roles", label: "Roles", icon: Users },
+    { href: "/docs/api", label: "API Docs", icon: FileCode2 },
   ];
 
   const recentThreads = threads;

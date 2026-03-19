@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { NextResponse } from "next/server";
 
-vi.mock("@/auth", () => ({
-  auth: vi.fn(),
+vi.mock("@/lib/auth-server", () => ({
+  requireUserOrApiToken: vi.fn(),
 }));
 
 vi.mock("@/lib/db", () => ({
@@ -34,7 +35,7 @@ vi.mock("@/lib/settings", () => ({
   getApiKeys: vi.fn().mockResolvedValue({ PERPLEXITY_API_KEY: "test-key" }),
 }));
 
-import { auth } from "@/auth";
+import { requireUserOrApiToken } from "@/lib/auth-server";
 import { db } from "@/lib/db";
 import { createAgentClient } from "@/lib/agent-client";
 import { getRedisClient } from "@/lib/redis";
@@ -52,7 +53,7 @@ describe("POST /api/chat", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(getRedisClient).mockReturnValue(null);
-    vi.mocked(auth).mockResolvedValue({ user: { email: "gary@example.com" } } as never);
+    vi.mocked(requireUserOrApiToken).mockResolvedValue({ user: { email: "gary@example.com" } } as never);
     vi.mocked(createAgentClient).mockReturnValue({
       responses: {
         create: vi.fn().mockResolvedValue({ output_text: "" }),
@@ -62,7 +63,7 @@ describe("POST /api/chat", () => {
   });
 
   it("returns 401 when unauthenticated", async () => {
-    vi.mocked(auth).mockResolvedValue(null as never);
+    vi.mocked(requireUserOrApiToken).mockResolvedValue(NextResponse.json({ error: "Unauthorized" }, { status: 401 }) as never);
 
     const request = createPostRequest("http://localhost/api/chat", {});
 

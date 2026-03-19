@@ -1,7 +1,8 @@
-import { FileText, File, Loader2, X } from "lucide-react";
+import { FileText, File, Loader2, X, Eye } from "lucide-react";
 import { ProcessingBadge } from "@/components/roles/ProcessingBadge";
 import { useState } from "react";
 import { toast } from "sonner";
+import DocumentChunksDialog from "./DocumentChunksDialog";
 
 export type RoleDocument = {
   id: string;
@@ -84,19 +85,35 @@ export function DocumentList({ documents, loading, onDeleted }: DocumentListProp
           className="group relative flex flex-col justify-between rounded-xl border border-border/50 bg-background p-3 transition-colors hover:bg-muted/30"
           title={document.filename}
         >
-          <button
-            type="button"
-            onClick={() => void handleDelete(document.id, document.roleId)}
-            disabled={deletingId === document.id}
-            className="absolute right-2 top-2 z-10 hidden rounded-full p-1 text-muted-foreground hover:bg-muted group-hover:block"
-            aria-label={`Delete ${document.filename}`}
-          >
-            {deletingId === document.id ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <X className="h-3.5 w-3.5" />
-            )}
-          </button>
+          <div className="absolute right-2 top-2 z-10 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <DocumentChunksDialog
+              roleId={document.roleId}
+              documentId={document.id}
+              filename={document.filename}
+              trigger={
+                <button
+                  type="button"
+                  className="rounded-full p-1 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                  aria-label={`View chunks for ${document.filename}`}
+                >
+                  <Eye className="h-3.5 w-3.5" />
+                </button>
+              }
+            />
+            <button
+              type="button"
+              onClick={() => void handleDelete(document.id, document.roleId)}
+              disabled={deletingId === document.id}
+              className="rounded-full p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+              aria-label={`Delete ${document.filename}`}
+            >
+              {deletingId === document.id ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <X className="h-3.5 w-3.5" />
+              )}
+            </button>
+          </div>
 
           <div className="flex flex-1 flex-col items-start gap-2">
              <div className="mb-1">{getFileIcon(document.filename)}</div>
@@ -118,3 +135,4 @@ export function DocumentList({ documents, loading, onDeleted }: DocumentListProp
     </div>
   );
 }
+

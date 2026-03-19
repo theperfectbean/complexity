@@ -17,6 +17,11 @@ const envSchema = z.object({
   LOCAL_OPENAI_API_KEY_FALLBACK: z.string().optional().default("none"),
   NEXTAUTH_SECRET: z.string().min(1, "NEXTAUTH_SECRET is required"),
   NEXTAUTH_URL: z.string().url().optional(),
+  GITHUB_CLIENT_ID: z.string().optional(),
+  GITHUB_CLIENT_SECRET: z.string().optional(),
+  GOOGLE_CLIENT_ID: z.string().optional(),
+  GOOGLE_CLIENT_SECRET: z.string().optional(),
+  TAVILY_API_KEY: z.string().optional(),
   EMBEDDER_URL: z.string().url().default("http://embedder:8000"),
   NODE_ENV: z
     .enum(["development", "production", "test"])

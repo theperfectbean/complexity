@@ -1,8 +1,10 @@
+import { and, eq, gt, isNull, or } from "drizzle-orm";
+import { NextResponse } from "next/server";
+
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
-import { users } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
-import { NextResponse } from "next/server";
+import { apiTokens, users } from "@/lib/db/schema";
+import { hashApiToken } from "@/lib/api-tokens";
 
 export type AuthenticatedUser = {
   id: string;
@@ -54,4 +56,58 @@ export async function requireAdmin(): Promise<{ user: AuthenticatedUser } | Next
   }
 
   return result;
+}
+
+function getApiTokenFromRequest(request: Request) {
+  const authHeader = request.headers.get("authorization");
+  if (authHeader?.toLowerCase().startsWith("bearer ")) {
+    return authHeader.slice(7).trim();
+  }
+
+  const apiKeyHeader = request.headers.get("x-api-key");
+  if (apiKeyHeader?.trim()) {
+    return apiKeyHeader.trim();
+  }
+
+  return null;
+}
+
+/**
+ * Validates either the current session or a personal API token.
+ * Returns a NextResponse if unauthorized or not found.
+ */
+export async function requireUserOrApiToken(request: Request): Promise<{ user: AuthenticatedUser } | NextResponse> {
+  const apiToken = getApiTokenFromRequest(request);
+  if (apiToken) {
+    const tokenHash = hashApiToken(apiToken);
+    const [row] = await db
+      .select({
+        id: users.id,
+        email: users.email,
+        isAdmin: users.isAdmin,
+        memoryEnabled: users.memoryEnabled,
+      })
+      .from(apiTokens)
+      .innerJoin(users, eq(users.id, apiTokens.userId))
+      .where(
+        and(
+          eq(apiTokens.tokenHash, tokenHash),
+          or(isNull(apiTokens.expiresAt), gt(apiTokens.expiresAt, new Date())),
+        ),
+      )
+      .limit(1);
+
+    if (!row) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    await db
+      .update(apiTokens)
+      .set({ lastUsedAt: new Date() })
+      .where(eq(apiTokens.tokenHash, tokenHash));
+
+    return { user: row as AuthenticatedUser };
+  }
+
+  return requireUser();
 }

@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/auth";
 import { createId } from "@/lib/db/cuid";
 import { getRedisClient } from "@/lib/redis";
 import { runtimeConfig } from "@/lib/config";
@@ -8,6 +7,7 @@ import { ChatService, ChatSession } from "@/lib/chat-service";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { z } from "zod";
 import { UIMessage } from "ai";
+import { requireUserOrApiToken } from "@/lib/auth-server";
 
 const schema = z.object({
   threadId: z.string().min(1),
@@ -21,12 +21,13 @@ const schema = z.object({
 export async function POST(request: Request) {
   const requestId = createId();
   const log = getLogger(requestId);
-  
-  const session = await auth();
-  const userEmail = session?.user?.email;
-  if (!userEmail) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const authResult = await requireUserOrApiToken(request);
+  if (authResult instanceof NextResponse) {
+    return authResult;
   }
+
+  const userEmail = authResult.user.email;
 
   // Rate Limiting
   const rateLimitKey = `rate:chat:${userEmail}:${Math.floor(Date.now() / 60000)}`;

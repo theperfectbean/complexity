@@ -408,3 +408,13 @@ DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose build app
 
 
 \n### External Links Update (2026-03-19)\n- **Feature**: All markdown links now open in a new browser tab/window.\n- **Implementation**: Added a custom anchor (`a`) handler to `react-markdown` components in `app/src/components/shared/MarkdownRenderer.tsx` that automatically applies `target="_blank"` and `rel="noopener noreferrer"`.
+
+### Document Chunk Viewer (2026-03-19)
+- **Feature**: Added a visual browser for extracted document chunks in the Role detail page (B5).
+- **Implementation**:
+  - Created a new API endpoint `GET /api/roles/[roleId]/documents/[documentId]/chunks` to retrieve all chunks for a specific document, ordered by index.
+  - Developed a `DocumentChunksDialog` component using Radix UI and Tailwind CSS to display chunk content in a modal.
+  - Added a "View Chunks" button (Eye icon) to each document card in the `DocumentList` component, visible on hover.
+  - Included real-time chunk filtering/search within the dialog for easier navigation of large documents.
+- **Testing**: Added unit tests for the chunks API route to verify authentication, ownership checks, and correct data retrieval.
+

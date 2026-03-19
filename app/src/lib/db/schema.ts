@@ -19,13 +19,15 @@ export const users = pgTable(
     id: text("id").primaryKey(),
     email: varchar("email", { length: 255 }).notNull(),
     emailVerified: timestamp("email_verified", { withTimezone: true }),
-    passwordHash: text("password_hash").notNull(),
+    passwordHash: text("password_hash"),
     name: varchar("name", { length: 100 }),
     image: text("image"),
     theme: varchar("theme", { length: 50 }),
     defaultModel: varchar("default_model", { length: 100 }),
     memoryEnabled: boolean("memory_enabled").notNull().default(true),
     isAdmin: boolean("is_admin").notNull().default(false),
+    totpSecret: text("totp_secret"),
+    totpEnabled: boolean("totp_enabled").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -76,6 +78,20 @@ export const verificationTokens = pgTable(
   (table) => [primaryKey({ columns: [table.identifier, table.token] })],
 );
 
+export const apiTokens = pgTable(
+  "api_tokens",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    name: varchar("name", { length: 100 }).notNull(),
+    tokenHash: text("token_hash").notNull(),
+    lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
+  },
+  (table) => [index("api_tokens_user_idx").on(table.userId), index("api_tokens_hash_idx").on(table.tokenHash)],
+);
+
 export const roles = pgTable("roles", {
   id: text("id").primaryKey(),
   name: varchar("name", { length: 100 }).notNull(),
@@ -99,6 +115,8 @@ export const threads = pgTable(
       .references(() => users.id, { onDelete: "cascade" }),
     roleId: text("role_id").references(() => roles.id, { onDelete: "set null" }),
     model: varchar("model", { length: 50 }).notNull().default("anthropic/claude-4-6-sonnet-latest"),
+    parentThreadId: text("parent_thread_id"),
+    branchPointMessageId: text("branch_point_message_id"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -180,6 +198,7 @@ export const usersRelations = relations(users, ({ many }) => ({
   threads: many(threads),
   roles: many(roles),
   memories: many(memories),
+  apiTokens: many(apiTokens),
 }));
 
 export const threadsRelations = relations(threads, ({ one, many }) => ({
@@ -238,5 +257,12 @@ export const chunksRelations = relations(chunks, ({ one }) => ({
   role: one(roles, {
     fields: [chunks.roleId],
     references: [roles.id],
+  }),
+}));
+
+export const apiTokensRelations = relations(apiTokens, ({ one }) => ({
+  user: one(users, {
+    fields: [apiTokens.userId],
+    references: [users.id],
   }),
 }));

@@ -4,13 +4,18 @@ import NextAuth, { type DefaultSession } from "next-auth";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { type JWT } from "next-auth/jwt";
 import Credentials from "next-auth/providers/credentials";
+import GitHub from "next-auth/providers/github";
+import Google from "next-auth/providers/google";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
+import { authenticator } from "otplib";
 
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 import { runtimeConfig } from "@/lib/config";
 import { getRedisClient } from "@/lib/redis";
+import { decrypt } from "@/lib/encryption";
+import { env } from "@/lib/env";
 
 declare module "next-auth" {
   interface Session {
@@ -34,6 +39,7 @@ declare module "next-auth/jwt" {
 const signInSchema = z.object({
   email: z.string().email(),
   password: z.string().min(runtimeConfig.auth.passwordMinLength),
+  totpCode: z.string().optional(),
 });
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
@@ -48,6 +54,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       credentials: {
         email: {},
         password: {},
+        totpCode: {},
       },
       authorize: async (credentials) => {
         const parsed = signInSchema.safeParse(credentials);
@@ -86,7 +93,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           .where(eq(users.email, email))
           .limit(1);
 
-        if (!user) {
+        if (!user || !user.passwordHash) {
           return null;
         }
 
@@ -99,6 +106,19 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           throw new Error("EMAIL_NOT_VERIFIED");
         }
 
+        // TOTP 2FA check
+        if (user.totpEnabled && user.totpSecret) {
+          if (!parsed.data.totpCode) {
+            throw new Error("TOTP_REQUIRED");
+          }
+          let secret = user.totpSecret;
+          try { secret = decrypt(user.totpSecret); } catch { /* not encrypted, use raw */ }
+          const isValidTotp = authenticator.verify({ token: parsed.data.totpCode, secret });
+          if (!isValidTotp) {
+            throw new Error("TOTP_INVALID");
+          }
+        }
+
         return {
           id: user.id,
           email: user.email,
@@ -108,6 +128,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         };
       },
     }),
+    ...(env.GITHUB_CLIENT_ID && env.GITHUB_CLIENT_SECRET
+      ? [GitHub({ clientId: env.GITHUB_CLIENT_ID, clientSecret: env.GITHUB_CLIENT_SECRET })]
+      : []),
+    ...(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET
+      ? [Google({ clientId: env.GOOGLE_CLIENT_ID, clientSecret: env.GOOGLE_CLIENT_SECRET })]
+      : []),
   ],
   pages: {
     signIn: "/login",
