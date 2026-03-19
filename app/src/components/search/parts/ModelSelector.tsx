@@ -2,7 +2,7 @@
 
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { ChevronDown } from "lucide-react";
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useCallback } from "react";
 import { MODELS, getDefaultModel, SearchModelOption } from "@/lib/models";
 import { cn } from "@/lib/utils";
 
@@ -21,6 +21,20 @@ export function ModelSelector({
 }: ModelSelectorProps) {
   const [availableModels, setAvailableModels] = useState<readonly SearchModelOption[]>(providedModelOptions || MODELS);
   const [hasUserSelectedModel, setHasUserSelectedModel] = useState(false);
+
+  // Load saved default model preference from profile
+  useEffect(() => {
+    if (hasUserSelectedModel) return;
+    fetch("/api/profile")
+      .then(r => r.ok ? r.json() as Promise<{ defaultModel?: string | null }> : null)
+      .then(profile => {
+        if (profile?.defaultModel && !hasUserSelectedModel) {
+          onModelChange?.(profile.defaultModel);
+        }
+      })
+      .catch(() => undefined);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (autoFilter && !providedModelOptions) {
@@ -59,10 +73,16 @@ export function ModelSelector({
 
   const activeModelLabel = modelOptions.find((item) => item.id === model)?.label ?? model;
 
-  const handleModelSelect = (id: string) => {
+  const handleModelSelect = useCallback((id: string) => {
     setHasUserSelectedModel(true);
     onModelChange?.(id);
-  };
+    // Persist preference to DB in the background
+    fetch("/api/profile", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ defaultModel: id }),
+    }).catch(() => undefined);
+  }, [onModelChange]);
 
   return (
     <DropdownMenu.Root>

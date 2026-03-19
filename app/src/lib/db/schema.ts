@@ -23,6 +23,7 @@ export const users = pgTable(
     name: varchar("name", { length: 100 }),
     image: text("image"),
     theme: varchar("theme", { length: 50 }),
+    defaultModel: varchar("default_model", { length: 100 }),
     memoryEnabled: boolean("memory_enabled").notNull().default(true),
     isAdmin: boolean("is_admin").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

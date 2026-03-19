@@ -124,6 +124,8 @@ export const runtimeConfig = {
   auth: {
     passwordMinLength: env.AUTH_PASSWORD_MIN_LENGTH ?? 8,
     passwordRequireComplexity: (env.AUTH_PASSWORD_REQUIRE_COMPLEXITY ?? "true") === "true",
+    requireEmailVerification: (env.AUTH_REQUIRE_EMAIL_VERIFICATION ?? "false") === "true",
+    verificationTokenTtlMs: env.AUTH_VERIFICATION_TOKEN_TTL_MS ?? 24 * 60 * 60 * 1000,
     bcryptCost: env.AUTH_BCRYPT_COST ?? 12,
     resetTokenBytes: env.AUTH_RESET_TOKEN_BYTES ?? 32,
     resetTokenTtlMs: env.AUTH_RESET_TOKEN_TTL_MS ?? 60 * 60 * 1000,

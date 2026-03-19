@@ -86,6 +86,8 @@ const envSchema = z.object({
       "<p>You requested a password reset.</p><p><a href=\"{resetLink}\">Click here to set a new password</a></p><p>This link will expire in 1 hour.</p>"
     ),
   AUTH_RESET_EMAIL_FROM_DEFAULT: z.string().default('"Complexity" <noreply@complexity.local>'),
+  AUTH_REQUIRE_EMAIL_VERIFICATION: z.enum(["true", "false"]).default("false"),
+  AUTH_VERIFICATION_TOKEN_TTL_MS: z.coerce.number().int().positive().default(24 * 60 * 60 * 1000),
   AUTH_LOCALHOST_BASE_URL: z.string().default("localhost:3002"),
   ENCRYPTION_KEY: z.string().length(32, "ENCRYPTION_KEY must be exactly 32 characters").optional(),
   REDIS_MAX_RETRIES_PER_REQUEST: z.coerce.number().int().nonnegative().default(1),

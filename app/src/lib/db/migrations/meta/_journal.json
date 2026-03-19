@@ -71,6 +71,13 @@
       "when": 1773894432600,
       "tag": "0009_broken_lady_mastermind",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1773895880870,
+      "tag": "0010_daffy_squadron_sinister",
+      "breakpoints": true
     }
   ]
 }

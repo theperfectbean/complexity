@@ -10,6 +10,7 @@ const patchSchema = z.object({
   name: z.string().min(1).max(100).optional(),
   image: z.string().url().nullable().optional(),
   theme: z.string().max(50).nullable().optional(),
+  defaultModel: z.string().max(100).nullable().optional(),
 });
 
 export async function GET() {
@@ -23,6 +24,7 @@ export async function GET() {
     name: user.name,
     image: user.image,
     theme: user.theme,
+    defaultModel: user.defaultModel,
   });
 }
 
@@ -43,6 +45,7 @@ export async function PATCH(request: Request) {
   if (parsed.data.name !== undefined) updates.name = parsed.data.name;
   if (parsed.data.image !== undefined) updates.image = parsed.data.image;
   if (parsed.data.theme !== undefined) updates.theme = parsed.data.theme;
+  if (parsed.data.defaultModel !== undefined) updates.defaultModel = parsed.data.defaultModel;
 
   await db.update(users).set(updates).where(eq(users.id, user.id));
 
