@@ -1,22 +1,27 @@
 "use client";
 
 import * as Dialog from "@radix-ui/react-dialog";
-import { X, Settings, Loader2, Info, Cpu } from "lucide-react";
+import { X, Settings, Loader2, Info, Cpu, Pin, Tag } from "lucide-react";
 import { useState, useMemo } from "react";
 import { toast } from "sonner";
-import { countTokens } from "@/lib/utils";
+import { countTokens, cn } from "@/lib/utils";
 import { ChatMessageItem } from "@/components/chat/MessageList";
 
 interface ThreadSettingsDialogProps {
   threadId: string;
   initialSystemPrompt: string | null;
+  initialPinned: boolean;
+  initialTags: string[];
   messages: ChatMessageItem[];
-  onUpdate: (newPrompt: string | null) => void;
+  onUpdate: (data: { systemPrompt?: string | null; pinned?: boolean; tags?: string[] }) => void;
 }
 
-export function ThreadSettingsDialog({ threadId, initialSystemPrompt, messages, onUpdate }: ThreadSettingsDialogProps) {
+export function ThreadSettingsDialog({ threadId, initialSystemPrompt, initialPinned, initialTags, messages, onUpdate }: ThreadSettingsDialogProps) {
   const [open, setOpen] = useState(false);
   const [prompt, setPrompt] = useState(initialSystemPrompt || "");
+  const [pinned, setPinned] = useState(initialPinned);
+  const [tags, setTags] = useState<string[]>(initialTags);
+  const [newTag, setNewTag] = useState("");
   const [isSaving, setIsSaving] = useState(false);
 
   const totalTokens = useMemo(() => {
@@ -26,16 +31,35 @@ export function ThreadSettingsDialog({ threadId, initialSystemPrompt, messages, 
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      const res = await fetch(`/api/threads/${threadId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ systemPrompt: prompt.trim() || null }),
-      });
+      // 1. Update system prompt if changed
+      if (prompt !== (initialSystemPrompt || "")) {
+        await fetch(`/api/threads/${threadId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ systemPrompt: prompt.trim() || null }),
+        });
+      }
 
-      if (!res.ok) throw new Error("Failed to update");
+      // 2. Update pinned status if changed
+      if (pinned !== initialPinned) {
+        await fetch(`/api/threads/${threadId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ pinned }),
+        });
+      }
 
-      toast.success("Thread instructions updated");
-      onUpdate(prompt.trim() || null);
+      // 3. Update tags if changed
+      if (JSON.stringify(tags) !== JSON.stringify(initialTags)) {
+        await fetch(`/api/threads/${threadId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tags }),
+        });
+      }
+
+      toast.success("Thread settings updated");
+      onUpdate({ systemPrompt: prompt.trim() || null, pinned, tags });
       setOpen(false);
     } catch {
       toast.error("Failed to save settings");
@@ -66,7 +90,82 @@ export function ThreadSettingsDialog({ threadId, initialSystemPrompt, messages, 
             </Dialog.Close>
           </div>
 
-          <div className="space-y-4">
+          <div className="space-y-6">
+            <div className="flex items-center justify-between p-3 rounded-xl border border-border bg-muted/20">
+              <div className="flex items-center gap-3">
+                <div className={cn("p-2 rounded-lg transition-colors", pinned ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground")}>
+                  <Pin className="h-4 w-4" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium">Pin to Sidebar</p>
+                  <p className="text-[11px] text-muted-foreground">Keep this thread at the top</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setPinned(!pinned)}
+                className={cn(
+                  "relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none",
+                  pinned ? "bg-primary" : "bg-muted"
+                )}
+              >
+                <span
+                  className={cn(
+                    "pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out",
+                    pinned ? "translate-x-5" : "translate-x-0"
+                  )}
+                />
+              </button>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-2 flex items-center gap-2">
+                <Tag className="h-4 w-4 text-muted-foreground" />
+                Tags
+              </label>
+              <div className="flex flex-wrap gap-2 mb-3">
+                {tags.map((tag) => (
+                  <span key={tag} className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-primary/5 text-primary text-xs font-semibold border border-primary/10">
+                    {tag}
+                    <button onClick={() => setTags(tags.filter(t => t !== tag))} className="hover:text-primary/70 transition-colors">
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
+                ))}
+                {tags.length === 0 && <p className="text-xs text-muted-foreground italic px-1">No tags added</p>}
+              </div>
+              {tags.length < 10 && (
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newTag}
+                    onChange={(e) => setNewTag(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        if (newTag.trim() && !tags.includes(newTag.trim())) {
+                          setTags([...tags, newTag.trim()]);
+                          setNewTag("");
+                        }
+                      }
+                    }}
+                    placeholder="Add a tag..."
+                    className="flex-1 rounded-lg border border-border bg-muted/30 px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                  />
+                  <button
+                    onClick={() => {
+                      if (newTag.trim() && !tags.includes(newTag.trim())) {
+                        setTags([...tags, newTag.trim()]);
+                        setNewTag("");
+                      }
+                    }}
+                    className="px-3 py-1.5 text-xs font-semibold bg-muted hover:bg-muted/80 rounded-lg transition-colors"
+                  >
+                    Add
+                  </button>
+                </div>
+              )}
+            </div>
+
             <div>
               <label htmlFor="system-prompt" className="block text-sm font-medium mb-1.5">
                 Thread Instructions (System Prompt Override)

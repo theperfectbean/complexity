@@ -118,6 +118,8 @@ export const threads = pgTable(
     parentThreadId: text("parent_thread_id"),
     branchPointMessageId: text("branch_point_message_id"),
     systemPrompt: text("system_prompt"),
+    pinned: boolean("pinned").notNull().default(false),
+    tags: jsonb("tags").$type<string[]>().notNull().default([]),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },

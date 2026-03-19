@@ -521,6 +521,16 @@ DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose build app
   - Integrated with Vercel AI SDK state management to ensure consistency when prepending history.
 - **Benefit**: Significantly improves performance and reduces database/memory overhead for conversations with hundreds of messages.
 
+### Thread Pinning & Tagging (2026-03-19)
+- **Feature**: Added ability to pin important conversations and organize threads with custom tags (I3).
+- **Implementation**:
+  - Updated the database schema (`threads` table) with `pinned` (boolean) and `tags` (jsonb array) columns.
+  - Enhanced the `PATCH /api/threads/[threadId]` API to handle pinning and tag management.
+  - Updated the `Sidebar` to include a dedicated **Pinned** section and display tag chips under thread titles.
+  - Added pinning and tagging controls to the **Thread Settings** dialog for easy organization.
+- **Benefit**: Provides users with better tools for organizing long-term projects or frequently referenced conversations.
+
+
 
 
 

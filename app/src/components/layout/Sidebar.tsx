@@ -19,6 +19,7 @@ import {
   FileCode2,
   GitBranch,
   History,
+  Pin,
 } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
 import Link from "next/link";
@@ -35,6 +36,8 @@ type Thread = {
   title: string;
   updatedAt: string;
   parentThreadId: string | null;
+  pinned: boolean;
+  tags: string[];
 };
 
 type ChatBranch = {
@@ -144,7 +147,8 @@ export function Sidebar({ collapsed = false, onToggle, onNavigate }: SidebarProp
     { href: "/docs/api", label: "API Docs", icon: FileCode2 },
   ];
 
-  const recentThreads = threads;
+  const pinnedThreads = threads.filter((t) => t.pinned);
+  const recentThreads = threads.filter((t) => !t.pinned);
 
   async function handleDeleteThread(threadId: string) {
     setDeletingThreadId(threadId);
@@ -299,6 +303,38 @@ export function Sidebar({ collapsed = false, onToggle, onNavigate }: SidebarProp
               </div>
             )}
 
+            {pinnedThreads.length > 0 && (
+              <div className="rounded-lg border border-sidebar-border/80 bg-card/70 p-2">
+                <div className="mb-2 flex items-center justify-between px-2 py-1">
+                  <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Pinned</span>
+                  <Pin className="h-3.5 w-3.5 text-primary/70 fill-primary/10" />
+                </div>
+                <div className="space-y-1">
+                  {pinnedThreads.map((thread) => (
+                    <div key={thread.id} className="group flex flex-col gap-0.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 px-2 py-1.5">
+                      <Link
+                        className="block min-w-0 flex-1 truncate font-medium"
+                        href={`/search/${thread.id}`}
+                        title={thread.title}
+                        onClick={onNavigate}
+                      >
+                        {thread.title}
+                      </Link>
+                      {thread.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-0.5">
+                          {thread.tags.slice(0, 3).map(tag => (
+                            <span key={tag} className="text-[9px] px-1 py-0 rounded bg-primary/10 text-primary truncate max-w-[60px]">
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="rounded-lg border border-sidebar-border/80 bg-card/70 p-2">
               <Link 
                 href="/recent" 
@@ -311,24 +347,35 @@ export function Sidebar({ collapsed = false, onToggle, onNavigate }: SidebarProp
               <div className="space-y-1">
                 {recentThreads.length === 0 ? <p className="px-2 py-1 text-xs text-muted-foreground">No recent threads</p> : null}
                 {recentThreads.map((thread) => (
-                  <div key={thread.id} className="group flex items-center gap-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/5">
-                    <Link
-                      className="block min-w-0 flex-1 truncate px-2 py-1.5"
-                      href={`/search/${thread.id}`}
-                      title={thread.title}
-                      onClick={onNavigate}
-                    >
-                      {thread.title}
-                    </Link>
-                    <button
-                      type="button"
-                      aria-label={`Delete ${thread.title}`}
-                      className="mr-1 inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-black/10 dark:hover:bg-white/10"
-                      onClick={() => void handleDeleteThread(thread.id)}
-                      disabled={deletingThreadId === thread.id}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
+                  <div key={thread.id} className="group flex flex-col gap-0.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 px-2 py-1.5">
+                    <div className="flex items-center justify-between gap-1 w-full">
+                      <Link
+                        className="block min-w-0 flex-1 truncate"
+                        href={`/search/${thread.id}`}
+                        title={thread.title}
+                        onClick={onNavigate}
+                      >
+                        {thread.title}
+                      </Link>
+                      <button
+                        type="button"
+                        aria-label={`Delete ${thread.title}`}
+                        className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted-foreground opacity-0 group-hover:opacity-100 hover:bg-black/10 dark:hover:bg-white/10"
+                        onClick={() => void handleDeleteThread(thread.id)}
+                        disabled={deletingThreadId === thread.id}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                    {thread.tags.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-0.5">
+                        {thread.tags.slice(0, 2).map(tag => (
+                          <span key={tag} className="text-[9px] px-1 py-0 rounded bg-muted text-muted-foreground truncate max-w-[50px]">
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

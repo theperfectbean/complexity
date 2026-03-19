@@ -23,6 +23,8 @@ type ThreadPayload = {
     model: string;
     roleId: string | null;
     systemPrompt: string | null;
+    pinned: boolean;
+    tags: string[];
   };
   messages: Array<{
     id: string;
@@ -90,6 +92,8 @@ type ThreadChatProps = {
   initialModel: string;
   initialRoleId: string | null;
   initialSystemPrompt: string | null;
+  initialPinned: boolean;
+  initialTags: string[];
   initialHistory: ChatMessageItem[];
   initialHasMore: boolean;
   initialNextCursor: string | null;
@@ -104,6 +108,8 @@ export function ThreadChat({
   initialModel,
   initialRoleId,
   initialSystemPrompt,
+  initialPinned,
+  initialTags,
   initialHistory,
   initialHasMore,
   initialNextCursor,
@@ -118,6 +124,8 @@ export function ThreadChat({
   const [roleId] = useState<string | null>(initialRoleId);
   const [threadTitle] = useState(initialTitle);
   const [threadSystemPrompt, setThreadSystemPrompt] = useState(initialSystemPrompt);
+  const [pinned, setPinned] = useState(initialPinned);
+  const [tags, setTags] = useState(initialTags);
   const [webSearchEnabled, setWebSearchEnabled] = useState(initialWebSearch);
   const [branches, setBranches] = useState<Array<{ id: string; title: string; branchPointMessageId: string | null }>>([]);
   const [hasMore, setHasMore] = useState(initialHasMore);
@@ -267,6 +275,12 @@ export function ThreadChat({
     setSearchMatches(count);
   }, [mergedMessages]);
 
+  const handleThreadSettingsUpdate = useCallback((data: { systemPrompt?: string | null; pinned?: boolean; tags?: string[] }) => {
+    if (data.systemPrompt !== undefined) setThreadSystemPrompt(data.systemPrompt);
+    if (data.pinned !== undefined) setPinned(data.pinned);
+    if (data.tags !== undefined) setTags(data.tags);
+  }, []);
+
   useEffect(() => {
     if (!initialQuery || hasSubmittedInitialQuery.current) {
       return;
@@ -381,8 +395,10 @@ export function ThreadChat({
           <ThreadSettingsDialog 
             threadId={threadId} 
             initialSystemPrompt={threadSystemPrompt} 
+            initialPinned={pinned}
+            initialTags={tags}
             messages={mergedMessages}
-            onUpdate={setThreadSystemPrompt} 
+            onUpdate={handleThreadSettingsUpdate} 
           />
           <ImageGallery messages={mergedMessages} />
           {mergedMessages.length > 0 && (
@@ -506,6 +522,8 @@ export default function ThreadPage() {
     model: string;
     roleId: string | null;
     systemPrompt: string | null;
+    pinned: boolean;
+    tags: string[];
     history: ChatMessageItem[];
     hasMore: boolean;
     nextCursor: string | null;
@@ -528,6 +546,8 @@ export default function ThreadPage() {
           model: payload.thread.model || getDefaultModel(),
           roleId: payload.thread.roleId,
           systemPrompt: payload.thread.systemPrompt,
+          pinned: payload.thread.pinned,
+          tags: payload.thread.tags,
           history: payload.messages.map((message) => ({
             id: message.id,
             role: message.role,
@@ -570,6 +590,8 @@ export default function ThreadPage() {
           initialModel={threadData.model}
           initialRoleId={threadData.roleId}
           initialSystemPrompt={threadData.systemPrompt}
+          initialPinned={threadData.pinned}
+          initialTags={threadData.tags}
           initialHistory={threadData.history}
           initialHasMore={threadData.hasMore}
           initialNextCursor={threadData.nextCursor}

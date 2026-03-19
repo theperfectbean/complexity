@@ -10,6 +10,8 @@ import { messages, threads, users } from "@/lib/db/schema";
 const patchSchema = z.union([
   z.object({ title: z.string().min(1).max(200) }),
   z.object({ systemPrompt: z.string().max(2000).optional().nullable() }),
+  z.object({ pinned: z.boolean() }),
+  z.object({ tags: z.array(z.string().max(50)).max(10) }),
   z.object({ action: z.literal("truncate-from"), messageId: z.string().min(1) }),
   z.object({ action: z.literal("branch"), messageId: z.string().min(1) }),
 ]);
@@ -182,6 +184,22 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ th
     await db
       .update(threads)
       .set({ systemPrompt: parsed.data.systemPrompt, updatedAt: new Date() })
+      .where(eq(threads.id, threadId));
+    return NextResponse.json({ ok: true });
+  }
+
+  if ("pinned" in parsed.data) {
+    await db
+      .update(threads)
+      .set({ pinned: parsed.data.pinned, updatedAt: new Date() })
+      .where(eq(threads.id, threadId));
+    return NextResponse.json({ ok: true });
+  }
+
+  if ("tags" in parsed.data) {
+    await db
+      .update(threads)
+      .set({ tags: parsed.data.tags, updatedAt: new Date() })
       .where(eq(threads.id, threadId));
     return NextResponse.json({ ok: true });
   }
