@@ -9,9 +9,21 @@ import { users } from "@/lib/db/schema";
 import { runtimeConfig } from "@/lib/config";
 import { getRedisClient } from "@/lib/redis";
 
+const passwordSchema = (() => {
+  let s = z.string().min(runtimeConfig.auth.passwordMinLength, {
+    message: `Password must be at least ${runtimeConfig.auth.passwordMinLength} characters`,
+  });
+  if (runtimeConfig.auth.passwordRequireComplexity) {
+    s = s
+      .regex(/[a-zA-Z]/, "Password must contain at least one letter")
+      .regex(/[0-9]/, "Password must contain at least one number");
+  }
+  return s;
+})();
+
 const schema = z.object({
   email: z.string().email(),
-  password: z.string().min(runtimeConfig.auth.passwordMinLength),
+  password: passwordSchema,
   name: z.string().min(1).max(100).optional(),
 });
 
@@ -47,7 +59,8 @@ export async function POST(request: Request) {
   const parsed = schema.safeParse(payload);
 
   if (!parsed.success) {
-    return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
+    const firstError = parsed.error.errors[0]?.message ?? "Invalid payload";
+    return NextResponse.json({ error: firstError }, { status: 400 });
   }
 
   const email = parsed.data.email.toLowerCase();

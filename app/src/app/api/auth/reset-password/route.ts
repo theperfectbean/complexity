@@ -7,10 +7,22 @@ import { db } from "@/lib/db";
 import { users, verificationTokens } from "@/lib/db/schema";
 import { runtimeConfig } from "@/lib/config";
 
+const passwordSchema = (() => {
+  let s = z.string().min(runtimeConfig.auth.passwordMinLength, {
+    message: `Password must be at least ${runtimeConfig.auth.passwordMinLength} characters`,
+  });
+  if (runtimeConfig.auth.passwordRequireComplexity) {
+    s = s
+      .regex(/[a-zA-Z]/, "Password must contain at least one letter")
+      .regex(/[0-9]/, "Password must contain at least one number");
+  }
+  return s;
+})();
+
 const schema = z.object({
   token: z.string().min(1),
   email: z.string().email(),
-  password: z.string().min(runtimeConfig.auth.passwordMinLength),
+  password: passwordSchema,
 });
 
 export async function POST(request: Request) {
@@ -19,7 +31,10 @@ export async function POST(request: Request) {
     const parsed = schema.safeParse(payload);
 
     if (!parsed.success) {
-      return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
+      return NextResponse.json(
+        { error: parsed.error.errors[0]?.message ?? "Invalid payload" },
+        { status: 400 },
+      );
     }
 
     const email = parsed.data.email.toLowerCase();

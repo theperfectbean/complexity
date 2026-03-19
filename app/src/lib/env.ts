@@ -70,6 +70,7 @@ const envSchema = z.object({
   CHAT_MAX_ATTACHMENT_BYTES: z.coerce.number().int().positive().default(5 * 1024 * 1024),
   ROLE_UPLOAD_MAX_FILE_SIZE: z.coerce.number().int().positive().default(50 * 1024 * 1024),
   AUTH_PASSWORD_MIN_LENGTH: z.coerce.number().int().positive().default(8),
+  AUTH_PASSWORD_REQUIRE_COMPLEXITY: z.enum(["true", "false"]).default("true"),
   AUTH_BCRYPT_COST: z.coerce.number().int().positive().default(12),
   AUTH_RESET_TOKEN_BYTES: z.coerce.number().int().positive().default(32),
   AUTH_RESET_TOKEN_TTL_MS: z.coerce.number().int().positive().default(60 * 60 * 1000),
