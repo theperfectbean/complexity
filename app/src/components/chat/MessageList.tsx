@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Copy, RotateCcw, ArrowDown, Globe, Search, Brain, Database, Pencil, ChevronLeft, ChevronRight } from "lucide-react";
+import { Check, Copy, RotateCcw, ArrowDown, Globe, Search, Brain, Database, Pencil, ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { useState, useRef, useEffect, useCallback, memo, useMemo } from "react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
@@ -46,6 +46,9 @@ type MessageListProps = {
   onRetry?: () => void;
   onRewrite?: (modelId: string) => void;
   onEditMessage?: (messageId: string, newContent: string) => Promise<void>;
+  onLoadMore?: () => Promise<void>;
+  hasMore?: boolean;
+  isLoadingMore?: boolean;
   isStreaming?: boolean;
 };
 
@@ -431,7 +434,7 @@ const MessageItem = memo(function MessageItem({
   );
 });
 
-export function MessageList({ messages, branches, onBranchChange, searchQuery, emptyLabel, onRetry, onRewrite, onEditMessage, isStreaming }: MessageListProps) {
+export function MessageList({ messages, branches, onBranchChange, searchQuery, emptyLabel, onRetry, onRewrite, onEditMessage, onLoadMore, hasMore, isLoadingMore, isStreaming }: MessageListProps) {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [showScrollButton, setShowScrollButton] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -512,6 +515,23 @@ export function MessageList({ messages, branches, onBranchChange, searchQuery, e
 
   return (
     <div className="relative space-y-6 pb-4 overflow-anchor-none">
+      {hasMore && onLoadMore && (
+        <div className="flex justify-center pt-2 pb-6">
+          <button
+            onClick={onLoadMore}
+            disabled={isLoadingMore}
+            className="flex items-center gap-2 rounded-full border border-border bg-card px-4 py-1.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground transition-colors hover:bg-muted disabled:opacity-50"
+          >
+            {isLoadingMore ? (
+              <RefreshCw className="h-3 w-3 animate-spin" />
+            ) : (
+              <ArrowDown className="h-3 w-3 rotate-180" />
+            )}
+            {isLoadingMore ? "Loading..." : "Load older messages"}
+          </button>
+        </div>
+      )}
+
       <AnimatePresence>
         {showScrollButton && (
           <motion.button

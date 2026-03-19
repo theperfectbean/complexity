@@ -14,7 +14,7 @@ const patchSchema = z.union([
   z.object({ action: z.literal("branch"), messageId: z.string().min(1) }),
 ]);
 
-export async function GET(_: Request, { params }: { params: Promise<{ threadId: string }> }) {
+export async function GET(request: Request, { params }: { params: Promise<{ threadId: string }> }) {
   const session = await auth();
   const userEmail = session?.user?.email;
   if (!userEmail) {
@@ -22,6 +22,9 @@ export async function GET(_: Request, { params }: { params: Promise<{ threadId: 
   }
 
   const { threadId } = await params;
+  const { searchParams } = new URL(request.url);
+  const cursor = searchParams.get("cursor"); // ISO date string of the oldest message known
+  const limit = Math.min(parseInt(searchParams.get("limit") || "50"), 100);
 
   const [row] = await db
     .select({
@@ -37,13 +40,33 @@ export async function GET(_: Request, { params }: { params: Promise<{ threadId: 
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const threadMessages = await db
+  // Build message query
+  const messageQuery = db
     .select()
     .from(messages)
-    .where(eq(messages.threadId, threadId))
-    .orderBy(asc(messages.createdAt));
+    .where(
+      and(
+        eq(messages.threadId, threadId),
+        cursor ? sql`${messages.createdAt} < ${cursor}` : undefined
+      )
+    )
+    .orderBy(desc(messages.createdAt))
+    .limit(limit + 1);
 
-  return NextResponse.json({ thread: row.thread, messages: threadMessages });
+  const threadMessages = await messageQuery;
+  const hasMore = threadMessages.length > limit;
+  const slicedMessages = hasMore ? threadMessages.slice(0, limit) : threadMessages;
+  
+  // Return messages in ascending order for the client
+  const orderedMessages = slicedMessages.reverse();
+  const nextCursor = hasMore ? orderedMessages[0].createdAt.toISOString() : null;
+
+  return NextResponse.json({ 
+    thread: row.thread, 
+    messages: orderedMessages,
+    hasMore,
+    nextCursor
+  });
 }
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ threadId: string }> }) {

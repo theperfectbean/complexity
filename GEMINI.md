@@ -512,6 +512,16 @@ DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose build app
     - **Token Usage**: Model-by-model breakdown of estimated resource consumption.
 - **Benefit**: Provides administrators with clear visibility into platform growth, resource hotspots, and user engagement levels.
 
+### Message Pagination (2026-03-19)
+- **Feature**: Implemented cursor-based pagination for long conversation threads (I1).
+- **Implementation**:
+  - Enhanced `GET /api/threads/[threadId]` to support `cursor` and `limit` parameters for partial message loading.
+  - Implemented a "Load older messages" button at the top of the `MessageList` that fetches and prepends historical messages.
+  - Optimized initial thread load by fetching only the most recent 20 messages, drastically reducing Time to First Token (TTFT) for very long threads.
+  - Integrated with Vercel AI SDK state management to ensure consistency when prepending history.
+- **Benefit**: Significantly improves performance and reduces database/memory overhead for conversations with hundreds of messages.
+
+
 
 
 

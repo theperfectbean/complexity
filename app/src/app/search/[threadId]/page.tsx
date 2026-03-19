@@ -91,6 +91,8 @@ type ThreadChatProps = {
   initialRoleId: string | null;
   initialSystemPrompt: string | null;
   initialHistory: ChatMessageItem[];
+  initialHasMore: boolean;
+  initialNextCursor: string | null;
   initialWebSearch: boolean;
   attachments: File[];
   setAttachments: React.Dispatch<React.SetStateAction<File[]>>;
@@ -103,6 +105,8 @@ export function ThreadChat({
   initialRoleId,
   initialSystemPrompt,
   initialHistory,
+  initialHasMore,
+  initialNextCursor,
   initialWebSearch,
   attachments,
   setAttachments,
@@ -116,6 +120,9 @@ export function ThreadChat({
   const [threadSystemPrompt, setThreadSystemPrompt] = useState(initialSystemPrompt);
   const [webSearchEnabled, setWebSearchEnabled] = useState(initialWebSearch);
   const [branches, setBranches] = useState<Array<{ id: string; title: string; branchPointMessageId: string | null }>>([]);
+  const [hasMore, setHasMore] = useState(initialHasMore);
+  const [nextCursor, setNextCursor] = useState(initialNextCursor);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchMatches, setSearchMatches] = useState(0);
   const hasSubmittedInitialQuery = useRef(false);
@@ -132,6 +139,37 @@ export function ThreadChat({
       console.error("Failed to fetch branches:", err);
     }
   }, [threadId]);
+
+  const loadMoreMessages = useCallback(async () => {
+    if (isLoadingMore || !hasMore || !nextCursor) return;
+
+    setIsLoadingMore(true);
+    try {
+      const res = await fetch(`/api/threads/${threadId}?cursor=${encodeURIComponent(nextCursor)}`);
+      if (!res.ok) throw new Error("Failed to load more messages");
+
+      const payload = await res.json() as ThreadPayload & { hasMore: boolean; nextCursor: string | null };
+      
+      const newMessages = payload.messages.map((m) => ({
+        id: m.id,
+        role: m.role as "user" | "assistant" | "system",
+        content: m.content,
+        parts: [{ type: "text" as const, text: m.content }],
+        ...(m.citations ? { citations: normalizeCitations(m.citations) } : {}),
+      } as UIMessage));
+
+      // Prepend to useChat state
+      setMessages((prev) => [...newMessages, ...prev]);
+      
+      setHasMore(payload.hasMore);
+      setNextCursor(payload.nextCursor);
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to load older messages");
+    } finally {
+      setIsLoadingMore(false);
+    }
+  }, [threadId, nextCursor, hasMore, isLoadingMore, setMessages]);
 
   useEffect(() => {
     void fetchBranches();
@@ -164,7 +202,6 @@ export function ThreadChat({
       }
       return uiMsg as unknown as UIMessage;
     }),
-    // eslint-disable-next-line react-hooks/refs
     transport: new DefaultChatTransport({
       api: "/api/chat",
       body: getBody,
@@ -366,6 +403,9 @@ export function ThreadChat({
           branches={branches}
           onBranchChange={handleBranchChange}
           searchQuery={searchQuery}
+          onLoadMore={loadMoreMessages}
+          hasMore={hasMore}
+          isLoadingMore={isLoadingMore}
           isStreaming={status === "streaming"}
           emptyLabel="Start this thread with your first question."
           onRetry={() => {
@@ -467,6 +507,8 @@ export default function ThreadPage() {
     roleId: string | null;
     systemPrompt: string | null;
     history: ChatMessageItem[];
+    hasMore: boolean;
+    nextCursor: string | null;
   } | null>(null);
   const [loading, setLoading] = useState(true);
   const [attachments, setAttachments] = useState<File[]>([]);
@@ -474,9 +516,9 @@ export default function ThreadPage() {
   useEffect(() => {
     let active = true;
 
-    fetch(`/api/threads/${threadId}`)
+    fetch(`/api/threads/${threadId}?limit=20`)
       .then((response) => (response.ok ? response.json() : Promise.reject(new Error("Failed to load thread"))))
-      .then((payload: ThreadPayload) => {
+      .then((payload: ThreadPayload & { hasMore: boolean; nextCursor: string | null }) => {
         if (!active) {
           return;
         }
@@ -492,6 +534,8 @@ export default function ThreadPage() {
             content: message.content,
             citations: normalizeCitations(message.citations),
           })),
+          hasMore: payload.hasMore,
+          nextCursor: payload.nextCursor,
         });
       })
       .catch(() => {
@@ -527,6 +571,8 @@ export default function ThreadPage() {
           initialRoleId={threadData.roleId}
           initialSystemPrompt={threadData.systemPrompt}
           initialHistory={threadData.history}
+          initialHasMore={threadData.hasMore}
+          initialNextCursor={threadData.nextCursor}
           initialWebSearch={webSearchDefault}
           attachments={attachments}
           setAttachments={setAttachments}
