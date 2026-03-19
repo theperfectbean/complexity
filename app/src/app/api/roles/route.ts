@@ -1,17 +1,18 @@
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, or, exists, and } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { createId } from "@/lib/db/cuid";
-import { roles, users } from "@/lib/db/schema";
+import { roles, users, roleAccess } from "@/lib/db/schema";
 
 const createSchema = z.object({
   name: z.string().min(1).max(100),
   description: z.string().max(1000).optional(),
   instructions: z.string().max(50000).optional(),
   pinned: z.boolean().optional().default(false),
+  isPublic: z.boolean().optional().default(false),
 });
 
 export async function GET() {
@@ -27,9 +28,32 @@ export async function GET() {
   }
 
   const rows = await db
-    .select()
+    .select({
+      id: roles.id,
+      name: roles.name,
+      description: roles.description,
+      pinned: roles.pinned,
+      isPublic: roles.isPublic,
+      userId: roles.userId,
+      updatedAt: roles.updatedAt,
+    })
     .from(roles)
-    .where(eq(roles.userId, user.id))
+    .where(
+      or(
+        eq(roles.userId, user.id),
+        eq(roles.isPublic, true),
+        exists(
+          db.select()
+            .from(roleAccess)
+            .where(
+              and(
+                eq(roleAccess.roleId, roles.id),
+                eq(roleAccess.userId, user.id)
+              )
+            )
+        )
+      )
+    )
     .orderBy(desc(roles.updatedAt));
 
   return NextResponse.json({ roles: rows });
@@ -61,6 +85,7 @@ export async function POST(request: Request) {
     description: parsed.data.description,
     instructions: parsed.data.instructions,
     pinned: parsed.data.pinned,
+    isPublic: parsed.data.isPublic,
     userId: user.id,
   });
 

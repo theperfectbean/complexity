@@ -8,7 +8,6 @@ import { toast } from "sonner";
 import { useSession } from "next-auth/react";
 
 import { RoleCard } from "@/components/roles/RoleCard";
-import { EmptyState } from "@/components/shared/EmptyState";
 import { LoadingSkeleton } from "@/components/shared/LoadingSkeleton";
 
 type Role = {
@@ -16,6 +15,8 @@ type Role = {
   name: string;
   description?: string | null;
   pinned: boolean;
+  isPublic: boolean;
+  userId: string;
   updatedAt: string;
 };
 
@@ -150,6 +151,9 @@ export default function RolesPage() {
       return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
     });
 
+  const myRoles = filteredRoles.filter(r => r.userId === session?.user?.id);
+  const sharedRoles = filteredRoles.filter(r => r.userId !== session?.user?.id);
+
   return (
     <main className="mx-auto w-full max-w-4xl px-6 py-12">
       <div className="flex items-center justify-between">
@@ -187,34 +191,56 @@ export default function RolesPage() {
         </div>
       </div>
 
-      <div className="mt-6 grid gap-4 md:grid-cols-2">
-        {loading ? <LoadingSkeleton lines={4} /> : null}
-        {!loading && filteredRoles.length === 0 ? (
-          <div className="col-span-full">
-            <EmptyState
-              title={query.trim() ? "No matching roles" : "No roles yet"}
-              description={
-                query.trim()
-                  ? "Try a different search term or clear the filter."
-                  : "Create your first role above to start uploading documents."
-              }
-            />
+      <div className="mt-10 space-y-12">
+        {/* Your Roles */}
+        <section>
+          <h2 className="mb-4 text-xs font-bold uppercase tracking-widest text-muted-foreground/60">Your Roles</h2>
+          <div className="grid gap-4 md:grid-cols-2">
+            {loading ? <LoadingSkeleton lines={2} /> : null}
+            {!loading && myRoles.length === 0 ? (
+              <p className="col-span-full py-12 text-center text-sm text-muted-foreground italic border-2 border-dashed border-border/40 rounded-2xl">
+                You haven&apos;t created any roles yet.
+              </p>
+            ) : null}
+            {myRoles.map((role) => (
+              <RoleCard
+                key={role.id}
+                id={role.id}
+                name={role.name}
+                description={role.description}
+                pinned={role.pinned}
+                updatedAt={role.updatedAt}
+                busy={busyRoleId === role.id}
+                onRename={() => void renameRole(role)}
+                onDelete={() => void deleteRole(role)}
+                onPin={() => void togglePin(role)}
+              />
+            ))}
           </div>
-        ) : null}
-        {filteredRoles.map((role) => (
-          <RoleCard
-            key={role.id}
-            id={role.id}
-            name={role.name}
-            description={role.description}
-            pinned={role.pinned}
-            updatedAt={role.updatedAt}
-            busy={busyRoleId === role.id}
-            onRename={() => void renameRole(role)}
-            onDelete={() => void deleteRole(role)}
-            onPin={() => void togglePin(role)}
-          />
-        ))}
+        </section>
+
+        {/* Shared & Public Roles */}
+        {(sharedRoles.length > 0 || loading) && (
+          <section>
+            <h2 className="mb-4 text-xs font-bold uppercase tracking-widest text-muted-foreground/60">Shared & Public</h2>
+            <div className="grid gap-4 md:grid-cols-2">
+              {loading ? <LoadingSkeleton lines={2} /> : null}
+              {sharedRoles.map((role) => (
+                <RoleCard
+                  key={role.id}
+                  id={role.id}
+                  name={role.name}
+                  description={role.description}
+                  pinned={role.pinned}
+                  updatedAt={role.updatedAt}
+                  busy={busyRoleId === role.id}
+                  // Hide edit/delete for non-owners in the list UI
+                  onPin={() => void togglePin(role)}
+                />
+              ))}
+            </div>
+          </section>
+        )}
       </div>
     </main>
   );

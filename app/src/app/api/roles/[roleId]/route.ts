@@ -11,9 +11,11 @@ const patchSchema = z.object({
   description: z.string().max(1000).optional().nullable(),
   instructions: z.string().max(50000).optional().nullable(),
   pinned: z.boolean().optional(),
+  isPublic: z.boolean().optional(),
 });
 
 async function getUserAndRole(roleId: string, email: string) {
+  // Check if owner
   const [row] = await db
     .select({
       userId: users.id,
@@ -24,7 +26,38 @@ async function getUserAndRole(roleId: string, email: string) {
     .where(and(eq(users.email, email), eq(roles.id, roleId)))
     .limit(1);
 
-  return row;
+  if (row) {
+    return { ...row, isOwner: true };
+  }
+
+  // Check if shared or public
+  const [sharedRow] = await db
+    .select({
+      userId: users.id,
+      role: roles,
+    })
+    .from(users)
+    .innerJoin(roles, or(
+      eq(roles.isPublic, true),
+      exists(
+        db.select()
+          .from(roleAccess)
+          .where(
+            and(
+              eq(roleAccess.roleId, roles.id),
+              eq(roleAccess.userId, users.id)
+            )
+          )
+      )
+    ))
+    .where(and(eq(users.email, email), eq(roles.id, roleId)))
+    .limit(1);
+
+  if (sharedRow) {
+    return { ...sharedRow, isOwner: false };
+  }
+
+  return null;
 }
 
 export async function GET(_: Request, { params }: { params: Promise<{ roleId: string }> }) {
@@ -40,7 +73,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ roleId: st
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  return NextResponse.json({ role: row.role });
+  return NextResponse.json({ role: row.role, isOwner: row.isOwner });
 }
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ roleId: string }> }) {
@@ -54,6 +87,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ ro
   const row = await getUserAndRole(roleId, userEmail);
   if (!row) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  if (!row.isOwner) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const body = await request.json();
@@ -70,6 +107,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ ro
       description: parsed.data.description ?? row.role.description,
       instructions: parsed.data.instructions !== undefined ? parsed.data.instructions : row.role.instructions,
       pinned: parsed.data.pinned !== undefined ? parsed.data.pinned : row.role.pinned,
+      isPublic: parsed.data.isPublic !== undefined ? parsed.data.isPublic : row.role.isPublic,
       updatedAt: new Date(),
     })
     .where(eq(roles.id, roleId));
@@ -88,6 +126,10 @@ export async function DELETE(_: Request, { params }: { params: Promise<{ roleId:
   const row = await getUserAndRole(roleId, userEmail);
   if (!row) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  if (!row.isOwner) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   await db.delete(roles).where(eq(roles.id, roleId));

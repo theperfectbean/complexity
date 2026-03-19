@@ -98,12 +98,28 @@ export const roles = pgTable("roles", {
   description: text("description"),
   instructions: text("instructions"),
   pinned: boolean("pinned").notNull().default(false),
+  isPublic: boolean("is_public").notNull().default(false),
   userId: text("user_id")
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+export const roleAccess = pgTable(
+  "role_access",
+  {
+    roleId: text("role_id")
+      .notNull()
+      .references(() => roles.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    permission: varchar("permission", { length: 20 }).notNull().default("viewer"), // 'viewer', 'editor'
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.roleId, table.userId] })],
+);
 
 export const threads = pgTable(
   "threads",
@@ -202,6 +218,7 @@ export const usersRelations = relations(users, ({ many }) => ({
   roles: many(roles),
   memories: many(memories),
   apiTokens: many(apiTokens),
+  roleAccess: many(roleAccess),
 }));
 
 export const threadsRelations = relations(threads, ({ one, many }) => ({
@@ -242,6 +259,18 @@ export const rolesRelations = relations(roles, ({ one, many }) => ({
   }),
   documents: many(documents),
   threads: many(threads),
+  access: many(roleAccess),
+}));
+
+export const roleAccessRelations = relations(roleAccess, ({ one }) => ({
+  role: one(roles, {
+    fields: [roleAccess.roleId],
+    references: [roles.id],
+  }),
+  user: one(users, {
+    fields: [roleAccess.userId],
+    references: [users.id],
+  }),
 }));
 
 export const documentsRelations = relations(documents, ({ one, many }) => ({

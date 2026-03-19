@@ -512,6 +512,20 @@ DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose build app
     - **Token Usage**: Model-by-model breakdown of estimated resource consumption.
 - **Benefit**: Provides administrators with clear visibility into platform growth, resource hotspots, and user engagement levels.
 
+### Role Sharing & Permissions (2026-03-19)
+- **Feature**: Implemented collaborative role sharing and public roles (B8).
+- **Implementation**:
+  - **Database**: Added `is_public` to `roles` and created a `role_access` junction table for granular user-to-role permissions.
+  - **API**: 
+    - Updated `/api/roles` to return owned, shared, and public roles.
+    - Added `/api/roles/[roleId]/share` for managing granular user access (Owner-only).
+    - Hardened `ChatSessionValidator` and document APIs to verify shared/public access.
+  - **UI**: 
+    - Developed `RoleShareDialog` for toggling public access and inviting users by email.
+    - Updated Roles gallery to categorize into "Your Roles" and "Shared & Public".
+- **Benefit**: Transforms the platform into a collaborative environment where knowledge bases (Spaces) can be shared across the entire self-hosted instance or with specific team members.
+
+
 ### Message Pagination (2026-03-19)
 - **Feature**: Implemented cursor-based pagination for long conversation threads (I1).
 - **Implementation**:

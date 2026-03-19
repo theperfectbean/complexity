@@ -1,6 +1,6 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, or, exists } from "drizzle-orm";
 import { db } from "../db";
-import { roles, threads, users } from "../db/schema";
+import { roles, threads, users, roleAccess } from "../db/schema";
 import type { ChatSession, ThreadInfo } from "./types";
 
 export class ChatSessionValidator {
@@ -35,13 +35,30 @@ export class ChatSessionValidator {
       const [role] = await db
         .select({ instructions: roles.instructions })
         .from(roles)
-        .innerJoin(users, eq(roles.userId, users.id))
-        .where(and(eq(roles.id, thread.roleId), eq(users.email, userEmail)))
+        .where(
+          and(
+            eq(roles.id, thread.roleId),
+            or(
+              eq(roles.userId, thread.userId),
+              eq(roles.isPublic, true),
+              exists(
+                db.select()
+                  .from(roleAccess)
+                  .where(
+                    and(
+                      eq(roleAccess.roleId, roles.id),
+                      eq(roleAccess.userId, thread.userId)
+                    )
+                  )
+              )
+            )
+          )
+        )
         .limit(1);
       
       if (!role) {
-        const error = new Error("Role not found") as Error & { status?: number };
-        error.status = 404;
+        const error = new Error("Role access denied") as Error & { status?: number };
+        error.status = 403;
         throw error;
       }
       roleInstructions = role.instructions ?? "";

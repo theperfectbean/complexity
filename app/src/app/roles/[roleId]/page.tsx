@@ -10,6 +10,7 @@ import { useSession } from "next-auth/react";
 
 import { cn } from "@/lib/utils";
 import { DocumentList, RoleDocument } from "@/components/roles/DocumentList";
+import { RoleShareDialog } from "@/components/roles/RoleShareDialog";
 import { FileUploader } from "@/components/roles/FileUploader";
 import { LoadingSkeleton } from "@/components/shared/LoadingSkeleton";
 import { getDefaultModel } from "@/lib/models";
@@ -18,10 +19,11 @@ import { SearchBar } from "@/components/search/SearchBar";
 type Role = {
   id: string;
   name: string;
-  description?: string | null;
-  instructions?: string | null;
+  description: string | null;
+  instructions: string | null;
   pinned: boolean;
-};
+  isPublic: boolean;
+  };
 
 type Thread = {
   id: string;
@@ -34,6 +36,7 @@ export default function RoleDetailPage() {
   const { roleId } = useParams<{ roleId: string }>();
   const router = useRouter();
   const [role, setRole] = useState<Role | null>(null);
+  const [isOwner, setIsOwner] = useState(false);
   const [documents, setDocuments] = useState<RoleDocument[]>([]);
   const [docsLoading, setDocsLoading] = useState(true);
   const [threads, setThreads] = useState<Thread[]>([]);
@@ -87,9 +90,10 @@ export default function RoleDetailPage() {
     let active = true;
     fetch(`/api/roles/${roleId}`)
       .then((response) => (response.ok ? response.json() : Promise.reject(new Error("Failed to load role"))))
-      .then((payload: { role: Role }) => {
+      .then((payload: { role: Role; isOwner: boolean }) => {
         if (active) {
           setRole(payload.role);
+          setIsOwner(payload.isOwner);
           setInstructionsDraft(payload.role.instructions ?? "");
         }
       })
@@ -225,6 +229,23 @@ export default function RoleDetailPage() {
     }
   }
 
+  const handlePublicToggle = async (isPublic: boolean) => {
+    try {
+      const res = await fetch(`/api/roles/${roleId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isPublic }),
+      });
+
+      if (!res.ok) throw new Error("Failed to update");
+
+      setRole((prev) => (prev ? { ...prev, isPublic } : null));
+      toast.success(isPublic ? "Role is now public" : "Role is now private");
+    } catch {
+      toast.error("Failed to update public status");
+    }
+  };
+
   if (!session?.user) {
     return (
       <main className="mx-auto max-w-5xl p-6">
@@ -242,6 +263,14 @@ export default function RoleDetailPage() {
       <div className="mt-6 flex items-center justify-between gap-4">
         <h1 className="font-[var(--font-accent)] text-3xl font-medium">{role ? role.name : `Role ${roleId}`}</h1>
         <div className="flex items-center gap-2">
+          {isOwner && role && (
+            <RoleShareDialog 
+              roleId={role.id} 
+              roleName={role.name} 
+              isPublic={role.isPublic} 
+              onPublicToggle={handlePublicToggle} 
+            />
+          )}
           <button
             type="button"
             onClick={() => void togglePin()}
@@ -256,6 +285,7 @@ export default function RoleDetailPage() {
           >
             <Pin className={cn("h-4 w-4", role?.pinned && "fill-current")} />
           </button>
+...
           <button
             type="button"
             className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-border/60 bg-background text-muted-foreground hover:bg-muted/40"
