@@ -36,6 +36,7 @@ type MessageListProps = {
   emptyLabel: string;
   onRetry?: () => void;
   onRewrite?: (modelId: string) => void;
+  onEditMessage?: (messageId: string, newContent: string) => Promise<void>;
   isStreaming?: boolean;
 };
 
@@ -63,6 +64,7 @@ const MessageItem = memo(function MessageItem({
   isStreaming, 
   onRetry, 
   onRewrite,
+  onEditMessage,
   onCopy, 
   copiedId 
 }: {
@@ -72,6 +74,7 @@ const MessageItem = memo(function MessageItem({
   isStreaming?: boolean;
   onRetry?: () => void;
   onRewrite?: (modelId: string) => void;
+  onEditMessage?: (messageId: string, newContent: string) => Promise<void>;
   onCopy: (id: string, content: string) => void;
   copiedId: string | null;
 }) {
@@ -79,6 +82,39 @@ const MessageItem = memo(function MessageItem({
   const urls = message.role === "assistant" ? (urlsFromCitations.length > 0 ? urlsFromCitations : extractUrls(message.content)) : [];
   const isUser = message.role === "user";
   const isLastAssistantMessage = !isUser && index === totalMessages - 1;
+
+  const [isEditing, setIsEditing] = useState(false);
+  const [editContent, setEditContent] = useState(message.content);
+  const [isSaving, setIsSaving] = useState(false);
+  const editRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (isEditing && editRef.current) {
+      editRef.current.focus();
+      editRef.current.setSelectionRange(editRef.current.value.length, editRef.current.value.length);
+    }
+  }, [isEditing]);
+
+  const handleEditSubmit = async () => {
+    const trimmed = editContent.trim();
+    if (!trimmed || !onEditMessage) {
+      setIsEditing(false);
+      setEditContent(message.content);
+      return;
+    }
+    setIsSaving(true);
+    try {
+      await onEditMessage(message.id, trimmed);
+      setIsEditing(false);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const cancelEdit = () => {
+    setIsEditing(false);
+    setEditContent(message.content);
+  };
 
   const [availableModels, setAvailableModels] = useState<readonly SearchModelOption[]>(MODELS);
   const [isRewriteMenuOpen, setIsRewriteMenuOpen] = useState(false);
@@ -112,29 +148,70 @@ const MessageItem = memo(function MessageItem({
       style={{ overflowAnchor: "auto" }}
     >
       {isUser ? (
-        <div className="w-fit max-w-[85%] rounded-2xl bg-muted/60 px-5 py-3.5 text-left md:max-w-[75%]">
-          {(() => {
-            const msgRecord = message as Record<string, unknown>;
-            const attachments = (msgRecord.experimental_attachments || msgRecord.attachments || []) as Array<{ url?: string; contentType?: string; name?: string }>;
-            const images = attachments.filter((a) => a.contentType?.startsWith("image/") || a.url?.startsWith("data:image/"));
-            
-            return images.length > 0 ? (
-              <div className="flex flex-wrap gap-2 mb-2">
-                {images.map((img, idx) => (
-                  /* eslint-disable-next-line @next/next/no-img-element */
-                  <img 
-                    key={idx} 
-                    src={img.url} 
-                    alt={img.name || "Attachment"} 
-                    className="max-h-48 rounded-lg object-cover shadow-sm border border-border/50" 
-                  />
-                ))}
+        <div className="group/user relative w-fit max-w-[85%] md:max-w-[75%]">
+          {isEditing ? (
+            <div className="flex flex-col gap-2 rounded-2xl bg-muted/60 px-5 py-3.5">
+              <textarea
+                ref={editRef}
+                value={editContent}
+                onChange={(e) => setEditContent(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    void handleEditSubmit();
+                  }
+                  if (e.key === "Escape") cancelEdit();
+                }}
+                disabled={isSaving}
+                rows={Math.max(2, editContent.split("\n").length)}
+                className="w-full min-w-[200px] resize-none bg-transparent text-[0.9375rem] font-medium leading-[1.6] text-foreground outline-none ring-1 ring-primary/40 rounded-lg px-2 py-1 focus:ring-primary/70 transition-all disabled:opacity-60"
+              />
+              <div className="flex justify-end gap-2">
+                <button
+                  onClick={cancelEdit}
+                  disabled={isSaving}
+                  className="rounded-lg px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted transition-colors disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => void handleEditSubmit()}
+                  disabled={isSaving || !editContent.trim()}
+                  className="rounded-lg bg-primary px-3 py-1.5 text-xs text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
+                >
+                  {isSaving ? "Sending…" : "Save & Send"}
+                </button>
               </div>
-            ) : null;
-          })()}
-          <p className="whitespace-pre-wrap text-[0.9375rem] font-medium leading-[1.6] text-foreground">
-            {message.content}
-          </p>
+            </div>
+          ) : (
+            <div className="rounded-2xl bg-muted/60 px-5 py-3.5 text-left">
+              {(() => {
+                const msgRecord = message as Record<string, unknown>;
+                const attachments = (msgRecord.experimental_attachments || msgRecord.attachments || []) as Array<{ url?: string; contentType?: string; name?: string }>;
+                const images = attachments.filter((a) => a.contentType?.startsWith("image/") || a.url?.startsWith("data:image/"));
+                return images.length > 0 ? (
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {images.map((img, idx) => (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img key={idx} src={img.url} alt={img.name || "Attachment"} className="max-h-48 rounded-lg object-cover shadow-sm border border-border/50" />
+                    ))}
+                  </div>
+                ) : null;
+              })()}
+              <p className="whitespace-pre-wrap text-[0.9375rem] font-medium leading-[1.6] text-foreground">
+                {message.content}
+              </p>
+            </div>
+          )}
+          {onEditMessage && !isEditing && !isStreaming && (
+            <button
+              onClick={() => setIsEditing(true)}
+              className="absolute -bottom-2 -right-2 flex h-7 w-7 items-center justify-center rounded-full border bg-background shadow-sm opacity-0 transition-opacity group-hover/user:opacity-100 hover:bg-muted"
+              title="Edit message"
+            >
+              <Pencil className="h-3 w-3 text-muted-foreground/60" />
+            </button>
+          )}
         </div>
       ) : (
         <div className="flex w-full flex-col">
@@ -282,7 +359,7 @@ const MessageItem = memo(function MessageItem({
   );
 });
 
-export function MessageList({ messages, emptyLabel, onRetry, onRewrite, isStreaming }: MessageListProps) {
+export function MessageList({ messages, emptyLabel, onRetry, onRewrite, onEditMessage, isStreaming }: MessageListProps) {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [showScrollButton, setShowScrollButton] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -386,6 +463,7 @@ export function MessageList({ messages, emptyLabel, onRetry, onRewrite, isStream
           isStreaming={isStreaming}
           onRetry={onRetry}
           onRewrite={onRewrite}
+          onEditMessage={onEditMessage}
           onCopy={copyMessage}
           copiedId={copiedId}
         />

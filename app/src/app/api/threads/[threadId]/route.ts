@@ -1,4 +1,4 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, gte } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -6,9 +6,10 @@ import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { messages, threads, users } from "@/lib/db/schema";
 
-const patchSchema = z.object({
-  title: z.string().min(1).max(200),
-});
+const patchSchema = z.union([
+  z.object({ title: z.string().min(1).max(200) }),
+  z.object({ action: z.literal("truncate-from"), messageId: z.string().min(1) }),
+]);
 
 export async function GET(_: Request, { params }: { params: Promise<{ threadId: string }> }) {
   const session = await auth();
@@ -69,6 +70,28 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ th
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
+  // Truncate thread from the given message (inclusive) onward
+  if ("action" in parsed.data) {
+    const { messageId } = parsed.data;
+
+    const [targetMsg] = await db
+      .select({ createdAt: messages.createdAt })
+      .from(messages)
+      .where(and(eq(messages.id, messageId), eq(messages.threadId, threadId)))
+      .limit(1);
+
+    if (!targetMsg) {
+      return NextResponse.json({ error: "Message not found" }, { status: 404 });
+    }
+
+    await db
+      .delete(messages)
+      .where(and(eq(messages.threadId, threadId), gte(messages.createdAt, targetMsg.createdAt)));
+
+    return NextResponse.json({ ok: true });
+  }
+
+  // Rename thread
   await db.update(threads).set({ title: parsed.data.title }).where(eq(threads.id, threadId));
   return NextResponse.json({ ok: true });
 }

@@ -127,6 +127,52 @@ describe("/api/threads/[threadId]", () => {
       await expect(response.json()).resolves.toEqual({ ok: true });
       expect(db.update).toHaveBeenCalledTimes(1);
     });
+
+    describe("truncate-from action", () => {
+      function mockTargetMessageOnce(result: unknown) {
+        const limit = vi.fn().mockResolvedValue(result);
+        const where = vi.fn(() => ({ limit }));
+        const from = vi.fn(() => ({ where }));
+        vi.mocked(db.select).mockReturnValueOnce({ from } as never);
+      }
+
+      it("returns 404 when target message not found", async () => {
+        mockOwnedThreadOnce([{ id: "thread-1" }]);
+        mockTargetMessageOnce([]);
+
+        const response = await PATCH(
+          new Request("http://localhost/api/threads/thread-1", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "truncate-from", messageId: "msg-999" }),
+          }),
+          { params: Promise.resolve({ threadId: "thread-1" }) },
+        );
+
+        expect(response.status).toBe(404);
+        await expect(response.json()).resolves.toEqual({ error: "Message not found" });
+      });
+
+      it("deletes messages from target onward and returns ok", async () => {
+        mockOwnedThreadOnce([{ id: "thread-1" }]);
+        mockTargetMessageOnce([{ createdAt: new Date("2025-01-01T10:00:00Z") }]);
+        const where = vi.fn().mockResolvedValue(undefined);
+        vi.mocked(db.delete).mockReturnValue({ where } as never);
+
+        const response = await PATCH(
+          new Request("http://localhost/api/threads/thread-1", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "truncate-from", messageId: "msg-5" }),
+          }),
+          { params: Promise.resolve({ threadId: "thread-1" }) },
+        );
+
+        expect(response.status).toBe(200);
+        await expect(response.json()).resolves.toEqual({ ok: true });
+        expect(db.delete).toHaveBeenCalledTimes(1);
+      });
+    });
   });
 
   describe("DELETE", () => {

@@ -2,6 +2,7 @@
 
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, UIMessageChunk, UIMessage } from "ai";
+import { Download } from "lucide-react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -59,8 +60,29 @@ function normalizeCitations(citations: unknown): ChatCitation[] {
     .filter((item) => Boolean(item.url));
 }
 
+function exportMessagesAsMarkdown(title: string, msgs: ChatMessageItem[]) {
+  const lines: string[] = [`# ${title}`, ""];
+  for (const msg of msgs) {
+    if (msg.role === "user") {
+      lines.push("**You**", "", msg.content, "", "---", "");
+    } else if (msg.role === "assistant") {
+      lines.push("**Assistant**", "", msg.content, "", "---", "");
+    }
+  }
+  const blob = new Blob([lines.join("\n")], { type: "text/markdown;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${title.replace(/[^\w\s-]/g, "").trim().replace(/\s+/g, "-").toLowerCase() || "conversation"}.md`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 type ThreadChatProps = {
   threadId: string;
+  initialTitle: string;
   initialModel: string;
   initialRoleId: string | null;
   initialHistory: ChatMessageItem[];
@@ -71,6 +93,7 @@ type ThreadChatProps = {
 
 export function ThreadChat({
   threadId,
+  initialTitle,
   initialModel,
   initialRoleId,
   initialHistory,
@@ -138,6 +161,50 @@ export function ThreadChat({
   }, [initialHistory, messages]);
 
   const chatErrorMessage = getChatErrorMessage(error);
+
+  const handleEditMessage = useCallback(
+    async (messageId: string, newContent: string) => {
+      const res = await fetch(`/api/threads/${threadId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "truncate-from", messageId }),
+      });
+
+      if (!res.ok) {
+        toast.error("Failed to edit message");
+        return;
+      }
+
+      // Reset SDK state to messages that precede the edited one
+      const msgIndex = mergedMessages.findIndex((m) => m.id === messageId);
+      const prior = mergedMessages.slice(0, msgIndex);
+
+      setMessages(
+        prior.map((m) => {
+          const uiMsg = {
+            id: m.id,
+            role: m.role as "user" | "assistant" | "system",
+            content: m.content,
+            parts: [{ type: "text" as const, text: m.content }],
+          };
+          if (m.citations && m.citations.length > 0) {
+            (uiMsg as Record<string, unknown>).citations = m.citations;
+          }
+          return uiMsg as UIMessage;
+        }),
+      );
+
+      try {
+        await sendMessage(
+          { parts: [{ type: "text", text: newContent }] },
+          { body: { threadId, model, roleId } },
+        );
+      } catch {
+        toast.error("Failed to send edited message");
+      }
+    },
+    [mergedMessages, threadId, model, roleId, setMessages, sendMessage],
+  );
 
   useEffect(() => {
     if (!initialQuery || hasSubmittedInitialQuery.current) {
@@ -244,6 +311,21 @@ export function ThreadChat({
         </div>
       ) : null}
 
+      <div className="mb-8 flex items-start justify-between gap-4">
+        <h1 className="text-xl font-semibold leading-snug tracking-tight text-foreground line-clamp-2">
+          {initialTitle}
+        </h1>
+        {mergedMessages.length > 0 && (
+          <button
+            onClick={() => exportMessagesAsMarkdown(initialTitle, mergedMessages)}
+            title="Export conversation as Markdown"
+            className="flex-shrink-0 flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground/50 transition-colors hover:bg-muted hover:text-foreground"
+          >
+            <Download className="h-4 w-4" />
+          </button>
+        )}
+      </div>
+
       <div className="flex-1 space-y-12">
         <MessageList
           messages={mergedMessages}
@@ -299,7 +381,9 @@ export function ThreadChat({
             triggerRef.current = "regenerate-message";
             void regenerate({ messageId: lastMessage.id });
           }}
-        />      </div>
+          onEditMessage={status !== "streaming" ? handleEditMessage : undefined}
+        />
+      </div>
 
       <div className="fixed inset-x-0 bottom-0 z-20 bg-gradient-to-t from-background via-background/95 to-transparent pb-6 pt-10 md:left-[278px]">
         <form onSubmit={onSubmit} className="mx-auto max-w-3xl px-4">
@@ -340,6 +424,7 @@ export default function ThreadPage() {
   const searchParams = useSearchParams();
   const threadId = params.threadId;
   const [threadData, setThreadData] = useState<{
+    title: string;
     model: string;
     roleId: string | null;
     history: ChatMessageItem[];
@@ -358,6 +443,7 @@ export default function ThreadPage() {
         }
 
         setThreadData({
+          title: payload.thread.title,
           model: payload.thread.model || getDefaultModel(),
           roleId: payload.thread.roleId,
           history: payload.messages.map((message) => ({
@@ -396,6 +482,7 @@ export default function ThreadPage() {
       ) : threadData ? (
         <ThreadChat
           threadId={threadId}
+          initialTitle={threadData.title}
           initialModel={threadData.model}
           initialRoleId={threadData.roleId}
           initialHistory={threadData.history}

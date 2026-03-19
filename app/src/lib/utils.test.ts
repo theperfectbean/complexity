@@ -85,7 +85,7 @@ describe("utils.ts", () => {
     });
     
     it("uses fallback if navigator.clipboard fails", async () => {
-      (navigator.clipboard.writeText as any).mockRejectedValue(new Error("Failed"));
+      (navigator.clipboard.writeText as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("Failed"));
       const success = await copyToClipboard("test text");
       expect(success).toBe(true);
       expect(document.execCommand).toHaveBeenCalledWith("copy");
