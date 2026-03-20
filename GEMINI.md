@@ -77,6 +77,18 @@ DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose build app
 
 ## Key Findings & Implementation Notes
 
+### Build & Pre-rendering Hardening (2026-03-20)
+- **Redis Connection in Build Phase**: The Next.js static generation phase (`npm run build`) was attempting to connect to Redis, causing `ENOTFOUND` errors when the `redis` container was not available (common in Docker build stages). This was fixed by implementing robust build-phase detection (`process.env.NEXT_PHASE`, `process.env.npm_lifecycle_event`, and `process.env.IS_NEXT_BUILD`) in `app/src/lib/redis.ts`, `app/src/instrumentation.ts`, and `app/src/lib/queue.ts` to return `null` and skip worker registration instead of initiating connections.
+- **Queue Lazy Initialization**: `documentQueue` in `queue.ts` was refactored from a static export to a lazily evaluated `getDocumentQueue()` function to prevent BullMQ from immediately attempting Redis connections upon module import during the build.
+- **Database Type Safety**: Reverted a temporary fix in `db/index.ts` that cast the Drizzle database instance to `any` during builds. Casting to `any` broke TypeScript inference across all Drizzle relational queries (e.g., `db.query.users.findFirst`), causing implicit `any` linting/build failures across API routes (`threads`, `analytics`, etc.). The `postgres` client lazily connects, so the casting was unnecessary.
+- **Static Generation Safety**: Modified `settings.ts` (`getSetting`) and `encryption.ts` (`encrypt`/`decrypt`) to bypass execution and return safe fallback values (`null` or raw strings) during the `isBuild` phase. This prevents Next.js from throwing "ENCRYPTION_KEY is required" or attempting database reads while prerendering pages.
+- **Docker Dependency Resolution**: 
+  - Upgraded the Dockerfile base image to `node:22-alpine` to satisfy the engine requirements for `ai-sdk-ollama`.
+  - Consolidated redundant SWC binary installations into a single `npm ci` command with `--loglevel=error` to suppress deprecation warnings.
+  - Added `react-is` to `dependencies` because Next.js Turbopack threw module resolution errors caused by a hidden `recharts` peer dependency during `docker build`.
+  - Moved `@types/nodemailer` to `dependencies` to prevent TypeScript compilation errors when `devDependencies` are omitted in production Docker builds.
+  - Excluded the `e2e` folder in `tsconfig.build.json` to prevent the compiler from looking for `@playwright/test` types during standard builds.
+
 ### Vercel AI SDK v6 Migration (Update)
 - **useChat Changes**: The `data` return property has been removed. Use the `onData` callback and local `useState` to capture custom stream parts.
 - **isDataUIMessageChunk Removal**: The `isDataUIMessageChunk` helper is no longer exported in v6. Use `part.type === 'data-json'` or `part.type.startsWith('data-')` to identify data chunks in the `onData` callback.
