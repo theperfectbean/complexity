@@ -11,24 +11,44 @@ const connection = REDIS_URL ? {
   password: new URL(REDIS_URL).password,
 } : undefined;
 
-export const documentQueue = connection ? new Queue("document-processing", {
-  connection,
-  defaultJobOptions: {
-    attempts: 3,
-    backoff: {
-      type: "exponential",
-      delay: 1000,
-    },
-    removeOnComplete: {
-      age: 3600, // 1 hour
-      count: 100, // keep last 100
-    },
-    removeOnFail: {
-      age: 24 * 3600, // 24 hours
-      count: 500, // keep last 500
-    },
+let _documentQueue: Queue | null = null;
+
+export function getDocumentQueue() {
+  if (_documentQueue) return _documentQueue;
+  
+  if (!connection) return null;
+
+  // Skip during build phase
+  if (
+    process.env.NEXT_PHASE === "phase-production-build" ||
+    process.env.IS_NEXT_BUILD === "true" ||
+    process.env.SKIP_ENV_VALIDATION === "true" ||
+    process.env.npm_lifecycle_event === "build"
+  ) {
+    return null;
   }
-}) : null;
+
+  _documentQueue = new Queue("document-processing", {
+    connection,
+    defaultJobOptions: {
+      attempts: 3,
+      backoff: {
+        type: "exponential",
+        delay: 1000,
+      },
+      removeOnComplete: {
+        age: 3600, // 1 hour
+        count: 100, // keep last 100
+      },
+      removeOnFail: {
+        age: 24 * 3600, // 24 hours
+        count: 500, // keep last 500
+      },
+    }
+  });
+
+  return _documentQueue;
+}
 
 export async function queueDocumentProcessing(data: {
   documentId: string;
@@ -39,12 +59,13 @@ export async function queueDocumentProcessing(data: {
   fileType: string;
   text?: string;
 }) {
-  if (!documentQueue) {
+  const queue = getDocumentQueue();
+  if (!queue) {
     logger.warn("Document queue not available, falling back to sync processing (not recommended)");
     return null;
   }
 
-  const job = await documentQueue.add("process-document", data);
+  const job = await queue.add("process-document", data);
   logger.info({ jobId: job.id, documentId: data.documentId }, "Queued document processing job");
   return job;
 }

@@ -4,7 +4,7 @@ import { sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { getRedisClient } from "@/lib/redis";
 import { env } from "@/lib/env";
-import { documentQueue } from "@/lib/queue";
+import { getDocumentQueue } from "@/lib/queue";
 
 export const dynamic = "force-dynamic";
 
@@ -42,12 +42,13 @@ export async function GET() {
   }
 
   // BullMQ queue depth
-  if (documentQueue) {
+  const queue = getDocumentQueue();
+  if (queue) {
     try {
       const [waiting, active, failed] = await Promise.all([
-        documentQueue.getWaitingCount(),
-        documentQueue.getActiveCount(),
-        documentQueue.getFailedCount(),
+        queue.getWaitingCount(),
+        queue.getActiveCount(),
+        queue.getFailedCount(),
       ]);
       details.queue = { waiting, active, failed };
       checks.queue = "ok";
