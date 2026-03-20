@@ -77,6 +77,11 @@ DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose build app
 
 ## Key Findings & Implementation Notes
 
+### Custom Models Dropdown Bug Fix (2026-03-21)
+- **Problem**: The `ModelSelector` component was only displaying the default base models ("Fast Search", "Pro Search", "Perplexity Sonar") instead of the user's custom selected models saved in "Manage Models".
+- **Root Cause**: `app/next.config.ts` had hardcoded `env: { IS_NEXT_BUILD: "true" }`. Next.js injects variables defined in the `env` object of `next.config.ts` at *both* build time and run time. Because `IS_NEXT_BUILD` was constantly evaluated to `"true"` at runtime, the `getSetting` utility (which bypasses Redis/DB reads during builds to avoid connection errors) always returned `null`. This forced `getConfiguredModels` to fallback to `DEFAULT_MODELS`, which were then filtered down to only the base Perplexity models.
+- **Fix**: Removed the hardcoded `IS_NEXT_BUILD` from `next.config.ts`. The variable is properly supplied in the `package.json` build scripts (e.g. `IS_NEXT_BUILD=true next build`) and the Dockerfile, ensuring it only applies during static generation.
+
 ### Build & Pre-rendering Hardening (2026-03-20)
 - **Redis Connection in Build Phase**: The Next.js static generation phase (`npm run build`) was attempting to connect to Redis, causing `ENOTFOUND` errors when the `redis` container was not available (common in Docker build stages). This was fixed by implementing robust build-phase detection (`process.env.NEXT_PHASE`, `process.env.npm_lifecycle_event`, and `process.env.IS_NEXT_BUILD`) in `app/src/lib/redis.ts`, `app/src/instrumentation.ts`, and `app/src/lib/queue.ts` to return `null` and skip worker registration instead of initiating connections.
 - **Queue Lazy Initialization**: `documentQueue` in `queue.ts` was refactored from a static export to a lazily evaluated `getDocumentQueue()` function to prevent BullMQ from immediately attempting Redis connections upon module import during the build.
