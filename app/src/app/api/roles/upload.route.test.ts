@@ -113,7 +113,7 @@ describe("POST /api/roles/[roleId]/upload", () => {
     mockOwnedRole([{ id: "role-1" }]);
     mockMutationChains();
     vi.mocked(isAllowedDocument).mockReturnValue(true);
-    vi.mocked(queueDocumentProcessing).mockResolvedValue({ id: "job-1" } as any);
+    vi.mocked(queueDocumentProcessing).mockResolvedValue({ id: "job-1" } as never);
 
     const formData = new FormData();
     formData.append("file", new File(["hello world"], "doc.txt", { type: "text/plain" }));
