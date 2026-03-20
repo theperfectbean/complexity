@@ -4,7 +4,9 @@
     "node_modules",
     "drizzle.config.ts",
     "vitest.config.ts",
+    "playwright.config.ts",
     "src/test/**",
+    "e2e/**",
     "**/*.test.ts",
     "**/*.test.tsx"
   ]
