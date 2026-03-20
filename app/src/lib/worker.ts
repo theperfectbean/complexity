@@ -33,35 +33,41 @@ export function startWorker() {
       log.info("Processing document job");
 
       try {
-        let buffer: Buffer;
+        let text = job.data.text as string | undefined;
         
-        if (filePath) {
-          log.info({ filePath }, "Reading file from disk");
-          buffer = await fs.readFile(filePath);
-        } else if (fileBase64) {
-          log.info("Decoding file from base64 payload");
-          buffer = Buffer.from(fileBase64, "base64");
+        if (!text) {
+          let buffer: Buffer;
+          
+          if (filePath) {
+            log.info({ filePath }, "Reading file from disk");
+            buffer = await fs.readFile(filePath);
+          } else if (fileBase64) {
+            log.info("Decoding file from base64 payload");
+            buffer = Buffer.from(fileBase64, "base64");
+          } else {
+            throw new Error("No file data or text provided in job");
+          }
+
+          // Create a minimal File-like object for extractTextFromFile
+          const file: DocumentFileLike = {
+            name: fileName,
+            type: fileType,
+            arrayBuffer: async () => {
+              const bytes = new Uint8Array(buffer.byteLength);
+              bytes.set(buffer);
+              return bytes.buffer;
+            },
+          };
+
+          text = await extractTextFromFile(file);
+          
+          // OCR Fallback for PDFs with no text
+          if (!text.trim() && (fileType === "application/pdf" || fileName.toLowerCase().endsWith(".pdf"))) {
+            log.info("No text extracted, attempting OCR fallback");
+            text = await performOcr(buffer, fileName);
+          }
         } else {
-          throw new Error("No file data provided in job");
-        }
-
-        // Create a minimal File-like object for extractTextFromFile
-        const file: DocumentFileLike = {
-          name: fileName,
-          type: fileType,
-          arrayBuffer: async () => {
-            const bytes = new Uint8Array(buffer.byteLength);
-            bytes.set(buffer);
-            return bytes.buffer;
-          },
-        };
-
-        let text = await extractTextFromFile(file);
-        
-        // OCR Fallback for PDFs with no text
-        if (!text.trim() && (fileType === "application/pdf" || fileName.toLowerCase().endsWith(".pdf"))) {
-          log.info("No text extracted, attempting OCR fallback");
-          text = await performOcr(buffer, fileName);
+          log.info("Using pre-provided text for re-processing");
         }
 
         const splitChunks = chunkText(text);
@@ -79,6 +85,9 @@ export function startWorker() {
 
         log.info("Saving chunks to database");
         await db.transaction(async (tx) => {
+          // Clear existing chunks if this is a re-process
+          await tx.delete(chunks).where(eq(chunks.documentId, documentId));
+
           await tx.insert(chunks).values(
             splitChunks.map((content, index) => ({
               id: createId(),
@@ -90,7 +99,13 @@ export function startWorker() {
             })),
           );
 
-          await tx.update(documents).set({ status: "ready" }).where(eq(documents.id, documentId));
+          await tx.update(documents)
+            .set({ 
+              status: "ready", 
+              extractedText: text,
+              updatedAt: new Date(),
+            })
+            .where(eq(documents.id, documentId));
         });
 
         // Cleanup temporary file if it exists

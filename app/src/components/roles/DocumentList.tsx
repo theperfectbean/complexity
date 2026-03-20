@@ -1,8 +1,9 @@
-import { FileText, File, Loader2, X, Eye } from "lucide-react";
+import { FileText, File, Loader2, X, Eye, RefreshCw } from "lucide-react";
 import { ProcessingBadge } from "@/components/roles/ProcessingBadge";
 import { useState } from "react";
 import { toast } from "sonner";
 import DocumentChunksDialog from "./DocumentChunksDialog";
+import { cn } from "@/lib/utils";
 
 export type RoleDocument = {
   id: string;
@@ -17,6 +18,7 @@ type DocumentListProps = {
   documents: RoleDocument[];
   loading?: boolean;
   onDeleted?: (documentId: string) => void;
+  onReprocess?: (documentId: string) => void;
 };
 
 function getFileIcon(filename: string) {
@@ -38,8 +40,9 @@ function getFileTypeLabel(filename: string) {
   return filename.split(".").pop()?.toUpperCase() || "FILE";
 }
 
-export function DocumentList({ documents, loading, onDeleted }: DocumentListProps) {
+export function DocumentList({ documents, loading, onDeleted, onReprocess }: DocumentListProps) {
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [reprocessingId, setReprocessingId] = useState<string | null>(null);
 
   async function handleDelete(documentId: string, roleId: string) {
     if (!confirm("Are you sure you want to delete this document?")) return;
@@ -61,6 +64,28 @@ export function DocumentList({ documents, loading, onDeleted }: DocumentListProp
       toast.error("An error occurred while deleting");
     } finally {
       setDeletingId(null);
+    }
+  }
+
+  async function handleReprocess(documentId: string, roleId: string) {
+    setReprocessingId(documentId);
+    try {
+      const response = await fetch(`/api/roles/${roleId}/documents/${documentId}/reprocess`, {
+        method: "POST",
+      });
+
+      if (!response.ok) {
+        const err = await response.json();
+        toast.error(err.error || "Failed to re-process");
+        return;
+      }
+
+      toast.success("Re-processing started");
+      onReprocess?.(documentId);
+    } catch {
+      toast.error("An error occurred");
+    } finally {
+      setReprocessingId(null);
     }
   }
 
@@ -102,6 +127,15 @@ export function DocumentList({ documents, loading, onDeleted }: DocumentListProp
             />
             <button
               type="button"
+              onClick={() => void handleReprocess(document.id, document.roleId)}
+              disabled={reprocessingId === document.id}
+              className="rounded-full p-1 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+              aria-label={`Re-process ${document.filename}`}
+            >
+              <RefreshCw className={cn("h-3.5 w-3.5", reprocessingId === document.id && "animate-spin")} />
+            </button>
+            <button
+              type="button"
               onClick={() => void handleDelete(document.id, document.roleId)}
               disabled={deletingId === document.id}
               className="rounded-full p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
@@ -135,4 +169,3 @@ export function DocumentList({ documents, loading, onDeleted }: DocumentListProp
     </div>
   );
 }
-

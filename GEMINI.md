@@ -552,6 +552,16 @@ DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose build app
   - **UI**: Integrated a "Context: Recalled Memories" badge (Brain icon) in `MessageList.tsx` that appears above messages influenced by the memory system.
 - **Benefit**: Provides users with clarity on why the AI might be referencing personal facts or preferences from previous conversations.
 
+### Document Re-processing & RAG Maintenance (2026-03-19)
+- **Feature**: Added ability to re-index documents without re-uploading the original files (B6).
+- **Implementation**:
+  - **Schema Update**: Added `extracted_text`, `mime_type`, and `size_bytes` to the `documents` table.
+  - **Persistence**: Modified the background worker to save the raw extracted text into the database after initial processing.
+  - **API**: Created endpoints for bulk and individual re-processing that re-enqueue jobs using the stored text.
+  - **UI**: Integrated "Sync" icons in the Role Detail page and individual document cards to trigger re-indexing.
+- **Benefit**: Essential for maintaining search quality when global chunking parameters or embedding models are updated, allowing for easy "refresh" of the entire knowledge base.
+
+
 
 
 ### Webhooks & Automation (2026-03-19)

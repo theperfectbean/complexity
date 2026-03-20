@@ -223,7 +223,10 @@ export const memories = pgTable(
 export const documents = pgTable("documents", {
   id: text("id").primaryKey(),
   filename: varchar("filename", { length: 255 }).notNull(),
+  mimeType: varchar("mime_type", { length: 100 }),
+  sizeBytes: integer("size_bytes"),
   status: varchar("status", { length: 20 }).notNull().default("processing"), // 'processing', 'ready', 'error'
+  extractedText: text("extracted_text"),
   roleId: text("role_id")
     .notNull()
     .references(() => roles.id, { onDelete: "cascade" }),

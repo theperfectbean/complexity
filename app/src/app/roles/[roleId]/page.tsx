@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useState } from "react";
-import { MoreHorizontal, Pin } from "lucide-react";
+import { MoreHorizontal, Pin, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 
 import { useSession } from "next-auth/react";
@@ -41,6 +41,7 @@ export default function RoleDetailPage() {
   const [docsLoading, setDocsLoading] = useState(true);
   const [threads, setThreads] = useState<Thread[]>([]);
   const [threadsLoading, setThreadsLoading] = useState(true);
+  const [reprocessing, setReprocessing] = useState(false);
   const [memoryEnabled, setMemoryEnabled] = useState<boolean | null>(null);
   const [model, setModel] = useState<string>(getDefaultModel());
   const [prompt, setPrompt] = useState("");
@@ -228,6 +229,26 @@ export default function RoleDetailPage() {
       toast.error("An error occurred");
     }
   }
+
+  const handleReprocessAll = async () => {
+    if (!confirm("Re-process all documents? This will re-index every file in this role.")) return;
+    
+    setReprocessing(true);
+    try {
+      const res = await fetch(`/api/roles/${roleId}/reprocess`, { method: "POST" });
+      if (res.ok) {
+        const payload = await res.json();
+        toast.success(payload.message || "Re-processing started");
+        void loadDocuments();
+      } else {
+        toast.error("Failed to start re-processing");
+      }
+    } catch {
+      toast.error("An error occurred");
+    } finally {
+      setReprocessing(false);
+    }
+  };
 
   const handlePublicToggle = async (isPublic: boolean) => {
     try {
@@ -427,13 +448,25 @@ export default function RoleDetailPage() {
           <section className="py-8">
             <div className="flex items-center justify-between gap-3">
               <h2 className="text-[13px] font-bold uppercase tracking-wider text-muted-foreground/80">Files</h2>
-              <FileUploader
-                roleId={roleId}
-                onUploaded={() => {
-                  void loadDocuments();
-                  toast.success("Document uploaded");
-                }}
-              />
+              <div className="flex items-center gap-2">
+                {documents.length > 0 && isOwner && (
+                  <button
+                    onClick={handleReprocessAll}
+                    disabled={reprocessing}
+                    title="Re-process all documents"
+                    className="p-1 text-muted-foreground/40 hover:text-foreground transition-colors disabled:opacity-30"
+                  >
+                    <RefreshCw className={cn("h-4 w-4", reprocessing && "animate-spin")} />
+                  </button>
+                )}
+                <FileUploader
+                  roleId={roleId}
+                  onUploaded={() => {
+                    void loadDocuments();
+                    toast.success("Document uploaded");
+                  }}
+                />
+              </div>
             </div>
             
             <div className="mt-4">
@@ -460,7 +493,11 @@ export default function RoleDetailPage() {
                    <p className="text-sm text-muted-foreground/60">No files uploaded</p>
                 </div>
               ) : (
-                <DocumentList documents={documents} onDeleted={loadDocuments} />
+                <DocumentList 
+                  documents={documents} 
+                  onDeleted={loadDocuments} 
+                  onReprocess={loadDocuments} 
+                />
               )}
             </div>
           </section>
