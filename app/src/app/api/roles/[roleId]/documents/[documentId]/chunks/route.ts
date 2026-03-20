@@ -51,7 +51,7 @@ export async function GET(
 
     return ApiResponse.success({
       document: doc,
-      chunks: docChunks.map(c => ({
+      chunks: docChunks.map((c: { id: string; content: string; chunkIndex: number; createdAt: Date }) => ({
         id: c.id,
         content: c.content,
         chunkIndex: c.chunkIndex,

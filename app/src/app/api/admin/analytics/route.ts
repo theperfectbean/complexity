@@ -90,7 +90,7 @@ export async function GET() {
     userActivity,
     roleActivity,
     dailyActivity,
-    tokens: tokenEstimation.map(t => ({
+    tokens: tokenEstimation.map((t: { model: string | null; totalChars: number | null }) => ({
       model: t.model,
       estimatedTokens: Math.round((t.totalChars || 0) / 4) // Rough proxy: 4 chars per token
     })),

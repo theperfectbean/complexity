@@ -25,7 +25,7 @@ export async function GET(request: Request) {
   const roleId = searchParams.get("roleId")?.trim();
 
   const rows = await db.query.users.findFirst({
-    where: (users, { eq }) => eq(users.email, userEmail),
+    where: (table, { eq }) => eq(table.email, userEmail),
     with: {
       threads: {
         orderBy: (table, { desc }) => desc(table.updatedAt),
@@ -49,7 +49,7 @@ export async function POST(request: Request) {
   }
 
   const user = await db.query.users.findFirst({
-    where: (users, { eq }) => eq(users.email, userEmail),
+    where: (table, { eq }) => eq(table.email, userEmail),
   });
 
   if (!user) {

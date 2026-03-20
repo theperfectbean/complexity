@@ -165,7 +165,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ th
 
     if (priorMessages.length > 0) {
       await db.insert(messages).values(
-        priorMessages.map((m) => ({
+        priorMessages.map((m: { role: string; content: string; model: string | null; citations: unknown; createdAt: Date }) => ({
           id: createId(),
           threadId: newThreadId,
           role: m.role,
