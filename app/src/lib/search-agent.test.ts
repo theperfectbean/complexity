@@ -15,7 +15,7 @@ describe("search-agent.ts", () => {
           create: vi.fn().mockRejectedValue(new Error("API Error")),
         },
       };
-      vi.mocked(createAgentClient).mockReturnValue(mockClient as ReturnType<typeof createAgentClient>);
+      vi.mocked(createAgentClient).mockReturnValue(mockClient as unknown as ReturnType<typeof createAgentClient>);
 
       const agentInput: Responses.InputItem[] = [
         { type: "message", role: "user", content: [{ type: "input_text", text: "hello" }] },

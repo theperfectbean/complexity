@@ -27,7 +27,7 @@ vi.mock("@/lib/db", () => ({
 }));
 
 describe("/api/admin/fetch-provider-models", () => {
-  const dbLimitMock = db.select().from().where().limit as unknown as ReturnType<typeof vi.fn>;
+  const dbLimitMock = (db.select().from as unknown as () => { where: () => { limit: ReturnType<typeof vi.fn> } })().where().limit;
 
   beforeEach(() => {
     vi.clearAllMocks();

@@ -162,6 +162,12 @@ describe("ThreadPage", () => {
         initialWebSearch={true}
         attachments={[]}
         setAttachments={vi.fn()}
+        initialTitle="Test Thread"
+        initialSystemPrompt={null}
+        initialPinned={false}
+        initialTags={[]}
+        initialHasMore={false}
+        initialNextCursor={null}
       />
     );
 
@@ -226,6 +232,12 @@ describe("ThreadPage", () => {
         initialWebSearch={true}
         attachments={[]}
         setAttachments={vi.fn()}
+        initialTitle="Test Thread"
+        initialSystemPrompt={null}
+        initialPinned={false}
+        initialTags={[]}
+        initialHasMore={false}
+        initialNextCursor={null}
       />
     );
 

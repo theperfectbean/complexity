@@ -48,7 +48,7 @@ describe("ChatService", () => {
     userEmail: "test@example.com",
     threadId: "thread-1",
     model: "test-model",
-    messages: [{ id: "msg-1", role: "user", content: "Hello" }],
+    messages: [{ id: "msg-1", role: "user", parts: [{ type: "text", text: "Hello" }] }],
     redis: null,
   };
 

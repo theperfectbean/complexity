@@ -21,7 +21,7 @@ test.describe("Voice Input", () => {
             // Simulate data
             setTimeout(() => {
               if (this.ondataavailable) {
-                this.ondataavailable({ data: new Blob(["test-audio"], { type: "audio/webm" }) });
+                this.ondataavailable({ data: new Blob(["test-audio"], { type: "audio/webm" }) } as unknown as BlobEvent);
               }
             }, 100);
           }, 50);

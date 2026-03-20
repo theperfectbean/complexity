@@ -62,8 +62,8 @@ describe("SearchBar", () => {
           submitLabel="Send"
           model="model-a"
           modelOptions={[
-            { id: "model-a", label: "Model A", category: "Presets" },
-            { id: "model-b", label: "Model B", category: "Presets" },
+            { id: "model-a", label: "Model A", category: "Presets", isPreset: true },
+            { id: "model-b", label: "Model B", category: "Presets", isPreset: true },
           ]}
           onModelChange={onModelChange}
           autoFilter={false}

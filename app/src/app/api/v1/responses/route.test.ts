@@ -119,8 +119,8 @@ describe("/api/v1/responses", () => {
 
   it("streams response deltas", async () => {
     vi.mocked(runGeneration).mockImplementation(async (options) => {
-      options.writer.write({ type: "text-delta", delta: "hello" });
-      options.writer.write({ type: "text-delta", delta: " world" });
+      options.writer.write({ type: "text-delta", delta: "hello", id: "1" });
+      options.writer.write({ type: "text-delta", delta: " world", id: "2" });
       return {
         text: "hello world",
         citations: [],
