@@ -145,7 +145,12 @@ export class ChatService {
           writer.write({ type: "start", messageId: responseMessageId });
           writer.write({ type: "text-start", id: textId });
 
-          const instructions = await this.assembler.assemble(this.session, thread, userText, writer);
+          const { instructions, ragCitations } = await this.assembler.assemble(this.session, thread, userText, writer);
+
+          // Write RAG citations early so they appear in the UI
+          ragCitations.forEach((c, i) => {
+            writer.write({ type: "source-url", sourceId: `rag-${i}`, url: c.url, title: c.title } as UIMessageChunk);
+          });
 
           const keys = await getApiKeys();
           const result = await runGeneration({
@@ -161,9 +166,10 @@ export class ChatService {
           });
 
           const assistantText = result.text || runtimeConfig.chat.emptyResponseFallbackText;
-          const citations = result.citations || [];
+          const citations = [...ragCitations, ...(result.citations || [])];
 
           citations.forEach((c: { url?: string; title?: string }, i: number) => {
+            if (c.url?.startsWith("complexity://")) return; // Already written
             writer.write({ type: "source-url", sourceId: `source-${i}`, url: c.url, title: c.title } as UIMessageChunk);
           });
 

@@ -534,6 +534,16 @@ DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose build app
   - **Admin UI**: Added a dedicated **Audit Log** tab to the Admin Console with chronological event browsing and metadata inspection.
 - **Benefit**: Provides a verifiable paper trail for accountability, especially important for public or multi-user self-hosted instances.
 
+### RAG Chunk Attribution (2026-03-19)
+- **Feature**: Enhanced the Source Carousel to show specific text snippets from documents used for grounding (B7).
+- **Implementation**:
+  - Updated `ContextAssembler.ts` to capture and return the specific database chunks used during hybrid search.
+  - Refactored `ChatService.ts` to stream these RAG citations to the UI early and persist them in the message history.
+  - Upgraded `SourceCarousel.tsx` to display interactive cards with text previews.
+  - Added a "Source Attribution" modal (Radix Dialog) to allow users to read the full context chunk without leaving the chat.
+- **Benefit**: Improves grounding transparency, allowing users to instantly verify AI claims against their own uploaded documents.
+
+
 ### Webhooks & Automation (2026-03-19)
 - **Feature**: Implemented an outgoing webhook system for real-time automation (G2).
 - **Implementation**:

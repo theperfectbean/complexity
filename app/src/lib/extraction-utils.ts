@@ -4,6 +4,7 @@
  */
 
 export interface Citation {
+  id?: string;
   url?: string;
   title?: string;
   snippet?: string;
@@ -112,12 +113,14 @@ export function extractCitationsFromResponse(response: unknown): Citation[] {
   if (Array.isArray(responseCitations)) {
     responseCitations.forEach((c: unknown) => {
       if (typeof c === "string") {
-        citationsMap.set(c, { url: c });
+        citationsMap.set(c, { url: c, id: c });
       } else if (c && typeof c === "object") {
         const citationRecord = c as Record<string, unknown>;
         const url = typeof citationRecord.url === "string" ? citationRecord.url : undefined;
+        const id = typeof citationRecord.id === "string" ? citationRecord.id : url;
         if (url) {
           citationsMap.set(url, {
+            id,
             url,
             title: typeof citationRecord.title === "string" ? citationRecord.title : undefined,
             snippet: typeof citationRecord.snippet === "string" ? citationRecord.snippet : undefined,

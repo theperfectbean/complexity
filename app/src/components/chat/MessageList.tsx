@@ -11,6 +11,7 @@ import { cn, copyToClipboard, cleanMarkdownForCopy } from "@/lib/utils";
 import { MODELS, SearchModelOption } from "@/lib/models";
 
 export type ChatCitation = {
+  id?: string;
   url?: string;
   title?: string;
   snippet?: string;
@@ -96,8 +97,16 @@ const MessageItem = memo(function MessageItem({
   onCopy: (id: string, content: string) => void;
   copiedId: string | null;
 }) {
-  const urlsFromCitations = (message.citations ?? []).map((citation) => citation.url).filter(Boolean) as string[];
-  const urls = message.role === "assistant" ? (urlsFromCitations.length > 0 ? urlsFromCitations : extractUrls(message.content)) : [];
+  const displayCitations = useMemo(() => {
+    if (message.role !== "assistant") return [];
+    
+    if (message.citations && message.citations.length > 0) {
+      return message.citations;
+    }
+
+    return extractUrls(message.content).map(url => ({ url, title: url }));
+  }, [message.role, message.citations, message.content]);
+
   const isUser = message.role === "user";
   const isLastAssistantMessage = !isUser && index === totalMessages - 1;
 
@@ -333,9 +342,9 @@ const MessageItem = memo(function MessageItem({
           )}
 
           <div className="max-w-none break-words">
-            {urls.length > 0 ? (
+            {displayCitations.length > 0 ? (
               <div className="my-6 min-h-[100px]">
-                <SourceCarousel urls={urls} />
+                <SourceCarousel citations={displayCitations} />
               </div>
             ) : null}
             <MarkdownRenderer 

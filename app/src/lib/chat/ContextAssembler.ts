@@ -5,6 +5,7 @@ import { getMemoryPrompt } from "../memory";
 import { runtimeConfig } from "../config";
 import { env } from "../env";
 import { MODELS } from "../models";
+import { type Citation } from "../extraction-utils";
 import type { ChatSession, ThreadInfo } from "./types";
 import type { UIMessageChunk } from "ai";
 
@@ -47,11 +48,13 @@ ${content}`;
     }
   }
 
-  async assemble(session: ChatSession, thread: ThreadInfo, userText: string, writer: { write: (chunk: UIMessageChunk) => void }): Promise<string> {
+  async assemble(session: ChatSession, thread: ThreadInfo, userText: string, writer: { write: (chunk: UIMessageChunk) => void }): Promise<{ instructions: string; ragCitations: Citation[] }> {
     const { roleId, memoryEnabled, userId } = thread;
     const { roleInstructions } = thread;
 
     let ragContext = "";
+    const ragCitations: Citation[] = [];
+
     if (roleId) {
       writer.write({ type: "data-call-start", data: { callId: "rag-search", toolName: "Retrieval", input: { query: userText } } } as UIMessageChunk);
       try {
@@ -60,8 +63,16 @@ ${content}`;
         this.log.info({ count: results.length }, "Hybrid search complete");
         if (results.length > 0) {
           ragContext = results.map((c, i) => `(${i + 1}) ${c.content}`).join("\n\n");
+          results.forEach((c) => {
+            ragCitations.push({
+              id: c.id,
+              title: "Local Knowledge",
+              url: `complexity://chunk/${c.id}`,
+              snippet: c.content,
+            });
+          });
         }
-        writer.write({ type: "data-call-result", data: { callId: "rag-search", result: `Found ${chunks.length} context chunks.` } } as UIMessageChunk);
+        writer.write({ type: "data-call-result", data: { callId: "rag-search", result: `Found ${results.length} context chunks.` } } as UIMessageChunk);
       } catch (error) {
         this.log.error({ err: error }, "RAG search failed");
         writer.write({ type: "data-call-result", data: { callId: "rag-search", result: "Search failed, continuing with web search." } } as UIMessageChunk);
@@ -104,6 +115,6 @@ ${ragContext}
 If insufficient, continue with normal reasoning.` : "",
     ].filter(Boolean).join("\n\n") || "Provide a concise and accurate response.";
 
-    return instructions;
+    return { instructions, ragCitations };
   }
 }
