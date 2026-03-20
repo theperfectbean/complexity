@@ -56,6 +56,8 @@ export class ChatService {
     const userText = await extractTextFromMessage(lastMessage);
     if (!userText) throw new Error("Message text required");
 
+    const persistUserMessage = this.history.saveUserMessage(this.session, userText, isRegenerate);
+
     // /image <prompt> shortcut — generate an image instead of text
     if (userText.trimStart().startsWith("/image ")) {
       const imagePrompt = userText.trimStart().slice("/image ".length).trim();
@@ -77,8 +79,6 @@ export class ChatService {
         }),
       });
     }
-
-    const persistUserMessage = this.history.saveUserMessage(this.session, userText, isRegenerate);
 
     // Cache logic
     const { roleInstructions } = thread;

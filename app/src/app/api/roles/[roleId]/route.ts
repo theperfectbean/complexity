@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, or, exists } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 

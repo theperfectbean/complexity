@@ -26,7 +26,7 @@ type ThreadPayload = {
     pinned: boolean;
     tags: string[];
   };
-  messages: Array<{
+  messages: Array<{ 
     id: string;
     role: string;
     content: string;
@@ -148,38 +148,6 @@ export function ThreadChat({
     }
   }, [threadId]);
 
-  const loadMoreMessages = useCallback(async () => {
-    if (isLoadingMore || !hasMore || !nextCursor) return;
-
-    setIsLoadingMore(true);
-    try {
-      const res = await fetch(`/api/threads/${threadId}?cursor=${encodeURIComponent(nextCursor)}`);
-      if (!res.ok) throw new Error("Failed to load more messages");
-
-      const payload = await res.json() as ThreadPayload & { hasMore: boolean; nextCursor: string | null };
-      
-      const newMessages = payload.messages.map((m) => ({
-        id: m.id,
-        role: m.role as "user" | "assistant" | "system",
-        content: m.content,
-        parts: [{ type: "text" as const, text: m.content }],
-        ...(m.citations ? { citations: normalizeCitations(m.citations) } : {}),
-        memoriesUsed: (m as { memoriesUsed?: boolean }).memoriesUsed ?? false,
-      } as UIMessage));
-
-      // Prepend to useChat state
-      setMessages((prev) => [...newMessages, ...prev]);
-      
-      setHasMore(payload.hasMore);
-      setNextCursor(payload.nextCursor);
-    } catch (err) {
-      console.error(err);
-      toast.error("Failed to load older messages");
-    } finally {
-      setIsLoadingMore(false);
-    }
-  }, [threadId, nextCursor, hasMore, isLoadingMore, setMessages]);
-
   useEffect(() => {
     void fetchBranches();
   }, [fetchBranches]);
@@ -221,6 +189,39 @@ export function ThreadChat({
       }
     },
   });
+
+  const loadMoreMessages = useCallback(async () => {
+    if (isLoadingMore || !hasMore || !nextCursor) return;
+
+    setIsLoadingMore(true);
+    try {
+      const res = await fetch(`/api/threads/${threadId}?cursor=${encodeURIComponent(nextCursor)}`);
+      if (!res.ok) throw new Error("Failed to load more messages");
+
+      const payload = await res.json() as ThreadPayload & { hasMore: boolean; nextCursor: string | null };
+      
+      const newMessages = payload.messages.map((m) => ({
+        id: m.id,
+        role: m.role as "user" | "assistant" | "system",
+        content: m.content,
+        parts: [{ type: "text" as const, text: m.content }],
+        ...(m.citations ? { citations: normalizeCitations(m.citations) } : {}),
+        memoriesUsed: (m as { memoriesUsed?: boolean }).memoriesUsed ?? false,
+      } as UIMessage));
+
+      // Prepend to useChat state
+      setMessages((prev) => [...newMessages, ...prev]);
+      
+      setHasMore(payload.hasMore);
+      setNextCursor(payload.nextCursor);
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to load older messages");
+    } finally {
+      setIsLoadingMore(false);
+    }
+  }, [threadId, nextCursor, hasMore, isLoadingMore, setMessages]);
+
   const [prompt, setPrompt] = useState("");
 
   const mergedMessages = useMemo<ChatMessageItem[]>(() => {

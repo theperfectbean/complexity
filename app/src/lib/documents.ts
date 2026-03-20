@@ -7,7 +7,7 @@ export type DocumentFileLike = Pick<File, "name" | "type" | "arrayBuffer">;
 
 export async function performOcr(buffer: Buffer, fileName: string) {
   const formData = new FormData();
-  const blob = new Blob([buffer], { type: "application/pdf" });
+  const blob = new Blob([new Uint8Array(buffer)], { type: "application/pdf" });
   formData.append("file", blob, fileName);
 
   const response = await fetch(`${env.EMBEDDER_URL}/ocr`, {

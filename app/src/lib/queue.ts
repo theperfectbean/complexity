@@ -37,6 +37,7 @@ export async function queueDocumentProcessing(data: {
   filePath?: string;
   fileName: string;
   fileType: string;
+  text?: string;
 }) {
   if (!documentQueue) {
     logger.warn("Document queue not available, falling back to sync processing (not recommended)");

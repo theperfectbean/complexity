@@ -1,4 +1,4 @@
-import { and, asc, eq, gte, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -204,9 +204,12 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ th
     return NextResponse.json({ ok: true });
   }
 
-  // Rename thread
-  await db.update(threads).set({ title: parsed.data.title }).where(eq(threads.id, threadId));
-  return NextResponse.json({ ok: true });
+  if ("title" in parsed.data) {
+    await db.update(threads).set({ title: parsed.data.title }).where(eq(threads.id, threadId));
+    return NextResponse.json({ ok: true });
+  }
+
+  return NextResponse.json({ error: "No action specified" }, { status: 400 });
 }
 
 export async function DELETE(_: Request, { params }: { params: Promise<{ threadId: string }> }) {

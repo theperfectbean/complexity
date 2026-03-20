@@ -11,6 +11,10 @@ export type AuthenticatedUser = {
   email: string;
   isAdmin: boolean;
   memoryEnabled: boolean;
+  name: string | null;
+  image: string | null;
+  theme: string | null;
+  defaultModel: string | null;
 };
 
 /**
@@ -31,6 +35,10 @@ export async function requireUser(): Promise<{ user: AuthenticatedUser } | NextR
       email: users.email,
       isAdmin: users.isAdmin,
       memoryEnabled: users.memoryEnabled,
+      name: users.name,
+      image: users.image,
+      theme: users.theme,
+      defaultModel: users.defaultModel,
     })
     .from(users)
     .where(eq(users.email, email))
@@ -86,6 +94,10 @@ export async function requireUserOrApiToken(request: Request): Promise<{ user: A
         email: users.email,
         isAdmin: users.isAdmin,
         memoryEnabled: users.memoryEnabled,
+        name: users.name,
+        image: users.image,
+        theme: users.theme,
+        defaultModel: users.defaultModel,
       })
       .from(apiTokens)
       .innerJoin(users, eq(users.id, apiTokens.userId))

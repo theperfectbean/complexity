@@ -8,7 +8,7 @@ import GitHub from "next-auth/providers/github";
 import Google from "next-auth/providers/google";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
-import { authenticator } from "otplib";
+import { verifySync } from "otplib";
 
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
@@ -113,7 +113,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           }
           let secret = user.totpSecret;
           try { secret = decrypt(user.totpSecret); } catch { /* not encrypted, use raw */ }
-          const isValidTotp = authenticator.verify({ token: parsed.data.totpCode, secret });
+          const isValidTotp = verifySync({ token: parsed.data.totpCode, secret });
           if (!isValidTotp) {
             throw new Error("TOTP_INVALID");
           }

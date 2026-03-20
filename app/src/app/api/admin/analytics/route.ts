@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
-import { sql, desc } from "drizzle-orm";
+import { sql, desc, eq } from "drizzle-orm";
 
 import { db } from "@/lib/db";
-import { users, threads, messages, memories, documents, chunks } from "@/lib/db/schema";
+import { users, threads, messages, memories, documents, chunks, roles } from "@/lib/db/schema";
 import { requireAdmin } from "@/lib/auth-server";
 
 export const dynamic = "force-dynamic";
@@ -89,7 +89,7 @@ export async function GET() {
     modelBreakdown,
     userActivity,
     roleActivity,
-    dailyActivity: dailyActivity.rows,
+    dailyActivity,
     tokens: tokenEstimation.map(t => ({
       model: t.model,
       estimatedTokens: Math.round((t.totalChars || 0) / 4) // Rough proxy: 4 chars per token

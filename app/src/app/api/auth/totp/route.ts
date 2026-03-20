@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { authenticator } from "otplib";
+import { generateSecret, generateURI, verifySync } from "otplib";
 import QRCode from "qrcode";
 import { eq } from "drizzle-orm";
 import { auth } from "@/auth";
@@ -21,8 +21,8 @@ export async function GET() {
     return NextResponse.json({ error: "2FA is already enabled" }, { status: 409 });
   }
 
-  const secret = authenticator.generateSecret();
-  const otpauth = authenticator.keyuri(user.email, "Complexity", secret);
+  const secret = generateSecret();
+  const otpauth = generateURI({ label: user.email, issuer: "Complexity", secret });
   const qrCodeDataUrl = await QRCode.toDataURL(otpauth);
 
   return NextResponse.json({ secret, qrCodeDataUrl });
@@ -36,7 +36,7 @@ export async function POST(request: Request) {
   const body = z.object({ secret: z.string().min(16), code: z.string().length(6) }).safeParse(await request.json());
   if (!body.success) return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
 
-  const isValid = authenticator.verify({ token: body.data.code, secret: body.data.secret });
+  const isValid = verifySync({ token: body.data.code, secret: body.data.secret });
   if (!isValid) return NextResponse.json({ error: "Invalid code" }, { status: 400 });
 
   const encryptedSecret = encrypt(body.data.secret);
@@ -64,7 +64,7 @@ export async function DELETE(request: Request) {
   let secret = user.totpSecret;
   try { secret = decrypt(user.totpSecret); } catch { /* raw */ }
 
-  const isValid = authenticator.verify({ token: body.data.code, secret });
+  const isValid = verifySync({ token: body.data.code, secret });
   if (!isValid) return NextResponse.json({ error: "Invalid code" }, { status: 400 });
 
   await db.update(users).set({ totpSecret: null, totpEnabled: false }).where(eq(users.email, session.user.email));

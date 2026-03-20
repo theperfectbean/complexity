@@ -24,7 +24,10 @@ export const users = pgTable(
     image: text("image"),
     theme: varchar("theme", { length: 50 }),
     memoryEnabled: boolean("memory_enabled").default(true),
+    defaultModel: varchar("default_model", { length: 100 }),
     isAdmin: boolean("is_admin").default(false).notNull(),
+    totpSecret: text("totp_secret"),
+    totpEnabled: boolean("totp_enabled").default(false).notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -109,6 +112,12 @@ export const roles = pgTable("roles", {
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const settings = pgTable("settings", {
+  key: varchar("key", { length: 255 }).primaryKey(),
+  value: text("value"),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -208,11 +217,12 @@ export const memories = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     threadId: text("thread_id")
-      .notNull()
       .references(() => threads.id, { onDelete: "cascade" }),
     content: text("content").notNull(),
     embedding: vector("embedding", { dimensions: 384 }).notNull(),
+    source: varchar("source", { length: 20 }).notNull().default("auto"), // 'auto', 'manual'
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
     index("memories_user_idx").on(table.userId),
@@ -231,6 +241,7 @@ export const documents = pgTable("documents", {
     .notNull()
     .references(() => roles.id, { onDelete: "cascade" }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 export const chunks = pgTable(

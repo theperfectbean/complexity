@@ -5,7 +5,6 @@ const withPWA = withPWAInit({
   dest: "public",
   disable: process.env.NODE_ENV === "development",
   register: true,
-  skipWaiting: true,
 });
 
 const nextConfig: NextConfig = {
@@ -17,6 +16,7 @@ const nextConfig: NextConfig = {
   experimental: {
     proxyClientMaxBodySize: 50 * 1024 * 1024, // 50MB
   },
+  turbopack: {},
 };
 
 export default withPWA(nextConfig);

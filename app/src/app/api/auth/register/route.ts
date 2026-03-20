@@ -62,7 +62,7 @@ export async function POST(request: Request) {
   const parsed = schema.safeParse(payload);
 
   if (!parsed.success) {
-    const firstError = parsed.error.errors[0]?.message ?? "Invalid payload";
+    const firstError = parsed.error.issues[0]?.message ?? "Invalid payload";
     return NextResponse.json({ error: firstError }, { status: 400 });
   }
 

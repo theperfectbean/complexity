@@ -262,6 +262,14 @@ DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose build app
 - **Type Safety Hardening**: Resolved several `any` type issues in `perplexity-agent.ts` and `api-response.ts` by using proper interfaces and explicit type guards, satisfying strict linting rules.
 - **Build Performance**: Fixed build-time EACCES errors by ensuring proper cleanup of host-mapped `.next` directories.
 
+### Build & Dependency Fixes (2026-03-20)
+- **Next.js 16 Build**: Resolved Turbopack/webpack conflicts by adding `turbopack: {}` to `next.config.ts`.
+- **Dependency Missing**: Installed `date-fns` which was used in the UI but missing from `package.json`.
+- **Otplib v13 Migration**: Updated 2FA logic to use `otplib` v13 functional exports (`verifySync`, `generateSecret`, `generateURI`) as the default `authenticator` instance was removed in v13.
+- **Database Schema Sync**: Restored missing `settings` table and added missing columns (`totpSecret`, `totpEnabled`, `defaultModel`, `updatedAt`, `source`) across `users`, `memories`, and `documents` tables to align schema with code usage.
+- **TypeScript & Build Integrity**: Fixed several critical type errors including missing Drizzle imports (`eq`, `or`, `desc`, `exists`), illegal property access in Zod (`.issues` vs `.errors`), and out-of-order variable declarations in `ThreadPage` and `ChatService`.
+- **Viewport Metadata**: Moved `themeColor` from `metadata` to the new `viewport` export in `layout.tsx` to comply with Next.js 16 standards and silence build warnings.
+
 ## Workspace Hygiene & Maintenance
 - **Mandatory Cleanup**: To prevent disk space exhaustion, the agent MUST run `sudo rm -rf app/.next` and `npm cache clean --force` as a mandatory final step for every task execution. **If the `complexity-app` container is running, it MUST be restarted immediately after cleanup to restore missing build manifests.** This is critical in this environment where large E2E test runs and frequent builds can rapidly consume storage.
 

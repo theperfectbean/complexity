@@ -44,12 +44,16 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ me
     return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
   }
 
-  let embedding: number[] | null = null;
+  let embedding: number[];
   try {
     const [fetchedEmbedding] = await getEmbeddings([parsed.data.content.trim()]);
+    if (!fetchedEmbedding) {
+      throw new Error("No embedding returned");
+    }
     embedding = fetchedEmbedding;
   } catch (error) {
     console.error("[Memory] Failed to generate embedding on update:", error);
+    return NextResponse.json({ error: "Failed to generate embedding" }, { status: 500 });
   }
 
   await db
@@ -57,7 +61,6 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ me
     .set({
       content: parsed.data.content.trim(),
       embedding,
-      updatedAt: new Date(),
     })
     .where(eq(memories.id, memoryId));
 

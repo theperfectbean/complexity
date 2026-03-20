@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { headers } from "next/headers";
 import { AppShell } from "@/components/layout/AppShell";
 import { AppProviders } from "@/lib/auth-client";
@@ -26,11 +26,18 @@ const sourceSerif = Source_Serif_4({
   display: "swap",
 });
 
+export const viewport: Viewport = {
+  themeColor: "#000000",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+};
+
 export const metadata: Metadata = {
   title: "Complexity",
   description: "Self-hosted Agentic answer engine",
   manifest: "/manifest.json",
-  themeColor: "#000000",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
@@ -49,14 +56,10 @@ export default async function RootLayout({
   const nonce = (await headers()).get("x-nonce") ?? undefined;
 
   return (
-    <html
-      lang="en"
-      suppressHydrationWarning
-      className={`${GeistSans.variable} ${dmSans.variable} ${beVietnamPro.variable} ${sourceSerif.variable}`}
-    >
-      <body suppressHydrationWarning className="antialiased">
+    <html lang="en" suppressHydrationWarning className={`${GeistSans.variable} ${beVietnamPro.variable} ${sourceSerif.variable} ${dmSans.variable}`}>
+      <body className="bg-background font-sans text-foreground antialiased selection:bg-primary/10 selection:text-primary">
         <AppProviders nonce={nonce}>
-          <AppShell contentClassName="flex min-h-screen flex-1">{children}</AppShell>
+          <AppShell>{children}</AppShell>
         </AppProviders>
       </body>
     </html>

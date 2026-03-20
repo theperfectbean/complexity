@@ -59,7 +59,7 @@ export async function POST(
   const body = await request.json() as unknown;
   const parsed = schema.safeParse(body);
   if (!parsed.success) {
-    return ApiResponse.badRequest(parsed.error.errors[0]?.message ?? "Invalid input");
+    return ApiResponse.badRequest(parsed.error.issues[0]?.message ?? "Invalid input");
   }
 
   const { url, title } = parsed.data;

@@ -219,6 +219,7 @@ export async function runGeneration(options: GenerationOptions): Promise<Generat
       tools: options.webSearch && env.TAVILY_API_KEY ? {
         web_search: webSearchTool,
       } : undefined,
+      // @ts-ignore
       maxSteps: options.webSearch ? 5 : 1,
     });
 
@@ -226,7 +227,7 @@ export async function runGeneration(options: GenerationOptions): Promise<Generat
       if (part.type === "tool-call") {
         options.writer.write({
           type: "data-call-start",
-          data: { callId: part.toolCallId, toolName: "Web Search", input: part.args },
+          data: { callId: part.toolCallId, toolName: "Web Search", input: (part as any).args || (part as any).input },
         } as UIMessageChunk);
       } else if (part.type === "tool-result") {
         options.writer.write({

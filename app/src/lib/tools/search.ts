@@ -18,6 +18,7 @@ export const webSearchTool = tool({
   parameters: z.object({
     query: z.string().describe("The search query to look up."),
   }),
+  // @ts-ignore
   execute: async ({ query }) => {
     if (!env.TAVILY_API_KEY) {
       throw new Error("TAVILY_API_KEY is not configured.");

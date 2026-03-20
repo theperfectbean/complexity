@@ -61,12 +61,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Memory limit reached" }, { status: 400 });
   }
 
-  let embedding: number[] | null = null;
+  let embedding: number[];
   try {
     const [fetchedEmbedding] = await getEmbeddings([parsed.data.content.trim()]);
+    if (!fetchedEmbedding) {
+       return NextResponse.json({ error: "Failed to generate embedding" }, { status: 500 });
+    }
     embedding = fetchedEmbedding;
   } catch (error) {
     console.error("[Memory] Failed to generate embedding:", error);
+    return NextResponse.json({ error: "Failed to generate embedding" }, { status: 500 });
   }
 
   const now = new Date();
@@ -77,7 +81,7 @@ export async function POST(request: Request) {
     content: parsed.data.content.trim(),
     embedding,
     source: "manual",
-    threadId: null,
+    threadId: undefined, // manual memories don't have a threadId
     createdAt: now,
     updatedAt: now,
   });

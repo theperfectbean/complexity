@@ -102,10 +102,11 @@ export async function deleteMemories(ids: string[]) {
 }
 
 export async function insertMemories(userId: string, threadId: string, items: { content: string, embedding: number[] | null }[]) {
-  if (items.length === 0) return;
+  const validItems = items.filter((item): item is { content: string, embedding: number[] } => item.embedding !== null);
+  if (validItems.length === 0) return;
   const now = new Date();
   await db.insert(memories).values(
-    items.map((item) => ({
+    validItems.map((item) => ({
       id: crypto.randomUUID(),
       userId,
       content: item.content,
