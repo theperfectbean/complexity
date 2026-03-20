@@ -77,6 +77,11 @@ DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose build app
 
 ## Key Findings & Implementation Notes
 
+### Model Selector UI & Discovery Improvements (2026-03-21)
+- **Enhanced Dropdown**: Refactored `ModelSelector` with a premium UI featuring provider-specific icons (Anthropic, OpenAI, etc.), better spacing, and a "Checked" indicator for the active model.
+- **Friendlier Labels**: Implemented an automatic "prettify" utility that cleans up raw model IDs (e.g., `perplexity/anthropic/claude-3-5-sonnet-latest`) into readable labels (`Claude 3 5 Sonnet Latest`) both in the chat UI and when discovering new models in the Admin Console.
+- **Categorization**: Improved grouping with icons and uppercase sub-headers for better visual hierarchy.
+
 ### Custom Models Dropdown Bug Fix (2026-03-21)
 - **Problem**: The `ModelSelector` component was only displaying the default base models ("Fast Search", "Pro Search", "Perplexity Sonar") instead of the user's custom selected models saved in "Manage Models".
 - **Root Cause**: `app/next.config.ts` had hardcoded `env: { IS_NEXT_BUILD: "true" }`. Next.js injects variables defined in the `env` object of `next.config.ts` at *both* build time and run time. Because `IS_NEXT_BUILD` was constantly evaluated to `"true"` at runtime, the `getSetting` utility (which bypasses Redis/DB reads during builds to avoid connection errors) always returned `null`. This forced `getConfiguredModels` to fallback to `DEFAULT_MODELS`, which were then filtered down to only the base Perplexity models.
