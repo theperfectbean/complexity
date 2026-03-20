@@ -64,7 +64,7 @@ export class ChatService {
       const textId = createId();
       const keys = await getApiKeys();
       const imageMarkdown = await generateImage(imagePrompt, keys);
-      await this.history.saveAssistantMessage(this.session, responseMessageId, imageMarkdown, []);
+      await this.history.saveAssistantMessage(this.session, responseMessageId, imageMarkdown, [], false);
       return createUIMessageStreamResponse({
         stream: createUIMessageStream({
           execute: async ({ writer }) => {
@@ -88,7 +88,7 @@ export class ChatService {
     if (cached) {
       await persistUserMessage;
       const responseMessageId = createId();
-      await this.history.saveAssistantMessage(this.session, responseMessageId, cached.text, cached.citations);
+      await this.history.saveAssistantMessage(this.session, responseMessageId, cached.text, cached.citations, false);
 
       return createUIMessageStreamResponse({
         stream: createUIMessageStream({
@@ -145,7 +145,7 @@ export class ChatService {
           writer.write({ type: "start", messageId: responseMessageId });
           writer.write({ type: "text-start", id: textId });
 
-          const { instructions, ragCitations } = await this.assembler.assemble(this.session, thread, userText, writer);
+          const { instructions, ragCitations, memoriesFound } = await this.assembler.assemble(this.session, thread, userText, writer);
 
           // Write RAG citations early so they appear in the UI
           ragCitations.forEach((c, i) => {
@@ -174,7 +174,7 @@ export class ChatService {
           });
 
           await this.history.setCache(this.session, cacheKey, { text: assistantText, citations });
-          await this.history.saveAssistantMessage(this.session, responseMessageId, assistantText, citations);
+          await this.history.saveAssistantMessage(this.session, responseMessageId, assistantText, citations, memoriesFound > 0);
 
           if (thread.memoryEnabled) {
             const memoryPromise = saveExtractedMemories({

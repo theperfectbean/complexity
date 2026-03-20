@@ -194,6 +194,7 @@ export const messages = pgTable(
     content: text("content").notNull(),
     model: varchar("model", { length: 50 }),
     citations: jsonb("citations"),
+    memoriesUsed: boolean("memories_used").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [index("messages_thread_created_idx").on(table.threadId, table.createdAt)],

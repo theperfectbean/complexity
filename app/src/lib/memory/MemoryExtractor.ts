@@ -60,9 +60,12 @@ export function buildMemoryPrompt(memoriesList: string[]): string {
   ].join("\n");
 }
 
-export async function getMemoryPrompt(userId: string, userText?: string): Promise<string> {
+export async function getMemoryPrompt(userId: string, userText?: string): Promise<{ prompt: string; count: number }> {
   const memoriesList = await MemoryStore.searchMemories(userId, userText);
-  return buildMemoryPrompt(memoriesList);
+  return {
+    prompt: buildMemoryPrompt(memoriesList),
+    count: memoriesList.length,
+  };
 }
 
 export async function extractMemories({

@@ -543,6 +543,16 @@ DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose build app
   - Added a "Source Attribution" modal (Radix Dialog) to allow users to read the full context chunk without leaving the chat.
 - **Benefit**: Improves grounding transparency, allowing users to instantly verify AI claims against their own uploaded documents.
 
+### Memory Visibility & Transparency (2026-03-19)
+- **Feature**: Added a visual indicator when the AI uses past memories to personalize its response (C5).
+- **Implementation**:
+  - **Database**: Added a `memories_used` boolean column to the `messages` table.
+  - **Backend**: Updated `ContextAssembler.ts` to track if any relevant memories were recalled and injected into the prompt.
+  - **API**: Modified `ChatService.ts` to save the `memories_used` status for each assistant message and stream a "Recall" status event to the UI during reasoning.
+  - **UI**: Integrated a "Context: Recalled Memories" badge (Brain icon) in `MessageList.tsx` that appears above messages influenced by the memory system.
+- **Benefit**: Provides users with clarity on why the AI might be referencing personal facts or preferences from previous conversations.
+
+
 
 ### Webhooks & Automation (2026-03-19)
 - **Feature**: Implemented an outgoing webhook system for real-time automation (G2).

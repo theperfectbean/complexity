@@ -164,6 +164,7 @@ export function ThreadChat({
         content: m.content,
         parts: [{ type: "text" as const, text: m.content }],
         ...(m.citations ? { citations: normalizeCitations(m.citations) } : {}),
+        memoriesUsed: (m as { memoriesUsed?: boolean }).memoriesUsed ?? false,
       } as UIMessage));
 
       // Prepend to useChat state
@@ -553,6 +554,7 @@ export default function ThreadPage() {
             role: message.role,
             content: message.content,
             citations: normalizeCitations(message.citations),
+            memoriesUsed: (message as { memoriesUsed?: boolean }).memoriesUsed ?? false,
           })),
           hasMore: payload.hasMore,
           nextCursor: payload.nextCursor,

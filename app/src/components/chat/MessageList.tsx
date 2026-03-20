@@ -30,6 +30,7 @@ export type ChatMessageItem = {
   content: string;
   citations?: ChatCitation[];
   thinking?: ChatThinkingPart[];
+  memoriesUsed?: boolean;
 };
 
 export type ChatBranch = {
@@ -342,6 +343,12 @@ const MessageItem = memo(function MessageItem({
           )}
 
           <div className="max-w-none break-words">
+            {message.memoriesUsed && (
+              <div className="mb-4 flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-primary/80 bg-primary/5 w-fit px-2 py-1 rounded-md border border-primary/10">
+                <Brain className="h-3 w-3" />
+                Context: Recalled Memories
+              </div>
+            )}
             {displayCitations.length > 0 ? (
               <div className="my-6 min-h-[100px]">
                 <SourceCarousel citations={displayCitations} />

@@ -48,7 +48,7 @@ ${content}`;
     }
   }
 
-  async assemble(session: ChatSession, thread: ThreadInfo, userText: string, writer: { write: (chunk: UIMessageChunk) => void }): Promise<{ instructions: string; ragCitations: Citation[] }> {
+  async assemble(session: ChatSession, thread: ThreadInfo, userText: string, writer: { write: (chunk: UIMessageChunk) => void }): Promise<{ instructions: string; ragCitations: Citation[]; memoriesFound: number }> {
     const { roleId, memoryEnabled, userId } = thread;
     const { roleInstructions } = thread;
 
@@ -80,7 +80,17 @@ ${content}`;
     }
 
     const externalContext = roleId ? await this.loadExternalData(roleId) : "";
-    const memoryPrompt = memoryEnabled ? await getMemoryPrompt(userId, userText) : "";
+    
+    let memoryPrompt = "";
+    let memoriesFound = 0;
+    
+    if (memoryEnabled) {
+      writer.write({ type: "data-call-start", data: { callId: "memory-search", toolName: "Recall", input: { query: userText } } } as UIMessageChunk);
+      const memResult = await getMemoryPrompt(userId, userText);
+      memoryPrompt = memResult.prompt;
+      memoriesFound = memResult.count;
+      writer.write({ type: "data-call-result", data: { callId: "memory-search", result: memoriesFound > 0 ? `Recalled ${memoriesFound} relevant memories.` : "No relevant memories found." } } as UIMessageChunk);
+    }
     
     const agenticGuidelines = `
 - You are an agentic search assistant. 
@@ -115,6 +125,6 @@ ${ragContext}
 If insufficient, continue with normal reasoning.` : "",
     ].filter(Boolean).join("\n\n") || "Provide a concise and accurate response.";
 
-    return { instructions, ragCitations };
+    return { instructions, ragCitations, memoriesFound };
   }
 }

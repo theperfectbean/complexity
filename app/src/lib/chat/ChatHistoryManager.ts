@@ -56,7 +56,7 @@ export class ChatHistoryManager {
     return userMessageId;
   }
 
-  async saveAssistantMessage(session: ChatSession, responseMessageId: string, text: string, citations: Citation[]): Promise<void> {
+  async saveAssistantMessage(session: ChatSession, responseMessageId: string, text: string, citations: Citation[], memoriesUsed = false): Promise<void> {
     const { threadId, model } = session;
     await db.insert(messages).values({
       id: responseMessageId,
@@ -65,6 +65,7 @@ export class ChatHistoryManager {
       content: text,
       model,
       citations: citations.length > 0 ? JSON.parse(JSON.stringify(citations)) : null,
+      memoriesUsed,
     });
     await db.update(threads).set({ model, updatedAt: new Date() }).where(eq(threads.id, threadId));
   }
