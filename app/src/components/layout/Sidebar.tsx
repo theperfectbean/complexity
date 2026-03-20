@@ -145,7 +145,6 @@ export function Sidebar({ collapsed = false, onToggle, onNavigate }: SidebarProp
   const navItems = [
     { href: "/", label: "Home", icon: Home },
     { href: "/roles", label: "Roles", icon: Users },
-    { href: "/docs/api", label: "API Docs", icon: FileCode2 },
   ];
 
   const pinnedThreads = threads.filter((t) => t.pinned);
@@ -471,6 +470,17 @@ export function Sidebar({ collapsed = false, onToggle, onNavigate }: SidebarProp
                 >
                   <Webhook className="h-4 w-4 text-muted-foreground" />
                   Webhooks
+                </Link>
+              </DropdownMenu.Item>
+
+              <DropdownMenu.Item asChild>
+                <Link 
+                  href="/docs/api"
+                  className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm outline-none hover:bg-black/5 dark:hover:bg-white/5 focus:bg-black/5 dark:focus:bg-white/5"
+                  onClick={onNavigate}
+                >
+                  <FileCode2 className="h-4 w-4 text-muted-foreground" />
+                  API Docs
                 </Link>
               </DropdownMenu.Item>
 
