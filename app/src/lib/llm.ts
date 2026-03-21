@@ -4,7 +4,7 @@ import OpenAI from "openai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createXai } from "@ai-sdk/xai";
 import { createOllama } from "ai-sdk-ollama";
-import { LanguageModel, streamText, convertToModelMessages, UIMessageChunk, UIMessage } from "ai";
+import { LanguageModel, streamText, convertToModelMessages, UIMessageChunk, UIMessage, generateText } from "ai";
 import type { Responses } from "@perplexity-ai/perplexity_ai/resources/responses";
 import { runSearchAgent } from "./search-agent";
 import { runtimeConfig } from "./config";
@@ -142,10 +142,18 @@ export function getLanguageModel(modelId: string, keys: Record<string, string | 
     const perplexityKey = keys["PERPLEXITY_API_KEY"];
     if (!perplexityKey) throw new Error("PERPLEXITY_API_KEY is not configured");
     
+    // Perplexity only supports native models on the /v1/chat/completions endpoint.
+    // If we have a third-party model ID (contains a slash) via Perplexity,
+    // we must fallback to a native model for standard Chat API tasks.
+    const isNativePerplexity = !modelName.includes("/") || modelName === "sonar";
+    const effectiveModel = isNativePerplexity ? mapToPerplexityModel(modelName) : "sonar";
+
+    console.log(`[getLanguageModel:perplexity] modelName: ${modelName}, effectiveModel: ${effectiveModel}`);
+
     return createOpenAI({
       apiKey: perplexityKey,
-      baseURL: "https://api.perplexity.ai/v1",
-    }).chat(mapToPerplexityModel(modelName));
+      baseURL: "https://api.perplexity.ai",
+    }).chat(effectiveModel);
   }
 
   const factory = factories[provider];
@@ -269,6 +277,26 @@ export async function runGeneration(options: GenerationOptions): Promise<Generat
 export function isPerplexityProvider(modelId: string): boolean {
   const { provider } = getProviderAndModel(modelId);
   return provider === "perplexity";
+}
+
+/**
+ * Summarize a user's first message into a high-quality thread title.
+ */
+export async function generateThreadTitle(message: string, modelId: string, keys: Record<string, string | null>): Promise<string> {
+  try {
+    const model = getLanguageModel(modelId, keys);
+    
+    const { text } = await generateText({
+      model,
+      system: "You are a helpful assistant that summarizes user queries into short, descriptive thread titles (3-6 words). Do not use quotes or special characters. Return ONLY the title text. Be concise but descriptive.",
+      prompt: `Summarize this query into a title: ${message}`,
+    });
+    
+    return text.trim().replace(/^["']|["']$/g, "").replace(/\.$/, "");
+  } catch (error) {
+    console.error("[generateThreadTitle] Error:", error);
+    return message.slice(0, 60) + (message.length > 60 ? "..." : "");
+  }
 }
 
 /**

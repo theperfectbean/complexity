@@ -2,7 +2,6 @@
 
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, UIMessageChunk, UIMessage } from "ai";
-import { Download } from "lucide-react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -283,6 +282,46 @@ export function ThreadChat({
     if (data.tags !== undefined) setTags(data.tags);
   }, []);
 
+  const handleDeleteMessage = useCallback(async (messageId: string) => {
+    // Find the message and its potential pair
+    const targetIndex = messages.findIndex(m => m.id === messageId);
+    if (targetIndex === -1) return;
+
+    const targetMsg = messages[targetIndex];
+    const idsToRemove = [messageId];
+
+    // If it's an assistant message, delete it and the preceding user message
+    if (targetMsg.role === "assistant" && targetIndex > 0) {
+      const prevMsg = messages[targetIndex - 1];
+      if (prevMsg.role === "user") {
+        idsToRemove.push(prevMsg.id);
+      }
+    } else if (targetMsg.role === "user" && targetIndex < messages.length - 1) {
+      // If it's a user message, delete it and the following assistant message
+      const nextMsg = messages[targetIndex + 1];
+      if (nextMsg.role === "assistant") {
+        idsToRemove.push(nextMsg.id);
+      }
+    }
+
+    // Update local UI (optimistic)
+    const originalMessages = [...messages];
+    setMessages(messages.filter(m => !idsToRemove.includes(m.id)));
+
+    try {
+      const res = await fetch(`/api/threads/${threadId}/messages/${messageId}`, {
+        method: "DELETE",
+      });
+
+      if (!res.ok) throw new Error("Failed to delete message");
+      toast.success("Message pair deleted");
+    } catch (err) {
+      console.error("Delete failed:", err);
+      toast.error("Failed to delete message");
+      setMessages(originalMessages);
+    }
+  }, [threadId, messages, setMessages]);
+
   useEffect(() => {
     if (!initialQuery || hasSubmittedInitialQuery.current) {
       return;
@@ -403,15 +442,6 @@ export function ThreadChat({
             onUpdate={handleThreadSettingsUpdate} 
           />
           <ImageGallery messages={mergedMessages} />
-          {mergedMessages.length > 0 && (
-            <button
-              onClick={() => exportMessagesAsMarkdown(threadTitle, mergedMessages)}
-              title="Export conversation as Markdown"
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground/50 transition-colors hover:bg-muted hover:text-foreground"
-            >
-              <Download className="h-4 w-4" />
-            </button>
-          )}
         </div>
       </div>
 
@@ -426,6 +456,8 @@ export function ThreadChat({
           isLoadingMore={isLoadingMore}
           isStreaming={status === "streaming"}
           emptyLabel="Start this thread with your first question."
+          onDownload={() => exportMessagesAsMarkdown(threadTitle, mergedMessages)}
+          onDelete={handleDeleteMessage}
           onRetry={() => {
             const lastMessage = mergedMessages[mergedMessages.length - 1];
             if (!lastMessage) return;

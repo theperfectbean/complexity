@@ -5,7 +5,6 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { MoreHorizontal, X, Trash2, Save, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-import { cn } from "@/lib/utils";
 
 type Role = {
   id: string;

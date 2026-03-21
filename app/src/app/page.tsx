@@ -31,7 +31,7 @@ export default function Home() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          title: query.slice(0, 80) || (attachments.length > 0 ? attachments[0].name : "New Thread"),
+          initialMessage: query.trim() || (attachments.length > 0 ? attachments[0].name : undefined),
           model,
         }),
       });

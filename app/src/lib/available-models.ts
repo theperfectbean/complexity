@@ -61,10 +61,31 @@ export async function getAvailableModels(options?: {
   };
 }
 
-export async function resolveRequestedModel(requestedModel?: string): Promise<string> {
+export async function resolveRequestedModel(
+  requestedModel?: string, 
+  options?: { preferNonPreset?: boolean }
+): Promise<string> {
   const { models } = await getAvailableModels();
-  if (requestedModel && models.some((model) => model.id === requestedModel)) {
-    return requestedModel;
+  
+  if (requestedModel) {
+    // 1. Exact match
+    const exact = models.find((model) => model.id === requestedModel);
+    if (exact && (!options?.preferNonPreset || !exact.isPreset)) {
+      return exact.id;
+    }
+
+    // 2. Base ID match (e.g. "anthropic/claude-..." matching "perplexity/anthropic/claude-...")
+    const baseRequested = requestedModel.includes("/") ? requestedModel.split("/").slice(-2).join("/") : requestedModel;
+    const fuzzyMatch = models.find(m => m.id.endsWith(baseRequested));
+    if (fuzzyMatch && (!options?.preferNonPreset || !fuzzyMatch.isPreset)) {
+      return fuzzyMatch.id;
+    }
+  }
+
+  // 3. Prefer non-preset if requested (good for streamText/Chat API tasks)
+  if (options?.preferNonPreset) {
+    const nonPreset = models.find(m => !m.isPreset);
+    if (nonPreset) return nonPreset.id;
   }
 
   return models[0]?.id ?? getDefaultModel();

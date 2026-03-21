@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Copy, RotateCcw, ArrowDown, Globe, Search, Brain, Database, Pencil, ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
+import { Check, Copy, RotateCcw, ArrowDown, Globe, Search, Brain, Database, Pencil, ChevronLeft, ChevronRight, RefreshCw, Download, ExternalLink, Trash2 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { useState, useRef, useEffect, useCallback, memo, useMemo } from "react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
@@ -47,11 +47,13 @@ type MessageListProps = {
   emptyLabel: string;
   onRetry?: () => void;
   onRewrite?: (modelId: string) => void;
+  onDelete?: (messageId: string) => void;
   onEditMessage?: (messageId: string, newContent: string) => Promise<void>;
   onLoadMore?: () => Promise<void>;
   hasMore?: boolean;
   isLoadingMore?: boolean;
   isStreaming?: boolean;
+  onDownload?: () => void;
 };
 
 const urlPattern = /(https?:\/\/[\w\-._~:/?#\[\]@!$&'()*+,;=%]+)/g;
@@ -81,8 +83,10 @@ const MessageItem = memo(function MessageItem({
   isStreaming, 
   onRetry, 
   onRewrite,
+  onDelete,
   onEditMessage,
   onCopy, 
+  onDownload,
   copiedId 
 }: {
   message: ChatMessageItem;
@@ -94,8 +98,10 @@ const MessageItem = memo(function MessageItem({
   isStreaming?: boolean;
   onRetry?: () => void;
   onRewrite?: (modelId: string) => void;
+  onDelete?: (messageId: string) => void;
   onEditMessage?: (messageId: string, newContent: string) => Promise<void>;
   onCopy: (id: string, content: string) => void;
+  onDownload?: () => void;
   copiedId: string | null;
 }) {
   const displayCitations = useMemo(() => {
@@ -116,12 +122,46 @@ const MessageItem = memo(function MessageItem({
   const [isSaving, setIsSaving] = useState(false);
   const editRef = useRef<HTMLTextAreaElement>(null);
 
+  // Auto-expand textarea
+  const adjustTextareaHeight = useCallback(() => {
+    const textarea = editRef.current;
+    if (textarea) {
+      const prevHeight = textarea.style.height;
+      textarea.style.height = "auto";
+      const newHeight = Math.max(textarea.scrollHeight, 44);
+      const newHeightPx = `${newHeight}px`;
+      
+      if (prevHeight !== newHeightPx) {
+        textarea.style.height = newHeightPx;
+      } else {
+        textarea.style.height = prevHeight; // Restore
+      }
+    }
+  }, []);
+
   useEffect(() => {
     if (isEditing && editRef.current) {
-      editRef.current.focus();
-      editRef.current.setSelectionRange(editRef.current.value.length, editRef.current.value.length);
+      const textarea = editRef.current;
+      textarea.focus();
+      textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+      
+      // Use a small delay to ensure the container width has settled before measuring
+      const timer = setTimeout(() => {
+        adjustTextareaHeight();
+      }, 0);
+
+      // Monitor width changes to re-adjust height
+      const observer = new ResizeObserver(() => {
+        adjustTextareaHeight();
+      });
+      observer.observe(textarea);
+      
+      return () => {
+        clearTimeout(timer);
+        observer.disconnect();
+      };
     }
-  }, [isEditing]);
+  }, [isEditing, adjustTextareaHeight]);
 
   const handleEditSubmit = async () => {
     const trimmed = editContent.trim();
@@ -209,36 +249,97 @@ const MessageItem = memo(function MessageItem({
         style={{ overflowAnchor: "auto" }}
       >
       {isUser ? (
-        <div className="group/user relative w-fit max-w-[85%] md:max-w-[75%]">
-          {relevantBranches.length > 1 && onBranchChange && (
-            <div className="absolute -left-20 top-1/2 -translate-y-1/2 flex items-center gap-1.5 opacity-0 group-hover/user:opacity-100 transition-opacity bg-background/80 backdrop-blur-sm px-2 py-1 rounded-full border border-border/40 shadow-sm text-[11px] font-medium text-muted-foreground whitespace-nowrap">
-              <button 
-                onClick={() => {
-                  const prev = relevantBranches[currentBranchIndex - 1] || relevantBranches[relevantBranches.length - 1];
-                  onBranchChange(prev.id);
-                }}
-                className="hover:text-foreground transition-colors"
-              >
-                <ChevronLeft className="h-3 w-3" />
-              </button>
-              <span>{currentBranchIndex + 1} / {relevantBranches.length}</span>
-              <button 
-                onClick={() => {
-                  const next = relevantBranches[currentBranchIndex + 1] || relevantBranches[0];
-                  onBranchChange(next.id);
-                }}
-                className="hover:text-foreground transition-colors"
-              >
-                <ChevronRight className="h-3 w-3" />
-              </button>
+        <div className={cn(
+          "group/user relative max-w-[85%] md:max-w-[75%]",
+          isEditing ? "w-full" : "w-fit"
+        )}>
+          {/* User Message Actions (Left Side) */}
+          {!isEditing && (
+            <div className="absolute -left-12 top-1/2 -translate-y-1/2 flex items-center gap-1.5 opacity-0 group-hover/user:opacity-100 transition-all duration-200">
+              {relevantBranches.length > 1 && onBranchChange && (
+                <div className="flex items-center gap-1 bg-background/80 backdrop-blur-sm px-2 py-1 rounded-full border border-border/40 shadow-sm text-[10px] font-medium text-muted-foreground whitespace-nowrap">
+                  <button 
+                    onClick={() => {
+                      const prev = relevantBranches[currentBranchIndex - 1] || relevantBranches[relevantBranches.length - 1];
+                      onBranchChange(prev.id);
+                    }}
+                    className="hover:text-foreground transition-colors"
+                  >
+                    <ChevronLeft className="h-2.5 w-2.5" />
+                  </button>
+                  <span>{currentBranchIndex + 1} / {relevantBranches.length}</span>
+                  <button 
+                    onClick={() => {
+                      const next = relevantBranches[currentBranchIndex + 1] || relevantBranches[0];
+                      onBranchChange(next.id);
+                    }}
+                    className="hover:text-foreground transition-colors"
+                  >
+                    <ChevronRight className="h-2.5 w-2.5" />
+                  </button>
+                </div>
+              )}
+
+              <div className="flex items-center gap-0.5">
+                {!isStreaming && onEditMessage && (
+                  <button
+                    onClick={() => setIsEditing(true)}
+                    className="flex h-7 w-7 items-center justify-center rounded-lg text-muted-foreground/40 transition-colors hover:bg-muted hover:text-foreground"
+                    title="Edit message"
+                  >
+                    <Pencil className="h-3 w-3" />
+                  </button>
+                )}
+                <button
+                  onClick={() => onCopy(message.id, message.content)}
+                  className="flex h-7 w-7 items-center justify-center rounded-lg text-muted-foreground/40 transition-colors hover:bg-muted hover:text-foreground"
+                  title="Copy message"
+                >
+                  <AnimatePresence mode="wait" initial={false}>
+                    {copiedId === message.id ? (
+                      <motion.div
+                        key="check"
+                        initial={{ scale: 0.8, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        exit={{ scale: 0.8, opacity: 0 }}
+                      >
+                        <Check className="h-3 w-3 text-emerald-500" />
+                      </motion.div>
+                    ) : (
+                      <motion.div
+                        key="copy"
+                        initial={{ scale: 0.8, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        exit={{ scale: 0.8, opacity: 0 }}
+                      >
+                        <Copy className="h-3 w-3" />
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </button>
+                {onDelete && !isStreaming && (
+                  <button
+                    onClick={() => onDelete(message.id)}
+                    className="flex h-7 w-7 items-center justify-center rounded-lg text-muted-foreground/40 transition-colors hover:bg-muted hover:text-destructive"
+                    title="Delete request and response"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </button>
+                )}
+              </div>
             </div>
           )}
+
           {isEditing ? (
             <div className="flex flex-col gap-2 rounded-2xl bg-muted/60 px-5 py-3.5">
               <textarea
                 ref={editRef}
+                data-testid="edit-textarea"
                 value={editContent}
-                onChange={(e) => setEditContent(e.target.value)}
+                onChange={(e) => {
+                  setEditContent(e.target.value);
+                  adjustTextareaHeight();
+                }}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault();
@@ -247,8 +348,7 @@ const MessageItem = memo(function MessageItem({
                   if (e.key === "Escape") cancelEdit();
                 }}
                 disabled={isSaving}
-                rows={Math.max(2, editContent.split("\n").length)}
-                className="w-full min-w-[200px] resize-none bg-transparent text-[0.9375rem] font-medium leading-[1.6] text-foreground outline-none ring-1 ring-primary/40 rounded-lg px-2 py-1 focus:ring-primary/70 transition-all disabled:opacity-60"
+                className="w-full min-w-[320px] overflow-hidden resize-none bg-transparent text-[0.9375rem] font-medium leading-[1.6] text-foreground outline-none ring-1 ring-primary/40 rounded-lg px-2 py-2 focus:ring-primary/70 transition-all disabled:opacity-60"
               />
               <div className="flex justify-end gap-2">
                 <button
@@ -286,15 +386,6 @@ const MessageItem = memo(function MessageItem({
                 {message.content}
               </p>
             </div>
-          )}
-          {onEditMessage && !isEditing && !isStreaming && (
-            <button
-              onClick={() => setIsEditing(true)}
-              className="absolute -bottom-2 -right-2 flex h-7 w-7 items-center justify-center rounded-full border bg-background shadow-sm opacity-0 transition-opacity group-hover/user:opacity-100 hover:bg-muted"
-              title="Edit message"
-            >
-              <Pencil className="h-3 w-3 text-muted-foreground/60" />
-            </button>
           )}
         </div>
       ) : (
@@ -395,6 +486,28 @@ const MessageItem = memo(function MessageItem({
                 </AnimatePresence>
               </button>
 
+              {onDownload && (
+                <button
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-black/5 dark:hover:bg-white/5 active:scale-95"
+                  onClick={onDownload}
+                  title="Export conversation"
+                >
+                  <Download className="h-3.5 w-3.5 text-muted-foreground/60" strokeWidth={1.5} />
+                </button>
+              )}
+
+              <button
+                className="inline-flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-black/5 dark:hover:bg-white/5 active:scale-95"
+                onClick={() => {
+                  if (typeof window !== "undefined") {
+                    void copyToClipboard(window.location.href);
+                  }
+                }}
+                title="Share thread"
+              >
+                <ExternalLink className="h-3.5 w-3.5 text-muted-foreground/60" strokeWidth={1.5} />
+              </button>
+
               {isLastAssistantMessage && onRetry && (
                 <button
                   className="inline-flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-black/5 dark:hover:bg-white/5 active:scale-95"
@@ -441,6 +554,16 @@ const MessageItem = memo(function MessageItem({
                   </DropdownMenu.Portal>
                 </DropdownMenu.Root>
               )}
+
+              {onDelete && (
+                <button
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-black/5 dark:hover:bg-white/5 active:scale-95"
+                  onClick={() => onDelete(message.id)}
+                  title="Delete request and response"
+                >
+                  <Trash2 className="h-3.5 w-3.5 text-muted-foreground/60 hover:text-destructive transition-colors" strokeWidth={1.5} />
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -450,7 +573,7 @@ const MessageItem = memo(function MessageItem({
   );
 });
 
-export function MessageList({ messages, branches, onBranchChange, searchQuery, emptyLabel, onRetry, onRewrite, onEditMessage, onLoadMore, hasMore, isLoadingMore, isStreaming }: MessageListProps) {
+export function MessageList({ messages, branches, onBranchChange, searchQuery, emptyLabel, onRetry, onRewrite, onDelete, onEditMessage, onLoadMore, hasMore, isLoadingMore, isStreaming, onDownload }: MessageListProps) {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [showScrollButton, setShowScrollButton] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -574,8 +697,10 @@ export function MessageList({ messages, branches, onBranchChange, searchQuery, e
           isStreaming={isStreaming}
           onRetry={onRetry}
           onRewrite={onRewrite}
+          onDelete={onDelete}
           onEditMessage={onEditMessage}
           onCopy={copyMessage}
+          onDownload={onDownload}
           copiedId={copiedId}
         />
       ))}

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useState } from "react";
-import { MoreHorizontal, Pin, RefreshCw } from "lucide-react";
+import { Pin, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 
 import { useSession } from "next-auth/react";
@@ -155,7 +155,7 @@ export default function RoleDetailPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          title: currentPrompt.slice(0, 80),
+          initialMessage: currentPrompt,
           model,
           roleId,
         }),

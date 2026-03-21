@@ -25,8 +25,10 @@ export async function POST(request: Request) {
   }
 
   const { prompt, model: requestedModel } = parsed.data;
-  const safeModel = await resolveRequestedModel(requestedModel);
+  const safeModel = await resolveRequestedModel(requestedModel, { preferNonPreset: true });
   const keys = await getApiKeys();
+
+  console.log(`[generate-instructions] Requested: ${requestedModel}, Resolved: ${safeModel}`);
 
   const systemInstructions = `You are an expert at creating system prompts and AI personas. 
 Based on the user's specification, generate a detailed, clear, and effective set of custom instructions (system prompt) for an AI role. 

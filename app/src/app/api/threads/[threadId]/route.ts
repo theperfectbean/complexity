@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, lt, sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -6,15 +6,16 @@ import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { createId } from "@/lib/db/cuid";
 import { messages, threads, users } from "@/lib/db/schema";
+import { logger } from "@/lib/logger";
 
-const patchSchema = z.union([
-  z.object({ title: z.string().min(1).max(200) }),
-  z.object({ systemPrompt: z.string().max(2000).optional().nullable() }),
-  z.object({ pinned: z.boolean() }),
-  z.object({ tags: z.array(z.string().max(50)).max(10) }),
-  z.object({ action: z.literal("truncate-from"), messageId: z.string().min(1) }),
-  z.object({ action: z.literal("branch"), messageId: z.string().min(1) }),
-]);
+const patchSchema = z.object({
+  title: z.string().min(1).max(200).optional(),
+  systemPrompt: z.string().max(2000).optional().nullable(),
+  pinned: z.boolean().optional(),
+  tags: z.array(z.string().max(50)).max(10).optional(),
+  action: z.enum(["truncate-from", "branch"]).optional(),
+  messageId: z.string().min(1).optional(),
+});
 
 export async function GET(request: Request, { params }: { params: Promise<{ threadId: string }> }) {
   const session = await auth();
@@ -101,6 +102,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ th
   // Truncate thread from the given message (inclusive) onward
   if ("action" in parsed.data && parsed.data.action === "truncate-from") {
     const { messageId } = parsed.data;
+    if (!messageId) {
+      return NextResponse.json({ error: "messageId required" }, { status: 400 });
+    }
 
     const [targetMsg] = await db
       .select({ createdAt: messages.createdAt })
@@ -122,6 +126,12 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ th
   // Branch thread from the given message (exclusive) onward
   if ("action" in parsed.data && parsed.data.action === "branch") {
     const { messageId } = parsed.data;
+    if (!messageId) {
+      return NextResponse.json({ error: "messageId required" }, { status: 400 });
+    }
+    const log = logger.child({ threadId, messageId, action: "branch" });
+
+    log.info("Starting thread branch");
 
     const [targetMsg] = await db
       .select({ createdAt: messages.createdAt })
@@ -130,6 +140,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ th
       .limit(1);
 
     if (!targetMsg) {
+      log.warn("Target message not found for branching");
       return NextResponse.json({ error: "Message not found" }, { status: 404 });
     }
 
@@ -139,6 +150,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ th
     });
 
     if (!currentThread) {
+      log.warn("Current thread not found for branching");
       return NextResponse.json({ error: "Thread not found" }, { status: 404 });
     }
 
@@ -146,38 +158,48 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ th
     const newThreadId = createId();
     const parentId = currentThread.parentThreadId || currentThread.id;
 
-    await db.insert(threads).values({
-      id: newThreadId,
-      title: currentThread.title,
-      userId: currentThread.userId,
-      roleId: currentThread.roleId,
-      model: currentThread.model,
-      parentThreadId: parentId,
-      branchPointMessageId: messageId,
-    });
+    log.info({ newThreadId, parentId }, "Creating branched thread");
 
-    // Copy prior messages
-    const priorMessages = await db
-      .select()
-      .from(messages)
-      .where(and(eq(messages.threadId, threadId), sql`${messages.createdAt} < ${targetMsg.createdAt}`))
-      .orderBy(asc(messages.createdAt));
+    try {
+      await db.insert(threads).values({
+        id: newThreadId,
+        title: currentThread.title,
+        userId: currentThread.userId,
+        roleId: currentThread.roleId,
+        model: currentThread.model,
+        parentThreadId: parentId,
+        branchPointMessageId: messageId,
+      });
 
-    if (priorMessages.length > 0) {
-      await db.insert(messages).values(
-        priorMessages.map((m: { role: string; content: string; model: string | null; citations: unknown; createdAt: Date }) => ({
-          id: createId(),
-          threadId: newThreadId,
-          role: m.role,
-          content: m.content,
-          model: m.model,
-          citations: m.citations,
-          createdAt: m.createdAt,
-        }))
-      );
+      // Copy prior messages
+      const priorMessages = await db
+        .select()
+        .from(messages)
+        .where(and(eq(messages.threadId, threadId), lt(messages.createdAt, targetMsg.createdAt)))
+        .orderBy(asc(messages.createdAt));
+
+      log.info({ priorCount: priorMessages.length }, "Copying prior messages to branch");
+
+      if (priorMessages.length > 0) {
+        await db.insert(messages).values(
+          priorMessages.map((m) => ({
+            id: createId(),
+            threadId: newThreadId,
+            role: m.role,
+            content: m.content,
+            model: m.model,
+            citations: m.citations,
+            createdAt: m.createdAt,
+          }))
+        );
+      }
+
+      log.info("Thread branch successful");
+      return NextResponse.json({ ok: true, threadId: newThreadId });
+    } catch (err) {
+      log.error({ err }, "Failed to branch thread");
+      return NextResponse.json({ error: "Internal server error" }, { status: 500 });
     }
-
-    return NextResponse.json({ ok: true, threadId: newThreadId });
   }
 
   if ("systemPrompt" in parsed.data) {

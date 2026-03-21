@@ -1,13 +1,11 @@
 "use client";
 
-import { FormEvent, useState, useEffect, useRef } from "react";
-import { Sparkles, ChevronDown, Wand2, Loader2 } from "lucide-react";
-import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
+import { FormEvent, useState, useRef } from "react";
+import { Sparkles, Wand2, Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { toast } from "sonner";
 import { useCompletion } from "@ai-sdk/react";
 import { cn } from "@/lib/utils";
-import { getDefaultModel } from "@/lib/models";
 
 type Role = {
   id: string;
@@ -16,12 +14,6 @@ type Role = {
   instructions?: string | null;
   pinned: boolean;
   updatedAt: string;
-};
-
-type ModelOption = {
-  id: string;
-  label: string;
-  category: string;
 };
 
 type RoleCreateFormProps = {
@@ -40,8 +32,7 @@ export function RoleCreateForm({ onCreated, onCancel, submitLabel = "Create role
   // Instruction Generation State
   const [showGenerator, setShowGenerator] = useState(false);
   const [genPrompt, setGenPrompt] = useState("");
-  const [genModel, setGenModel] = useState(getDefaultModel());
-  const [availableModels, setAvailableModels] = useState<ModelOption[]>([]);
+  const genModel = "anthropic/claude-4-6-sonnet-latest";
   
   const instructionsRef = useRef<HTMLTextAreaElement>(null);
 
@@ -56,21 +47,6 @@ export function RoleCreateForm({ onCreated, onCancel, submitLabel = "Create role
       toast.success("Instructions generated successfully!");
     }
   });
-
-  useEffect(() => {
-    fetch("/api/models")
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.models) {
-          setAvailableModels(data.models);
-          // If default model isn't in available models, pick the first one
-          if (!data.models.some((m: ModelOption) => m.id === genModel) && data.models.length > 0) {
-            setGenModel(data.models[0].id);
-          }
-        }
-      })
-      .catch((err) => console.error("Failed to fetch models", err));
-  }, [genModel]);
 
   async function generateInstructions() {
     if (!genPrompt.trim() || isGenerating) return;
@@ -112,14 +88,6 @@ export function RoleCreateForm({ onCreated, onCancel, submitLabel = "Create role
       setSubmitting(false);
     }
   }
-
-  const groupedModels = availableModels.reduce<Record<string, ModelOption[]>>((acc, m) => {
-    if (!acc[m.category]) acc[m.category] = [];
-    acc[m.category].push(m);
-    return acc;
-  }, {});
-
-  const activeModelLabel = availableModels.find((m) => m.id === genModel)?.label ?? "Select Model";
 
   return (
     <form onSubmit={onSubmit} className="w-full">
@@ -172,44 +140,7 @@ export function RoleCreateForm({ onCreated, onCancel, submitLabel = "Create role
                       value={genPrompt}
                       onChange={(e) => setGenPrompt(e.target.value)}
                     />
-                    <div className="flex items-center justify-between gap-2">
-                      <DropdownMenu.Root>
-                        <DropdownMenu.Trigger asChild>
-                          <button
-                            type="button"
-                            className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border/40 bg-background px-2.5 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
-                          >
-                            <span className="max-w-[140px] truncate">{activeModelLabel}</span>
-                            <ChevronDown className="h-3 w-3 opacity-50" />
-                          </button>
-                        </DropdownMenu.Trigger>
-                        <DropdownMenu.Portal>
-                          <DropdownMenu.Content
-                            sideOffset={4}
-                            align="start"
-                            className="z-50 max-h-64 min-w-[200px] overflow-y-auto rounded-xl border bg-popover p-1 shadow-lg animate-in fade-in zoom-in-95"
-                          >
-                            {Object.entries(groupedModels).map(([category, options]) => (
-                              <div key={category} className="py-1">
-                                <p className="px-2 pb-1 pt-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/50">{category}</p>
-                                {options.map((option) => (
-                                  <DropdownMenu.Item
-                                    key={option.id}
-                                    onSelect={() => setGenModel(option.id)}
-                                    className={cn(
-                                      "flex cursor-pointer items-center rounded-lg px-2 py-1.5 text-xs outline-none transition-colors hover:bg-accent hover:text-accent-foreground",
-                                      genModel === option.id && "bg-primary/5 text-primary font-medium"
-                                    )}
-                                  >
-                                    {option.label}
-                                  </DropdownMenu.Item>
-                                ))}
-                              </div>
-                            ))}
-                          </DropdownMenu.Content>
-                        </DropdownMenu.Portal>
-                      </DropdownMenu.Root>
-
+                    <div className="flex items-center justify-end">
                       <button
                         type="button"
                         onClick={generateInstructions}

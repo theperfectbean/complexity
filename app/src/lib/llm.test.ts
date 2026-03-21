@@ -1,11 +1,19 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { runGeneration, getProviderAndModel, getLanguageModel, GenerationOptions } from "./llm";
+import { runGeneration, getProviderAndModel, getLanguageModel, GenerationOptions, generateThreadTitle } from "./llm";
 import * as searchAgent from "./search-agent";
-import { UIMessage } from "ai";
+import { UIMessage, generateText } from "ai";
 
 vi.mock("./search-agent", () => ({
   runSearchAgent: vi.fn(),
 }));
+
+vi.mock("ai", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("ai")>();
+  return {
+    ...actual,
+    generateText: vi.fn(),
+  };
+});
 
 describe("llm.ts", () => {
   beforeEach(() => {
@@ -89,6 +97,30 @@ describe("llm.ts", () => {
     it("resolves anthropic model with alias", () => {
         // We can't easily check the returned model object because it's an internal AI SDK object,
         // but we verified the logic doesn't crash and throws the right error when keys are missing.
+    });
+  });
+
+  describe("generateThreadTitle", () => {
+    it("returns a summarized title on success", async () => {
+      vi.mocked(generateText).mockResolvedValue({ text: "Summarized Title" } as unknown as Awaited<ReturnType<typeof generateText>>);
+      const keys = { "ANTHROPIC_API_KEY": "test" };
+      
+      const title = await generateThreadTitle("A long query about stuff", "anthropic/claude-3", keys);
+      
+      expect(title).toBe("Summarized Title");
+      expect(generateText).toHaveBeenCalledWith(expect.objectContaining({
+        system: expect.stringContaining("summarizes user queries"),
+      }));
+    });
+
+    it("falls back to truncation on error", async () => {
+      vi.mocked(generateText).mockRejectedValue(new Error("API Error"));
+      const keys = { "ANTHROPIC_API_KEY": "test" };
+      
+      const query = "This is a very long query that should be truncated because the model failed";
+      const title = await generateThreadTitle(query, "anthropic/claude-3", keys);
+      
+      expect(title).toBe(query.slice(0, 60) + "...");
     });
   });
 });

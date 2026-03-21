@@ -7,9 +7,12 @@ import { db } from "@/lib/db";
 import { createId } from "@/lib/db/cuid";
 import { threads } from "@/lib/db/schema";
 import { resolveRequestedModel } from "@/lib/available-models";
+import { generateThreadTitle } from "@/lib/llm";
+import { getApiKeys } from "@/lib/settings";
 
 const createSchema = z.object({
-  title: z.string().min(1).max(200),
+  title: z.string().min(1).max(200).optional(),
+  initialMessage: z.string().optional(),
   model: z.string().min(1).max(50).optional(),
   roleId: z.string().optional(),
 });
@@ -64,9 +67,21 @@ export async function POST(request: Request) {
 
   const id = createId();
   const safeModel = await resolveRequestedModel(parsed.data.model);
+
+  let title = parsed.data.title;
+  if (!title && parsed.data.initialMessage) {
+    const keys = await getApiKeys();
+    const titlingModel = await resolveRequestedModel(parsed.data.model, { preferNonPreset: true });
+    title = await generateThreadTitle(parsed.data.initialMessage, titlingModel, keys);
+  }
+
+  if (!title) {
+    title = "New Thread";
+  }
+
   await db.insert(threads).values({
     id,
-    title: parsed.data.title,
+    title,
     model: safeModel,
     userId: user.id,
     roleId: parsed.data.roleId,

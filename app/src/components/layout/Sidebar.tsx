@@ -17,14 +17,11 @@ import {
   Shield,
   User,
   FileCode2,
-  GitBranch,
-  History,
   Pin,
   Webhook,
 } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 
@@ -39,13 +36,6 @@ type Thread = {
   parentThreadId: string | null;
   pinned: boolean;
   tags: string[];
-};
-
-type ChatBranch = {
-  id: string;
-  title: string;
-  branchPointMessageId: string | null;
-  createdAt: string;
 };
 
 type Role = {
@@ -76,10 +66,8 @@ function getInitials(name?: string | null, email?: string | null) {
 
 export function Sidebar({ collapsed = false, onToggle, onNavigate }: SidebarProps) {
   const { data: session } = useSession();
-  const pathname = usePathname();
   const [threads, setThreads] = useState<Thread[]>([]);
   const [pinnedRoles, setPinnedRoles] = useState<Role[]>([]);
-  const [branches, setBranches] = useState<ChatBranch[]>([]);
   const [deletingThreadId, setDeletingThreadId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -88,10 +76,6 @@ export function Sidebar({ collapsed = false, onToggle, onNavigate }: SidebarProp
     }
 
     let active = true;
-
-    // Determine if we are in a thread
-    const threadMatch = pathname?.match(/^\/search\/([a-zA-Z0-9_-]+)$/);
-    const activeThreadId = threadMatch ? threadMatch[1] : null;
 
     fetch("/api/threads")
       .then((response) => (response.ok ? response.json() : Promise.reject(new Error("Failed to load threads"))))
@@ -122,25 +106,10 @@ export function Sidebar({ collapsed = false, onToggle, onNavigate }: SidebarProp
         }
       });
 
-    // Fetch branches if in a thread
-    if (activeThreadId) {
-      fetch(`/api/threads/${activeThreadId}/branches`)
-        .then((response) => (response.ok ? response.json() : Promise.reject(new Error("Failed to load branches"))))
-        .then((payload: { branches: ChatBranch[] }) => {
-          if (!active) return;
-          setBranches(payload.branches);
-        })
-        .catch(() => {
-          if (active) setBranches([]);
-        });
-    } else {
-      setBranches([]);
-    }
-
     return () => {
       active = false;
     };
-  }, [session?.user, pathname]);
+  }, [session?.user]);
 
   const navItems = [
     { href: "/", label: "Home", icon: Home },
@@ -268,35 +237,6 @@ export function Sidebar({ collapsed = false, onToggle, onNavigate }: SidebarProp
                     >
                       <Users className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                       <span className="truncate">{role.name}</span>
-                    </Link>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {branches.length > 1 && (
-              <div className="rounded-lg border border-sidebar-border/80 bg-card/70 p-2">
-                <div className="mb-2 flex items-center justify-between px-2 py-1">
-                  <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Thread Branches</span>
-                  <GitBranch className="h-3.5 w-3.5 text-muted-foreground/50" />
-                </div>
-                <div className="space-y-1">
-                  {branches.map((branch, idx) => (
-                    <Link
-                      key={branch.id}
-                      className={cn(
-                        "flex items-center gap-2 rounded-lg px-2 py-1.5 transition-colors",
-                        pathname?.includes(branch.id)
-                          ? "bg-primary/10 text-primary" 
-                          : "hover:bg-black/5 dark:hover:bg-white/5 text-muted-foreground"
-                      )}
-                      href={`/search/${branch.id}`}
-                      onClick={onNavigate}
-                    >
-                      <History className="h-3 w-3 shrink-0" />
-                      <span className="truncate font-medium">
-                        {branch.branchPointMessageId ? `Branch ${idx + 1}` : "Original path"}
-                      </span>
                     </Link>
                   ))}
                 </div>

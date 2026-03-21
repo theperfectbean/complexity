@@ -8,6 +8,8 @@ import PythonExecutor from "./PythonExecutor";
 import { Copy, Check } from "lucide-react";
 import { cn, copyToClipboard } from "@/lib/utils";
 
+import { LoadingSkeleton } from "./LoadingSkeleton";
+
 type MarkdownRendererProps = {
   content: string;
   isStreaming?: boolean;
@@ -16,7 +18,9 @@ type MarkdownRendererProps = {
 function CopyButton({ content }: { content: string }) {
   const [copied, setCopied] = useState(false);
 
-  const handleCopy = async () => {
+  const handleCopy = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
     const success = await copyToClipboard(content);
     if (success) {
       setCopied(true);
@@ -27,11 +31,11 @@ function CopyButton({ content }: { content: string }) {
   return (
     <button
       onClick={handleCopy}
-      className="absolute top-2 right-2 p-1.5 rounded-md border border-border bg-background/80 hover:bg-background text-muted-foreground hover:text-foreground transition-all md:opacity-0 md:group-hover:opacity-100 md:focus:opacity-100 z-10"
+      className="p-1.5 rounded-md border border-border bg-background/90 hover:bg-background text-muted-foreground hover:text-foreground shadow-sm transition-all md:opacity-0 md:group-hover/code:opacity-100 md:focus/code:opacity-100 z-30"
       title="Copy to clipboard"
     >
       {copied ? (
-        <Check className="h-3.5 w-3.5 text-green-500" />
+        <Check className="h-3.5 w-3.5 text-emerald-500" />
       ) : (
         <Copy className="h-3.5 w-3.5" />
       )}
@@ -52,12 +56,9 @@ const components: Components = {
   },
   pre({ children, ...props }: React.ComponentPropsWithoutRef<"pre">) {
     return (
-      <pre 
-        {...props} 
-        className={`${props.className || ""} group relative`}
-      >
+      <div className="group/code relative my-6 rounded-xl border border-border/40 bg-muted/30 overflow-hidden shadow-sm">
         {children}
-      </pre>
+      </div>
     );
   },
   code({ className, children, ...props }: React.ComponentPropsWithoutRef<"code">) {
@@ -112,24 +113,29 @@ const components: Components = {
     }
 
     return (
-      <div className="relative group/code my-4">
-        {language && (
-          <div className="absolute top-0 right-12 px-2 py-1 text-[10px] font-bold uppercase text-muted-foreground/50 select-none pointer-events-none z-20">
-            {language}
+      <>
+        <div className="sticky top-0 right-0 w-full h-0 z-30 flex justify-end p-2 pointer-events-none">
+          <div className="pointer-events-auto flex items-center gap-3">
+            {language && (
+              <span className="px-2 py-1 text-[10px] font-bold uppercase text-muted-foreground/40 select-none bg-muted/50 rounded-md backdrop-blur-sm">
+                {language}
+              </span>
+            )}
+            <CopyButton content={content} />
           </div>
-        )}
-        <CopyButton content={content} />
-        {/* Destructure node to prevent it from being passed to the code element */}
-        {(() => {
-          // eslint-disable-next-line @typescript-eslint/no-unused-vars
-          const { node: _node, ...rest } = props as Record<string, unknown>;
-          return (
-            <code className={cn("block w-full overflow-x-auto", className)} {...rest}>
-              {children}
-            </code>
-          );
-        })()}
-      </div>
+        </div>
+        <div className="w-full overflow-x-auto">
+          {(() => {
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            const { node: _node, ...rest } = props as Record<string, unknown>;
+            return (
+              <code className={cn("block w-full p-4 pt-12 text-[13px] leading-relaxed", className)} {...rest}>
+                {children}
+              </code>
+            );
+          })()}
+        </div>
+      </>
     );
   },
   table({ children, ...props }: React.ComponentPropsWithoutRef<"table">) {
@@ -163,6 +169,15 @@ export const MarkdownRenderer = memo(function MarkdownRenderer({ content, isStre
   }, [content, isStreaming]);
 
   const finalContent = isStreaming ? displayContent : content;
+  const isActuallyEmpty = !finalContent || finalContent === "\u200B" || finalContent.trim().length === 0;
+
+  if (isStreaming && isActuallyEmpty) {
+    return (
+      <div className="markdown-body max-w-none">
+        <LoadingSkeleton lines={2} />
+      </div>
+    );
+  }
 
   return (
     <div className={`markdown-body max-w-none ${isStreaming ? "min-h-[100px]" : ""}`}>

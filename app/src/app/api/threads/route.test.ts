@@ -24,9 +24,19 @@ vi.mock("@/lib/available-models", () => ({
   resolveRequestedModel: vi.fn(),
 }));
 
+vi.mock("@/lib/llm", () => ({
+  generateThreadTitle: vi.fn(),
+}));
+
+vi.mock("@/lib/settings", () => ({
+  getApiKeys: vi.fn(),
+}));
+
 import { auth } from "@/auth";
 import { resolveRequestedModel } from "@/lib/available-models";
 import { db } from "@/lib/db";
+import { generateThreadTitle } from "@/lib/llm";
+import { getApiKeys } from "@/lib/settings";
 
 import { GET, POST } from "@/app/api/threads/route";
 
@@ -114,7 +124,7 @@ describe("/api/threads", () => {
       await expect(response.json()).resolves.toEqual({ error: "Invalid payload" });
     });
 
-    it("creates a new thread", async () => {
+    it("creates a new thread with explicit title", async () => {
       vi.mocked(db.query.users.findFirst).mockResolvedValue({ id: "user-1" } as never);
 
       const values = vi.fn().mockResolvedValue(undefined);
@@ -134,6 +144,31 @@ describe("/api/threads", () => {
         thread: { id: "thread-1", title: "Hello", model: "pro-search", userId: "user-1" },
       });
       expect(db.insert).toHaveBeenCalledTimes(1);
+    });
+
+    it("creates a new thread with summarized title from initialMessage", async () => {
+      vi.mocked(db.query.users.findFirst).mockResolvedValue({ id: "user-1" } as never);
+      vi.mocked(getApiKeys).mockResolvedValue({ OPENAI_API_KEY: "sk-123" });
+      vi.mocked(generateThreadTitle).mockResolvedValue("Summarized Title");
+      vi.mocked(resolveRequestedModel).mockImplementation(async (m) => m || "fast-search");
+
+      const values = vi.fn().mockResolvedValue(undefined);
+      vi.mocked(db.insert).mockReturnValue({ values } as never);
+      mockThreadSelect([{ id: "thread-1", title: "Summarized Title", model: "fast-search", userId: "user-1" }]);
+
+      const request = new Request("http://localhost/api/threads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ initialMessage: "A long user request that needs summary", model: "fast-search" }),
+      });
+
+      const response = await POST(request);
+
+      expect(response.status).toBe(201);
+      expect(generateThreadTitle).toHaveBeenCalled();
+      await expect(response.json()).resolves.toEqual({
+        thread: { id: "thread-1", title: "Summarized Title", model: "fast-search", userId: "user-1" },
+      });
     });
 
     it("falls back to a safe available model when the requested model is stale", async () => {

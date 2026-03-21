@@ -40,8 +40,9 @@ export class ChatHistoryManager {
   }
 
   async saveUserMessage(session: ChatSession, text: string, isRegenerate: boolean): Promise<string> {
-    const { threadId, model } = session;
-    const userMessageId = createId();
+    const { threadId, model, messages: inputMessages } = session;
+    const lastMessage = inputMessages[inputMessages.length - 1];
+    const userMessageId = lastMessage?.id || createId();
     
     if (!isRegenerate) {
       await db.insert(messages).values({
