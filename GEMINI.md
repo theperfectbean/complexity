@@ -77,10 +77,16 @@ DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose build app
 
 ## Key Findings & Implementation Notes
 
+### Role Detail Page UI Fix (2026-03-21)
+- **Stray Text Removal**: Fixed a minor UI bug where a literal `...` text node was being rendered between the Pin and Action buttons in the top right corner of the Role Detail page.
+
 ### Model Selector UI & Discovery Improvements (2026-03-21)
 - **Enhanced Dropdown**: Refactored `ModelSelector` with a premium UI featuring provider-specific icons (Anthropic, OpenAI, etc.), better spacing, and a "Checked" indicator for the active model.
 - **Friendlier Labels**: Implemented an automatic "prettify" utility that cleans up raw model IDs (e.g., `perplexity/anthropic/claude-3-5-sonnet-latest`) into readable labels (`Claude 3 5 Sonnet Latest`) both in the chat UI and when discovering new models in the Admin Console.
 - **Categorization**: Improved grouping with icons and uppercase sub-headers for better visual hierarchy.
+
+### Docker & Database
+- **psql Interactive Pager**: When running `psql` via `docker compose exec`, the output may become interactive (using a pager like `less`). This blocks automation. **Always disable the pager** by setting `PAGER=cat` in the environment or using `-P pager=off` in the command. Example: `docker compose exec -e PAGER=cat postgres psql -U ...`.
 
 ### Custom Models Dropdown Bug Fix (2026-03-21)
 - **Problem**: The `ModelSelector` component was only displaying the default base models ("Fast Search", "Pro Search", "Perplexity Sonar") instead of the user's custom selected models saved in "Manage Models".
