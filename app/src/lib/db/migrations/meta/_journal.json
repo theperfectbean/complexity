@@ -92,6 +92,13 @@
       "when": 1773991000000,
       "tag": "0012_tokens_totp_branching",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1774136615934,
+      "tag": "0013_serious_argent",
+      "breakpoints": true
     }
   ]
 }

@@ -86,7 +86,7 @@ ${content}`;
     
     if (memoryEnabled) {
       writer.write({ type: "data-call-start", data: { callId: "memory-search", toolName: "Recall", input: { query: userText } } } as UIMessageChunk);
-      const memResult = await getMemoryPrompt(userId, userText);
+      const memResult = await getMemoryPrompt(userId, userText, roleId);
       memoryPrompt = memResult.prompt;
       memoriesFound = memResult.count;
       writer.write({ type: "data-call-result", data: { callId: "memory-search", result: memoriesFound > 0 ? `Recalled ${memoriesFound} relevant memories.` : "No relevant memories found." } } as UIMessageChunk);

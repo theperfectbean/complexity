@@ -60,8 +60,8 @@ export function buildMemoryPrompt(memoriesList: string[]): string {
   ].join("\n");
 }
 
-export async function getMemoryPrompt(userId: string, userText?: string): Promise<{ prompt: string; count: number }> {
-  const memoriesList = await MemoryStore.searchMemories(userId, userText);
+export async function getMemoryPrompt(userId: string, userText?: string, roleId?: string | null): Promise<{ prompt: string; count: number }> {
+  const memoriesList = await MemoryStore.searchMemories(userId, userText, roleId);
   return {
     prompt: buildMemoryPrompt(memoriesList),
     count: memoriesList.length,
@@ -127,8 +127,9 @@ export async function saveExtractedMemories(params: {
   userMessage: string;
   assistantMessage: string;
   conversationMessages: number;
+  roleId?: string | null;
 }): Promise<number> {
-  const { userId, threadId, userMessage, assistantMessage, conversationMessages } = params;
+  const { userId, threadId, userMessage, assistantMessage, conversationMessages, roleId } = params;
 
   if (!userMessage.trim() || !assistantMessage.trim()) {
     return 0;
@@ -146,7 +147,7 @@ export async function saveExtractedMemories(params: {
     return 0;
   }
 
-  const existingRows = await MemoryStore.getExistingMemories(userId);
+  const existingRows = await MemoryStore.getExistingMemories(userId, roleId);
 
   const { added, deletedIds } = await extractMemories({
     userMessage,
@@ -199,14 +200,14 @@ export async function saveExtractedMemories(params: {
         ];
 
         if (insertList.length > 0) {
-          await MemoryStore.insertMemories(userId, threadId, insertList);
+          await MemoryStore.insertMemories(userId, threadId, insertList, roleId);
           totalChanges += insertList.length;
         }
       }
     }
 
   if (totalChanges > 0) {
-    await MemoryStore.invalidateMemoryCache(userId);
+    await MemoryStore.invalidateMemoryCache(userId, roleId);
   }
 
   return totalChanges;

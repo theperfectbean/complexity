@@ -183,6 +183,7 @@ export class ChatService {
               userMessage: userText,
               assistantMessage: assistantText,
               conversationMessages: inputMessages.length + 1,
+              roleId: thread.roleId,
             });
             try {
               const memoryCount = await Promise.race([memoryPromise, new Promise<null>((r) => setTimeout(() => r(null), runtimeConfig.chat.memoryEventTimeoutMs))]);

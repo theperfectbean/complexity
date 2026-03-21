@@ -1,12 +1,14 @@
-import { cosineDistance, desc, eq, inArray } from "drizzle-orm";
+import { cosineDistance, desc, eq, inArray, isNull, or, and } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { memories } from "@/lib/db/schema";
 import { getRedisClient } from "@/lib/redis";
 import { runtimeConfig } from "../config";
 
-export async function getMemoryContents(userId: string, useCache = true): Promise<string[]> {
+export async function getMemoryContents(userId: string, roleId?: string | null, useCache = true): Promise<string[]> {
   const redis = getRedisClient();
-  const cacheKey = `${runtimeConfig.memory.cachePrefix}:${userId}`;
+  const cacheKey = roleId 
+    ? `${runtimeConfig.memory.cachePrefix}:${userId}:role:${roleId}` 
+    : `${runtimeConfig.memory.cachePrefix}:${userId}:global`;
 
   if (useCache && redis) {
     try {
@@ -22,10 +24,12 @@ export async function getMemoryContents(userId: string, useCache = true): Promis
     }
   }
 
+  const roleCondition = roleId ? or(isNull(memories.roleId), eq(memories.roleId, roleId)) : isNull(memories.roleId);
+
   const rows = await db
     .select({ content: memories.content })
     .from(memories)
-    .where(eq(memories.userId, userId))
+    .where(and(eq(memories.userId, userId), roleCondition))
     .orderBy(desc(memories.createdAt))
     .limit(runtimeConfig.memory.maxMemories);
 
@@ -42,28 +46,42 @@ export async function getMemoryContents(userId: string, useCache = true): Promis
   return contents;
 }
 
-export async function invalidateMemoryCache(userId: string): Promise<void> {
+export async function invalidateMemoryCache(userId: string, roleId?: string | null): Promise<void> {
   const redis = getRedisClient();
   if (!redis) {
     return;
   }
 
   try {
-    await redis.del(`${runtimeConfig.memory.cachePrefix}:${userId}`);
+    if (roleId) {
+      await redis.del(`${runtimeConfig.memory.cachePrefix}:${userId}:role:${roleId}`);
+    } else {
+      // Global cache invalidation should technically invalidate all role caches too
+      // Because role caches contain global memories.
+      const pattern = `${runtimeConfig.memory.cachePrefix}:${userId}*`;
+      let cursor = '0';
+      do {
+        const [newCursor, keys] = await redis.scan(cursor, 'MATCH', pattern, 'COUNT', 100);
+        cursor = newCursor;
+        if (keys.length > 0) {
+          await redis.del(...keys);
+        }
+      } while (cursor !== '0');
+    }
   } catch {
     // Ignore cache delete errors.
   }
 }
 
-export async function searchMemories(userId: string, userText?: string, topK?: number): Promise<string[]> {
+export async function searchMemories(userId: string, userText?: string, roleId?: string | null, topK?: number): Promise<string[]> {
   const k = topK ?? runtimeConfig.memory.topK;
   
   if (!userText) {
-    const all = await getMemoryContents(userId, true);
+    const all = await getMemoryContents(userId, roleId, true);
     return all.slice(0, k);
   }
 
-  const allMemories = await getMemoryContents(userId, true);
+  const allMemories = await getMemoryContents(userId, roleId, true);
   if (allMemories.length <= k) {
     return allMemories;
   }
@@ -73,10 +91,12 @@ export async function searchMemories(userId: string, userText?: string, topK?: n
     const [embedding] = await getEmbeddings([userText]);
     const distance = cosineDistance(memories.embedding, embedding);
     
+    const roleCondition = roleId ? or(isNull(memories.roleId), eq(memories.roleId, roleId)) : isNull(memories.roleId);
+
     const rows = await db
       .select({ content: memories.content })
       .from(memories)
-      .where(eq(memories.userId, userId))
+      .where(and(eq(memories.userId, userId), roleCondition))
       .orderBy(distance)
       .limit(k);
       
@@ -87,11 +107,12 @@ export async function searchMemories(userId: string, userText?: string, topK?: n
   }
 }
 
-export async function getExistingMemories(userId: string) {
+export async function getExistingMemories(userId: string, roleId?: string | null) {
+  const roleCondition = roleId ? or(isNull(memories.roleId), eq(memories.roleId, roleId)) : isNull(memories.roleId);
   return db
     .select({ id: memories.id, content: memories.content, embedding: memories.embedding })
     .from(memories)
-    .where(eq(memories.userId, userId))
+    .where(and(eq(memories.userId, userId), roleCondition))
     .orderBy(desc(memories.createdAt))
     .limit(runtimeConfig.memory.maxMemories);
 }
@@ -101,7 +122,7 @@ export async function deleteMemories(ids: string[]) {
   await db.delete(memories).where(inArray(memories.id, ids));
 }
 
-export async function insertMemories(userId: string, threadId: string, items: { content: string, embedding: number[] | null }[]) {
+export async function insertMemories(userId: string, threadId: string, items: { content: string, embedding: number[] | null }[], roleId?: string | null) {
   const validItems = items.filter((item): item is { content: string, embedding: number[] } => item.embedding !== null);
   if (validItems.length === 0) return;
   const now = new Date();
@@ -113,6 +134,7 @@ export async function insertMemories(userId: string, threadId: string, items: { 
       embedding: item.embedding,
       source: "auto" as const,
       threadId,
+      roleId: roleId ?? null,
       createdAt: now,
       updatedAt: now,
     })),

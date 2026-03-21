@@ -637,6 +637,15 @@ This strategy ensures all dependencies (Postgres, Redis, Embedder) are running w
   - **UI**: Created a comprehensive **Webhooks** management page in User Settings for creating hooks and inspecting delivery logs.
 - **Benefit**: Enables seamless integration with tools like n8n, Zapier, and custom dashboards, turning Complexity into a trigger for larger automated workflows.
 
+### Role Memory Isolation (2026-03-22)
+- **Feature**: Implemented isolated memory spaces for Roles while retaining access to global user memory.
+- **Architecture**:
+  - **Database**: Added `roleId` to the `memories` table (referencing `roles.id` with cascade delete).
+  - **Retrieval**: `MemoryStore` functions (`getMemoryContents`, `searchMemories`, `getExistingMemories`) now accept an optional `roleId`. If provided, they fetch memories where `roleId IS NULL OR roleId = roleId` (unifying global and role-specific memory). If not provided, they fetch only global memory (`roleId IS NULL`).
+  - **Storage**: `insertMemories` saves new memories with the thread's `roleId`. Global chats save with `roleId = null`.
+  - **Deduplication**: The memory extractor dedups new facts against *both* global and role memory, preventing a role from learning and storing a fact already known globally.
+  - **Caching**: Updated Redis invalidation to correctly clear role-specific caches or globally scan and wipe all caches when a global memory is modified.
+
 ### Major Plan Update & Roadmap (2026-03-19)
 - **Status**: Re-evaluated the project plan to reflect massive recent progress (all Tier 1 and most Tier 2 tasks completed).
 - **Roadmap Refinement**:

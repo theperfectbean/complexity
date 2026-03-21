@@ -218,6 +218,8 @@ export const memories = pgTable(
       .references(() => users.id, { onDelete: "cascade" }),
     threadId: text("thread_id")
       .references(() => threads.id, { onDelete: "cascade" }),
+    roleId: text("role_id")
+      .references(() => roles.id, { onDelete: "cascade" }),
     content: text("content").notNull(),
     embedding: vector("embedding", { dimensions: 384 }).notNull(),
     source: varchar("source", { length: 20 }).notNull().default("auto"), // 'auto', 'manual'
@@ -304,6 +306,10 @@ export const memoriesRelations = relations(memories, ({ one }) => ({
   thread: one(threads, {
     fields: [memories.threadId],
     references: [threads.id],
+  }),
+  role: one(roles, {
+    fields: [memories.roleId],
+    references: [roles.id],
   }),
 }));
 

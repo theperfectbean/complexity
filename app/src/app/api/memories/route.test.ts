@@ -20,6 +20,9 @@ vi.mock("@/lib/config", () => ({
     memory: {
       maxMemories: 100,
     },
+    rag: {
+      embedderBatchSize: 200,
+    }
   },
 }));
 
