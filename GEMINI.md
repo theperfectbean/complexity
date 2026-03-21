@@ -78,6 +78,7 @@ DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose build app
 ## Key Findings & Implementation Notes
 
 ### Role Detail Page UI Fix (2026-03-21)
+- **Role Settings Dialog**: Replaced the non-functional `...` button with a fully implemented `RoleSettingsDialog`. This adds the ability to edit a role's name and description, and includes a "Delete Role" action with a confirmation flow.
 - **Stray Text Removal**: Fixed a minor UI bug where a literal `...` text node was being rendered between the Pin and Action buttons in the top right corner of the Role Detail page.
 
 ### Model Selector UI & Discovery Improvements (2026-03-21)

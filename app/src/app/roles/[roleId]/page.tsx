@@ -11,6 +11,7 @@ import { useSession } from "next-auth/react";
 import { cn } from "@/lib/utils";
 import { DocumentList, RoleDocument } from "@/components/roles/DocumentList";
 import { RoleShareDialog } from "@/components/roles/RoleShareDialog";
+import { RoleSettingsDialog } from "@/components/roles/RoleSettingsDialog";
 import { FileUploader } from "@/components/roles/FileUploader";
 import { LoadingSkeleton } from "@/components/shared/LoadingSkeleton";
 import { getDefaultModel } from "@/lib/models";
@@ -306,13 +307,12 @@ export default function RoleDetailPage() {
           >
             <Pin className={cn("h-4 w-4", role?.pinned && "fill-current")} />
           </button>
-          <button
-            type="button"
-            className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-border/60 bg-background text-muted-foreground hover:bg-muted/40"
-            aria-label="Role actions"
-          >
-            <MoreHorizontal className="h-4 w-4" />
-          </button>
+          {isOwner && role && (
+            <RoleSettingsDialog 
+              role={role} 
+              onUpdate={(updated) => setRole((prev) => (prev ? { ...prev, ...updated } : null))} 
+            />
+          )}
         </div>
       </div>
 
