@@ -1,5 +1,6 @@
 import { getApiKeys } from "./settings";
 import type { ModelProviderId } from "./model-registry";
+import { formatDisplayLabel } from "./utils";
 
 export type ProviderModel = {
   id: string;
@@ -36,21 +37,9 @@ function createProviderModel(
   id: string,
   name: string,
 ): ProviderModel {
-  // Prettify name if it looks like an ID
-  let friendlyName = name;
-  if (name.includes("/") || (name.match(/-/g) || []).length > 2) {
-    const lastPart = name.split("/").pop()!;
-    friendlyName = lastPart
-      .replace(/-/g, " ")
-      .replace(/\b\w/g, (l) => l.toUpperCase())
-      .replace(/Gpt/g, "GPT")
-      .replace(/Llama/g, "Llama")
-      .replace(/Mistral/g, "Mistral");
-  }
-
   return {
     id,
-    name: friendlyName,
+    name: formatDisplayLabel(name),
     provider,
     providerId,
     normalizedId: normalizeDiscoveredModelId(providerId, id),

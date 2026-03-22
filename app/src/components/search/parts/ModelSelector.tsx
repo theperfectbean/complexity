@@ -4,7 +4,7 @@ import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { ChevronDown, Check, Sparkles, Search, Brain, Zap, Globe, Terminal, Cpu, Settings2 } from "lucide-react";
 import { useMemo, useState, useEffect, useCallback } from "react";
 import { MODELS, getDefaultModel, SearchModelOption } from "@/lib/models";
-import { cn } from "@/lib/utils";
+import { cn, formatDisplayLabel } from "@/lib/utils";
 
 type ModelSelectorProps = {
   model?: string;
@@ -22,21 +22,6 @@ const CATEGORY_ICONS: Record<string, React.ReactNode> = {
   xAI: <Terminal className="h-3.5 w-3.5" />,
   Local: <Cpu className="h-3.5 w-3.5" />,
 };
-
-function formatDisplayLabel(label: string): string {
-  // If it's a raw ID-like string (contains / or nhiều -), clean it up
-  if (label.includes("/") || (label.match(/-/g) || []).length > 2) {
-    const parts = label.split("/");
-    const lastPart = parts[parts.length - 1];
-    return lastPart
-      .replace(/-/g, " ")
-      .replace(/\b\w/g, (l) => l.toUpperCase())
-      .replace(/Gpt/g, "GPT")
-      .replace(/Llama/g, "Llama")
-      .replace(/Mistral/g, "Mistral");
-  }
-  return label;
-}
 
 export function ModelSelector({
   model = getDefaultModel(),

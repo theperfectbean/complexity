@@ -7,8 +7,6 @@ import { db } from "@/lib/db";
 import { createId } from "@/lib/db/cuid";
 import { threads } from "@/lib/db/schema";
 import { resolveRequestedModel } from "@/lib/available-models";
-import { generateThreadTitle } from "@/lib/llm";
-import { getApiKeys } from "@/lib/settings";
 
 const createSchema = z.object({
   title: z.string().min(1).max(200).optional(),
@@ -70,9 +68,10 @@ export async function POST(request: Request) {
 
   let title = parsed.data.title;
   if (!title && parsed.data.initialMessage) {
-    const keys = await getApiKeys();
-    const titlingModel = await resolveRequestedModel(parsed.data.model, { preferNonPreset: true });
-    title = await generateThreadTitle(parsed.data.initialMessage, titlingModel, keys);
+    title = parsed.data.initialMessage.slice(0, 60);
+    if (parsed.data.initialMessage.length > 60) {
+      title += "...";
+    }
   }
 
   if (!title) {

@@ -4,6 +4,24 @@ import { encode } from "gpt-tokenizer";
 import type { ChatMessageItem, ChatCitation, ChatThinkingPart } from "@/components/chat/MessageList";
 import { collectTextStrings } from "./extraction-utils";
 
+/**
+ * Formats a model ID or label into a human-readable string.
+ */
+export function formatDisplayLabel(label: string): string {
+  // If it's a raw ID-like string (contains / or multiple -), clean it up
+  if (label.includes("/") || (label.match(/-/g) || []).length > 2) {
+    const parts = label.split("/");
+    const lastPart = parts[parts.length - 1];
+    return lastPart
+      .replace(/-/g, " ")
+      .replace(/\b\w/g, (l) => l.toUpperCase())
+      .replace(/Gpt/g, "GPT")
+      .replace(/Llama/g, "Llama")
+      .replace(/Mistral/g, "Mistral");
+  }
+  return label;
+}
+
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }

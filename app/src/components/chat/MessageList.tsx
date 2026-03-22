@@ -7,7 +7,7 @@ import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 
 import { SourceCarousel } from "@/components/chat/SourceCarousel";
 import { MarkdownRenderer } from "@/components/shared/MarkdownRenderer";
-import { cn, copyToClipboard, cleanMarkdownForCopy } from "@/lib/utils";
+import { cn, copyToClipboard, cleanMarkdownForCopy, formatDisplayLabel } from "@/lib/utils";
 import { MODELS, SearchModelOption } from "@/lib/models";
 
 export type ChatCitation = {
@@ -543,7 +543,7 @@ const MessageItem = memo(function MessageItem({
                                 "flex cursor-pointer items-center rounded-lg px-3 py-2 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground"
                               )}
                             >
-                              {option.label}
+                              {formatDisplayLabel(option.label)}
                             </DropdownMenu.Item>
                           ))}
                         </div>
