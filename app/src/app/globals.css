@@ -404,7 +404,7 @@ div.markdown-body pre code {
 @layer components {
 }
 [data-nextjs-dev-overlay] {
-  display: none;
+  display: none !important;
 }
 
 

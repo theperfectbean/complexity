@@ -83,8 +83,8 @@ const components: Components = {
     }
 
     return (
-      <div className="group/code relative my-6 rounded-xl border border-border bg-muted/20 overflow-hidden shadow-sm">
-        <div className="absolute top-0 right-0 w-full h-0 z-30 flex justify-end p-2 pointer-events-none">
+      <div className="group/code relative my-6 rounded-xl border border-border bg-muted/20 shadow-sm">
+        <div className="sticky top-2 right-2 z-30 flex justify-end h-0 pointer-events-none">
           <div className="pointer-events-auto flex items-center gap-3">
             {language && (
               <span className="px-2 py-1 text-[10px] font-bold uppercase text-muted-foreground/40 select-none bg-muted/50 rounded-md backdrop-blur-sm">
@@ -94,7 +94,7 @@ const components: Components = {
             <CopyButton content={content} />
           </div>
         </div>
-        <div className="w-full overflow-x-auto p-4 pt-12">
+        <div className="w-full overflow-x-auto overflow-hidden rounded-xl p-4 pt-12">
           <code className="block w-full text-[13px] leading-relaxed whitespace-pre-wrap font-mono">
             {children}
           </code>
