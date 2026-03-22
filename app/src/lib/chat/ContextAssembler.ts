@@ -66,7 +66,7 @@ ${content}`;
           results.forEach((c) => {
             ragCitations.push({
               id: c.id,
-              title: "Local Knowledge",
+              title: c.filename || "Local Document",
               url: `complexity://chunk/${c.id}`,
               snippet: c.content,
             });

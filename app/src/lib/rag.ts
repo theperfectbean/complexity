@@ -168,11 +168,11 @@ function dotProduct(a: number[], b: number[]): number {
  * λ = 1 → pure relevance; λ = 0 → pure diversity.
  */
 function mmrRerank(
-  candidates: Array<{ id: string; content: string; embedding: number[]; score: number }>,
+  candidates: Array<{ id: string; content: string; embedding: number[]; score: number; filename?: string | null }>,
   queryEmbedding: number[],
   topK: number,
   lambda = runtimeConfig.rag.mmrLambda,
-): Array<{ id: string; content: string; score: number }> {
+): Array<{ id: string; content: string; score: number; filename?: string | null }> {
   if (candidates.length === 0) return [];
 
   const selected: typeof candidates = [];
@@ -200,7 +200,7 @@ function mmrRerank(
     remaining.splice(bestIdx, 1);
   }
 
-  return selected.map(({ id, content, score }) => ({ id, content, score }));
+  return selected.map(({ id, content, score, filename }) => ({ id, content, score, filename }));
 }
 
 /**
@@ -216,7 +216,7 @@ export async function hybridSearch(
   queryText: string,
   embedding: number[],
   topK = runtimeConfig.rag.similarityLimit,
-): Promise<Array<{ id: string; content: string; score: number }>> {
+): Promise<Array<{ id: string; content: string; score: number; filename?: string | null }>> {
   const candidates = runtimeConfig.rag.hybridCandidates;
 
   if (!runtimeConfig.rag.hybridSearch) {
@@ -227,7 +227,13 @@ export async function hybridSearch(
   // 1. Vector search — top `candidates` by cosine distance
   const distance = cosineDistance(chunks.embedding, embedding);
   const vectorRows = await db
-    .select({ id: chunks.id, content: chunks.content, embedding: chunks.embedding, distance })
+    .select({ 
+      id: chunks.id, 
+      content: chunks.content, 
+      embedding: chunks.embedding, 
+      distance,
+      filename: documents.filename
+    })
     .from(chunks)
     .innerJoin(documents, eq(chunks.documentId, documents.id))
     .where(and(eq(chunks.roleId, roleId), eq(documents.status, "ready")))
@@ -236,7 +242,13 @@ export async function hybridSearch(
 
   // 2. BM25 keyword search via PostgreSQL full-text search
   const bm25Rows = await db
-    .select({ id: chunks.id, content: chunks.content, embedding: chunks.embedding, rank: sql<number>`ts_rank_cd(to_tsvector('english', ${chunks.content}), plainto_tsquery('english', ${queryText}))` })
+    .select({ 
+      id: chunks.id, 
+      content: chunks.content, 
+      embedding: chunks.embedding, 
+      rank: sql<number>`ts_rank_cd(to_tsvector('english', ${chunks.content}), plainto_tsquery('english', ${queryText}))`,
+      filename: documents.filename
+    })
     .from(chunks)
     .innerJoin(documents, eq(chunks.documentId, documents.id))
     .where(and(
@@ -249,11 +261,11 @@ export async function hybridSearch(
 
   // 3. RRF: build rank maps and merge scores (k=60 is standard RRF constant)
   const RRF_K = 60;
-  const scores = new Map<string, { content: string; embedding: number[]; score: number }>();
+  const scores = new Map<string, { content: string; embedding: number[]; score: number; filename?: string | null }>();
 
   vectorRows.forEach((row, rank) => {
     const rrf = 1 / (RRF_K + rank + 1);
-    scores.set(row.id, { content: row.content, embedding: row.embedding as number[], score: rrf });
+    scores.set(row.id, { content: row.content, embedding: row.embedding as number[], score: rrf, filename: row.filename });
   });
 
   bm25Rows.forEach((row, rank) => {
@@ -262,7 +274,7 @@ export async function hybridSearch(
     if (existing) {
       existing.score += rrf;
     } else {
-      scores.set(row.id, { content: row.content, embedding: row.embedding as number[], score: rrf });
+      scores.set(row.id, { content: row.content, embedding: row.embedding as number[], score: rrf, filename: row.filename });
     }
   });
 

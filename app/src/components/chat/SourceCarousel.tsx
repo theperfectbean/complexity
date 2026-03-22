@@ -18,15 +18,17 @@ function toDomain(url: string): string {
 export function SourceCarousel({ citations }: SourceCarouselProps) {
   const [selectedCitation, setSelectedCitation] = useState<ChatCitation | null>(null);
 
-  if (citations.length === 0) {
+  const filteredCitations = citations.filter(c => !c.url?.startsWith("complexity://"));
+
+  if (filteredCitations.length === 0) {
     return null;
   }
 
   return (
     <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
-      {citations.map((citation, index) => {
-        const domain = citation.url?.startsWith("complexity://") ? "Local Document" : toDomain(citation.url || "");
-        const isLocal = citation.url?.startsWith("complexity://");
+      {filteredCitations.map((citation, index) => {
+        const domain = toDomain(citation.url || "");
+        const isLocal = false; // Always false after filtering complexity://
 
         return (
           <div key={citation.id || index} className="flex flex-col">
@@ -99,7 +101,7 @@ export function SourceCarousel({ citations }: SourceCarouselProps) {
 
             <div className="mt-6 flex items-center justify-between">
               <div className="text-xs text-muted-foreground">
-                <p className="font-semibold text-foreground">{selectedCitation?.title || "Local Knowledge"}</p>
+                <p className="font-semibold text-foreground">{selectedCitation?.title || "Local Document"}</p>
                 <p className="truncate max-w-[300px]">{selectedCitation?.url}</p>
               </div>
               {selectedCitation?.url && !selectedCitation.url.startsWith("complexity://") && (
