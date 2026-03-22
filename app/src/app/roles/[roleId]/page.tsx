@@ -412,7 +412,7 @@ export default function RoleDetailPage() {
             {editingInstructions ? (
               <div className="mt-4 space-y-3">
                 <textarea
-                  className="min-h-[140px] w-full rounded-xl border border-border/70 bg-background px-3 py-2 text-sm focus:border-primary/50 focus:outline-none focus:ring-4 focus:ring-primary/5"
+                  className="field-sizing-content min-h-[300px] w-full resize-y rounded-xl border border-border/70 bg-background px-3 py-2 text-sm focus:border-primary/50 focus:outline-none focus:ring-4 focus:ring-primary/5"
                   value={instructionsDraft}
                   onChange={(event) => setInstructionsDraft(event.target.value)}
                 />
