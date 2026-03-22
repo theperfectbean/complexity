@@ -441,7 +441,7 @@ const MessageItem = memo(function MessageItem({
                 Context: Recalled Memories
               </div>
             )}
-            {displayCitations.length > 0 ? (
+            {displayCitations.filter(c => !c.url?.startsWith("complexity://")).length > 0 ? (
               <div className="my-6 min-h-[100px]">
                 <SourceCarousel citations={displayCitations} />
               </div>
