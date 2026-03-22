@@ -283,6 +283,9 @@ export function isPerplexityProvider(modelId: string): boolean {
  * Summarize a user's first message into a high-quality thread title.
  */
 export async function generateThreadTitle(message: string, modelId: string, keys: Record<string, string | null>): Promise<string> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 3000);
+
   try {
     const model = getLanguageModel(modelId, keys);
     
@@ -290,12 +293,15 @@ export async function generateThreadTitle(message: string, modelId: string, keys
       model,
       system: "You are a helpful assistant that summarizes user queries into short, descriptive thread titles (3-6 words). Do not use quotes or special characters. Return ONLY the title text. Be concise but descriptive.",
       prompt: `Summarize this query into a title: ${message}`,
+      abortSignal: controller.signal,
     });
     
     return text.trim().replace(/^["']|["']$/g, "").replace(/\.$/, "");
   } catch (error) {
-    console.error("[generateThreadTitle] Error:", error);
+    console.error("[generateThreadTitle] Error or timeout:", error);
     return message.slice(0, 60) + (message.length > 60 ? "..." : "");
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
 

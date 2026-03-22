@@ -448,6 +448,7 @@ const MessageItem = memo(function MessageItem({
             <MarkdownRenderer 
               content={message.content} 
               isStreaming={isStreaming && index === totalMessages - 1} 
+              hasThinking={message.thinking && message.thinking.length > 0}
             />
           </div>
 

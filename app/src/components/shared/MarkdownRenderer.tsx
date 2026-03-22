@@ -13,6 +13,7 @@ import { LoadingSkeleton } from "./LoadingSkeleton";
 type MarkdownRendererProps = {
   content: string;
   isStreaming?: boolean;
+  hasThinking?: boolean;
 };
 
 // Helper to extract plain text from React nodes
@@ -44,11 +45,11 @@ function CopyButton({ content }: { content: string }) {
   return (
     <button
       onClick={handleCopy}
-      className="p-1.5 rounded-md border border-border bg-background/90 hover:bg-background text-muted-foreground hover:text-foreground shadow-sm transition-all md:opacity-0 md:group-hover/code:opacity-100 md:focus/code:opacity-100 z-30"
+      className="p-1.5 rounded-md bg-white/80 dark:bg-zinc-700/60 hover:bg-white dark:hover:bg-zinc-600/80 border border-black/10 dark:border-white/10 text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-100 shadow-sm transition-all"
       title="Copy to clipboard"
     >
       {copied ? (
-        <Check className="h-3.5 w-3.5 text-emerald-500" />
+        <Check className="h-3.5 w-3.5 text-emerald-400" />
       ) : (
         <Copy className="h-3.5 w-3.5" />
       )}
@@ -83,19 +84,15 @@ const components: Components = {
     }
 
     return (
-      <div className="group/code relative my-6 rounded-xl border border-border bg-muted/20 shadow-sm">
-        <div className="sticky top-2 right-2 z-30 flex justify-end h-0 pointer-events-none">
-          <div className="pointer-events-auto flex items-center gap-3">
-            {language && (
-              <span className="px-2 py-1 text-[10px] font-bold uppercase text-muted-foreground/40 select-none bg-muted/50 rounded-md backdrop-blur-sm">
-                {language}
-              </span>
-            )}
+      <div className="relative my-4 rounded-xl overflow-hidden border border-border/60 bg-[#f6f8fa] dark:bg-[#161b22]">
+        {/* Copy button — sticky so it stays top-right as the page scrolls */}
+        <div className="sticky top-2 z-10 h-0 flex justify-end overflow-visible pointer-events-none">
+          <div className="pointer-events-auto mr-2 mt-2">
             <CopyButton content={content} />
           </div>
         </div>
-        <div className="w-full overflow-x-auto overflow-hidden rounded-xl p-4 pt-12">
-          <code className="block w-full text-[13px] leading-relaxed whitespace-pre-wrap font-mono">
+        <div className="overflow-x-auto p-4 pt-10">
+          <code className="block text-[13px] leading-relaxed whitespace-pre font-mono">
             {children}
           </code>
         </div>
@@ -151,7 +148,7 @@ const components: Components = {
   }
 };
 
-export const MarkdownRenderer = memo(function MarkdownRenderer({ content, isStreaming }: MarkdownRendererProps) {
+export const MarkdownRenderer = memo(function MarkdownRenderer({ content, isStreaming, hasThinking }: MarkdownRendererProps) {
   const [displayContent, setDisplayContent] = useState(content);
 
   useEffect(() => {
@@ -170,9 +167,12 @@ export const MarkdownRenderer = memo(function MarkdownRenderer({ content, isStre
   const isActuallyEmpty = !finalContent || finalContent === "\u200B" || finalContent.trim().length === 0;
 
   if (isStreaming && isActuallyEmpty) {
+    if (hasThinking) {
+      return <div className="markdown-body min-h-[40px]" />;
+    }
     return (
       <div className="markdown-body max-w-none">
-        <LoadingSkeleton lines={2} />
+        <LoadingSkeleton lines={1} />
       </div>
     );
   }

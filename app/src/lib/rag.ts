@@ -1,4 +1,4 @@
-import { and, cosineDistance, eq, sql } from "drizzle-orm";
+import { and, cosineDistance, desc, eq, sql } from "drizzle-orm";
 import { encode, decode } from "gpt-tokenizer";
 
 import { db } from "@/lib/db";
@@ -244,7 +244,7 @@ export async function hybridSearch(
       eq(documents.status, "ready"),
       sql`to_tsvector('english', ${chunks.content}) @@ plainto_tsquery('english', ${queryText})`,
     ))
-    .orderBy(sql`rank DESC`)
+    .orderBy(desc(sql<number>`ts_rank_cd(to_tsvector('english', ${chunks.content}), plainto_tsquery('english', ${queryText}))`))
     .limit(candidates);
 
   // 3. RRF: build rank maps and merge scores (k=60 is standard RRF constant)

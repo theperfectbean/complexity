@@ -659,13 +659,17 @@ This strategy ensures all dependencies (Postgres, Redis, Embedder) are running w
 
 
 ### Message Pagination (2026-03-19)
-- **Feature**: Implemented cursor-based pagination for long conversation threads (I1).
-- **Implementation**:
-  - Enhanced `GET /api/threads/[threadId]` to support `cursor` and `limit` parameters for partial message loading.
-  - Implemented a "Load older messages" button at the top of the `MessageList` that fetches and prepends historical messages.
-  - Optimized initial thread load by fetching only the most recent 20 messages, drastically reducing Time to First Token (TTFT) for very long threads.
-  - Integrated with Vercel AI SDK state management to ensure consistency when prepending history.
-- **Benefit**: Significantly improves performance and reduces database/memory overhead for conversations with hundreds of messages.
+... (rest of the file)
+
+### RAG & Streaming UI Polish (2026-03-22)
+- **Titling Delay Fix**: Added a 3-second timeout to `generateThreadTitle` in `app/src/lib/llm.ts` to prevent slow LLM responses from blocking the creation of new threads and delaying navigation.
+- **RAG Search Fix**: Resolved a critical `DrizzleQueryError` in `hybridSearch` where the `rank` alias was not recognized in the `orderBy` clause. Fixed by using the full expression in `orderBy` and ensuring `desc` is properly imported.
+- **Streaming Jitter Reduction**:
+  - Reduced `LoadingSkeleton` from 2 lines to 1 to minimize the "flashing block" effect.
+  - Added a `hasThinking` prop to `MarkdownRenderer` to hide the skeleton entirely when "Thinking" indicators are already visible, replacing it with a subtle spacer.
+  - Ensured all placeholder states maintain the `markdown-body` class for consistent layout and testability.
+- **Context Clarity**: Enhanced the RAG context prompt in `ContextAssembler.ts` to explicitly label retrieved information as "UPLOADED FILES CONTENT," improving the LLM's ability to recognize and summarize local documents.
+- **Model Selector Robustness**: Added `AbortController` to the `ModelSelector`'s model-fetching effect to prevent `TypeError: Failed to fetch` errors when navigating away or reloading during a fetch.
 
 ### Thread Pinning & Tagging (2026-03-19)
 - **Feature**: Added ability to pin important conversations and organize threads with custom tags (I3).

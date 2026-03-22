@@ -118,11 +118,13 @@ ${thread.systemPrompt}` : "",
       externalContext ? `External User Data:
 ${externalContext}` : "",
       chartInstructions,
-      ragContext ? `Use this local context if relevant:
+      ragContext ? `Below is content from the user's UPLOADED FILES. Please use this as your primary source of truth for the response:
 
+--- UPLOADED FILES CONTENT START ---
 ${ragContext}
+--- UPLOADED FILES CONTENT END ---
 
-If insufficient, continue with normal reasoning.` : "",
+Use the information above to answer the user's request. If the information is not present in the files, you may use your general knowledge but clearly state when you are doing so.` : "",
     ].filter(Boolean).join("\n\n") || "Provide a concise and accurate response.";
 
     return { instructions, ragCitations, memoriesFound };

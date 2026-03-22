@@ -63,7 +63,9 @@ export function ModelSelector({
 
   useEffect(() => {
     if (autoFilter && !providedModelOptions) {
-      fetch("/api/models")
+      const controller = new AbortController();
+      
+      fetch("/api/models", { signal: controller.signal })
         .then(res => res.json())
         .then(data => {
           if (data.models && data.models.length > 0) {
@@ -80,7 +82,13 @@ export function ModelSelector({
             }
           }
         })
-        .catch(err => console.error("Failed to fetch available models:", err));
+        .catch(err => {
+          if (err.name !== "AbortError") {
+            console.error("Failed to fetch available models:", err);
+          }
+        });
+
+      return () => controller.abort();
     }
   }, [autoFilter, providedModelOptions, model, onModelChange, hasUserSelectedModel]);
 

@@ -107,6 +107,7 @@ export function DocumentList({ documents, loading, onDeleted, onReprocess }: Doc
       {documents.map((document) => (
         <article
           key={document.id}
+          data-testid="document-item"
           className="group relative flex flex-col justify-between rounded-xl border border-border/50 bg-background p-3 transition-colors hover:bg-muted/30"
           title={document.filename}
         >
