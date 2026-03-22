@@ -117,11 +117,21 @@ test.describe("Role summarise-uploaded-files diagnostic", () => {
     expect(networkErrors.filter(e => e.status >= 500), "No 5xx errors").toHaveLength(0);
     expect(consoleErrors.filter(e => e.includes("Error") || e.includes("failed")), "No JS errors").toHaveLength(0);
 
-    // The response should contain some text (not empty)
-    const messageBody = page.locator(".markdown-body").first();
-    await expect(messageBody).toBeVisible({ timeout: 10_000 });
+    // The response should contain some text or a thinking state
+    const messageItem = page.locator('[data-testid*="message-assistant"]').last();
+    await expect(messageItem).toBeVisible({ timeout: 10_000 });
     
-    // Wait for text to arrive (it might be in a thinking state initially)
+    // Wait for either Thinking... or actual markdown content
+    await expect(async () => {
+      const thinking = page.getByText(/thinking.../i);
+      const markdown = page.locator(".markdown-body").first();
+      const isThinking = await thinking.isVisible();
+      const hasContent = await markdown.isVisible();
+      expect(isThinking || hasContent).toBeTruthy();
+    }).toPass({ timeout: 10_000 });
+
+    // Final wait for actual text content to arrive
+    const messageBody = page.locator(".markdown-body").first();
     await expect(async () => {
       const text = await messageBody.innerText();
       expect(text.trim().length).toBeGreaterThan(5);

@@ -168,7 +168,7 @@ export const MarkdownRenderer = memo(function MarkdownRenderer({ content, isStre
 
   if (isStreaming && isActuallyEmpty) {
     if (hasThinking) {
-      return <div className="markdown-body min-h-[40px]" />;
+      return null;
     }
     return (
       <div className="markdown-body max-w-none">

@@ -245,6 +245,7 @@ const MessageItem = memo(function MessageItem({
       )}
     >
       <article 
+        data-testid={`message-${message.role}`}
         className={isUser ? "flex flex-col items-end py-2" : "group relative flex flex-col gap-0 pt-2 pb-10"}
         style={{ overflowAnchor: "auto" }}
       >
@@ -445,10 +446,18 @@ const MessageItem = memo(function MessageItem({
                 <SourceCarousel citations={displayCitations} />
               </div>
             ) : null}
+
+            {isStreaming && index === totalMessages - 1 && !message.content && (!message.thinking || message.thinking.length === 0) && (
+              <div className="flex items-center gap-2 mb-4 animate-pulse">
+                <div className="h-2 w-2 rounded-full bg-muted-foreground/40" />
+                <span className="text-sm font-medium text-muted-foreground/60 italic">Thinking...</span>
+              </div>
+            )}
+
             <MarkdownRenderer 
               content={message.content} 
               isStreaming={isStreaming && index === totalMessages - 1} 
-              hasThinking={message.thinking && message.thinking.length > 0}
+              hasThinking={(message.thinking && message.thinking.length > 0) || (isStreaming && index === totalMessages - 1 && !message.content)}
             />
           </div>
 
