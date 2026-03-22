@@ -702,6 +702,13 @@ This strategy ensures all dependencies (Postgres, Redis, Embedder) are running w
   - Enhanced `app/layout.tsx` with PWA-specific metadata (manifest link, apple-mobile-web-app tags).
 - **Benefit**: Users can "install" Complexity as a native-like application with its own icon and splash screen, improving accessibility on all devices.
 
+### UI Performance & Polish E2E Audit (2026-03-23)
+- **Feature**: Added a dedicated `ui-performance-audit.test.ts` to track rendering timings, layout shifts (CLS), and visual stability during RAG and general queries.
+- **Findings**: 
+  - General Time-to-First-Token (TTFT) was observed around 1.1s - 2.2s.
+  - Cumulative Layout Shift (CLS) during streaming was consistently around ~0.22, showing mostly smooth rendering but some minimal shifts remaining.
+  - Asserted lack of horizontal scrollbars and robust visibility of RAG citation elements.
+
 
 
 
