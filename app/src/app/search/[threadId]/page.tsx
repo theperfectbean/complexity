@@ -184,11 +184,7 @@ export function ThreadChat({
     }),
     onData(part: UIMessageChunk) {
       if (part.type === "data-json") {
-        const payload = part.data as Record<string, unknown>;
-        if (payload.kind === "title-updated") {
-          setThreadTitle(payload.title as string);
-        }
-        setData((prev) => [...prev, payload]);
+        setData((prev) => [...prev, part.data as Record<string, unknown>]);
       }
     },
   });
@@ -431,10 +427,7 @@ export function ThreadChat({
         </div>
       ) : null}
 
-      <div className="mb-8 flex items-start justify-between gap-4">
-        <h1 className="text-xl font-semibold leading-snug tracking-tight text-foreground line-clamp-2">
-          {threadTitle}
-        </h1>
+      <div className="mb-8 flex items-start justify-end gap-4">
         <div className="flex items-center gap-2 flex-shrink-0">
           <ThreadSearchBar onSearch={handleSearch} matchCount={searchMatches} />
           <ThreadSettingsDialog 

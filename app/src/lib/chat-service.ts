@@ -147,23 +147,6 @@ export class ChatService {
 
           const keys = await getApiKeys();
 
-          // Background Titling for first message
-          const titlingPromise = (async () => {
-            if (inputMessages.length === 1 && (threadTitle === "New Thread" || threadTitle.endsWith("..."))) {
-              try {
-                const titlingModel = await resolveRequestedModel(model, { preferNonPreset: true });
-                const newTitle = await generateThreadTitle(userText, titlingModel, keys);
-                if (newTitle && newTitle !== threadTitle) {
-                  await db.update(threads).set({ title: newTitle }).where(eq(threads.id, threadId));
-                  return newTitle;
-                }
-              } catch (e) {
-                this.log.error({ err: e }, "Failed to generate intelligent title");
-              }
-            }
-            return null;
-          })();
-
           const { instructions, ragCitations, memoriesFound } = await this.assembler.assemble(this.session, thread, userText, writer);
 
           // Write RAG citations early so they appear in the UI
@@ -193,11 +176,6 @@ export class ChatService {
 
           await this.history.setCache(this.session, cacheKey, { text: assistantText, citations });
           await this.history.saveAssistantMessage(this.session, responseMessageId, assistantText, citations, memoriesFound > 0);
-
-          const finalTitle = await titlingPromise;
-          if (finalTitle) {
-            writer.write({ type: "data-json", data: { kind: "title-updated", title: finalTitle } } as UIMessageChunk);
-          }
 
           if (thread.memoryEnabled) {
             const memoryPromise = saveExtractedMemories({
