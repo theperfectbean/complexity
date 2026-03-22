@@ -280,6 +280,39 @@ export function isPerplexityProvider(modelId: string): boolean {
 }
 
 /**
+ * Summarizes a user query into a concise title (3-6 words) using the LLM.
+ * Includes a strict timeout to prevent blocking thread creation.
+ */
+export async function generateThreadTitle(
+  query: string, 
+  modelId: string, 
+  keys: Record<string, string | null>
+): Promise<string> {
+  const startTime = Date.now();
+  try {
+    const model = getLanguageModel(modelId, keys);
+    const { text } = await generateText({
+      model,
+      system: "You are a helpful assistant that summarizes user queries into a concise, high-quality title (3-6 words). Do not use quotes or periods.",
+      prompt: `Summarize this query into a title: "${query}"`,
+      maxTokens: 20,
+      abortSignal: AbortSignal.timeout(3000), // 3 second timeout
+    });
+    
+    const title = text.trim();
+    if (title) {
+      console.log(`[generateThreadTitle] Success in ${Date.now() - startTime}ms: "${title}"`);
+      return title;
+    }
+    throw new Error("Empty title returned");
+  } catch (error) {
+    console.error(`[generateThreadTitle] Failed in ${Date.now() - startTime}ms:`, error instanceof Error ? error.message : error);
+    // Fallback to truncation
+    return query.slice(0, 60) + (query.length > 60 ? "..." : "");
+  }
+}
+
+/**
  * Generate an image using DALL-E 3 via the OpenAI API.
  * Returns a markdown image string on success, or an error message.
  */

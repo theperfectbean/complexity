@@ -283,7 +283,9 @@ export default function RoleDetailPage() {
       </Link>
 
       <div className="mt-6 flex items-center justify-between gap-4">
-        <h1 className="font-[var(--font-accent)] text-3xl font-medium">{role ? role.name : `Role ${roleId}`}</h1>
+        <h1 className="font-[var(--font-accent)] text-3xl font-medium">
+          {role ? role.name : <div className="h-9 w-48 animate-pulse rounded-md bg-muted" />}
+        </h1>
         <div className="flex items-center gap-2">
           {isOwner && role && (
             <RoleShareDialog 

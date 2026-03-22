@@ -121,7 +121,7 @@ export function ThreadChat({
   const initialQuery = searchParams.get("q")?.trim() ?? "";
   const [model, setModel] = useState<string>(initialModel);
   const [roleId] = useState<string | null>(initialRoleId);
-  const [threadTitle] = useState(initialTitle);
+  const [threadTitle, setThreadTitle] = useState(initialTitle);
   const [threadSystemPrompt, setThreadSystemPrompt] = useState(initialSystemPrompt);
   const [pinned, setPinned] = useState(initialPinned);
   const [tags, setTags] = useState(initialTags);
@@ -184,7 +184,11 @@ export function ThreadChat({
     }),
     onData(part: UIMessageChunk) {
       if (part.type === "data-json") {
-        setData((prev) => [...prev, part.data as Record<string, unknown>]);
+        const payload = part.data as Record<string, unknown>;
+        if (payload.kind === "title-updated") {
+          setThreadTitle(payload.title as string);
+        }
+        setData((prev) => [...prev, payload]);
       }
     },
   });

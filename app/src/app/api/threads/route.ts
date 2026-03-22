@@ -7,11 +7,13 @@ import { db } from "@/lib/db";
 import { createId } from "@/lib/db/cuid";
 import { threads } from "@/lib/db/schema";
 import { resolveRequestedModel } from "@/lib/available-models";
+import { generateThreadTitle } from "@/lib/llm";
+import { getApiKeys } from "@/lib/settings";
 
 const createSchema = z.object({
   title: z.string().min(1).max(200).optional(),
   initialMessage: z.string().optional(),
-  model: z.string().min(1).max(50).optional(),
+  model: z.string().min(1).max(100).optional(),
   roleId: z.string().optional(),
 });
 

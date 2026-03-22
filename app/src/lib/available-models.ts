@@ -65,7 +65,7 @@ export async function resolveRequestedModel(
   requestedModel?: string, 
   options?: { preferNonPreset?: boolean }
 ): Promise<string> {
-  const { models } = await getAvailableModels();
+  const { models } = await getAvailableModels({ refreshHealthIfStale: false });
   
   if (requestedModel) {
     // 1. Exact match
