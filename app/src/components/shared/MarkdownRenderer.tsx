@@ -15,6 +15,19 @@ type MarkdownRendererProps = {
   isStreaming?: boolean;
 };
 
+// Helper to extract plain text from React nodes
+const extractText = (node: unknown): string => {
+  if (typeof node === "string") return node;
+  if (Array.isArray(node)) return node.map(extractText).join("");
+  if (node && typeof node === "object") {
+    const record = node as { props?: { children?: unknown } };
+    if (record.props?.children !== undefined) {
+      return extractText(record.props.children);
+    }
+  }
+  return "";
+};
+
 function CopyButton({ content }: { content: string }) {
   const [copied, setCopied] = useState(false);
 
@@ -45,7 +58,6 @@ function CopyButton({ content }: { content: string }) {
 
 const components: Components = {
   a({ children, href, ...props }: React.ComponentPropsWithoutRef<"a">) {
-    // Destructure node to prevent it from being passed to the a element
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { node, ...rest } = props as Record<string, unknown>;
     return (
@@ -55,66 +67,24 @@ const components: Components = {
     );
   },
   pre({ children, ...props }: React.ComponentPropsWithoutRef<"pre">) {
-    return (
-      <div className="group/code relative my-6 rounded-xl border border-border/40 bg-muted/30 overflow-hidden shadow-sm">
-        {children}
-      </div>
-    );
-  },
-  code({ className, children, ...props }: React.ComponentPropsWithoutRef<"code">) {
-    // Extract text content from children
-    const extractText = (node: unknown): string => {
-      if (typeof node === "string") return node;
-      if (Array.isArray(node)) return node.map(extractText).join("");
-      if (node && typeof node === "object") {
-        const record = node as { props?: { children?: unknown } };
-        if (record.props?.children !== undefined) {
-          return extractText(record.props.children);
-        }
-      }
-      return "";
-    };
-
     const content = extractText(children).trim();
     
-    // Most resilient detection for chart data: 
-    if (content.startsWith('{') && content.endsWith('}')) {
-      if (content.includes('"type"') && content.includes('"data"')) {
-        return <ChartRenderer data={content} />;
-      }
+    let language = "";
+    if (React.isValidElement(children)) {
+      const className = (children.props as { className?: string }).className || "";
+      const match = /language-(\w+)/.exec(className);
+      if (match) language = match[1];
     }
 
-    // In react-markdown v9+, inline is no longer passed. 
-    // We check if it's a block by looking for language- in className
-    const isBlock = className?.includes("language-");
-
-    if (!isBlock) {
-      // Destructure node to prevent it from being passed to the code element
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { node: _node, ...rest } = props as Record<string, unknown>;
-      return (
-        <code className={cn("px-1.5 py-0.5 rounded-md bg-muted/60 text-foreground font-medium text-[0.9em]", className)} {...rest}>
-          {children}
-        </code>
-      );
-    }
-
-    const match = /language-(\w+)/.exec(className || "");
-    const language = match ? match[1] : "";
-
-    // Python Sandbox interception
-    if (language === "python") {
-      return <PythonExecutor code={content} />;
-    }
-
-    // Artifact interception: HTML or explicit "artifact" language tag
-    if (language === "html" || language === "artifact") {
-      return <ArtifactRenderer code={content} language={language} />;
+    // Interception components should be returned directly
+    const childType = React.isValidElement(children) ? (children.type as any) : null;
+    if (childType === ChartRenderer || childType === PythonExecutor || childType === ArtifactRenderer) {
+      return <>{children}</>;
     }
 
     return (
-      <>
-        <div className="sticky top-0 right-0 w-full h-0 z-30 flex justify-end p-2 pointer-events-none">
+      <div className="group/code relative my-6 rounded-xl border border-border bg-muted/20 overflow-hidden shadow-sm">
+        <div className="absolute top-0 right-0 w-full h-0 z-30 flex justify-end p-2 pointer-events-none">
           <div className="pointer-events-auto flex items-center gap-3">
             {language && (
               <span className="px-2 py-1 text-[10px] font-bold uppercase text-muted-foreground/40 select-none bg-muted/50 rounded-md backdrop-blur-sm">
@@ -124,22 +94,51 @@ const components: Components = {
             <CopyButton content={content} />
           </div>
         </div>
-        <div className="w-full overflow-x-auto">
-          {(() => {
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars
-            const { node: _node, ...rest } = props as Record<string, unknown>;
-            return (
-              <code className={cn("block w-full p-4 pt-12 text-[13px] leading-relaxed", className)} {...rest}>
-                {children}
-              </code>
-            );
-          })()}
+        <div className="w-full overflow-x-auto p-4 pt-12">
+          <code className="block w-full text-[13px] leading-relaxed whitespace-pre-wrap font-mono">
+            {children}
+          </code>
         </div>
-      </>
+      </div>
+    );
+  },
+  code({ className, children, ...props }: React.ComponentPropsWithoutRef<"code">) {
+    const content = extractText(children).trim();
+    
+    // Detection for chart data: 
+    if (content.startsWith('{') && content.endsWith('}')) {
+      if (content.includes('"type"') && content.includes('"data"')) {
+        return <ChartRenderer data={content} />;
+      }
+    }
+
+    const match = /language-(\w+)/.exec(className || "");
+    const language = match ? match[1] : "";
+
+    if (language === "python") {
+      return <PythonExecutor code={content} />;
+    }
+
+    if (language === "html" || language === "artifact") {
+      return <ArtifactRenderer code={content} language={language} />;
+    }
+
+    // Check if we are a block code (usually has language class or hljs)
+    const isBlock = className?.includes("language-") || className?.includes("hljs");
+
+    if (isBlock) {
+      // Just return the children, the pre component handles the block styling
+      return <>{children}</>;
+    }
+
+    // Inline code
+    return (
+      <code className={cn("px-1.5 py-0.5 rounded-md bg-muted/60 text-foreground font-medium text-[0.9em]", className)} {...props}>
+        {children}
+      </code>
     );
   },
   table({ children, ...props }: React.ComponentPropsWithoutRef<"table">) {
-    // Destructure node to prevent it from being passed to the table element
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { node, ...rest } = props as Record<string, unknown>;
     return (
@@ -160,7 +159,6 @@ export const MarkdownRenderer = memo(function MarkdownRenderer({ content, isStre
       return;
     }
 
-    // Debounce updates during streaming to 100ms to reduce re-render frequency and jitter
     const timer = setTimeout(() => {
       setDisplayContent(content);
     }, 100);
