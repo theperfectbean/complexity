@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Copy, RotateCcw, ArrowDown, Globe, Search, Brain, Database, Pencil, ChevronLeft, ChevronRight, RefreshCw, Download, ExternalLink, Trash2 } from "lucide-react";
+import { Check, Copy, RotateCcw, ArrowDown, Globe, Search, Brain, Database, Pencil, ChevronLeft, ChevronRight, RefreshCw, Download, Trash2 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { useState, useRef, useEffect, useCallback, memo, useMemo } from "react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
@@ -495,18 +495,6 @@ const MessageItem = memo(function MessageItem({
                   <Download className="h-3.5 w-3.5 text-muted-foreground/60" strokeWidth={1.5} />
                 </button>
               )}
-
-              <button
-                className="inline-flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-black/5 dark:hover:bg-white/5 active:scale-95"
-                onClick={() => {
-                  if (typeof window !== "undefined") {
-                    void copyToClipboard(window.location.href);
-                  }
-                }}
-                title="Share thread"
-              >
-                <ExternalLink className="h-3.5 w-3.5 text-muted-foreground/60" strokeWidth={1.5} />
-              </button>
 
               {isLastAssistantMessage && onRetry && (
                 <button
