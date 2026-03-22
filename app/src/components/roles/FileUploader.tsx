@@ -17,13 +17,15 @@ export function FileUploader({ roleId, onUploaded, variant = "button" }: FileUpl
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   async function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    if (!file) return;
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
 
     setUploading(true);
     try {
       const body = new FormData();
-      body.append("file", file);
+      for (let i = 0; i < files.length; i++) {
+        body.append("file", files[i]);
+      }
 
       const response = await fetch(`/api/roles/${roleId}/upload`, {
         method: "POST",
@@ -35,7 +37,8 @@ export function FileUploader({ roleId, onUploaded, variant = "button" }: FileUpl
         throw new Error((data.error as string) || "Upload failed");
       }
 
-      toast.success("File uploaded successfully");
+      const count = files.length;
+      toast.success(count === 1 ? "File uploaded successfully" : `${count} files uploaded successfully`);
       onUploaded();
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
@@ -83,6 +86,7 @@ export function FileUploader({ roleId, onUploaded, variant = "button" }: FileUpl
           accept=".pdf,.docx,.txt,.md"
           onChange={handleFileChange}
           disabled={uploading}
+          multiple
         />
         <button
           type="button"
@@ -151,6 +155,7 @@ export function FileUploader({ roleId, onUploaded, variant = "button" }: FileUpl
           accept=".pdf,.docx,.txt,.md"
           onChange={handleFileChange}
           disabled={uploading}
+          multiple
         />
         <div className="flex flex-col items-center gap-3 text-center">
           {uploading ? (
@@ -161,8 +166,8 @@ export function FileUploader({ roleId, onUploaded, variant = "button" }: FileUpl
             </div>
           )}
           <div className="space-y-1">
-            <p className="text-sm font-medium">Click or drag to upload</p>
-            <p className="text-xs text-muted-foreground">PDF, DOCX, TXT, or MD up to 50MB</p>
+            <p className="text-sm font-medium">Click or drag to upload files</p>
+            <p className="text-xs text-muted-foreground">PDF, DOCX, TXT, or MD up to 50MB each</p>
           </div>
         </div>
       </div>

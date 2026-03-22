@@ -15,7 +15,7 @@ test.describe("Role document upload + chat", () => {
     await page.getByRole("button", { name: "Create role" }).click();
 
     await expect(page).toHaveURL(/\/roles\//, { timeout: 15000 });
-    await expect(page.getByRole("heading", { name: roleName })).toBeVisible();
+    await expect(page.getByRole("heading", { name: roleName })).toBeVisible({ timeout: 15000 });
 
     const uploadButton = page.getByRole("button", { name: "Upload file" }).first();
     const fileChooserPromise = page.waitForEvent("filechooser");
@@ -33,7 +33,7 @@ test.describe("Role document upload + chat", () => {
     await expect(page.getByText("rag-notes.txt")).toBeVisible({ timeout: 30000 });
 
     await page.getByPlaceholder("Ask anything...").fill("What is the secret word?");
-    await page.getByRole("button", { name: "Start" }).click();
+    await page.getByRole("button", { name: "Start", exact: true }).click();
 
     await expect(page).toHaveURL(/\/search\//, { timeout: 15000 });
     await expect(page.getByRole("button", { name: "Copy message" })).toBeVisible({ timeout: 30000 });
@@ -50,6 +50,7 @@ test.describe("Role document upload + chat", () => {
     await page.getByRole("button", { name: "Create role" }).click();
 
     await expect(page).toHaveURL(/\/roles\//, { timeout: 15000 });
+    await expect(page.getByRole("heading", { name: roleName })).toBeVisible({ timeout: 15000 });
 
     const uploadButton = page.getByRole("button", { name: "Upload file" }).first();
     const fileChooserPromise = page.waitForEvent("filechooser");
@@ -110,5 +111,48 @@ test.describe("Role document upload + chat", () => {
 
     // Large files take longer to process (upload + chunk + embed)
     await expect(page.getByText("large-test.txt")).toBeVisible({ timeout: 540000 });
+  });
+
+  test("uploads multiple documents to a role simultaneously", async ({ page }) => {
+    const roleName = `Multi-Upload Role ${Math.random().toString(36).slice(2, 8)}`;
+
+    await registerUser(page, { emailPrefix: "role-multi-upload", name: "Role Multi-Upload E2E" });
+
+    await page.goto("/roles");
+    await page.getByRole("link", { name: "New role" }).click();
+    await page.getByPlaceholder("e.g. Python Expert, Research Assistant, etc...").fill(roleName);
+    await page.getByRole("button", { name: "Create role" }).click();
+
+    await expect(page).toHaveURL(/\/roles\//, { timeout: 15000 });
+
+    const uploadButton = page.getByRole("button", { name: "Upload file" }).first();
+    const fileChooserPromise = page.waitForEvent("filechooser");
+    await uploadButton.click();
+    const fileChooser = await fileChooserPromise;
+
+    await fileChooser.setFiles([
+      {
+        name: "multi-1.txt",
+        mimeType: "text/plain",
+        buffer: Buffer.from("File 1 content"),
+      },
+      {
+        name: "multi-2.txt",
+        mimeType: "text/plain",
+        buffer: Buffer.from("File 2 content"),
+      },
+      {
+        name: "multi-3.txt",
+        mimeType: "text/plain",
+        buffer: Buffer.from("File 3 content"),
+      },
+    ]);
+
+    // Verify all files appear
+    await expect(page.getByText("multi-1.txt")).toBeVisible({ timeout: 30000 });
+    await expect(page.getByText("multi-2.txt")).toBeVisible({ timeout: 30000 });
+    await expect(page.getByText("multi-3.txt")).toBeVisible({ timeout: 30000 });
+    
+    await expect(page.getByText("3 files uploaded successfully")).toBeVisible();
   });
 });

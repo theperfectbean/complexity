@@ -45,6 +45,9 @@ test.describe("UI Performance and Polish Audit", () => {
 
     await expect(page).toHaveURL(/\/search\//, { timeout: 15000 });
 
+    // Assert that the "Thinking..." indicator is visible during the submitted/streaming phase
+    await expect(page.getByText("Thinking...", { exact: true })).toBeVisible({ timeout: 5000 });
+
     const article = page.locator("article").last();
     await expect(article).toBeVisible({ timeout: 15000 });
     

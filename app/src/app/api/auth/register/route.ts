@@ -47,7 +47,7 @@ export async function POST(request: Request) {
         await redis.expire(rateKey, 600 + 1); // 10 minutes + buffer
       }
       if (current > 15) {
-        // Limit to 15 attempts per 10 minutes per IP (increased from 5 for E2E tests)
+        // Limit to 15 attempts per 10 minutes per IP
         return NextResponse.json(
           { error: "Too many registration attempts. Please try again in 10 minutes." },
           { status: 429 }

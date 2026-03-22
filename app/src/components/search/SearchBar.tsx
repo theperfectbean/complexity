@@ -2,7 +2,7 @@
 
 import { Globe, Paperclip, SendHorizontal, Square } from "lucide-react";
 import { motion } from "motion/react";
-import { useRef, useState, useEffect } from "react";
+import { useRef, useState, useEffect, useCallback } from "react";
 import TextareaAutosize from "react-textarea-autosize";
 
 import { getDefaultModel } from "@/lib/models";
@@ -61,7 +61,9 @@ export function SearchBar({
   roleId,
 }: SearchBarProps) {
   const fileAttachmentsRef = useRef<FileAttachmentsHandle>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [internalAttachments, setInternalAttachments] = useState<File[]>(externalAttachments);
+  const [isDragging, setIsDragging] = useState(false);
 
   useEffect(() => {
     setInternalAttachments(externalAttachments);
@@ -71,15 +73,100 @@ export function SearchBar({
     fileAttachmentsRef.current?.clickInput();
   };
 
+  const handlePaste = useCallback((event: ClipboardEvent) => {
+    const files: File[] = [];
+    const clipboardData = event.clipboardData;
+    if (!clipboardData) return;
+    
+    // Check files first
+    if (clipboardData.files && clipboardData.files.length > 0) {
+      for (let i = 0; i < clipboardData.files.length; i++) {
+        files.push(clipboardData.files[i]);
+      }
+    } 
+    
+    // Then check items (especially for images)
+    const items = clipboardData.items;
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].kind === "file") {
+        const file = items[i].getAsFile();
+        if (file && !files.some(f => f.name === file.name && f.size === file.size)) {
+          files.push(file);
+        }
+      }
+    }
+
+    if (files.length > 0) {
+      fileAttachmentsRef.current?.processFiles(files);
+    }
+  }, []);
+
+  const handleDrop = useCallback((event: DragEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setIsDragging(false);
+
+    if (disabled) return;
+
+    const files = event.dataTransfer?.files;
+    if (files && files.length > 0) {
+      fileAttachmentsRef.current?.processFiles(files);
+    }
+  }, [disabled]);
+
+  const handlePasteReact = (event: React.ClipboardEvent) => {
+    handlePaste(event.nativeEvent as ClipboardEvent);
+  };
+
+  const handleDropReact = (event: React.DragEvent) => {
+    handleDrop(event.nativeEvent as DragEvent);
+  };
+
+  useEffect(() => {
+    // Only use native listener for dropping on the container background if needed,
+    // but the onDrop on motion.div already calls onContainerDrop.
+    // The textarea needs its own listener to prevent default properly.
+  }, []);
+
+  const handleDragOver = (event: React.DragEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!disabled) setIsDragging(true);
+  };
+
+  const handleDragEnter = (event: React.DragEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!disabled) setIsDragging(true);
+  };
+
+  const handleDragLeave = (event: React.DragEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const onContainerDrop = (event: React.DragEvent) => {
+    // Only handle if it didn't come from the textarea (already handled)
+    if (event.target === textareaRef.current) return;
+    
+    handleDrop(event.nativeEvent as DragEvent);
+  };
+
   return (
     <motion.div
       id={id}
       layoutId={layoutId}
       layout={!compact}
       data-testid={dataTestId || id}
+      onDragOver={handleDragOver}
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
+      onDrop={onContainerDrop}
       className={cn(
         "flex flex-col rounded-[22px] border bg-card p-2 shadow-md transition-all duration-200",
         "focus-within:border-primary/30 focus-within:ring-4 focus-within:ring-primary/5 focus-within:shadow-lg",
+        isDragging && "border-primary/50 ring-4 ring-primary/10 bg-primary/5 shadow-xl scale-[1.01]"
       )}
     >
       <FileAttachments
@@ -93,6 +180,7 @@ export function SearchBar({
 
       <div className="flex items-end gap-2 px-2">
         <TextareaAutosize
+          ref={textareaRef}
           minRows={compact ? 1 : 2}
           maxRows={12}
           value={value}
@@ -103,6 +191,8 @@ export function SearchBar({
               event.currentTarget.form?.requestSubmit();
             }
           }}
+          onPaste={handlePasteReact}
+          onDrop={handleDropReact}
           disabled={disabled}
           placeholder={placeholder}
           className="flex-1 resize-none bg-transparent py-2.5 text-[15px] outline-none placeholder:text-muted-foreground/60 disabled:opacity-50 leading-relaxed"

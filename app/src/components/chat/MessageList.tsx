@@ -447,7 +447,7 @@ const MessageItem = memo(function MessageItem({
               </div>
             ) : null}
 
-            {isStreaming && index === totalMessages - 1 && !message.content && (!message.thinking || message.thinking.length === 0) && (
+            {isStreaming && index === totalMessages - 1 && (!message.content || message.content === "\u200B") && (
               <div className="flex items-center gap-2 mb-4 animate-pulse">
                 <div className="h-2 w-2 rounded-full bg-muted-foreground/40" />
                 <span className="text-sm font-medium text-muted-foreground/60 italic">Thinking...</span>
@@ -457,7 +457,7 @@ const MessageItem = memo(function MessageItem({
             <MarkdownRenderer 
               content={message.content} 
               isStreaming={isStreaming && index === totalMessages - 1} 
-              hasThinking={(message.thinking && message.thinking.length > 0) || (isStreaming && index === totalMessages - 1 && !message.content)}
+              hasThinking={(message.thinking && message.thinking.length > 0) || (isStreaming && index === totalMessages - 1 && (!message.content || message.content === "\u200B"))}
             />
           </div>
 
@@ -702,6 +702,16 @@ export function MessageList({ messages, branches, onBranchChange, searchQuery, e
           copiedId={copiedId}
         />
       ))}
+      
+      {isStreaming && messages.length > 0 && messages[messages.length - 1].role === "user" && (
+        <div className="flex w-full flex-col gap-2 animate-pulse px-6 py-4 border-l-2 border-transparent pl-12">
+          <div className="flex items-center gap-2">
+            <div className="h-2 w-2 rounded-full bg-muted-foreground/40" />
+            <span className="text-sm font-medium text-muted-foreground/60 italic">Thinking...</span>
+          </div>
+        </div>
+      )}
+
       <div ref={bottomRef} className="h-px w-full scroll-mt-40" />
     </div>
   );

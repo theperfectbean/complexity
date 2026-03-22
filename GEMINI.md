@@ -709,6 +709,15 @@ This strategy ensures all dependencies (Postgres, Redis, Embedder) are running w
   - Cumulative Layout Shift (CLS) during streaming was consistently around ~0.22, showing mostly smooth rendering but some minimal shifts remaining.
   - Asserted lack of horizontal scrollbars and robust visibility of RAG citation elements.
 
+### Thinking... Indicator & Latency Fix (2026-03-23)
+- **Problem**: Users reported "screen inactivity" after sending a prompt, especially when using complex roles like the Diabetes Assistant which involves heavy RAG or external data processing. The "Thinking..." indicator was also missing during tool calls.
+- **Implementation**:
+  - Updated `ThreadChat` to consider the `submitted` state (waiting for server response) as "streaming," ensuring UI feedback starts immediately.
+  - Added a global "Thinking..." indicator at the end of the `MessageList` that appears as soon as the user message is sent.
+  - Fixed a logic bug where the zero-width space (`\u200B`) used as a placeholder for empty messages was being treated as "content," hiding the thinking indicator.
+  - Refactored `MessageList` to *always* show "Thinking..." while waiting for text content, even if intermediate tool-call results (like Retrieval or Recall) are already visible.
+- **Benefit**: Immediate visual feedback after user input, eliminating the "dead air" period during RAG retrieval and improving the perceived responsiveness of the platform.
+
 
 
 

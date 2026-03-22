@@ -454,7 +454,7 @@ export function ThreadChat({
           onLoadMore={loadMoreMessages}
           hasMore={hasMore}
           isLoadingMore={isLoadingMore}
-          isStreaming={status === "streaming"}
+          isStreaming={status === "streaming" || status === "submitted"}
           emptyLabel="Start this thread with your first question."
           onDownload={() => exportMessagesAsMarkdown(threadTitle, mergedMessages)}
           onDelete={handleDeleteMessage}

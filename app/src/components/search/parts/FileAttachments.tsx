@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 
 export type FileAttachmentsHandle = {
   clickInput: () => void;
+  processFiles: (files: FileList | File[]) => Promise<void>;
 };
 
 type FileAttachmentsProps = {
@@ -27,20 +28,16 @@ export const FileAttachments = forwardRef<FileAttachmentsHandle, FileAttachments
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [imagePreviews, setImagePreviews] = useState<Record<string, string>>({});
 
-  useImperativeHandle(ref, () => ({
-    clickInput: () => {
-      fileInputRef.current?.click();
-    }
-  }));
-
-  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files;
-    if (!files || files.length === 0) return;
-
+  const processFiles = async (files: FileList | File[]) => {
     const filesArray = Array.from(files);
     const newAttachments = [...attachments];
     
     for (const file of filesArray) {
+      // Avoid duplicates by name if they are the same size
+      if (attachments.some(a => a.name === file.name && a.size === file.size)) {
+        continue;
+      }
+
       if (file.type.startsWith("image/")) {
         const reader = new FileReader();
         reader.onload = (e) => {
@@ -66,7 +63,22 @@ export const FileAttachments = forwardRef<FileAttachmentsHandle, FileAttachments
     }
     
     onAttachmentsChange(newAttachments);
-    onAttachClick?.(files);
+    // Propagate to parent if possible. FileList and File[] both work with Array.from
+    onAttachClick?.(files as any);
+  };
+
+  useImperativeHandle(ref, () => ({
+    clickInput: () => {
+      fileInputRef.current?.click();
+    },
+    processFiles
+  }));
+
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+
+    await processFiles(files);
     event.target.value = "";
   };
 
