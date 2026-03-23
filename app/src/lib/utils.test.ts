@@ -1,7 +1,33 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { normalizeUIMessage, copyToClipboard, cleanMarkdownForCopy } from "./utils";
+import { normalizeUIMessage, copyToClipboard, cleanMarkdownForCopy, formatDisplayLabel } from "./utils";
 
 describe("utils.ts", () => {
+  describe("formatDisplayLabel", () => {
+    it("preserves already formatted labels", () => {
+      expect(formatDisplayLabel("Claude 4.5 Sonnet")).toBe("Claude 4.5 Sonnet");
+    });
+
+    it("cleans up raw IDs with providers", () => {
+      expect(formatDisplayLabel("anthropic/claude-3-opus")).toBe("Claude 3 Opus");
+    });
+
+    it("corrects version numbers with hyphens into dots", () => {
+      expect(formatDisplayLabel("anthropic/claude-4-5-haiku-latest")).toBe("Claude 4.5 Haiku Latest");
+      expect(formatDisplayLabel("anthropic/claude-3-5-sonnet")).toBe("Claude 3.5 Sonnet");
+      expect(formatDisplayLabel("openai/gpt-5-4-turbo")).toBe("GPT 5.4 Turbo");
+    });
+
+    it("handles multiple hyphens correctly", () => {
+      expect(formatDisplayLabel("perplexity/anthropic/claude-3-5-sonnet-latest")).toBe("Claude 3.5 Sonnet Latest");
+    });
+
+    it("fixes common model name casing", () => {
+      expect(formatDisplayLabel("google/gemini-pro")).toBe("Gemini Pro");
+      expect(formatDisplayLabel("openai/gpt-4o")).toBe("GPT 4o");
+      expect(formatDisplayLabel("ollama/llama3")).toBe("Llama3");
+    });
+  });
+
   describe("cleanMarkdownForCopy", () => {
     it("removes chart blocks", () => {
       const input = "Hello\n```chart\njson data\n```\nWorld";

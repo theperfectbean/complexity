@@ -13,11 +13,13 @@ export function formatDisplayLabel(label: string): string {
     const parts = label.split("/");
     const lastPart = parts[parts.length - 1];
     return lastPart
+      .replace(/(\d)-(\d)/g, "$1.$2") // Fix versions like 4-5 to 4.5
       .replace(/-/g, " ")
       .replace(/\b\w/g, (l) => l.toUpperCase())
       .replace(/Gpt/g, "GPT")
       .replace(/Llama/g, "Llama")
-      .replace(/Mistral/g, "Mistral");
+      .replace(/Mistral/g, "Mistral")
+      .replace(/Xai/g, "xAI");
   }
   return label;
 }
