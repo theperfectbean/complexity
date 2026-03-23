@@ -2,7 +2,6 @@ import { test, expect } from "@playwright/test";
 import { registerUser } from "./helpers/auth";
 
 const ROLE_ID = "ee191a5caf9c4438a86e8ef2c62f4c9a";
-const ROLE_URL = `/roles/${ROLE_ID}`;
 
 // Use existing credentials from env, or fall back to registration
 const ADMIN_EMAIL = process.env.TEST_EMAIL;

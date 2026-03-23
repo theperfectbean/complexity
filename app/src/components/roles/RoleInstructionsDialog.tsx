@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, FormEvent } from "react";
+import { useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { X, Sparkles, Wand2, Loader2, Save, Pencil } from "lucide-react";
 import { toast } from "sonner";

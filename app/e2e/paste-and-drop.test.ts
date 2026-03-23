@@ -82,7 +82,7 @@ test.describe("SearchBar Paste and Drag-and-Drop", () => {
 
     // Check for visual feedback (scale change or background change)
     // We used scale-[1.01] and bg-primary/5 in the implementation
-    const box = await searchBar.boundingBox();
+    await searchBar.boundingBox();
     
     // Trigger dragleave
     await searchBar.evaluate((el) => {

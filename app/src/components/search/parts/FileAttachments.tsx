@@ -63,8 +63,8 @@ export const FileAttachments = forwardRef<FileAttachmentsHandle, FileAttachments
     }
     
     onAttachmentsChange(newAttachments);
-    // Propagate to parent if possible. FileList and File[] both work with Array.from
-    onAttachClick?.(files as any);
+    // Propagate to parent — only forward a FileList; File[] arrays from programmatic calls pass null.
+    onAttachClick?.(files instanceof FileList ? files : null);
   };
 
   useImperativeHandle(ref, () => ({

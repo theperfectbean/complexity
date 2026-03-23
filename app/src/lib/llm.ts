@@ -324,7 +324,7 @@ export async function generateThreadTitle(query: string, modelId: string, keys: 
       abortSignal: AbortSignal.timeout(3000),
     });
     return text.trim().replace(/^["'](.*)["']$/, "$1") || query.slice(0, 60) + (query.length > 60 ? "..." : "");
-  } catch (error) {
+  } catch {
     // Silently fallback to truncation on error to avoid blocking UX
     return query.slice(0, 60) + (query.length > 60 ? "..." : "");
   }

@@ -1,6 +1,15 @@
 import { test, expect } from "@playwright/test";
 import { registerUser } from "./helpers/auth";
 
+interface WindowWithCls extends Window {
+  clsValue: number;
+}
+
+interface LayoutShiftEntry extends PerformanceEntry {
+  hadRecentInput: boolean;
+  value: number;
+}
+
 test.describe("UI Performance and Polish Audit", () => {
   test.slow();
 
@@ -23,16 +32,17 @@ test.describe("UI Performance and Polish Audit", () => {
   test("general query performance and CLS audit", async ({ page }) => {
     // Setup CLS observer
     await page.evaluate(() => {
-      (window as any).clsValue = 0;
+      (window as unknown as WindowWithCls).clsValue = 0;
       try {
         new PerformanceObserver((entryList) => {
           for (const entry of entryList.getEntries()) {
-            if (!(entry as any).hadRecentInput) {
-              (window as any).clsValue += (entry as any).value;
+            const ls = entry as unknown as LayoutShiftEntry;
+            if (!ls.hadRecentInput) {
+              (window as unknown as WindowWithCls).clsValue += ls.value;
             }
           }
         }).observe({ type: "layout-shift", buffered: true });
-      } catch (e) {
+      } catch {
         console.log("Layout Instability API not supported");
       }
     });
@@ -62,7 +72,7 @@ test.describe("UI Performance and Polish Audit", () => {
     console.log(`General Query Total Time: ${totalTime}ms`);
 
     // Check CLS
-    const cls = await page.evaluate(() => (window as any).clsValue || 0);
+    const cls = await page.evaluate(() => (window as unknown as WindowWithCls).clsValue || 0);
     console.log(`General Query CLS: ${cls}`);
     // We expect a smooth experience, but streaming layout shifts can accumulate.
     expect(cls).toBeLessThan(0.4);
@@ -103,16 +113,17 @@ test.describe("UI Performance and Polish Audit", () => {
 
     // Setup CLS observer for the chat phase
     await page.evaluate(() => {
-      (window as any).clsValue = 0;
+      (window as unknown as WindowWithCls).clsValue = 0;
       try {
         new PerformanceObserver((entryList) => {
           for (const entry of entryList.getEntries()) {
-            if (!(entry as any).hadRecentInput) {
-              (window as any).clsValue += (entry as any).value;
+            const ls = entry as unknown as LayoutShiftEntry;
+            if (!ls.hadRecentInput) {
+              (window as unknown as WindowWithCls).clsValue += ls.value;
             }
           }
         }).observe({ type: "layout-shift", buffered: true });
-      } catch (e) {
+      } catch {
         console.log("Layout Instability API not supported");
       }
     });
@@ -144,7 +155,7 @@ test.describe("UI Performance and Polish Audit", () => {
     await expect(article).toContainText(/8847-OMEGA/i, { timeout: 15000 });
 
     // Check CLS
-    const cls = await page.evaluate(() => (window as any).clsValue || 0);
+    const cls = await page.evaluate(() => (window as unknown as WindowWithCls).clsValue || 0);
     console.log(`RAG Query CLS: ${cls}`);
     expect(cls).toBeLessThan(0.4); // Might be slightly higher due to source carousel rendering
 

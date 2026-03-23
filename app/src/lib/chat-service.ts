@@ -222,6 +222,7 @@ export class ChatService {
             // Try to write the error to the stream so the user knows what happened
             try {
               writer.write({ type: "text-delta", id: textId, delta: assistantText });
+              writer.write({ type: "text-end", id: textId });
               writer.write({ type: "finish" });
             } catch (writeError) {
               this.log.error({ err: writeError }, "Failed to write error to stream");

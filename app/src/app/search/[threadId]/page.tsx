@@ -121,7 +121,7 @@ export function ThreadChat({
   const initialQuery = searchParams.get("q")?.trim() ?? "";
   const [model, setModel] = useState<string>(initialModel);
   const [roleId] = useState<string | null>(initialRoleId);
-  const [threadTitle, setThreadTitle] = useState(initialTitle);
+  const [threadTitle] = useState(initialTitle);
   const [threadSystemPrompt, setThreadSystemPrompt] = useState(initialSystemPrompt);
   const [pinned, setPinned] = useState(initialPinned);
   const [tags, setTags] = useState(initialTags);

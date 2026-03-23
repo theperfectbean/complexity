@@ -74,8 +74,7 @@ describe("POST /api/chat", () => {
 
   it("returns 429 when rate limit is exceeded", async () => {
     vi.mocked(getRedisClient).mockReturnValue({
-      incr: vi.fn().mockResolvedValue(21),
-      expire: vi.fn(),
+      eval: vi.fn().mockResolvedValue(21),
       get: vi.fn(),
     } as never);
 
@@ -132,8 +131,7 @@ describe("POST /api/chat", () => {
     mockMutationChains();
 
     vi.mocked(getRedisClient).mockReturnValue({
-      incr: vi.fn().mockResolvedValue(1),
-      expire: vi.fn().mockResolvedValue(1),
+      eval: vi.fn().mockResolvedValue(1),
       get: vi.fn().mockResolvedValue(
         JSON.stringify({
           text: "cached answer",
@@ -159,8 +157,7 @@ describe("POST /api/chat", () => {
     mockSelectResult([]);
 
     vi.mocked(getRedisClient).mockReturnValue({
-      incr: vi.fn().mockRejectedValue(new Error("redis down")),
-      expire: vi.fn(),
+      eval: vi.fn().mockRejectedValue(new Error("redis down")),
       get: vi.fn(),
       set: vi.fn(),
     } as never);
@@ -348,8 +345,7 @@ describe("POST /api/chat", () => {
 
     const redisDel = vi.fn().mockResolvedValue(1);
     vi.mocked(getRedisClient).mockReturnValue({
-      incr: vi.fn().mockResolvedValue(1),
-      expire: vi.fn().mockResolvedValue(1),
+      eval: vi.fn().mockResolvedValue(1),
       get: vi.fn().mockResolvedValue(
         JSON.stringify({
           text: "I couldn't generate a response. Please try again.",

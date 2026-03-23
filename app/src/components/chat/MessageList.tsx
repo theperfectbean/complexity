@@ -571,9 +571,6 @@ export function MessageList({ messages, branches, onBranchChange, searchQuery, e
   const hasAutoScrolledRef = useRef(false);
   const lastScrollTimeRef = useRef(0);
 
-  const lastMessageContent = messages[messages.length - 1]?.content;
-  const lastMessageThinkingLength = messages[messages.length - 1]?.thinking?.length;
-
   const previousMessagesLengthRef = useRef(messages.length);
 
   const scrollToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {

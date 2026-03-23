@@ -73,7 +73,7 @@ export async function POST(request: Request) {
     try {
       const keys = await getApiKeys();
       title = await generateThreadTitle(parsed.data.initialMessage, safeModel, keys);
-    } catch (error) {
+    } catch {
       // Fallback to truncation if summarize fails
       title = parsed.data.initialMessage.slice(0, 60);
       if (parsed.data.initialMessage.length > 60) {

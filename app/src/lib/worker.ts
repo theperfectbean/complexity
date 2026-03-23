@@ -108,7 +108,13 @@ export function startWorker() {
             .where(eq(documents.id, documentId));
         });
 
-        // Cleanup temporary file if it exists
+        log.info("Document processing complete");
+      } catch (error) {
+        log.error({ err: error }, "Document processing failed");
+        await db.update(documents).set({ status: "failed" }).where(eq(documents.id, documentId));
+        throw error; // Rethrow to let BullMQ handle retries
+      } finally {
+        // Always clean up the temporary file, even if processing failed.
         if (filePath) {
           try {
             await fs.unlink(filePath);
@@ -117,12 +123,6 @@ export function startWorker() {
             log.warn({ cleanupError, filePath }, "Failed to cleanup temporary file");
           }
         }
-
-        log.info("Document processing complete");
-      } catch (error) {
-        log.error({ err: error }, "Document processing failed");
-        await db.update(documents).set({ status: "failed" }).where(eq(documents.id, documentId));
-        throw error; // Rethrow to let BullMQ handle retries
       }
     },
     { 

@@ -1,4 +1,4 @@
-import React, { memo, useState, useEffect } from "react";
+import React, { memo, useState, useEffect, useRef } from "react";
 import ReactMarkdown, { Components } from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
 import remarkGfm from "remark-gfm";
@@ -67,18 +67,11 @@ const components: Components = {
       </a>
     );
   },
-  pre({ children, ...props }: React.ComponentPropsWithoutRef<"pre">) {
+  pre({ children }: React.ComponentPropsWithoutRef<"pre">) {
     const content = extractText(children).trim();
-    
-    let language = "";
-    if (React.isValidElement(children)) {
-      const className = (children.props as { className?: string }).className || "";
-      const match = /language-(\w+)/.exec(className);
-      if (match) language = match[1];
-    }
 
     // Interception components should be returned directly
-    const childType = React.isValidElement(children) ? (children.type as any) : null;
+    const childType = React.isValidElement(children) ? children.type : null;
     if (childType === ChartRenderer || childType === PythonExecutor || childType === ArtifactRenderer) {
       return <>{children}</>;
     }
@@ -149,38 +142,26 @@ const components: Components = {
 };
 
 export const MarkdownRenderer = memo(function MarkdownRenderer({ content, isStreaming, hasThinking }: MarkdownRendererProps) {
-  const [displayContent, setDisplayContent] = useState(content);
+  // Track the typewriter-animated content separately; derive the rendered value from isStreaming.
+  const [streamedContent, setStreamedContent] = useState(content);
   const contentRef = useRef(content);
-  
-  // Sync ref with content
+
+  // Sync ref with latest content so the interval closure is never stale.
   useEffect(() => {
     contentRef.current = content;
   }, [content]);
 
+  // Adaptive typewriter effect — only active during streaming.
   useEffect(() => {
-    if (!isStreaming) {
-      setDisplayContent(content);
-      return;
-    }
+    if (!isStreaming) return;
 
-    // Initialize displayContent with current content if we just started streaming
-    // but don't reset if we are already in the middle of it.
-    setDisplayContent((prev) => {
-      if (!prev || prev === "\u200B") return content;
-      return prev;
-    });
-
-    // Adaptive typewriter effect that doesn't reset on every token
     const interval = setInterval(() => {
       const targetContent = contentRef.current;
-      
-      setDisplayContent((prev) => {
-        if (prev.length >= targetContent.length) {
-          return targetContent;
-        }
+
+      setStreamedContent((prev) => {
+        if (prev.length >= targetContent.length) return targetContent;
 
         const diff = targetContent.length - prev.length;
-        // Adaptive speed: type faster if we are far behind the actual stream
         let increment = 1;
         if (diff > 300) increment = 25;
         else if (diff > 100) increment = 10;
@@ -189,38 +170,34 @@ export const MarkdownRenderer = memo(function MarkdownRenderer({ content, isStre
 
         return targetContent.slice(0, prev.length + increment);
       });
-    }, 40); 
+    }, 40);
 
     return () => clearInterval(interval);
-  }, [isStreaming]); // Only depends on isStreaming state
+  }, [isStreaming]);
 
-  // Use a throttled value for rendering the actual markdown during streaming
-  // to reduce the frequency of expensive ReactMarkdown parsing.
-  const [throttledContent, setThrottledContent] = useState(displayContent);
+  // When not streaming, render raw content directly; otherwise use the typewriter value.
+  const displayContent = isStreaming ? streamedContent : content;
+
+  // Throttle expensive ReactMarkdown re-parses to at most once per 100 ms during streaming.
+  const [throttledStreamedContent, setThrottledStreamedContent] = useState(displayContent);
   const lastUpdateRef = useRef(0);
 
   useEffect(() => {
-    if (!isStreaming) {
-      setThrottledContent(content);
-      return;
-    }
+    if (!isStreaming) return;
 
     const now = Date.now();
     const timeSinceLastUpdate = now - lastUpdateRef.current;
 
-    if (timeSinceLastUpdate >= 100) {
-      setThrottledContent(displayContent);
-      lastUpdateRef.current = now;
-      return;
-    }
-
+    const delay = Math.max(0, 100 - timeSinceLastUpdate);
     const timer = setTimeout(() => {
-      setThrottledContent(displayContent);
+      setThrottledStreamedContent(displayContent);
       lastUpdateRef.current = Date.now();
-    }, 100 - timeSinceLastUpdate);
+    }, delay);
 
     return () => clearTimeout(timer);
-  }, [displayContent, isStreaming, content]);
+  }, [displayContent, isStreaming]);
+
+  const throttledContent = isStreaming ? throttledStreamedContent : content;
 
   const isActuallyEmpty = !throttledContent || throttledContent === "\u200B" || throttledContent.trim().length === 0;
 
@@ -245,7 +222,7 @@ export const MarkdownRenderer = memo(function MarkdownRenderer({ content, isStre
         rehypePlugins={isStreaming ? [] : [rehypeHighlight]}
         components={components}
       >
-        {finalContent}
+        {throttledContent}
       </ReactMarkdown>
     </div>
   );
