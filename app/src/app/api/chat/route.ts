@@ -8,6 +8,7 @@ import { checkRateLimit } from "@/lib/rate-limit";
 import { z } from "zod";
 import { UIMessage } from "ai";
 import { requireUserOrApiToken } from "@/lib/auth-server";
+import { ApiResponse } from "@/lib/api-response";
 
 const schema = z.object({
   threadId: z.string().min(1),
@@ -38,17 +39,15 @@ export async function POST(request: Request) {
   });
 
   if (!isAllowed) {
-    return NextResponse.json(
-      { error: "Rate limit exceeded. Try again in a minute." },
-      { status: 429 }
-    );
+    return ApiResponse.error("Rate limit exceeded. Try again in a minute.", 429);
   }
 
   try {
     const body = await request.json();
     const parsed = schema.safeParse(body);
     if (!parsed.success) {
-      return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
+      log.warn({ err: parsed.error.format() }, "Invalid payload");
+      return ApiResponse.badRequest("Invalid payload", parsed.error.format());
     }
 
     const redis = getRedisClient();
@@ -70,6 +69,6 @@ export async function POST(request: Request) {
     const err = error as { status?: number; message?: string };
     log.error({ err }, "Chat API Error");
     const status = err.status || (err.message === "Thread not found" ? 404 : 400);
-    return NextResponse.json({ error: err.message || "Internal server error" }, { status });
+    return ApiResponse.error(err.message || "Internal server error", status, err);
   }
 }

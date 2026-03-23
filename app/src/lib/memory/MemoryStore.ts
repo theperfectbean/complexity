@@ -110,7 +110,7 @@ export async function searchMemories(userId: string, userText?: string, roleId?:
 export async function getExistingMemories(userId: string, roleId?: string | null) {
   const roleCondition = roleId ? or(isNull(memories.roleId), eq(memories.roleId, roleId)) : isNull(memories.roleId);
   return db
-    .select({ id: memories.id, content: memories.content, embedding: memories.embedding })
+    .select({ id: memories.id, content: memories.content, embedding: memories.embedding, roleId: memories.roleId })
     .from(memories)
     .where(and(eq(memories.userId, userId), roleCondition))
     .orderBy(desc(memories.createdAt))

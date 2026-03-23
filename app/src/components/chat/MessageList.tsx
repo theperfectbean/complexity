@@ -613,20 +613,15 @@ export function MessageList({ messages, branches, onBranchChange, searchQuery, e
       return;
     }
 
-    if (isNewMessage) {
-      // Force scroll on new message
-      requestAnimationFrame(() => scrollToBottom("instant" as ScrollBehavior));
-      return;
-    }
-
     // Smart auto-scroll: only scroll if the user was already near the bottom
+    // or if it's a new message (forcing focus on the new input).
     const isNearBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 300;
 
-    if (isNearBottom) {
+    if (isNewMessage || isNearBottom) {
       // Use "instant" (auto) instead of smooth during active streaming to prevent animation jitter
       requestAnimationFrame(() => scrollToBottom("instant" as ScrollBehavior));
     }
-  }, [messages, lastMessageContent, lastMessageThinkingLength, scrollToBottom]);
+  }, [messages, isStreaming, scrollToBottom]);
 
   async function copyMessage(messageId: string, content: string) {
     const cleaned = cleanMarkdownForCopy(content);

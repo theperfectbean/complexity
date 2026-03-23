@@ -1,4 +1,4 @@
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 import {
   boolean,
   index,
@@ -244,7 +244,10 @@ export const documents = pgTable("documents", {
     .references(() => roles.id, { onDelete: "cascade" }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-});
+}, (table) => [
+  index("documents_status_idx").on(table.status),
+  index("documents_role_idx").on(table.roleId),
+]);
 
 export const chunks = pgTable(
   "chunks",
@@ -265,6 +268,7 @@ export const chunks = pgTable(
     index("chunks_doc_idx").on(table.documentId),
     index("chunks_role_idx").on(table.roleId),
     index("chunks_embedding_hnsw_idx").using("hnsw", table.embedding.op("vector_cosine_ops")),
+    index("chunks_fts_idx").using("gin", sql`to_tsvector('english', ${table.content})`),
   ],
 );
 

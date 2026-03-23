@@ -1,4 +1,4 @@
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -13,7 +13,7 @@ const createSchema = z.object({
   content: z.string().min(1).max(1000),
 });
 
-export async function GET() {
+export async function GET(request: Request) {
   const session = await auth();
   const userEmail = session?.user?.email;
   if (!userEmail) {
@@ -25,11 +25,21 @@ export async function GET() {
     return NextResponse.json({ error: "User not found" }, { status: 404 });
   }
 
-  const rows = await db
+  const { searchParams } = new URL(request.url);
+  const roleId = searchParams.get("roleId");
+
+  const query = db
     .select()
     .from(memories)
-    .where(eq(memories.userId, user.id))
+    .where(
+      and(
+        eq(memories.userId, user.id),
+        roleId ? eq(memories.roleId, roleId) : undefined
+      )
+    )
     .orderBy(desc(memories.createdAt));
+
+  const rows = await query;
 
   return NextResponse.json({ memories: rows });
 }

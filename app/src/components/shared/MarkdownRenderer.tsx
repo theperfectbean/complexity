@@ -150,6 +150,12 @@ const components: Components = {
 
 export const MarkdownRenderer = memo(function MarkdownRenderer({ content, isStreaming, hasThinking }: MarkdownRendererProps) {
   const [displayContent, setDisplayContent] = useState(content);
+  const contentRef = useRef(content);
+  
+  // Sync ref with content
+  useEffect(() => {
+    contentRef.current = content;
+  }, [content]);
 
   useEffect(() => {
     if (!isStreaming) {
@@ -157,30 +163,66 @@ export const MarkdownRenderer = memo(function MarkdownRenderer({ content, isStre
       return;
     }
 
-    // Adaptive typewriter effect
+    // Initialize displayContent with current content if we just started streaming
+    // but don't reset if we are already in the middle of it.
+    setDisplayContent((prev) => {
+      if (!prev || prev === "\u200B") return content;
+      return prev;
+    });
+
+    // Adaptive typewriter effect that doesn't reset on every token
     const interval = setInterval(() => {
+      const targetContent = contentRef.current;
+      
       setDisplayContent((prev) => {
-        if (prev.length >= content.length) {
-          return content;
+        if (prev.length >= targetContent.length) {
+          return targetContent;
         }
 
-        const diff = content.length - prev.length;
+        const diff = targetContent.length - prev.length;
         // Adaptive speed: type faster if we are far behind the actual stream
         let increment = 1;
-        if (diff > 300) increment = 20;
-        else if (diff > 100) increment = 8;
-        else if (diff > 30) increment = 3;
+        if (diff > 300) increment = 25;
+        else if (diff > 100) increment = 10;
+        else if (diff > 30) increment = 4;
         else if (diff > 10) increment = 2;
 
-        return content.slice(0, prev.length + increment);
+        return targetContent.slice(0, prev.length + increment);
       });
-    }, 40); // ~25fps, slightly slower and more readable
+    }, 40); 
 
     return () => clearInterval(interval);
-  }, [content, isStreaming]);
+  }, [isStreaming]); // Only depends on isStreaming state
 
-  const finalContent = isStreaming ? displayContent : content;
-  const isActuallyEmpty = !finalContent || finalContent === "\u200B" || finalContent.trim().length === 0;
+  // Use a throttled value for rendering the actual markdown during streaming
+  // to reduce the frequency of expensive ReactMarkdown parsing.
+  const [throttledContent, setThrottledContent] = useState(displayContent);
+  const lastUpdateRef = useRef(0);
+
+  useEffect(() => {
+    if (!isStreaming) {
+      setThrottledContent(content);
+      return;
+    }
+
+    const now = Date.now();
+    const timeSinceLastUpdate = now - lastUpdateRef.current;
+
+    if (timeSinceLastUpdate >= 100) {
+      setThrottledContent(displayContent);
+      lastUpdateRef.current = now;
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      setThrottledContent(displayContent);
+      lastUpdateRef.current = Date.now();
+    }, 100 - timeSinceLastUpdate);
+
+    return () => clearTimeout(timer);
+  }, [displayContent, isStreaming, content]);
+
+  const isActuallyEmpty = !throttledContent || throttledContent === "\u200B" || throttledContent.trim().length === 0;
 
   if (isStreaming && isActuallyEmpty) {
     if (hasThinking) {

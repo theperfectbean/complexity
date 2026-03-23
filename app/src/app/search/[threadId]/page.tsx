@@ -223,11 +223,24 @@ export function ThreadChat({
 
   const [prompt, setPrompt] = useState("");
 
+  const normalizedCacheRef = useRef<Record<string, { msg: ChatMessageItem; original: UIMessage }>>({});
+
   const mergedMessages = useMemo<ChatMessageItem[]>(() => {
     // If the SDK has messages (including initial history), use them as the source of truth.
     // This ensures that when regenerate() slices the state, the UI correctly reflects it.
     if (messages.length > 0) {
-      return messages.map((message) => normalizeUIMessage(message));
+      return messages.map((message) => {
+        const cached = normalizedCacheRef.current[message.id];
+        // If we have a cached version and the original reference hasn't changed, reuse it.
+        // useChat maintains stable references for non-changing messages.
+        if (cached && cached.original === message) {
+          return cached.msg;
+        }
+
+        const normalized = normalizeUIMessage(message);
+        normalizedCacheRef.current[message.id] = { msg: normalized, original: message };
+        return normalized;
+      });
     }
     // Fallback only if messages is completely empty (e.g. initial load before hook settles)
     return initialHistory;

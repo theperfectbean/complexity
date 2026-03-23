@@ -24,17 +24,34 @@ export const proxy = auth(async (req) => {
   // 1. CSRF Protection: Verify Origin/Referer for state-mutating methods
   if (["POST", "PUT", "PATCH", "DELETE"].includes(method)) {
     const origin = headers.get("origin");
+    const referer = headers.get("referer");
     const host = headers.get("host");
+    const hasSession = !!session;
     
-    if (origin && host) {
-      try {
-        const originUrl = new URL(origin);
-        if (originUrl.host !== host) {
-          return new NextResponse("Forbidden: Invalid Origin", { status: 403 });
+    let isValid = true;
+    
+    // If it's a session-based request (browser-like), strictly enforce CSRF
+    if (hasSession) {
+      isValid = false;
+      if (origin) {
+        try {
+          const originUrl = new URL(origin);
+          if (originUrl.host === host) isValid = true;
+        } catch {
+          isValid = false;
         }
-      } catch {
-        return new NextResponse("Forbidden: Invalid Origin Header", { status: 403 });
+      } else if (referer) {
+        try {
+          const refererUrl = new URL(referer);
+          if (refererUrl.host === host) isValid = true;
+        } catch {
+          isValid = false;
+        }
       }
+    }
+
+    if (!isValid) {
+      return new NextResponse("Forbidden: CSRF Validation Failed", { status: 403 });
     }
   }
 
@@ -42,6 +59,7 @@ export const proxy = auth(async (req) => {
   const isApiAuth = nextUrl.pathname.startsWith("/api/auth");
   const isApiHealth = nextUrl.pathname === "/api/health";
   const isPublicAsset = nextUrl.pathname.startsWith("/_next") || nextUrl.pathname.startsWith("/favicon");
+  const isAdminPage = nextUrl.pathname.startsWith("/settings/admin");
   
   const isAuthPage = 
     nextUrl.pathname === "/login" || 
@@ -53,7 +71,9 @@ export const proxy = auth(async (req) => {
 
   let response: NextResponse;
 
-  if (isPublic) {
+  if (isAdminPage && (!session || !session.user?.isAdmin)) {
+    response = NextResponse.redirect(new URL("/", nextUrl));
+  } else if (isPublic) {
     if (session && (nextUrl.pathname === "/login" || nextUrl.pathname === "/register")) {
       response = NextResponse.redirect(new URL("/", nextUrl));
     } else {

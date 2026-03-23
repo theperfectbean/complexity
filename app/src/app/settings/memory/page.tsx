@@ -16,17 +16,25 @@ type Memory = {
   content: string;
   source: "auto" | "manual";
   threadId: string | null;
+  roleId: string | null;
   createdAt: string;
   updatedAt: string;
 };
 
+type Role = {
+  id: string;
+  name: string;
+};
+
 function MemoryItem({
   memory,
+  roleName,
   busyId,
   onEdit,
   onDelete,
 }: {
   memory: Memory;
+  roleName?: string;
   busyId: string | null;
   onEdit: (memory: Memory, newContent: string) => Promise<void>;
   onDelete: (memory: Memory) => Promise<void>;
@@ -94,6 +102,15 @@ function MemoryItem({
             >
               {memory.source}
             </span>
+            {roleName ? (
+              <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-700 uppercase tracking-wide">
+                Role: {roleName}
+              </span>
+            ) : (
+              <span className="rounded-full bg-blue-500/10 px-2 py-0.5 text-[11px] font-medium text-blue-700 uppercase tracking-wide">
+                Global
+              </span>
+            )}
             <span>{new Date(memory.createdAt).toLocaleString()}</span>
             {memory.threadId ? (
               <Link
@@ -157,6 +174,7 @@ function MemoryItem({
 export default function MemorySettingsPage() {
   const { data: session, status } = useSession();
   const [memories, setMemories] = useState<Memory[]>([]);
+  const [roles, setRoles] = useState<Role[]>([]);
   const [memoryEnabled, setMemoryEnabled] = useState(true);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -180,8 +198,8 @@ export default function MemorySettingsPage() {
     let active = true;
     setLoading(true);
 
-    Promise.all([fetch("/api/settings"), fetch("/api/memories")])
-      .then(async ([settingsRes, memoriesRes]) => {
+    Promise.all([fetch("/api/settings"), fetch("/api/memories"), fetch("/api/roles")])
+      .then(async ([settingsRes, memoriesRes, rolesRes]) => {
         if (!active) {
           return;
         }
@@ -196,6 +214,11 @@ export default function MemorySettingsPage() {
           setMemories(payload.memories);
         } else {
           setMemories([]);
+        }
+
+        if (rolesRes.ok) {
+          const payload = (await rolesRes.json()) as { roles: Role[] };
+          setRoles(payload.roles);
         }
       })
       .catch(() => {
@@ -213,6 +236,7 @@ export default function MemorySettingsPage() {
       active = false;
     };
   }, [status]);
+
 
   if (!session?.user) {
     return (
@@ -451,6 +475,7 @@ export default function MemorySettingsPage() {
             <MemoryItem
               key={memory.id}
               memory={memory}
+              roleName={roles.find((r) => r.id === memory.roleId)?.name}
               busyId={busyId}
               onEdit={handleEditMemory}
               onDelete={handleDeleteMemory}

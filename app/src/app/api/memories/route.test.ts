@@ -26,6 +26,10 @@ vi.mock("@/lib/config", () => ({
   },
 }));
 
+vi.mock("@/lib/rag", () => ({
+  getEmbeddings: vi.fn().mockResolvedValue([[0.1, 0.2, 0.3]]),
+}));
+
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
 
@@ -62,7 +66,7 @@ describe("/api/memories", () => {
     it("returns 401 when unauthenticated", async () => {
       vi.mocked(auth).mockResolvedValue(null as never);
 
-      const response = await GET();
+      const response = await GET(new Request("http://localhost/api/memories"));
 
       expect(response.status).toBe(401);
       await expect(response.json()).resolves.toEqual({ error: "Unauthorized" });
@@ -71,7 +75,7 @@ describe("/api/memories", () => {
     it("returns 404 when user not found", async () => {
       mockSelectOnce([]);
 
-      const response = await GET();
+      const response = await GET(new Request("http://localhost/api/memories"));
 
       expect(response.status).toBe(404);
       await expect(response.json()).resolves.toEqual({ error: "User not found" });
@@ -80,7 +84,7 @@ describe("/api/memories", () => {
     it("returns user memories", async () => {
       mockSelectSequence([[{ id: "user-1" }], [{ id: "mem-1", content: "Likes tabs" }]]);
 
-      const response = await GET();
+      const response = await GET(new Request("http://localhost/api/memories"));
 
       expect(response.status).toBe(200);
       await expect(response.json()).resolves.toEqual({ memories: [{ id: "mem-1", content: "Likes tabs" }] });

@@ -6,6 +6,7 @@ import { safeParseJsonLine } from "./sse";
 import { asRecord } from "./extraction-utils";
 import { runtimeConfig } from "./config";
 import { env } from "./env";
+import { getLogger } from "./logger";
 
 export interface SearchAgentOptions {
   modelId: string | string[];
@@ -38,7 +39,8 @@ interface AgentEvent {
   };
 }
 export async function runSearchAgent(options: SearchAgentOptions) {
-  const { modelId: rawModelId, agentInput, instructions, webSearch, apiKey, writer, textId } = options;
+  const { modelId: rawModelId, agentInput, instructions, webSearch, apiKey, writer, textId, requestId } = options;
+  const log = getLogger(requestId);
 
   let modelConfig: Record<string, unknown> = {};
   if (Array.isArray(rawModelId)) {
@@ -100,7 +102,7 @@ export async function runSearchAgent(options: SearchAgentOptions) {
     if (!res.ok) {
       const errText = await res.text();
       if (res.status === 400) {
-        console.error(`[runSearchAgent] Perplexity 400: ${errText}`);
+        log.error({ errText, status: 400 }, "Perplexity Agent API Bad Request");
         streamingFailed = true;
       } else {
         throw new Error(`Perplexity API Error: ${res.status} ${errText}`);
@@ -272,6 +274,7 @@ export async function runSearchAgent(options: SearchAgentOptions) {
     }
   } catch (error: unknown) {
     const err = error as { message?: string; status?: number };
+    log.error({ err }, "Perplexity Agent streaming encountered an error");
     if (!hasWrittenTextDelta && (err.message?.includes("400") || err.status === 400 || streamingFailed === false)) {
       streamingFailed = true;
     } else {
@@ -285,19 +288,24 @@ export async function runSearchAgent(options: SearchAgentOptions) {
   // 2. We got NO events at all
   // 3. We finished the stream but still have no text (happens if reasoning finishes but generation doesn't start)
   if (streamingFailed || streamEventCount === 0 || (!assistantText.trim() && !completedResponse)) {
-    const nonStreamingResponse = await client.responses.create(
-      requestBodyBase as Responses.ResponseCreateParamsNonStreaming,
-    );
-    completedResponse = (nonStreamingResponse as unknown) as Record<string, unknown>;
-    if (!assistantText.trim()) {
-      assistantText = nonStreamingResponse.output_text || "";
-      if (assistantText) {
-        if (!hasWrittenTextDelta) {
-          writer.write({ type: "data-call-result", data: { callId: "model-gen", result: "Finished reasoning." } } as UIMessageChunk);
+    try {
+      const nonStreamingResponse = await client.responses.create(
+        requestBodyBase as Responses.ResponseCreateParamsNonStreaming,
+      );
+      completedResponse = (nonStreamingResponse as unknown) as Record<string, unknown>;
+      if (!assistantText.trim()) {
+        assistantText = nonStreamingResponse.output_text || "";
+        if (assistantText) {
+          if (!hasWrittenTextDelta) {
+            writer.write({ type: "data-call-result", data: { callId: "model-gen", result: "Finished reasoning." } } as UIMessageChunk);
+          }
+          writer.write({ type: "text-delta", id: textId, delta: assistantText });
+          hasWrittenTextDelta = true;
         }
-        writer.write({ type: "text-delta", id: textId, delta: assistantText });
-        hasWrittenTextDelta = true;
       }
+    } catch (fallbackError) {
+      log.error({ err: fallbackError }, "Perplexity Agent non-streaming fallback failed");
+      throw fallbackError;
     }
   }
 

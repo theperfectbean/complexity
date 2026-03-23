@@ -12,6 +12,7 @@ import { env } from "./env";
 import { extractCitationsFromResponse, type Citation } from "./extraction-utils";
 import { isPresetModel } from "./models";
 import { webSearchTool } from "./tools/search";
+import { getLogger } from "./logger";
 
 export type ProviderType = "perplexity" | "anthropic" | "openai" | "google" | "xai" | "ollama" | "local-openai";
 
@@ -148,8 +149,6 @@ export function getLanguageModel(modelId: string, keys: Record<string, string | 
     const isNativePerplexity = !modelName.includes("/") || modelName === "sonar";
     const effectiveModel = isNativePerplexity ? mapToPerplexityModel(modelName) : "sonar";
 
-    console.log(`[getLanguageModel:perplexity] modelName: ${modelName}, effectiveModel: ${effectiveModel}`);
-
     return createOpenAI({
       apiKey: perplexityKey,
       baseURL: "https://api.perplexity.ai",
@@ -166,6 +165,7 @@ export function getLanguageModel(modelId: string, keys: Record<string, string | 
 
 export async function runGeneration(options: GenerationOptions): Promise<GenerationResult> {
   const { provider, model: modelName } = getProviderAndModel(options.modelId);
+  const log = getLogger(options.requestId);
 
   if (provider === "perplexity") {
     try {
@@ -198,7 +198,7 @@ export async function runGeneration(options: GenerationOptions): Promise<Generat
         citations: extractCitationsFromResponse(result.completedResponse),
       };
     } catch (error) {
-      console.error(`[runGeneration:perplexity] Error:`, error);
+      log.error({ err: error }, "Perplexity Agent generation failed");
       const message = error instanceof Error ? error.message : "Perplexity Agent request failed";
       const assistantText = `Model request failed: ${message}`;
       options.writer.write({ type: "text-delta", id: options.textId, delta: assistantText });
@@ -259,7 +259,7 @@ export async function runGeneration(options: GenerationOptions): Promise<Generat
       }
     }
   } catch (error) {
-    console.error(`[runGeneration] Error:`, error);
+    log.error({ err: error, modelId: options.modelId }, "Direct model generation failed");
     const message = error instanceof Error ? error.message : "Direct model request failed";
     assistantText = `Model request failed: ${message}`;
     if (!hasSentConnected) {
@@ -283,22 +283,29 @@ export function isPerplexityProvider(modelId: string): boolean {
  * Generate an image using DALL-E 3 via the OpenAI API.
  * Returns a markdown image string on success, or an error message.
  */
-export async function generateImage(prompt: string, keys: Record<string, string | null>): Promise<string> {
+export async function generateImage(prompt: string, keys: Record<string, string | null>, requestId?: string): Promise<string> {
+  const log = getLogger(requestId);
   const apiKey = keys["OPENAI_API_KEY"];
   if (!apiKey) {
     return "⚠️ Image generation requires an OpenAI API key. Please add it in Admin Settings.";
   }
 
-  const client = new OpenAI({ apiKey });
-  const response = await client.images.generate({
-    model: "dall-e-3",
-    prompt,
-    n: 1,
-    size: "1024x1024",
-  });
+  try {
+    const client = new OpenAI({ apiKey });
+    const response = await client.images.generate({
+      model: "dall-e-3",
+      prompt,
+      n: 1,
+      size: "1024x1024",
+    });
 
-  const url = response.data?.[0]?.url;
-  if (!url) return "⚠️ Image generation returned no result.";
+    const url = response.data?.[0]?.url;
+    if (!url) return "⚠️ Image generation returned no result.";
 
-  return `![Generated image: ${prompt}](${url})`;
+    return `![Generated image: ${prompt}](${url})`;
+  } catch (error) {
+    log.error({ err: error, prompt }, "Image generation failed");
+    const message = error instanceof Error ? error.message : "Unknown error";
+    return `⚠️ Image generation failed: ${message}`;
+  }
 }

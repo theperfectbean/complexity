@@ -160,8 +160,13 @@ export async function saveExtractedMemories(params: {
   }
 
   let totalChanges = 0;
+  let globalModified = false;
 
   if (deletedIds.length > 0) {
+    const deletedGlobal = existingRows.some((m) => deletedIds.includes(m.id) && m.roleId === null);
+    if (deletedGlobal) {
+      globalModified = true;
+    }
     await MemoryStore.deleteMemories(deletedIds);
     totalChanges += deletedIds.length;
   }
@@ -202,12 +207,17 @@ export async function saveExtractedMemories(params: {
         if (insertList.length > 0) {
           await MemoryStore.insertMemories(userId, threadId, insertList, roleId);
           totalChanges += insertList.length;
+          if (roleId === null) {
+            globalModified = true;
+          }
         }
       }
     }
 
   if (totalChanges > 0) {
-    await MemoryStore.invalidateMemoryCache(userId, roleId);
+    // If a global memory was added or deleted, we must invalidate all caches (roleId = null)
+    // because role-specific caches contain global memories.
+    await MemoryStore.invalidateMemoryCache(userId, globalModified ? null : roleId);
   }
 
   return totalChanges;

@@ -191,8 +191,12 @@ export class ChatService {
               if (typeof memoryCount === "number" && memoryCount > 0) {
                 writer.write({ type: "data-json", data: { kind: "memory-saved", count: memoryCount } } as UIMessageChunk);
               }
-            } catch {} finally {
-              void memoryPromise.catch(() => {});
+            } catch (err) {
+              this.log.error({ err }, "Memory extraction failed");
+            } finally {
+              void memoryPromise.catch((err) => {
+                this.log.error({ err }, "Background memory extraction failed");
+              });
             }
           }
 

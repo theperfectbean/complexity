@@ -57,7 +57,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         password: {},
         totpCode: {},
       },
-      authorize: async (credentials) => {
+      authorize: async (credentials, req) => {
         const parsed = signInSchema.safeParse(credentials);
         if (!parsed.success) {
           return null;
@@ -69,14 +69,21 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const redis = getRedisClient();
         if (redis) {
           try {
+            const ip = (req.headers as Headers).get("x-forwarded-for")?.split(",")[0] ?? "unknown";
             const rateWindow = Math.floor(Date.now() / 600000); // 10 minute window
-            const rateKey = `rate:login:${email}:${rateWindow}`;
-            const current = await redis.incr(rateKey);
-            if (current === 1) {
-              await redis.expire(rateKey, 600 + 1);
-            }
-            if (current > 10) {
-              // Limit to 10 attempts per 10 minutes per email
+            
+            // Per-email limit (10 per 10m)
+            const emailKey = `rate:login:email:${email}:${rateWindow}`;
+            const emailCurrent = await redis.incr(emailKey);
+            
+            // Per-IP limit (20 per 10m)
+            const ipKey = `rate:login:ip:${ip}:${rateWindow}`;
+            const ipCurrent = await redis.incr(ipKey);
+
+            if (emailCurrent === 1) await redis.expire(emailKey, 600 + 1);
+            if (ipCurrent === 1) await redis.expire(ipKey, 600 + 1);
+
+            if (emailCurrent > 10 || ipCurrent > 20) {
               throw new Error("Too many login attempts. Please try again in 10 minutes.");
             }
           } catch (e: unknown) {

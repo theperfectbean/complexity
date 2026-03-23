@@ -17,17 +17,31 @@ const schema = z.object({
 export async function POST(request: Request) {
   // Rate limiting
   const redis = getRedisClient();
+
   if (redis) {
     try {
-      const ip = request.headers.get("x-forwarded-for") ?? "unknown";
-      const rateWindow = Math.floor(Date.now() / 600000); // 10 minute window
-      const rateKey = `rate:forgot-password:${ip}:${rateWindow}`;
-      const current = await redis.incr(rateKey);
-      if (current === 1) {
-        await redis.expire(rateKey, 600 + 1); // 10 minutes + buffer
+      const ip = request.headers.get("x-forwarded-for")?.split(",")[0] ?? "unknown";
+      let email = "unknown";
+      try {
+        const payload = await request.clone().json();
+        email = payload?.email?.toLowerCase() ?? "unknown";
+      } catch {
+        // Not JSON
       }
-      if (current > 3) {
-        // Limit to 3 attempts per 10 minutes per IP
+      const rateWindow = Math.floor(Date.now() / 600000); // 10 minute window
+
+      // IP limit (3 per 10m)
+      const ipKey = `rate:forgot-password:ip:${ip}:${rateWindow}`;
+      const ipCurrent = await redis.incr(ipKey);
+
+      // Email limit (2 per 10m)
+      const emailKey = `rate:forgot-password:email:${email}:${rateWindow}`;
+      const emailCurrent = await redis.incr(emailKey);
+
+      if (ipCurrent === 1) await redis.expire(ipKey, 600 + 1);
+      if (emailCurrent === 1) await redis.expire(emailKey, 600 + 1);
+
+      if (ipCurrent > 3 || emailCurrent > 2) {
         return NextResponse.json(
           { error: "Too many password reset requests. Please try again in 10 minutes." },
           { status: 429 }

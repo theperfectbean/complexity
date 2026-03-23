@@ -80,10 +80,10 @@ def rerank(request: RerankRequest):
 
 
 @app.post("/ocr")
-async def ocr(file: UploadFile = File(...)) -> dict[str, str]:
+def ocr(file: UploadFile = File(...)) -> dict[str, str]:
     # Save the uploaded file to a temporary file
     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
-        content = await file.read()
+        content = file.file.read()
         tmp.write(content)
         tmp_path = tmp.name
 
@@ -108,10 +108,10 @@ async def ocr(file: UploadFile = File(...)) -> dict[str, str]:
 
 
 @app.post("/transcribe")
-async def transcribe(file: UploadFile = File(...)) -> dict[str, str]:
+def transcribe(file: UploadFile = File(...)) -> dict[str, str]:
     # Save the uploaded file to a temporary file
     with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(file.filename)[1] or ".webm") as tmp:
-        content = await file.read()
+        content = file.file.read()
         tmp.write(content)
         tmp_path = tmp.name
 

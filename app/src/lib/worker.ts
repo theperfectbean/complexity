@@ -125,7 +125,12 @@ export function startWorker() {
         throw error; // Rethrow to let BullMQ handle retries
       }
     },
-    { connection, concurrency: 2 }
+    { 
+      connection, 
+      concurrency: 2,
+      lockDuration: 1000 * 60 * 5, // 5 minutes
+      stalledInterval: 1000 * 60 * 2, // 2 minutes
+    }
   );
 
   worker.on("completed", (job) => {
