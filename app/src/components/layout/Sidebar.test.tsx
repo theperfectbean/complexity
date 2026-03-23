@@ -25,7 +25,8 @@ describe("Sidebar", () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({
-        threads: [{ id: "thread-1", title: "First thread", updatedAt: new Date().toISOString() }],
+        threads: [{ id: "thread-1", title: "First thread", updatedAt: new Date().toISOString(), pinned: false, parentThreadId: null, tags: [] }],
+        roles: [],
       }),
     } as never);
   });

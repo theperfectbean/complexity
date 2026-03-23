@@ -10,6 +10,9 @@ vi.mock("@/lib/db", () => ({
     select: vi.fn(),
     insert: vi.fn(),
     update: vi.fn(),
+    query: {
+      threads: { findFirst: vi.fn().mockResolvedValue({ title: "Test Thread" }) },
+    },
   },
 }));
 
@@ -33,6 +36,10 @@ vi.mock("@/lib/rag", () => ({
 
 vi.mock("@/lib/settings", () => ({
   getApiKeys: vi.fn().mockResolvedValue({ PERPLEXITY_API_KEY: "test-key" }),
+}));
+
+vi.mock("@/lib/webhooks", () => ({
+  triggerWebhook: vi.fn().mockResolvedValue(undefined),
 }));
 
 import { requireUserOrApiToken } from "@/lib/auth-server";

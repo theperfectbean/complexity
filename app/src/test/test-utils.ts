@@ -15,6 +15,8 @@ export function mockSelectResult(result: unknown) {
 
 /**
  * Mocks a sequence of Drizzle select queries.
+ * When 2+ results are provided, automatically appends an exists-subquery stub
+ * for the role-access check used by ChatSessionValidator and the roles GET route.
  */
 export function mockSelectResults(results: unknown[]) {
   const selectMock = vi.mocked(db.select);
@@ -26,6 +28,12 @@ export function mockSelectResults(results: unknown[]) {
     const innerJoin = vi.fn(() => ({ where }));
     const from = vi.fn(() => ({ innerJoin, where }));
     selectMock.mockReturnValueOnce({ from } as never);
+  }
+
+  if (results.length >= 2) {
+    const existsWhere = vi.fn(() => ({}));
+    const existsFrom = vi.fn(() => ({ where: existsWhere }));
+    selectMock.mockReturnValueOnce({ from: existsFrom } as never);
   }
 }
 

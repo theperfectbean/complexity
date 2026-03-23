@@ -48,7 +48,7 @@ export async function POST(
   const files = formData.getAll("file").filter((f): f is File => f instanceof File);
 
   if (files.length === 0) {
-    return ApiResponse.badRequest("Missing file(s)");
+    return ApiResponse.badRequest("Missing file");
   }
 
   const maxSizeBytes = runtimeConfig.uploads.maxRoleFileSizeBytes;
@@ -56,7 +56,7 @@ export async function POST(
 
   for (const file of files) {
     if (!isAllowedDocument(file)) {
-      return ApiResponse.badRequest(`File "${file.name}" is not an allowed document type (pdf/docx/txt/md)`);
+      return ApiResponse.badRequest("Only pdf/docx/txt/md are allowed");
     }
 
     if (file.size > maxSizeBytes) {
@@ -116,13 +116,16 @@ export async function POST(
         .update(documents)
         .set({ status: "failed" })
         .where(eq(documents.id, documentId));
-      
-      // If one file fails, we'll continue with others but log it
     }
   }
 
+  if (processedFiles.length === 0) {
+    return ApiResponse.error("Failed to process document", 500);
+  }
+
+  const first = processedFiles[0];
   return ApiResponse.success({
-    files: processedFiles,
-    message: `${processedFiles.length} document(s) are being processed in the background`,
+    status: first.status,
+    documentId: first.documentId,
   }, 202);
 }

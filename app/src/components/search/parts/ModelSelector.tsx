@@ -145,7 +145,7 @@ export function ModelSelector({
                   <div className="flex flex-col min-w-0">
                     <span className="truncate">{formatDisplayLabel(option.label)}</span>
                     {option.id !== option.label && !option.id.endsWith(option.label) && (
-                      <span className="truncate text-[10px] font-mono opacity-50">{option.id.split('/').pop()}</span>
+                      <span aria-hidden="true" className="truncate text-[10px] font-mono opacity-50">{option.id.split('/').pop()}</span>
                     )}
                   </div>
                   {model === option.id && (

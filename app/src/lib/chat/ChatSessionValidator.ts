@@ -57,8 +57,8 @@ export class ChatSessionValidator {
         .limit(1);
       
       if (!role) {
-        const error = new Error("Role access denied") as Error & { status?: number };
-        error.status = 403;
+        const error = new Error("Role not found") as Error & { status?: number };
+        error.status = 404;
         throw error;
       }
       roleInstructions = role.instructions ?? "";

@@ -1,5 +1,6 @@
 import { FormEvent } from "react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { SearchBar } from "@/components/search/SearchBar";
@@ -71,8 +72,9 @@ describe("SearchBar", () => {
       </form>,
     );
 
-    fireEvent.pointerDown(screen.getByRole("button", { name: "Select model" }));
-    fireEvent.click(await screen.findByRole("menuitem", { name: "Model B" }));
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Select model" }));
+    await user.click(await screen.findByRole("menuitem", { name: "Model B" }));
 
     expect(onModelChange).toHaveBeenCalledWith("model-b");
   });

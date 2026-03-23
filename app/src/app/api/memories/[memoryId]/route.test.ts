@@ -16,6 +16,10 @@ vi.mock("@/lib/memory", () => ({
   invalidateMemoryCache: vi.fn(),
 }));
 
+vi.mock("@/lib/rag", () => ({
+  getEmbeddings: vi.fn().mockResolvedValue([[0.1, 0.2, 0.3]]),
+}));
+
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
 

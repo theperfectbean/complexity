@@ -21,7 +21,7 @@ function mockOwnedRole(result: unknown) {
   const limit = vi.fn().mockResolvedValue(result);
   const where = vi.fn(() => ({ limit }));
   const innerJoin = vi.fn(() => ({ where }));
-  const from = vi.fn(() => ({ innerJoin }));
+  const from = vi.fn(() => ({ innerJoin, where }));
   vi.mocked(db.select).mockReturnValue({ from } as never);
 }
 
@@ -62,7 +62,7 @@ describe("/api/roles/[roleId]", () => {
       });
 
       expect(response.status).toBe(200);
-      await expect(response.json()).resolves.toEqual({ role: { id: "role-1", name: "Research" } });
+      await expect(response.json()).resolves.toEqual({ role: { id: "role-1", name: "Research" }, isOwner: true });
     });
   });
 

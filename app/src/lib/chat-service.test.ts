@@ -11,6 +11,9 @@ vi.mock("./db", () => ({
     update: vi.fn().mockReturnValue({ set: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue({}) }) }),
     delete: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue({}) }),
     transaction: vi.fn((cb) => cb(db)),
+    query: {
+      threads: { findFirst: vi.fn().mockResolvedValue({ title: "Test Thread" }) },
+    },
   },
 }));
 
@@ -38,6 +41,10 @@ vi.mock("./logger", () => ({
 
 vi.mock("./settings", () => ({
   getApiKeys: vi.fn().mockResolvedValue({ PERPLEXITY_API_KEY: "test-key" }),
+}));
+
+vi.mock("./webhooks", () => ({
+  triggerWebhook: vi.fn().mockResolvedValue(undefined),
 }));
 
 describe("ChatService", () => {
@@ -84,15 +91,18 @@ describe("ChatService", () => {
         }),
       });
 
-      // Mock role select
+      // Mock role select (no innerJoin — real code calls .from().where().limit() directly)
       dbSelectMock.mockReturnValueOnce({
         from: vi.fn().mockReturnValue({
-          innerJoin: vi.fn().mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              limit: vi.fn().mockResolvedValue([{ instructions: "Be a helpful assistant" }]),
-            }),
+          where: vi.fn().mockReturnValue({
+            limit: vi.fn().mockResolvedValue([{ instructions: "Be a helpful assistant" }]),
           }),
         }),
+      });
+
+      // Mock exists subquery (nested db.select() inside the role where clause)
+      dbSelectMock.mockReturnValueOnce({
+        from: vi.fn().mockReturnValue({ where: vi.fn().mockReturnValue({}) }),
       });
 
       const service = new ChatService(mockSession);
@@ -126,7 +136,7 @@ describe("ChatService", () => {
 
   describe("execute", () => {
     it("should orchestrate a full chat completion", async () => {
-      // Setup validation mocks
+      // Setup validation mocks — thread select (with innerJoin)
       dbSelectMock.mockReturnValueOnce({
         from: vi.fn().mockReturnValue({
           innerJoin: vi.fn().mockReturnValue({
@@ -136,14 +146,17 @@ describe("ChatService", () => {
           }),
         }),
       });
+      // Role select (from → where → limit, no innerJoin)
       dbSelectMock.mockReturnValueOnce({
         from: vi.fn().mockReturnValue({
-          innerJoin: vi.fn().mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              limit: vi.fn().mockResolvedValue([{ instructions: "Role prompt" }]),
-            }),
+          where: vi.fn().mockReturnValue({
+            limit: vi.fn().mockResolvedValue([{ instructions: "Role prompt" }]),
           }),
         }),
+      });
+      // Exists subquery stub (nested db.select() inside role where clause)
+      dbSelectMock.mockReturnValueOnce({
+        from: vi.fn().mockReturnValue({ where: vi.fn().mockReturnValue({}) }),
       });
 
       const service = new ChatService(mockSession);

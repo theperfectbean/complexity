@@ -62,6 +62,10 @@ describe("/api/roles", () => {
     it("returns user roles", async () => {
       mockSelectSingleOnce([{ id: "user-1" }]);
       mockSelectManyOnce([{ id: "role-1", name: "Personal" }]);
+      // Exists subquery stub for role-access check inside the roles WHERE clause
+      vi.mocked(db.select).mockReturnValueOnce({
+        from: vi.fn().mockReturnValue({ where: vi.fn().mockReturnValue({}) }),
+      } as never);
 
       const response = await GET();
 

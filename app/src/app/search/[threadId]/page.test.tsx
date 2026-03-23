@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -37,17 +37,35 @@ describe("ThreadPage", () => {
       error: undefined,
     });
 
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        thread: {
-          id: "thread-1",
-          title: "Thread 1",
-          model: "pro-search",
-        },
-        messages: [],
-      }),
-    } as unknown as Response);
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes("/api/models")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            models: [
+              { id: "openai/gpt-5.4", label: "GPT-5.4", category: "OpenAI", isPreset: false },
+              { id: "pro-search", label: "Pro Search", category: "Presets", isPreset: true },
+            ],
+          }),
+        } as unknown as Response);
+      }
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({
+          thread: {
+            id: "thread-1",
+            title: "Thread 1",
+            model: "pro-search",
+            roleId: null,
+            systemPrompt: null,
+            pinned: false,
+            tags: [],
+            webSearchEnabled: true,
+          },
+          messages: [],
+        }),
+      } as unknown as Response);
+    });
   });
 
   it("submits with the currently selected model in request body", async () => {
@@ -57,7 +75,7 @@ describe("ThreadPage", () => {
 
     const user = userEvent.setup();
     await user.click(await screen.findByRole("button", { name: "Select model" }));
-    await user.click(await screen.findByRole("menuitem", { name: "GPT-5.4" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "GPT-5.4" }));
     await user.type(screen.getByPlaceholderText("Ask a follow-up..."), "hello model");
     await user.click(screen.getByRole("button", { name: "Send" }));
 
@@ -171,9 +189,8 @@ describe("ThreadPage", () => {
       />
     );
 
-    const user = userEvent.setup();
     const retryButtons = await screen.findAllByRole("button", { name: "Retry" });
-    await user.click(retryButtons[retryButtons.length - 1]);
+    fireEvent.click(retryButtons[retryButtons.length - 1]);
 
     await waitFor(() => {
       expect(mockSetMessages).toHaveBeenCalled();
@@ -246,7 +263,7 @@ describe("ThreadPage", () => {
     await user.click(rewriteButtons[rewriteButtons.length - 1]);
 
     const modelBItem = await screen.findByRole("menuitem", { name: "Model B" });
-    await user.click(modelBItem);
+    fireEvent.click(modelBItem);
 
     await waitFor(() => {
       expect(mockSetMessages).toHaveBeenCalled();

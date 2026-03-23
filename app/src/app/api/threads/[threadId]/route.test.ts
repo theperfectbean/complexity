@@ -26,7 +26,8 @@ function mockOwnedThreadOnce(result: unknown) {
 }
 
 function mockThreadMessagesOnce(result: unknown) {
-  const orderBy = vi.fn().mockResolvedValue(result);
+  const limit = vi.fn().mockResolvedValue(result);
+  const orderBy = vi.fn(() => ({ limit }));
   const where = vi.fn(() => ({ orderBy }));
   const from = vi.fn(() => ({ where }));
   vi.mocked(db.select).mockReturnValueOnce({ from } as never);
@@ -73,6 +74,8 @@ describe("/api/threads/[threadId]", () => {
       await expect(response.json()).resolves.toEqual({
         thread: { id: "thread-1", title: "Thread 1" },
         messages: [{ id: "msg-1", role: "user", content: "hello" }],
+        hasMore: false,
+        nextCursor: null,
       });
     });
   });
