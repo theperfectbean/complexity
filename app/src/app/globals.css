@@ -241,6 +241,29 @@
   overflow-anchor: none;
 }
 
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+.markdown-body.is-streaming > *:last-child:not(pre):not(table):after,
+.markdown-body.is-streaming > *:last-child > *:last-child:not(pre):not(table):after {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 1.1em;
+  background-color: var(--primary);
+  vertical-align: middle;
+  margin-left: 4px;
+  animation: blink 1s step-end infinite;
+  border-radius: 1px;
+}
+
+/* Ensure the cursor doesn't wrap alone to a new line if possible */
+.markdown-body.is-streaming p:last-child {
+  display: inline;
+}
+
 /* Markdown Content Styles - Visual Parity Refinement */
 div.markdown-body {
   font-size: 1.0625rem !important;

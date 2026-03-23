@@ -153,14 +153,30 @@ export const MarkdownRenderer = memo(function MarkdownRenderer({ content, isStre
 
   useEffect(() => {
     if (!isStreaming) {
+      setDisplayContent(content);
       return;
     }
 
-    const timer = setTimeout(() => {
-      setDisplayContent(content);
-    }, 100);
+    // Adaptive typewriter effect
+    const interval = setInterval(() => {
+      setDisplayContent((prev) => {
+        if (prev.length >= content.length) {
+          return content;
+        }
 
-    return () => clearTimeout(timer);
+        const diff = content.length - prev.length;
+        // Adaptive speed: type faster if we are far behind the actual stream
+        let increment = 1;
+        if (diff > 300) increment = 25;
+        else if (diff > 100) increment = 10;
+        else if (diff > 30) increment = 4;
+        else if (diff > 10) increment = 2;
+
+        return content.slice(0, prev.length + increment);
+      });
+    }, 30); // ~33fps for smoothness
+
+    return () => clearInterval(interval);
   }, [content, isStreaming]);
 
   const finalContent = isStreaming ? displayContent : content;
@@ -178,7 +194,10 @@ export const MarkdownRenderer = memo(function MarkdownRenderer({ content, isStre
   }
 
   return (
-    <div className={`markdown-body max-w-none ${isStreaming ? "min-h-[100px]" : ""}`}>
+    <div className={cn(
+      "markdown-body max-w-none transition-all duration-200",
+      isStreaming ? "is-streaming min-h-[100px]" : ""
+    )}>
       <ReactMarkdown 
         remarkPlugins={[remarkGfm]} 
         rehypePlugins={isStreaming ? [] : [rehypeHighlight]}
