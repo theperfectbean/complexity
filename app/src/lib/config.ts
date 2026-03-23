@@ -98,7 +98,7 @@ export const runtimeConfig = {
     similarityTopK: env.RAG_SIMILARITY_TOP_K ?? 8,
     hybridSearch: (env.RAG_HYBRID_SEARCH ?? "true") === "true",
     hybridCandidates: env.RAG_HYBRID_CANDIDATES ?? 20,
-    rerankEnabled: (env.RAG_RERANK_ENABLED ?? "true") === "true",
+    rerankEnabled: (env.RAG_RERANK_ENABLED ?? "false") === "true",
     mmrLambda: env.RAG_MMR_LAMBDA ?? 0.6,
   },
   memory: {

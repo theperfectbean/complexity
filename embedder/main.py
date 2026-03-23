@@ -20,27 +20,13 @@ app = FastAPI(title=app_title, version=app_version)
 # Sentence Transformer for embeddings
 embed_model = SentenceTransformer(model_name)
 
-# Lazy-loaded CrossEncoder
-rerank_model = None
+# CrossEncoder for reranking
+print(f"Loading Cross-Encoder model: {rerank_model_name}...")
+rerank_model = CrossEncoder(rerank_model_name)
 
-# Lazy-loaded Whisper model
-whisper_model = None
-
-def get_rerank_model():
-    global rerank_model
-    if rerank_model is None:
-        print(f"Loading Cross-Encoder model: {rerank_model_name}...")
-        rerank_model = CrossEncoder(rerank_model_name)
-    return rerank_model
-
-def get_whisper_model():
-    global whisper_model
-    if whisper_model is None:
-        print(f"Loading Faster-Whisper model: {whisper_model_name}...")
-        # compute_type="int8" is best for CPU efficiency
-        whisper_model = WhisperModel(whisper_model_name, device="cpu", compute_type="int8")
-    return whisper_model
-
+# Whisper model for transcription
+print(f"Loading Faster-Whisper model: {whisper_model_name}...")
+whisper_model = WhisperModel(whisper_model_name, device="cpu", compute_type="int8")
 
 class EmbedRequest(BaseModel):
     texts: list[str]
@@ -75,11 +61,9 @@ def rerank(request: RerankRequest):
     if not request.documents:
         return {"results": []}
     
-    model = get_rerank_model()
-    
     # CrossEncoder.predict takes a list of [query, doc] pairs
     pairs = [[request.query, doc] for doc in request.documents]
-    scores = model.predict(pairs)
+    scores = rerank_model.predict(pairs)
     
     # Combine docs with scores and sort
     results = []
@@ -125,8 +109,6 @@ async def ocr(file: UploadFile = File(...)) -> dict[str, str]:
 
 @app.post("/transcribe")
 async def transcribe(file: UploadFile = File(...)) -> dict[str, str]:
-    model = get_whisper_model()
-    
     # Save the uploaded file to a temporary file
     with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(file.filename)[1] or ".webm") as tmp:
         content = await file.read()
@@ -135,7 +117,7 @@ async def transcribe(file: UploadFile = File(...)) -> dict[str, str]:
 
     try:
         # Transcribe the audio file
-        segments, info = model.transcribe(tmp_path, beam_size=5)
+        segments, info = whisper_model.transcribe(tmp_path, beam_size=5)
         text = " ".join([segment.text for segment in segments]).strip()
         return {"text": text}
     finally:

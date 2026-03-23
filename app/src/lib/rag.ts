@@ -5,6 +5,9 @@ import { db } from "@/lib/db";
 import { chunks, documents } from "@/lib/db/schema";
 import { env } from "@/lib/env";
 import { runtimeConfig } from "./config";
+import { getLogger } from "./logger";
+
+const log = getLogger("rag");
 
 /**
  * Split `input` into overlapping token-window chunks.
@@ -217,6 +220,7 @@ export async function hybridSearch(
   embedding: number[],
   topK = runtimeConfig.rag.similarityLimit,
 ): Promise<Array<{ id: string; content: string; score: number; filename?: string | null }>> {
+  const startTime = Date.now();
   const candidates = runtimeConfig.rag.hybridCandidates;
 
   if (!runtimeConfig.rag.hybridSearch) {
@@ -224,40 +228,48 @@ export async function hybridSearch(
     return rows.map((r) => ({ id: r.id, content: r.content, score: 1 - Number(r.distance) }));
   }
 
-  // 1. Vector search — top `candidates` by cosine distance
-  const distance = cosineDistance(chunks.embedding, embedding);
-  const vectorRows = await db
-    .select({ 
-      id: chunks.id, 
-      content: chunks.content, 
-      embedding: chunks.embedding, 
-      distance,
-      filename: documents.filename
-    })
-    .from(chunks)
-    .innerJoin(documents, eq(chunks.documentId, documents.id))
-    .where(and(eq(chunks.roleId, roleId), eq(documents.status, "ready")))
-    .orderBy(distance)
-    .limit(candidates);
+  // 1. & 2. Run Vector and BM25 searches in parallel
+  const vectorStartTime = Date.now();
+  const bm25StartTime = Date.now();
+  
+  const [vectorRows, bm25Rows] = await Promise.all([
+    // 1. Vector search — top `candidates` by cosine distance
+    db
+      .select({ 
+        id: chunks.id, 
+        content: chunks.content, 
+        embedding: chunks.embedding, 
+        distance: cosineDistance(chunks.embedding, embedding),
+        filename: documents.filename
+      })
+      .from(chunks)
+      .innerJoin(documents, eq(chunks.documentId, documents.id))
+      .where(and(eq(chunks.roleId, roleId), eq(documents.status, "ready")))
+      .orderBy(cosineDistance(chunks.embedding, embedding))
+      .limit(candidates),
 
-  // 2. BM25 keyword search via PostgreSQL full-text search
-  const bm25Rows = await db
-    .select({ 
-      id: chunks.id, 
-      content: chunks.content, 
-      embedding: chunks.embedding, 
-      rank: sql<number>`ts_rank_cd(to_tsvector('english', ${chunks.content}), plainto_tsquery('english', ${queryText}))`,
-      filename: documents.filename
-    })
-    .from(chunks)
-    .innerJoin(documents, eq(chunks.documentId, documents.id))
-    .where(and(
-      eq(chunks.roleId, roleId),
-      eq(documents.status, "ready"),
-      sql`to_tsvector('english', ${chunks.content}) @@ plainto_tsquery('english', ${queryText})`,
-    ))
-    .orderBy(desc(sql<number>`ts_rank_cd(to_tsvector('english', ${chunks.content}), plainto_tsquery('english', ${queryText}))`))
-    .limit(candidates);
+    // 2. BM25 keyword search via PostgreSQL full-text search
+    db
+      .select({ 
+        id: chunks.id, 
+        content: chunks.content, 
+        embedding: chunks.embedding, 
+        rank: sql<number>`ts_rank_cd(to_tsvector('english', ${chunks.content}), plainto_tsquery('english', ${queryText}))`,
+        filename: documents.filename
+      })
+      .from(chunks)
+      .innerJoin(documents, eq(chunks.documentId, documents.id))
+      .where(and(
+        eq(chunks.roleId, roleId),
+        eq(documents.status, "ready"),
+        sql`to_tsvector('english', ${chunks.content}) @@ plainto_tsquery('english', ${queryText})`,
+      ))
+      .orderBy(desc(sql<number>`ts_rank_cd(to_tsvector('english', ${chunks.content}), plainto_tsquery('english', ${queryText}))`))
+      .limit(candidates)
+  ]);
+
+  const vectorDuration = Date.now() - vectorStartTime;
+  const bm25Duration = Date.now() - bm25StartTime;
 
   // 3. RRF: build rank maps and merge scores (k=60 is standard RRF constant)
   const RRF_K = 60;
@@ -285,7 +297,9 @@ export async function hybridSearch(
     .slice(0, candidates);
 
   // 4. Optional Cross-Encoder Reranking
+  let rerankDuration = 0;
   if (runtimeConfig.rag.rerankEnabled && merged.length > 0) {
+    const rerankStartTime = Date.now();
     try {
       const rerankResults = await rerank(
         queryText,
@@ -304,8 +318,22 @@ export async function hybridSearch(
     } catch (error) {
       console.error("Reranking failed, falling back to RRF scores:", error);
     }
+    rerankDuration = Date.now() - rerankStartTime;
   }
 
   // 5. MMR reranking for diversity
-  return mmrRerank(merged, embedding, topK);
+  const mmrStartTime = Date.now();
+  const finalResults = mmrRerank(merged, embedding, topK);
+  const mmrDuration = Date.now() - mmrStartTime;
+
+  log.info({
+    totalMs: Date.now() - startTime,
+    vectorMs: vectorDuration,
+    bm25Ms: bm25Duration,
+    rerankMs: rerankDuration,
+    mmrMs: mmrDuration,
+    count: finalResults.length
+  }, "Hybrid search performance");
+  
+  return finalResults;
 }
