@@ -93,7 +93,9 @@ export class ChatHistoryManager {
     if (session.redis && payload.text && payload.text !== runtimeConfig.chat.emptyResponseFallbackText) {
       try {
         await session.redis.set(cacheKey, JSON.stringify(payload), "EX", runtimeConfig.chat.cacheTtlSeconds);
-      } catch {} // Ignore cache errors
+      } catch (error) {
+        this.log.error({ err: error, cacheKey }, "Redis cache write failed");
+      }
     }
   }
 }

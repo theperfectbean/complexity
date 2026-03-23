@@ -1,3 +1,5 @@
+import { logger } from "./logger";
+
 export function safeParseJsonLine(line: string): Record<string, unknown> | null {
   try {
     const parsed = JSON.parse(line);
@@ -5,7 +7,8 @@ export function safeParseJsonLine(line: string): Record<string, unknown> | null 
       return null;
     }
     return parsed as Record<string, unknown>;
-  } catch {
+  } catch (err) {
+    logger.error({ err, line }, "Failed to parse JSON line");
     return null;
   }
 }

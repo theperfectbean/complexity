@@ -207,19 +207,19 @@ export async function runGeneration(options: GenerationOptions): Promise<Generat
   }
 
   // Direct Vercel AI SDK Providers
-  const model = getLanguageModel(options.modelId, options.keys);
-
-  options.writer.write({
-    type: "data-call-start",
-    data: { callId: "model-gen", toolName: "Reasoning", input: { model: options.modelId } },
-  } as UIMessageChunk);
-
-  const coreMessages = await convertToModelMessages(options.messages);
-  
   let assistantText = "";
   let hasSentConnected = false;
 
   try {
+    const model = getLanguageModel(options.modelId, options.keys);
+
+    options.writer.write({
+      type: "data-call-start",
+      data: { callId: "model-gen", toolName: "Reasoning", input: { model: options.modelId } },
+    } as UIMessageChunk);
+
+    const coreMessages = await convertToModelMessages(options.messages);
+    
     const result = streamText({
       model,
       system: options.system,
@@ -307,5 +307,25 @@ export async function generateImage(prompt: string, keys: Record<string, string 
     log.error({ err: error, prompt }, "Image generation failed");
     const message = error instanceof Error ? error.message : "Unknown error";
     return `⚠️ Image generation failed: ${message}`;
+  }
+}
+
+/**
+ * Summarizes a user's initial query into a concise thread title.
+ * Includes a 3-second timeout to prevent blocking thread creation.
+ */
+export async function generateThreadTitle(query: string, modelId: string, keys: Record<string, string | null>): Promise<string> {
+  try {
+    const model = getLanguageModel(modelId, keys);
+    const { text } = await generateText({
+      model,
+      system: "You are a helpful assistant that summarizes user queries into a concise, high-quality thread title (3-6 words). Do not use quotes or punctuation. Return ONLY the title.",
+      prompt: `Summarize this query: ${query}`,
+      abortSignal: AbortSignal.timeout(3000),
+    });
+    return text.trim().replace(/^["'](.*)["']$/, "$1") || query.slice(0, 60) + (query.length > 60 ? "..." : "");
+  } catch (error) {
+    // Silently fallback to truncation on error to avoid blocking UX
+    return query.slice(0, 60) + (query.length > 60 ? "..." : "");
   }
 }
