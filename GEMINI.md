@@ -731,6 +731,17 @@ This strategy ensures all dependencies (Postgres, Redis, Embedder) are running w
     - **Role Management**: Creation, deletion, renaming, and pinning in the Roles gallery and detail pages.
 - **Benefit**: The sidebar now stays perfectly in sync with user actions in real-time, providing a more fluid and reactive experience across the entire workspace.
 
+### Role Instructions Modal & Typewriter Tuning (2026-03-23)
+- **Feature**: Refactored role instruction editing from an inline form to a dedicated modal (`RoleInstructionsDialog.tsx`).
+- **Implementation**:
+  - The new modal provides a larger, more focused environment for managing complex system prompts.
+  - Retained and integrated the AI-powered instruction generator directly into the editing modal.
+  - Removed the inline editing state from the role detail page, simplifying the main UI.
+- **Typewriter Optimization**:
+  - Slowed down the streaming typewriter effect (from 30ms to 40ms intervals) and reduced adaptive character increments.
+  - This results in a more readable, less "frantic" streaming experience that still maintains responsiveness through adaptive catch-up.
+- **Benefit**: Improved ergonomics for role management and a more polished, readable chat interface.
+
 
 
 

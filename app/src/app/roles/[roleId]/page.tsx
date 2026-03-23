@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 import { DocumentList, RoleDocument } from "@/components/roles/DocumentList";
 import { RoleShareDialog } from "@/components/roles/RoleShareDialog";
 import { RoleSettingsDialog } from "@/components/roles/RoleSettingsDialog";
+import { RoleInstructionsDialog } from "@/components/roles/RoleInstructionsDialog";
 import { FileUploader } from "@/components/roles/FileUploader";
 import { LoadingSkeleton } from "@/components/shared/LoadingSkeleton";
 import { getDefaultModel } from "@/lib/models";
@@ -47,9 +48,6 @@ export default function RoleDetailPage() {
   const [model, setModel] = useState<string>(getDefaultModel());
   const [prompt, setPrompt] = useState("");
   const [creatingThread, setCreatingThread] = useState(false);
-  const [editingInstructions, setEditingInstructions] = useState(false);
-  const [instructionsDraft, setInstructionsDraft] = useState("");
-  const [savingInstructions, setSavingInstructions] = useState(false);
   const [webSearchEnabled, setWebSearchEnabled] = useState(true);
   const [attachments, setAttachments] = useState<File[]>([]);
 
@@ -96,7 +94,6 @@ export default function RoleDetailPage() {
         if (active) {
           setRole(payload.role);
           setIsOwner(payload.isOwner);
-          setInstructionsDraft(payload.role.instructions ?? "");
         }
       })
       .catch(() => {
@@ -180,34 +177,6 @@ export default function RoleDetailPage() {
       router.push(`/search/${payload.thread.id}?q=${encodeURIComponent(currentPrompt)}&web=${webSearchEnabled}`);
     } finally {
       setCreatingThread(false);
-    }
-  }
-
-  async function saveInstructions() {
-    if (savingInstructions) {
-      return;
-    }
-
-    setSavingInstructions(true);
-    try {
-      const response = await fetch(`/api/roles/${roleId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          instructions: instructionsDraft.trim() ? instructionsDraft.trim() : null,
-        }),
-      });
-
-      if (!response.ok) {
-        toast.error("Failed to update instructions");
-        return;
-      }
-
-      setRole((current) => (current ? { ...current, instructions: instructionsDraft.trim() || null } : current));
-      setEditingInstructions(false);
-      toast.success("Instructions updated");
-    } finally {
-      setSavingInstructions(false);
     }
   }
 
@@ -403,51 +372,16 @@ export default function RoleDetailPage() {
           <section className="py-8">
             <div className="flex items-center justify-between gap-3">
               <h2 className="text-[13px] font-bold uppercase tracking-wider text-muted-foreground/80">Instructions</h2>
-              {!editingInstructions ? (
-                <button
-                  type="button"
-                  onClick={() => setEditingInstructions(true)}
-                  className="text-muted-foreground/40 hover:text-foreground"
-                >
-                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                  </svg>
-                </button>
-              ) : null}
-            </div>
-            {editingInstructions ? (
-              <div className="mt-4 space-y-3">
-                <textarea
-                  className="field-sizing-content min-h-[300px] w-full resize-y rounded-xl border border-border/70 bg-background px-3 py-2 text-sm focus:border-primary/50 focus:outline-none focus:ring-4 focus:ring-primary/5"
-                  value={instructionsDraft}
-                  onChange={(event) => setInstructionsDraft(event.target.value)}
+              {isOwner && role && (
+                <RoleInstructionsDialog 
+                  role={role} 
+                  onUpdate={(instructions) => setRole((prev) => (prev ? { ...prev, instructions } : null))} 
                 />
-                <div className="flex items-center justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setInstructionsDraft(role?.instructions ?? "");
-                      setEditingInstructions(false);
-                    }}
-                    className="rounded-full px-3 py-1 text-xs font-medium text-muted-foreground hover:bg-muted/40"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void saveInstructions()}
-                    disabled={savingInstructions}
-                    className="rounded-full bg-foreground px-4 py-1.5 text-xs font-medium text-background disabled:opacity-60"
-                  >
-                    {savingInstructions ? "Saving..." : "Save"}
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <p className="mt-3 line-clamp-4 text-sm leading-relaxed text-muted-foreground/80">
-                {role?.instructions?.trim() ? role.instructions : "No instructions yet. Add them to personalize how this role responds."}
-              </p>
-            )}
+              )}
+            </div>
+            <p className="mt-3 line-clamp-4 text-sm leading-relaxed text-muted-foreground/80">
+              {role?.instructions?.trim() ? role.instructions : "No instructions yet. Add them to personalize how this role responds."}
+            </p>
           </section>
 
           <section className="py-8">

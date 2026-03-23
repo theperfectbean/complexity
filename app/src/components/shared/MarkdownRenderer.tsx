@@ -167,14 +167,14 @@ export const MarkdownRenderer = memo(function MarkdownRenderer({ content, isStre
         const diff = content.length - prev.length;
         // Adaptive speed: type faster if we are far behind the actual stream
         let increment = 1;
-        if (diff > 300) increment = 25;
-        else if (diff > 100) increment = 10;
-        else if (diff > 30) increment = 4;
+        if (diff > 300) increment = 20;
+        else if (diff > 100) increment = 8;
+        else if (diff > 30) increment = 3;
         else if (diff > 10) increment = 2;
 
         return content.slice(0, prev.length + increment);
       });
-    }, 30); // ~33fps for smoothness
+    }, 40); // ~25fps, slightly slower and more readable
 
     return () => clearInterval(interval);
   }, [content, isStreaming]);
