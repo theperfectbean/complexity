@@ -60,6 +60,7 @@ export function ThreadSettingsDialog({ threadId, initialSystemPrompt, initialPin
 
       toast.success("Thread settings updated");
       onUpdate({ systemPrompt: prompt.trim() || null, pinned, tags });
+      window.dispatchEvent(new CustomEvent("thread-list-updated"));
       setOpen(false);
     } catch {
       toast.error("Failed to save settings");

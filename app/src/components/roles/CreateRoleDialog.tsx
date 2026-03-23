@@ -82,6 +82,7 @@ export function RoleCreateForm({ onCreated, onCancel, submitLabel = "Create role
 
       const payload = (await response.json()) as { role: Role };
       onCreated?.(payload.role);
+      window.dispatchEvent(new CustomEvent("thread-list-updated"));
       setName("");
       setInstructions("");
     } finally {

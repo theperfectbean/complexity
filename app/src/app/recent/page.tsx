@@ -74,6 +74,7 @@ export default function RecentPage() {
         return;
       }
       setThreads((current) => current.filter((thread) => thread.id !== threadId));
+      window.dispatchEvent(new CustomEvent("thread-list-updated"));
     } finally {
       setDeletingId(null);
     }

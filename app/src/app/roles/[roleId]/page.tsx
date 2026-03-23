@@ -168,6 +168,9 @@ export default function RoleDetailPage() {
 
       const payload = (await response.json()) as { thread: { id: string } };
       
+      // Notify sidebar to refresh
+      window.dispatchEvent(new CustomEvent("thread-list-updated"));
+      
       if (attachments.length > 0) {
         toast.info("Thread created! Please re-attach your files in the chat.");
       }
@@ -225,6 +228,7 @@ export default function RoleDetailPage() {
       }
 
       setRole((current) => (current ? { ...current, pinned: newPinned } : current));
+      window.dispatchEvent(new CustomEvent("thread-list-updated"));
       toast.success(newPinned ? "Role pinned to sidebar" : "Role unpinned");
     } catch {
       toast.error("An error occurred");

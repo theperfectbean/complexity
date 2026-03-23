@@ -96,6 +96,7 @@ export default function RolesPage() {
       setRoles((current) =>
         current.map((item) => (item.id === role.id ? { ...item, name: nextName, updatedAt: new Date().toISOString() } : item)),
       );
+      window.dispatchEvent(new CustomEvent("thread-list-updated"));
     } finally {
       setBusyRoleId(null);
     }
@@ -115,6 +116,7 @@ export default function RolesPage() {
       }
 
       setRoles((current) => current.filter((item) => item.id !== role.id));
+      window.dispatchEvent(new CustomEvent("thread-list-updated"));
     } finally {
       setBusyRoleId(null);
     }
@@ -138,6 +140,7 @@ export default function RolesPage() {
       setRoles((current) =>
         current.map((item) => (item.id === role.id ? { ...item, pinned: newPinned } : item)),
       );
+      window.dispatchEvent(new CustomEvent("thread-list-updated"));
       toast.success(newPinned ? "Role pinned to sidebar" : "Role unpinned");
     } finally {
       setBusyRoleId(null);

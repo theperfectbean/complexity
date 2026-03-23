@@ -718,6 +718,19 @@ This strategy ensures all dependencies (Postgres, Redis, Embedder) are running w
   - Refactored `MessageList` to *always* show "Thinking..." while waiting for text content, even if intermediate tool-call results (like Retrieval or Recall) are already visible.
 - **Benefit**: Immediate visual feedback after user input, eliminating the "dead air" period during RAG retrieval and improving the perceived responsiveness of the platform.
 
+### Sidebar Synchronization (2026-03-23)
+- **Problem**: The sidebar thread list and pinned roles only updated after a manual page refresh or navigating between pages, causing a lag in UI consistency.
+- **Implementation**:
+  - Established a standardized `thread-list-updated` custom event to signal sidebar data refreshes.
+  - Updated `Sidebar.tsx` to listen for this event and immediately refetch both threads and pinned roles.
+  - Integrated event dispatching into all state-mutating actions across the app:
+    - **Thread Creation**: Home page and Role detail pages.
+    - **Thread Deletion**: Recent history page and sidebar itself.
+    - **Thread Settings**: Pinning and tag updates in the chat interface.
+    - **Conversation Branching**: When editing previous messages.
+    - **Role Management**: Creation, deletion, renaming, and pinning in the Roles gallery and detail pages.
+- **Benefit**: The sidebar now stays perfectly in sync with user actions in real-time, providing a more fluid and reactive experience across the entire workspace.
+
 
 
 

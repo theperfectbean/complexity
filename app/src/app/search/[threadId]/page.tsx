@@ -252,6 +252,7 @@ export function ThreadChat({
       const newThreadId = payload.threadId;
 
       // Redirect to the new thread with the edit content as the initial query
+      window.dispatchEvent(new CustomEvent("thread-list-updated"));
       router.push(`/search/${newThreadId}?q=${encodeURIComponent(newContent)}&web=${webSearchEnabled}`);
     },
     [threadId, router, webSearchEnabled],

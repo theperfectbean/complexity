@@ -43,6 +43,9 @@ export default function Home() {
 
       const payload = (await response.json()) as { thread: { id: string } };
       
+      // Notify sidebar to refresh
+      window.dispatchEvent(new CustomEvent("thread-list-updated"));
+      
       // Note: In a production app, we would upload these files immediately or store them in a persistent draft state.
       // For this implementation, since SearchBar state is lost on redirect, we notify the user.
       // Alternatively, we could base64 encode them into the URL, but that's risky for large files.

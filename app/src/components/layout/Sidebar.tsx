@@ -77,37 +77,52 @@ export function Sidebar({ collapsed = false, onToggle, onNavigate }: SidebarProp
 
     let active = true;
 
-    fetch("/api/threads")
-      .then((response) => (response.ok ? response.json() : Promise.reject(new Error("Failed to load threads"))))
-      .then((payload: { threads: Thread[] }) => {
-        if (!active) {
-          return;
-        }
-        setThreads(payload.threads.slice(0, 24));
-      })
-      .catch(() => {
-        if (active) {
-          setThreads([]);
-        }
-      });
+    const fetchThreads = () => {
+      fetch("/api/threads")
+        .then((response) => (response.ok ? response.json() : Promise.reject(new Error("Failed to load threads"))))
+        .then((payload: { threads: Thread[] }) => {
+          if (!active) {
+            return;
+          }
+          setThreads(payload.threads.slice(0, 24));
+        })
+        .catch(() => {
+          if (active) {
+            setThreads([]);
+          }
+        });
+    };
 
-    // Fetch pinned roles
-    fetch("/api/roles")
-      .then((response) => (response.ok ? response.json() : Promise.reject(new Error("Failed to load roles"))))
-      .then((payload: { roles: Role[] }) => {
-        if (!active) {
-          return;
-        }
-        setPinnedRoles(payload.roles.filter((r) => r.pinned));
-      })
-      .catch(() => {
-        if (active) {
-          setPinnedRoles([]);
-        }
-      });
+    const fetchRoles = () => {
+      fetch("/api/roles")
+        .then((response) => (response.ok ? response.json() : Promise.reject(new Error("Failed to load roles"))))
+        .then((payload: { roles: Role[] }) => {
+          if (!active) {
+            return;
+          }
+          setPinnedRoles(payload.roles.filter((r) => r.pinned));
+        })
+        .catch(() => {
+          if (active) {
+            setPinnedRoles([]);
+          }
+        });
+    };
+
+    fetchThreads();
+    fetchRoles();
+
+    // Listen for updates to refresh the list
+    const handleUpdate = () => {
+      fetchThreads();
+      fetchRoles();
+    };
+
+    window.addEventListener("thread-list-updated", handleUpdate);
 
     return () => {
       active = false;
+      window.removeEventListener("thread-list-updated", handleUpdate);
     };
   }, [session?.user]);
 
@@ -131,6 +146,7 @@ export function Sidebar({ collapsed = false, onToggle, onNavigate }: SidebarProp
       }
 
       setThreads((current) => current.filter((thread) => thread.id !== threadId));
+      window.dispatchEvent(new CustomEvent("thread-list-updated"));
     } finally {
       setDeletingThreadId(null);
     }
