@@ -10,46 +10,25 @@ import { getRedisClient } from "@/lib/redis";
 import { sendEmail } from "@/lib/email";
 import { getBaseUrl } from "@/lib/base-url";
 
+import { checkRateLimit } from "@/lib/rate-limit";
+
 const schema = z.object({
   email: z.string().email(),
 });
 
 export async function POST(request: Request) {
-  // Rate limiting
-  const redis = getRedisClient();
+  const ip = request.headers.get("x-forwarded-for")?.split(",")[0] ?? "unknown";
+  const allowed = await checkRateLimit({
+    key: `rate:forgot-password:ip:${ip}`,
+    limit: 5,
+    windowSeconds: 60,
+  });
 
-  if (redis) {
-    try {
-      const ip = request.headers.get("x-forwarded-for")?.split(",")[0] ?? "unknown";
-      let email = "unknown";
-      try {
-        const payload = await request.clone().json();
-        email = payload?.email?.toLowerCase() ?? "unknown";
-      } catch {
-        // Not JSON
-      }
-      const rateWindow = Math.floor(Date.now() / 600000); // 10 minute window
-
-      // IP limit (3 per 10m)
-      const ipKey = `rate:forgot-password:ip:${ip}:${rateWindow}`;
-      const ipCurrent = await redis.incr(ipKey);
-
-      // Email limit (2 per 10m)
-      const emailKey = `rate:forgot-password:email:${email}:${rateWindow}`;
-      const emailCurrent = await redis.incr(emailKey);
-
-      if (ipCurrent === 1) await redis.expire(ipKey, 600 + 1);
-      if (emailCurrent === 1) await redis.expire(emailKey, 600 + 1);
-
-      if (ipCurrent > 3 || emailCurrent > 2) {
-        return NextResponse.json(
-          { error: "Too many password reset requests. Please try again in 10 minutes." },
-          { status: 429 }
-        );
-      }
-    } catch {
-      // Fail open
-    }
+  if (!allowed) {
+    return NextResponse.json(
+      { error: "Too many password reset requests. Please try again later." },
+      { status: 429 }
+    );
   }
 
   try {

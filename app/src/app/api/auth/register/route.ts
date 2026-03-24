@@ -12,6 +12,8 @@ import { getRedisClient } from "@/lib/redis";
 import { sendEmail } from "@/lib/email";
 import { getBaseUrl } from "@/lib/base-url";
 
+import { checkRateLimit } from "@/lib/rate-limit";
+
 const passwordSchema = (() => {
   let s = z.string().min(runtimeConfig.auth.passwordMinLength, {
     message: `Password must be at least ${runtimeConfig.auth.passwordMinLength} characters`,
@@ -33,41 +35,18 @@ const schema = z.object({
 export async function POST(request: Request) {
   console.log("[Registration] Received POST request");
 
-  // Rate limiting
-  const redis = getRedisClient();
+  const ip = request.headers.get("x-forwarded-for")?.split(",")[0] ?? "unknown";
+  const allowed = await checkRateLimit({
+    key: `rate:register:ip:${ip}`,
+    limit: 5,
+    windowSeconds: 60,
+  });
 
-  if (redis) {
-    try {
-      const ip = request.headers.get("x-forwarded-for")?.split(",")[0] ?? "unknown";
-      let email = "unknown";
-      try {
-        const payload = await request.clone().json();
-        email = payload?.email?.toLowerCase() ?? "unknown";
-      } catch {
-        // Not JSON or empty
-      }
-      const rateWindow = Math.floor(Date.now() / 600000); // 10 minute window
-
-      // IP limit (5 per 10m)
-      const ipKey = `rate:register:ip:${ip}:${rateWindow}`;
-      const ipCurrent = await redis.incr(ipKey);
-
-      // Email limit (3 per 10m)
-      const emailKey = `rate:register:email:${email}:${rateWindow}`;
-      const emailCurrent = await redis.incr(emailKey);
-
-      if (ipCurrent === 1) await redis.expire(ipKey, 600 + 1);
-      if (emailCurrent === 1) await redis.expire(emailKey, 600 + 1);
-
-      if (ipCurrent > 5 || emailCurrent > 3) {
-        return NextResponse.json(
-          { error: "Too many registration attempts. Please try again in 10 minutes." },
-          { status: 429 }
-        );
-      }
-    } catch {
-      // Fail open
-    }
+  if (!allowed) {
+    return NextResponse.json(
+      { error: "Too many registration attempts. Please try again later." },
+      { status: 429 }
+    );
   }
 
   const payload = await request.json();
