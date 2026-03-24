@@ -4,7 +4,7 @@ import OpenAI from "openai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createXai } from "@ai-sdk/xai";
 import { createOllama } from "ai-sdk-ollama";
-import { LanguageModel, streamText, convertToModelMessages, UIMessageChunk, UIMessage, generateText } from "ai";
+import { LanguageModel, streamText, UIMessageChunk, UIMessage, generateText } from "ai";
 import type { Responses } from "@perplexity-ai/perplexity_ai/resources/responses";
 import { runSearchAgent } from "./search-agent";
 import { runtimeConfig } from "./config";

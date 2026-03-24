@@ -28,6 +28,13 @@ declare module "next-auth" {
   }
 }
 
+declare module "next-auth/jwt" {
+  interface JWT {
+    id?: string;
+    isAdmin?: boolean;
+  }
+}
+
 const signInSchema = z.object({
   email: z.string().email(),
   password: z.string().min(runtimeConfig.auth.passwordMinLength),

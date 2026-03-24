@@ -6,7 +6,6 @@ import crypto from "crypto";
 import { db } from "@/lib/db";
 import { users, verificationTokens } from "@/lib/db/schema";
 import { runtimeConfig } from "@/lib/config";
-import { getRedisClient } from "@/lib/redis";
 import { sendEmail } from "@/lib/email";
 import { getBaseUrl } from "@/lib/base-url";
 
