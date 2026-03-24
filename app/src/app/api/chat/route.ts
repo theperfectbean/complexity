@@ -44,7 +44,26 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    log.info({ messageCount: body.messages?.length, lastMessageParts: body.messages?.[body.messages.length - 1]?.parts }, "Received chat request");
+    const lastMessage =
+      Array.isArray(body.messages) && body.messages.length > 0
+        ? (body.messages[body.messages.length - 1] as Record<string, unknown>)
+        : null;
+    const lastParts = Array.isArray(lastMessage?.parts) ? lastMessage.parts : [];
+    const attachmentPartCount = lastParts.filter((part) => {
+      if (!part || typeof part !== "object") return false;
+      const record = part as Record<string, unknown>;
+      return record.type === "file" || record.type === "image" || typeof record.url === "string";
+    }).length;
+
+    log.info(
+      {
+        messageCount: Array.isArray(body.messages) ? body.messages.length : 0,
+        lastMessageRole: typeof lastMessage?.role === "string" ? lastMessage.role : null,
+        lastMessagePartCount: lastParts.length,
+        attachmentPartCount,
+      },
+      "Received chat request",
+    );
     const parsed = schema.safeParse(body);
     if (!parsed.success) {
       log.warn({ err: parsed.error.format() }, "Invalid payload");

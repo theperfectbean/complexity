@@ -1,8 +1,6 @@
 import { DrizzleAdapter } from "@auth/drizzle-adapter";
 import * as bcrypt from "bcrypt-ts";
 import NextAuth, { type DefaultSession } from "next-auth";
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-import { type JWT } from "next-auth/jwt";
 import Credentials from "next-auth/providers/credentials";
 import GitHub from "next-auth/providers/github";
 import Google from "next-auth/providers/google";
@@ -30,13 +28,6 @@ declare module "next-auth" {
   }
 }
 
-declare module "next-auth/jwt" {
-  interface JWT {
-    id?: string;
-    isAdmin?: boolean;
-  }
-}
-
 const signInSchema = z.object({
   email: z.string().email(),
   password: z.string().min(runtimeConfig.auth.passwordMinLength),
@@ -48,7 +39,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   basePath: "/api/auth",
   adapter: DrizzleAdapter(db),
   session: {
-    strategy: "jwt",
+    strategy: "database",
   },
   providers: [
     Credentials({
@@ -159,17 +150,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     signIn: "/login",
   },
   callbacks: {
-    async jwt({ token, user }) {
-      if (user) {
-        token.id = user.id;
-        token.isAdmin = user.isAdmin;
-      }
-      return token;
-    },
-    async session({ session, token }) {
+    async session({ session, user }) {
       if (session.user) {
-        session.user.id = token.id as string;
-        session.user.isAdmin = token.isAdmin;
+        session.user.id = user.id;
+        session.user.isAdmin = user.isAdmin;
       }
       return session;
     },

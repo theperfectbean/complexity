@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { db } from "@/lib/db";
-import { users, verificationTokens } from "@/lib/db/schema";
+import { users, verificationTokens, apiTokens, sessions } from "@/lib/db/schema";
 import { runtimeConfig } from "@/lib/config";
 import { getRedisClient } from "@/lib/redis";
 
@@ -77,6 +77,19 @@ export async function POST(request: Request) {
     const email = parsed.data.email.toLowerCase();
     const { token, password } = parsed.data;
 
+    const [user] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.email, email))
+      .limit(1);
+
+    if (!user) {
+      return NextResponse.json(
+        { error: "Invalid or expired reset token" },
+        { status: 400 }
+      );
+    }
+
     // Verify token
     const [storedToken] = await db
       .select()
@@ -103,13 +116,16 @@ export async function POST(request: Request) {
     // Update user password
     await db
       .update(users)
-      .set({ passwordHash, updatedAt: new Date() })
+      .set({ passwordHash, passwordChangedAt: new Date(), updatedAt: new Date() })
       .where(eq(users.email, email));
 
-    // Delete used token
+    // Delete all reset/verification tokens for this identifier and revoke active access.
     await db
       .delete(verificationTokens)
-      .where(and(eq(verificationTokens.identifier, email), eq(verificationTokens.token, token)));
+      .where(eq(verificationTokens.identifier, email));
+
+    await db.delete(apiTokens).where(eq(apiTokens.userId, user.id));
+    await db.delete(sessions).where(eq(sessions.userId, user.id));
 
     return NextResponse.json({ ok: true });
   } catch (error) {

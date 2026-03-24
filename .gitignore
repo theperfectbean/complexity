@@ -29,3 +29,10 @@ yarn-error.log*
 gha-creds-*.json
 .data/
 backups/
+.playwright-mcp/
+test-results/
+app/artifacts/
+app/local.db
+app/hover-overlap-check-*.png
+Screenshot *.png
+sticky-*.png

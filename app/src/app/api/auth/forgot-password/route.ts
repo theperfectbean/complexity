@@ -87,8 +87,6 @@ export async function POST(request: Request) {
       });
 
       const resetLink = `${getBaseUrl(request)}/reset-password?token=${token}&email=${encodeURIComponent(email)}`;
-      
-      console.log(`[Password Reset] Link for ${email}: ${resetLink}`);
 
       await sendEmail({
         to: email,

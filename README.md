@@ -18,21 +18,21 @@ Self-hosted Agentic AI search and RAG workspace.
 - Chat API with streaming responses:
   - `POST /api/chat`
   - Perplexity Agent API integration (`@perplexity-ai/perplexity_ai`)
-  - Optional RAG context injection when a `spaceId` is provided
+  - Optional RAG context injection when a `roleId` is provided
 - Threads API:
   - `GET/POST /api/threads`
   - `GET/PATCH/DELETE /api/threads/[threadId]`
-- Spaces API:
-  - `GET/POST /api/spaces`
-  - `GET/PATCH/DELETE /api/spaces/[spaceId]`
-  - `GET /api/spaces/[spaceId]/documents`
-  - `POST /api/spaces/[spaceId]/upload`
+- Roles API:
+  - `GET/POST /api/roles`
+  - `GET/PATCH/DELETE /api/roles/[roleId]`
+  - `GET /api/roles/[roleId]/documents`
+  - `POST /api/roles/[roleId]/upload`
 
 ### Database + RAG
 - Drizzle schema in [app/src/lib/db/schema.ts](app/src/lib/db/schema.ts)
 - Tables:
   - `users`, `accounts`, `sessions`, `verification_tokens`
-  - `threads`, `messages`, `spaces`, `documents`, `chunks`
+  - `threads`, `messages`, `roles`, `documents`, `chunks`
 - `chunks.embedding` uses `vector(384)` with HNSW cosine index
 - pgvector extension enabled in [postgres/init.sql](postgres/init.sql)
 - RAG pipeline:
@@ -45,7 +45,7 @@ Self-hosted Agentic AI search and RAG workspace.
 - Pages implemented:
   - `/`, `/login`, `/register`
   - `/search/[threadId]`
-  - `/spaces`, `/spaces/[spaceId]`
+  - `/roles`, `/roles/[roleId]`
   - `/recent`
   - `/settings/memory`
 - Chat UI uses AI SDK v6 transport (`DefaultChatTransport`) and features enhanced Framer Motion animations (for copy buttons, layout transitions, and thinking states).

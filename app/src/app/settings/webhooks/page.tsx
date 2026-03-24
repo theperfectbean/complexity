@@ -8,8 +8,6 @@ import {
   Trash2, 
   Shield, 
   Activity, 
-  Check, 
-  Copy, 
   RefreshCw,
   Clock,
   AlertCircle
@@ -21,10 +19,14 @@ import { cn, copyToClipboard } from "@/lib/utils";
 interface WebhookData {
   id: string;
   url: string;
-  secret: string;
   events: string[];
   isActive: boolean;
   createdAt: string;
+}
+
+interface CreateWebhookResponse {
+  webhook: WebhookData;
+  signingSecret: string;
 }
 
 interface DeliveryData {
@@ -43,6 +45,7 @@ export default function WebhooksPage() {
   const [isCreating, setIsCreating] = useState(false);
   const [newUrl, setNewUrl] = useState("");
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [newSigningSecret, setNewSigningSecret] = useState<string | null>(null);
   
   // Delivery history state
   const [selectedHookId, setSelectedHookId] = useState<string | null>(null);
@@ -100,8 +103,12 @@ export default function WebhooksPage() {
         }),
       });
 
-      if (!res.ok) throw new Error("Failed to create webhook");
+      const data = await res.json() as Partial<CreateWebhookResponse> & { error?: string };
+      if (!res.ok || !data.signingSecret) {
+        throw new Error(data.error || "Failed to create webhook");
+      }
 
+      setNewSigningSecret(data.signingSecret);
       toast.success("Webhook created");
       setNewUrl("");
       void fetchWebhooks();
@@ -146,6 +153,28 @@ export default function WebhooksPage() {
         <h1 className="font-[var(--font-accent)] text-3xl font-semibold">Webhooks</h1>
         <p className="mt-1 text-muted-foreground">Automate your research by pushing completed threads to external URLs.</p>
       </div>
+
+      {newSigningSecret ? (
+        <section className="mb-6 rounded-2xl border border-primary/20 bg-primary/5 p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold">Copy your signing secret now</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                For security, stored webhook secrets are no longer shown again after creation.
+              </p>
+            </div>
+            <button
+              onClick={() => handleCopy("new-webhook-secret", newSigningSecret)}
+              className="shrink-0 rounded-lg border px-3 py-1.5 text-xs font-medium hover:bg-background"
+            >
+              {copiedId === "new-webhook-secret" ? "Copied" : "Copy Secret"}
+            </button>
+          </div>
+          <div className="mt-3 rounded-lg border border-border/50 bg-background/70 p-3 font-mono text-[11px] break-all">
+            {newSigningSecret}
+          </div>
+        </section>
+      ) : null}
 
       <div className="grid gap-8 lg:grid-cols-[1fr_350px]">
         <div className="space-y-6">
@@ -234,21 +263,8 @@ export default function WebhooksPage() {
                         </button>
                       </div>
                     </div>
-
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between text-[11px]">
-                        <span className="font-bold text-muted-foreground uppercase tracking-wider">Signing Secret</span>
-                        <button
-                          onClick={() => handleCopy(hook.id, hook.secret)}
-                          className="flex items-center gap-1 text-primary hover:underline"
-                        >
-                          {copiedId === hook.id ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
-                          {copiedId === hook.id ? "Copied" : "Copy Secret"}
-                        </button>
-                      </div>
-                      <div className="rounded-lg bg-muted/50 p-2 font-mono text-[10px] break-all border border-border/50">
-                        {hook.secret}
-                      </div>
+                    <div className="rounded-lg border border-border/50 bg-muted/30 p-3 text-[11px] text-muted-foreground">
+                      Signing secrets are shown once at creation and are no longer retrievable from the server.
                     </div>
                   </div>
                 ))}

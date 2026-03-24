@@ -54,7 +54,7 @@ Browser -> Next.js app (app:3000)
 
 ## Security Hardening
 
-- **CSRF & CSP:** Implemented nonce-based Content Security Policy and strict Host/Origin validation in `middleware.ts`.
+- **CSRF & CSP:** Implemented nonce-based Content Security Policy and strict Host/Origin validation in `proxy.ts`.
 - **Encryption:** Sensitive provider API keys are stored AES-256-GCM encrypted in the `settings` table, using a rotating IV and auth tag.
 - **Rate Limiting:** Generic Redis-backed rate limiter (`lib/rate-limit.ts`) prevents abuse on chat and sensitive endpoints.
 - **Admin UX:** Protected `/settings/admin` route provides a central panel for API keys, model management, and **User Management** (promoting/demoting admins).
@@ -74,7 +74,7 @@ The application uses the AI SDK "v6" (SSE) protocol.
 - LLM Registry: `app/src/lib/llm.ts`
 - Roles/RAG: `app/src/lib/rag.ts` & `app/src/app/api/roles/**`
 - Admin API: `app/src/app/api/admin/**`
-- Security Middleware: `app/src/middleware.ts`
+- Security Middleware: `app/src/proxy.ts`
 - Encryption: `app/src/lib/encryption.ts`
 
 ## Database Model Summary

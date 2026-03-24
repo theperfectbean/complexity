@@ -51,6 +51,9 @@ This strategy ensures all dependencies (Postgres, Redis, Embedder) are running w
   - `postgres/`: Database initialization scripts (enabling pgvector).
   - `docs/`: Extensive documentation including architecture, API references, runbooks, and testing guides.
 
+- **Git Workflow:**
+  - Commit and push every workspace change before ending a task unless the user explicitly says not to.
+
 - **Testing:**
   - The project uses Vitest and React Testing Library for unit/integration, and Playwright for E2E testing.
   - Run tests from within the `app` directory:
@@ -216,7 +219,6 @@ This strategy ensures all dependencies (Postgres, Redis, Embedder) are running w
   - **Search Status Indicators**: Updated the `thinking` part UI in `MessageList` to show specific animated icons (Globe, Database, Brain, Search) depending on the tool call (`Searching`, `Retrieval`, `Reasoning`). Added support for dynamically updating the `data-call-start` state so that live search queries (`Searching for: [query]`) are displayed immediately while the search is in progress, mimicking Perplexity/Claude's transparent web search UI.
   - **SearchBar Styling**: Removed the hard top border, rounded the corners to `22px`, improved hover/focus transitions, and updated the attachment chips to be more compact and visually appealing.
 
-### Sign-Out Redirect Fix
 ### Sign-Out Redirect Fix (Updated 2026-03-14)
 - **Problem**: Calling `signOut({ callbackUrl: "/login" })` was still redirecting to `http://localhost:3002/login` when accessed via an external proxy (`https://complexity.internal.lan`). 
 - **Finding**: Even with `trustHost: true`, the `NEXTAUTH_URL` environment variable acts as a canonical base URL that overrides dynamic host detection in NextAuth v5. If `NEXTAUTH_URL` is hardcoded to `localhost`, the server will absolute-ify all relative redirect URLs using that base.
@@ -227,7 +229,10 @@ This strategy ensures all dependencies (Postgres, Redis, Embedder) are running w
 
 
 ### Password Reset Flow (Implemented 2026-03-14)
-... (existing content)
+- **Forgot Password Endpoint**: Added `POST /api/auth/forgot-password` to generate a one-time reset token, persist its hash and expiry, and send the reset link via email.
+- **Reset Password Endpoint**: Added `POST /api/auth/reset-password` to validate the token, hash the new password, invalidate existing sessions, and clear the reset token after use.
+- **Auth Hardening**: Updated the auth flow to reject stale sessions after a password change and to avoid leaking whether an email address exists in the system.
+- **UI Support**: Implemented dedicated forgot-password and reset-password pages under the auth flow so users can request and complete a reset without admin intervention.
 
 ### Multi-Provider & Admin Settings (Implemented 2026-03-14)
 - **Direct Providers**: Integrated Vercel AI SDK providers (`@ai-sdk/anthropic`, `@ai-sdk/openai`, `@ai-sdk/google`, `@ai-sdk/xai`) into the `/api/chat` route. This allows for direct, low-latency connections to LLMs alongside the Perplexity Agent API.
@@ -345,20 +350,20 @@ This strategy ensures all dependencies (Postgres, Redis, Embedder) are running w
 - **Viewport Metadata**: Moved `themeColor` from `metadata` to the new `viewport` export in `layout.tsx` to comply with Next.js 16 standards and silence build warnings.
 
 ## Workspace Hygiene & Maintenance
-- **Mandatory Cleanup**: To prevent disk space exhaustion, the agent MUST run `sudo rm -rf app/.next` and `npm cache clean --force` as a mandatory final step for every task execution. **If the `complexity-app` container is running, it MUST be restarted immediately after cleanup to restore missing build manifests.** This is critical in this environment where large E2E test runs and frequent builds can rapidly consume storage.
+- **Targeted Cleanup Only**: If disk space or stale build artifacts become a real issue, prefer targeted cleanup commands such as removing `app/.next` without `sudo` when permissions allow, or clearing the npm cache only when debugging dependency/cache problems. Do not treat destructive cleanup as a mandatory step for every task, and do not restart containers unless the task actually requires it.
 
 ### AI SDK v6 Streaming & Perplexity Routing (2026-03-16)
 - **toUIMessageStreamResponse**: When using the `@ai-sdk/react` hook `useCompletion` in combination with the Vercel AI SDK v6, the server must use `return result.toUIMessageStreamResponse()` rather than `toDataStreamResponse()` or `toTextStreamResponse()` to ensure proper NDJSON payload compatibility with the client.
 - **Perplexity Agent vs Chat API**: The application's core chat experience routes through a highly customized `runPerplexityAgent` designed exclusively for the **Perplexity Agent API** (`/v1/responses`), which requires rigid `agentInput` schemas and handles RAG/search internally.
-- **Standard Vercel AI SDK Routing**: To support non-Agent tasks (like instruction generation) that use standard `streamText`, the Perplexity fallback uses the standard Vercel AI SDK OpenAI adapter. This must be initialized explicitly using `createOpenAI({...}).chat("sonar")` with `compatibility: "compatible"` to ensure it routes to the correct `/chat/completions` REST endpoint instead of clashing with the Agent API endpoint.
+- **Standard Vercel AI SDK Routing**: To support non-Agent tasks (like instruction generation) that use standard `streamText`, the Perplexity fallback uses the standard Vercel AI SDK OpenAI adapter. Initialize it with the Perplexity `baseURL` including `/v1`, and call `createOpenAI({...}).chat("sonar")` without the unsupported `compatibility: "compatible"` option.
 
 ### Full Codebase Fitness Analysis (2026-03-17)
 - **Verdict**: Codebase is broadly **fit for purpose** as a self-hosted AI search/RAG platform, featuring solid auth, input validation, and deployment orchestration.
 - **Architectural Footprint**: Identified a historical aliasing issue where the `roles` Drizzle symbol maps to the `spaces` database table. The 715-line `chat/route.ts` remains the most complex single module in the system.
 - **Security Hardening Gaps**: Identified missing CSRF protection, CSP headers, and rate limiting on auth (login/register) endpoints.
-- **Testing Coverage**: Verified strong E2E suite (15 Playwright files) but noted a lack of unit tests for core logical components like `memory.ts`, `llm.ts`, and `perplexity-agent.ts`.
+- **Testing Coverage**: Verified a strong E2E suite and identified a then-current lack of unit tests for core logical components like `memory.ts`, `llm.ts`, and the search-agent layer.
 - **Optimization Opportunities**: Recommended Redis caching for API key lookups and context window management for long threads.
-- **Documentation**: Generated a full [Codebase Fitness Report](file:///home/gary/projects/complexity/docs/CODEBASE_FITNESS_REPORT.md) in the workspace.
+- **Documentation**: Generated an internal codebase fitness report during the 2026-03-17 audit.
 
 ### Codebase Fitness Report Implementation (2026-03-17)
 - **Security Hardening**:
@@ -486,10 +491,9 @@ This strategy ensures all dependencies (Postgres, Redis, Embedder) are running w
   - Implemented `cleanMarkdownForCopy` in `app/src/lib/utils.ts` to strip out ` ```chart ``` ` blocks using regex.
   - Updated `MessageList.tsx` to pass the message content through this cleaner before sending it to the clipboard.
   - Added unit tests to ensure chart blocks are removed while standard code blocks remain intact.
-
-
-
-\n### External Links Update (2026-03-19)\n- **Feature**: All markdown links now open in a new browser tab/window.\n- **Implementation**: Added a custom anchor (`a`) handler to `react-markdown` components in `app/src/components/shared/MarkdownRenderer.tsx` that automatically applies `target="_blank"` and `rel="noopener noreferrer"`.
+### External Links Update (2026-03-19)
+- **Feature**: All markdown links now open in a new browser tab/window.
+- **Implementation**: Added a custom anchor (`a`) handler to `react-markdown` components in `app/src/components/shared/MarkdownRenderer.tsx` that automatically applies `target="_blank"` and `rel="noopener noreferrer"`.
 
 ### Document Chunk Viewer (2026-03-19)
 - **Feature**: Added a visual browser for extracted document chunks in the Role detail page (B5).
@@ -670,7 +674,7 @@ This strategy ensures all dependencies (Postgres, Redis, Embedder) are running w
 - **Roadmap Refinement**:
   - Categorized remaining tasks into **Short-term** (Polish & Transparency), **Mid-term** (Governance & Scale), and **Long-term** (Operational Excellence).
   - Moved **Conversation Templates (I4)** and **Session Management (F4)** to a "Future Roadmap" list to prioritize UI simplicity and v1.0 stability.
-  - Synchronized the `claude_plan.md` work log with the latest 30+ implemented features.
+  - Synchronized the internal feature roadmap with the latest 30+ implemented features.
 - **Goal**: Focused the next 2 weeks on RAG precision (Chunk Attribution) and Memory transparency.
 
 
@@ -760,10 +764,6 @@ This strategy ensures all dependencies (Postgres, Redis, Embedder) are running w
   - Slowed down the streaming typewriter effect (from 30ms to 40ms intervals) and reduced adaptive character increments.
   - This results in a more readable, less "frantic" streaming experience that still maintains responsiveness through adaptive catch-up.
 - **Benefit**: Improved ergonomics for role management and a more polished, readable chat interface.
-
-
-
-
 
 
 

@@ -5,9 +5,9 @@ import { db } from "./db";
 import { chunks, documents, webhookDeliveries } from "./db/schema";
 import { eq } from "drizzle-orm";
 import { createId } from "./db/cuid";
-import { extractTextFromFile, performOcr, type DocumentFileLike } from "./documents";
+import { extractTextFromFile, type DocumentFileLike } from "./documents";
 import { chunkText, getEmbeddings } from "./rag";
-import { signWebhookPayload } from "./webhooks";
+import { assertSafeWebhookUrl, decryptWebhookSecret, signWebhookPayload, WEBHOOK_DELIVERY_TIMEOUT_MS } from "./webhooks";
 import { GoogleDriveService } from "./google-drive";
 import fs from "fs/promises";
 
@@ -174,11 +174,13 @@ export function startWebhookWorker() {
         data: payload,
       });
 
-      const signature = signWebhookPayload(body, secret);
+      await assertSafeWebhookUrl(url);
+      const signature = signWebhookPayload(body, decryptWebhookSecret(secret));
 
       try {
         const response = await fetch(url, {
           method: "POST",
+          signal: AbortSignal.timeout(WEBHOOK_DELIVERY_TIMEOUT_MS),
           headers: {
             "Content-Type": "application/json",
             "X-Complexity-Signature": signature,
