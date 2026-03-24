@@ -156,6 +156,9 @@ head -n 20 backups/postgres/snapshot.sql
 
 ## Maintenance & Hygiene
 
+### Test Data Cleanup
+When performing manual testing involving the creation of test users or dummy data, always ensure you clean up and remove the test users once you are finished with them. This prevents database bloat and maintains a clean environment.
+
 ### Disk Space Cleanup
 To prevent disk exhaustion during heavy build/test cycles:
 ```bash

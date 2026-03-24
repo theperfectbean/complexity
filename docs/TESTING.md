@@ -63,3 +63,8 @@ Playwright and smoke runs can generate local output such as:
 - `app/artifacts/`
 
 These directories are disposable and ignored from version control.
+
+## Manual Testing & Test Data
+
+When performing manual testing involving the creation of test users or dummy data, always ensure you clean up and remove the test users once you are finished with them to prevent database bloat and maintain a clean testing environment.
+
