@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+          cache-dependency-path: app/package-lock.json
+
+      - name: Install dependencies
+        run: cd app && npm ci --loglevel=error
+
+      - name: Run ESLint
+        run: cd app && npm run lint
+
+      - name: Run tests (Vitest)
+        run: cd app && npm run test -- --run
+
+      - name: Build Next.js app
+        run: cd app && npm run build
+        env:
+          SKIP_ENV_VALIDATION: true
+          IS_NEXT_BUILD: true
+          NEXT_PHASE: phase-production-build
