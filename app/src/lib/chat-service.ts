@@ -107,8 +107,18 @@ export class ChatService {
       });
     }
 
+    // Context Window Management: truncate history to the last 30 messages
+    const MAX_CONTEXT_MESSAGES = 30;
+    const contextMessages = inputMessages.length > MAX_CONTEXT_MESSAGES 
+      ? inputMessages.slice(-MAX_CONTEXT_MESSAGES) 
+      : inputMessages;
+
+    if (inputMessages.length > MAX_CONTEXT_MESSAGES) {
+      this.log.warn({ threadId, total: inputMessages.length, kept: MAX_CONTEXT_MESSAGES }, "Truncating context window to prevent token limit errors");
+    }
+
     // Build Agent Input
-    const agentInput: Responses.InputItem[] = await Promise.all(inputMessages.map(async (msg) => {
+    const agentInput: Responses.InputItem[] = await Promise.all(contextMessages.map(async (msg) => {
       const text = await extractTextFromMessage(msg);
       const content: Responses.InputItem.InputMessage.ContentPartArray[] = [];
       
@@ -158,7 +168,7 @@ export class ChatService {
 
             const result = await runGeneration({
               modelId: model,
-              messages: inputMessages,
+              messages: contextMessages,
               agentInput,
               system: instructions,
               keys,
@@ -194,10 +204,10 @@ export class ChatService {
                   writer.write({ type: "data-json", data: { kind: "memory-saved", count: memoryCount } } as UIMessageChunk);
                 }
               } catch (err) {
-                this.log.error({ err }, "Memory extraction failed");
+                this.log.warn({ err }, "Memory extraction failed");
               } finally {
                 void memoryPromise.catch((err) => {
-                  this.log.error({ err }, "Background memory extraction failed");
+                  this.log.warn({ err }, "Background memory extraction failed");
                 });
               }
             }
