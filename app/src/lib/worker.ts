@@ -224,7 +224,9 @@ export function startWebhookWorker() {
             response: (error as Error).message,
             durationMs,
           });
-        } catch {}
+        } catch (dbErr) {
+          log.warn({ err: dbErr }, "Failed to log webhook delivery failure to database");
+        }
 
         throw error;
       }

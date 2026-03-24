@@ -84,7 +84,7 @@ export class ChatHistoryManager {
         return payload;
       }
     } catch (error) {
-      this.log.error({ err: error }, "Redis cache read failed");
+      this.log.warn({ err: error }, "Redis cache read failed");
     }
     return null;
   }
@@ -94,7 +94,7 @@ export class ChatHistoryManager {
       try {
         await session.redis.set(cacheKey, JSON.stringify(payload), "EX", runtimeConfig.chat.cacheTtlSeconds);
       } catch (error) {
-        this.log.error({ err: error, cacheKey }, "Redis cache write failed");
+        this.log.warn({ err: error, cacheKey }, "Redis cache write failed");
       }
     }
   }
