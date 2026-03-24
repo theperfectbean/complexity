@@ -122,17 +122,3 @@ npm run lint
 npm test
 npm run test:coverage
 ```
-
-## Backup Strategy (PostgreSQL)
-
-Example daily `pg_dump` command:
-
-```bash
-docker exec complexity-postgres pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" > backup-$(date +%F).sql
-```
-
-Example cron entry (daily at 2 AM):
-
-```cron
-0 2 * * * cd /path/to/complexity && docker exec complexity-postgres pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" > backups/backup-$(date +\%F).sql
-```

@@ -37,6 +37,72 @@ If you are upgrading from a version where API keys were stored in plaintext:
 docker exec complexity-app npm run db:encrypt-keys
 ```
 
+## Deployment
+
+### Reverse Proxy / TLS
+For a production deployment, use a reverse proxy to handle HTTPS termination (e.g., `complexity.internal.lan`).
+- **Caddy Example (`Caddyfile`)**:
+  ```caddyfile
+  complexity.internal.lan {
+      reverse_proxy localhost:3002
+  }
+  ```
+- **Nginx Example (`nginx.conf`)**:
+  ```nginx
+  server {
+      listen 443 ssl;
+      server_name complexity.internal.lan;
+      
+      ssl_certificate /path/to/cert.pem;
+      ssl_certificate_key /path/to/key.pem;
+
+      location / {
+          proxy_pass http://localhost:3002;
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+      }
+  }
+  ```
+
+---
+
+## Operations & Lifecycle
+
+### Upgrade Procedure
+To update to a new version, pull the latest changes, run migrations, and restart the services:
+```bash
+# 1. Pull the latest code
+git pull origin main
+
+# 2. Rebuild the updated image
+docker compose build app
+
+# 3. Stop the current containers
+docker compose down
+
+# 4. Start the new containers
+docker compose up -d
+
+# 5. Run database migrations
+docker exec complexity-app npm run db:migrate
+```
+
+### Rollback Procedure
+If an upgrade introduces breaking issues, rollback to a previous version and restore the database state:
+```bash
+# 1. Revert to the previous working commit
+git checkout <previous_commit_hash>
+
+# 2. Stop containers and destroy the current broken database volume
+docker compose down -v
+
+# 3. Rebuild and start the previous image
+docker compose up -d --build
+
+# 4. Restore the database from the last known good backup
+cat backups/postgres/<good_snapshot>.sql | docker exec -i complexity-postgres psql -U postgres -d postgres
+```
+
 ---
 
 ## Background Worker & Queues
@@ -55,12 +121,12 @@ Complexity uses **BullMQ** for asynchronous document processing.
 
 ## Storage & Backups
 
-### Persistence
-The system uses local bind mounts in the `.data/` directory:
-- `.data/postgres`: Database files.
-- `.data/redis`: Cache and queue state.
-- `.data/models`: Downloaded embedding models.
-- `.data/external`: Role-specific external data.
+### Persistence Scope
+The system uses local bind mounts in the `.data/` directory. Understanding what is persistent versus ephemeral is critical:
+- **`.data/postgres`**: Contains all users, threads, messages, roles, and RAG embeddings. **Must be backed up.**
+- **`.data/redis`**: Contains cache, rate-limits, and BullMQ state. **Ephemeral**. If lost, cache misses will occur and pending document uploads must be retried.
+- **`.data/models`**: Downloaded embedding models for the FastAPI service. **Ephemeral**. They will automatically re-download from Hugging Face on startup if missing.
+- **`.data/external`**: Role-specific external data and temporary files. **Ephemeral**. Can be safely wiped.
 
 ### Automated Backups
 A `postgres-backup` sidecar service performs a `pg_dump` every 24 hours to `backups/postgres/` and retains the last 7 snapshots.
@@ -69,6 +135,13 @@ A `postgres-backup` sidecar service performs a `pg_dump` every 24 hours to `back
 Restore a SQL backup:
 ```bash
 cat backups/postgres/snapshot.sql | docker exec -i complexity-postgres psql -U postgres -d postgres
+```
+
+### Backup Verification
+Periodically verify backups to ensure they are functional. You can spin up a temporary database container and restore the snapshot:
+```bash
+# Verify the latest backup file is not empty and contains SQL
+head -n 20 backups/postgres/snapshot.sql
 ```
 
 ---
