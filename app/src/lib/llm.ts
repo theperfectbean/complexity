@@ -98,7 +98,24 @@ function mapToPerplexityModel(modelName: string): string {
 }
 
 export function getLanguageModel(modelId: string, keys: Record<string, string | null>): LanguageModel {
-  const { provider, model: modelName } = getProviderAndModel(modelId);
+  let { provider, model: modelName } = getProviderAndModel(modelId);
+
+  // Fallback to Perplexity if primary provider key is missing but Perplexity key is available
+  if (provider !== "perplexity" && provider !== "ollama" && provider !== "local-openai") {
+    const primaryKeyMap: Record<string, string> = {
+      anthropic: "ANTHROPIC_API_KEY",
+      openai: "OPENAI_API_KEY",
+      google: "GOOGLE_GENERATIVE_AI_API_KEY",
+      xai: "XAI_API_KEY",
+    };
+    const primaryKey = primaryKeyMap[provider];
+    if (primaryKey && !keys[primaryKey] && keys["PERPLEXITY_API_KEY"]) {
+      provider = "perplexity";
+      // When falling back to Perplexity, we use the full original modelId (e.g. anthropic/claude-...)
+      // so the perplexity block can map it correctly.
+      modelName = modelId;
+    }
+  }
 
   const factories: Record<Exclude<ProviderType, "perplexity">, () => LanguageModel> = {
     anthropic: () => {
@@ -143,11 +160,19 @@ export function getLanguageModel(modelId: string, keys: Record<string, string | 
     const perplexityKey = keys["PERPLEXITY_API_KEY"];
     if (!perplexityKey) throw new Error("PERPLEXITY_API_KEY is not configured");
     
-    // Perplexity only supports native models on the /v1/chat/completions endpoint.
-    // If we have a third-party model ID (contains a slash) via Perplexity,
-    // we must fallback to a native model for standard Chat API tasks.
-    const isNativePerplexity = !modelName.includes("/") || modelName === "sonar";
-    const effectiveModel = isNativePerplexity ? mapToPerplexityModel(modelName) : "sonar";
+    // Mapping for Perplexity-hosted models that use different IDs than standard
+    const perplexityMapping: Record<string, string> = {
+      "anthropic/claude-4-5-haiku-latest": "anthropic/claude-haiku-4-5",
+      "anthropic/claude-4-6-sonnet-latest": "anthropic/claude-sonnet-4-6",
+      "anthropic/claude-4-6-opus-latest": "anthropic/claude-opus-4-6",
+      "google/gemini-3.1-pro-preview": "google/gemini-3.1-pro-preview",
+      "google/gemini-3-flash-preview": "google/gemini-3-flash-preview",
+      "openai/gpt-5.4": "openai/gpt-5.4",
+    };
+
+    const mappedModel = perplexityMapping[modelName] || modelName;
+    const isNativePerplexity = !mappedModel.includes("/") || mappedModel === "sonar";
+    const effectiveModel = isNativePerplexity ? mapToPerplexityModel(mappedModel) : mappedModel;
 
     return createOpenAI({
       apiKey: perplexityKey,

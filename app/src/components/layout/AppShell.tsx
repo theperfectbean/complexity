@@ -39,7 +39,7 @@ export function AppShell({ children, contentClassName }: AppShellProps) {
         </>
       )}
 
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="flex min-w-0 flex-1 flex-col overflow-x-hidden">
         {isAuthenticated && (
           <header className="sticky top-0 z-40 flex items-center justify-between border-b bg-background/80 px-4 py-3 backdrop-blur md:hidden">
             <button

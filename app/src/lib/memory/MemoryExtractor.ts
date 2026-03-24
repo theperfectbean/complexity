@@ -1,6 +1,8 @@
-import { createAgentClient } from "@/lib/agent-client";
+import { generateText } from "ai";
+import { getLanguageModel } from "@/lib/llm";
+import { getApiKeys } from "@/lib/settings";
 import { runtimeConfig } from "../config";
-import { extractJsonObject, extractAssistantText } from "../extraction-utils";
+import { extractJsonObject } from "../extraction-utils";
 import * as MemoryStore from "./MemoryStore";
 
 export type ExtractMemoriesInput = {
@@ -74,27 +76,16 @@ export async function extractMemories({
   existingMemories,
 }: ExtractMemoriesInput): Promise<ExtractionResult> {
   const existingNormalized = new Set(existingMemories.map((item) => normalizeMemory(item.content)));
-  const client = createAgentClient();
+  
+  const keys = await getApiKeys();
+  const model = getLanguageModel(runtimeConfig.memory.extractionModel, keys);
 
-  const response = await client.responses.create({
-    model: runtimeConfig.memory.extractionModel,
-    input: [
-      {
-        type: "message",
-        role: "user",
-        content: [
-          {
-            type: "input_text",
-            text: `Existing memories:\n${JSON.stringify(existingMemories)}\n\nUser:\n${userMessage}\n\nAssistant:\n${assistantMessage}`,
-          },
-        ],
-      },
-    ],
-    instructions: runtimeConfig.memory.extractionInstructions,
-    stream: false,
+  const { text: raw } = await generateText({
+    model,
+    system: runtimeConfig.memory.extractionInstructions,
+    prompt: `Existing memories:\n${JSON.stringify(existingMemories)}\n\nUser:\n${userMessage}\n\nAssistant:\n${assistantMessage}`,
   });
 
-  const raw = extractAssistantText(response);
   const parsed = extractJsonObject(raw) ?? {};
 
   const rawAdded = Array.isArray(parsed.added) ? parsed.added.filter((item): item is string => typeof item === "string") : [];

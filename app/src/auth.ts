@@ -39,7 +39,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   basePath: "/api/auth",
   adapter: DrizzleAdapter(db),
   session: {
-    strategy: "database",
+    strategy: "jwt",
   },
   providers: [
     Credentials({
@@ -150,10 +150,17 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     signIn: "/login",
   },
   callbacks: {
-    async session({ session, user }) {
-      if (session.user) {
-        session.user.id = user.id;
-        session.user.isAdmin = user.isAdmin;
+    async jwt({ token, user }) {
+      if (user) {
+        token.id = user.id;
+        token.isAdmin = user.isAdmin;
+      }
+      return token;
+    },
+    async session({ session, token }) {
+      if (session.user && token) {
+        session.user.id = token.id as string;
+        session.user.isAdmin = token.isAdmin as boolean | undefined;
       }
       return session;
     },

@@ -52,7 +52,7 @@ const envSchema = z.object({
   RAG_MMR_LAMBDA: z.coerce.number().min(0).max(1).default(0.6),
   MEMORY_CACHE_TTL_SECONDS: z.coerce.number().int().positive().default(60 * 5),
   MEMORY_CACHE_PREFIX: z.string().default("memories"),
-  MEMORY_EXTRACTION_MODEL: z.string().default("anthropic/claude-4-6-sonnet-latest"),
+  MEMORY_EXTRACTION_MODEL: z.string().default("perplexity/sonar"),
   MEMORY_MAX_MEMORIES: z.coerce.number().int().positive().default(100),
   MEMORY_TOP_K: z.coerce.number().int().positive().default(10),
   MEMORY_EXTRACTION_MIN_EXCHANGES: z.coerce.number().int().positive().default(3),

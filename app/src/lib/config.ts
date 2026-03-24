@@ -104,7 +104,7 @@ export const runtimeConfig = {
   memory: {
     cacheTtlSeconds: env.MEMORY_CACHE_TTL_SECONDS ?? 60 * 5,
     cachePrefix: env.MEMORY_CACHE_PREFIX ?? "memories",
-    extractionModel: env.MEMORY_EXTRACTION_MODEL ?? "anthropic/claude-4-5-haiku-latest",
+    extractionModel: env.MEMORY_EXTRACTION_MODEL ?? "perplexity/sonar",
     maxMemories: env.MEMORY_MAX_MEMORIES ?? 100,
     topK: env.MEMORY_TOP_K ?? 10,
     minExchanges: env.MEMORY_EXTRACTION_MIN_EXCHANGES ?? 3,

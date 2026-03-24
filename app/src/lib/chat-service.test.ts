@@ -37,6 +37,11 @@ vi.mock("./logger", () => ({
     error: vi.fn(),
     warn: vi.fn(),
   }),
+  logger: {
+    info: vi.fn(),
+    error: vi.fn(),
+    warn: vi.fn(),
+  },
 }));
 
 vi.mock("./settings", () => ({
