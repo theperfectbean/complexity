@@ -8,6 +8,7 @@ import { createId } from "./db/cuid";
 import { extractTextFromFile, performOcr, type DocumentFileLike } from "./documents";
 import { chunkText, getEmbeddings } from "./rag";
 import { signWebhookPayload } from "./webhooks";
+import { GoogleDriveService } from "./google-drive";
 import fs from "fs/promises";
 
 const REDIS_URL = env.REDIS_URL;
@@ -27,18 +28,34 @@ export function startWorker() {
   const worker = new Worker(
     "document-processing",
     async (job: Job) => {
-      const { documentId, roleId, fileBase64, filePath, fileName, fileType } = job.data;
-      const log = logger.child({ jobId: job.id, documentId, roleId });
+      const { documentId, roleId, userId, fileBase64, filePath, googleDriveFileId, fileName, fileType } = job.data;
+      const log = logger.child({ jobId: job.id, documentId, roleId, googleDriveFileId });
 
       log.info("Processing document job");
 
       try {
         let text = job.data.text as string | undefined;
+        let actualFileName = fileName;
+        let actualFileType = fileType;
         
         if (!text) {
           let buffer: Buffer;
           
-          if (filePath) {
+          if (googleDriveFileId && userId) {
+            log.info({ googleDriveFileId }, "Downloading file from Google Drive");
+            const result = await GoogleDriveService.downloadFile(userId, googleDriveFileId);
+            buffer = result.data;
+            actualFileName = result.filename;
+            actualFileType = result.mimeType;
+
+            // Update document metadata with actual values from Google Drive
+            await db.update(documents).set({
+              filename: actualFileName,
+              mimeType: actualFileType,
+              sizeBytes: buffer.byteLength,
+              updatedAt: new Date(),
+            }).where(eq(documents.id, documentId));
+          } else if (filePath) {
             log.info({ filePath }, "Reading file from disk");
             buffer = await fs.readFile(filePath);
           } else if (fileBase64) {
@@ -50,8 +67,8 @@ export function startWorker() {
 
           // Create a minimal File-like object for extractTextFromFile
           const file: DocumentFileLike = {
-            name: fileName,
-            type: fileType,
+            name: actualFileName,
+            type: actualFileType,
             arrayBuffer: async () => {
               const bytes = new Uint8Array(buffer.byteLength);
               bytes.set(buffer);
@@ -60,12 +77,6 @@ export function startWorker() {
           };
 
           text = await extractTextFromFile(file);
-          
-          // OCR Fallback for PDFs with no text
-          if (!text.trim() && (fileType === "application/pdf" || fileName.toLowerCase().endsWith(".pdf"))) {
-            log.info("No text extracted, attempting OCR fallback");
-            text = await performOcr(buffer, fileName);
-          }
         } else {
           log.info("Using pre-provided text for re-processing");
         }

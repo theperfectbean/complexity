@@ -26,17 +26,24 @@ export async function GET(request: Request) {
 
   const { searchParams } = new URL(request.url);
   const roleId = searchParams.get("roleId")?.trim();
+  const query = searchParams.get("q")?.trim();
 
   const rows = await db.query.users.findFirst({
     where: (table, { eq }) => eq(table.email, userEmail),
     with: {
       threads: {
         orderBy: (table, { desc }) => desc(table.updatedAt),
-        ...(roleId
-          ? {
-              where: (table, { eq }) => eq(table.roleId, roleId),
-            }
-          : {}),
+        where: (table, { eq, and, ilike }) => {
+          const conditions = [];
+          if (roleId) {
+            conditions.push(eq(table.roleId, roleId));
+          }
+          if (query) {
+            conditions.push(ilike(table.title, `%${query}%`));
+          }
+          return conditions.length > 0 ? and(...conditions) : undefined;
+        },
+        limit: query ? 50 : 100, // Limit results for better performance
       },
     },
   });

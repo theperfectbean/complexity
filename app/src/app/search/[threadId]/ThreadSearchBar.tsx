@@ -1,15 +1,18 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Search, X } from "lucide-react";
+import { Search, X, ChevronUp, ChevronDown } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
 interface ThreadSearchBarProps {
   onSearch: (query: string) => void;
   matchCount: number;
+  currentIndex: number;
+  onNext: () => void;
+  onPrev: () => void;
 }
 
-export function ThreadSearchBar({ onSearch, matchCount }: ThreadSearchBarProps) {
+export function ThreadSearchBar({ onSearch, matchCount, currentIndex, onNext, onPrev }: ThreadSearchBarProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setPrompt] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -34,11 +37,18 @@ export function ThreadSearchBar({ onSearch, matchCount }: ThreadSearchBarProps) 
       if (e.key === "Escape" && isOpen) {
         handleClear();
       }
+      if (isOpen && matchCount > 0) {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          if (e.shiftKey) onPrev();
+          else onNext();
+        }
+      }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, handleClear]);
+  }, [isOpen, handleClear, matchCount, onNext, onPrev]);
 
   useEffect(() => {
     if (isOpen) {
@@ -77,8 +87,26 @@ export function ThreadSearchBar({ onSearch, matchCount }: ThreadSearchBarProps) 
             </div>
             
             {query && matchCount > 0 && (
-              <div className="flex items-center gap-1 px-2 text-[10px] font-bold text-primary bg-primary/5 rounded-md border border-primary/10 h-8 whitespace-nowrap">
-                {matchCount} {matchCount === 1 ? "match" : "matches"}
+              <div className="flex items-center gap-1.5 px-2 text-[10px] font-bold text-primary bg-primary/5 rounded-md border border-primary/10 h-8 whitespace-nowrap">
+                <span>
+                  {currentIndex + 1} / {matchCount}
+                </span>
+                <div className="flex items-center gap-0.5 border-l border-primary/10 pl-1">
+                  <button
+                    onClick={onPrev}
+                    className="p-0.5 hover:bg-primary/10 rounded-sm transition-colors"
+                    title="Previous match (Shift+Enter)"
+                  >
+                    <ChevronUp className="h-3 w-3" />
+                  </button>
+                  <button
+                    onClick={onNext}
+                    className="p-0.5 hover:bg-primary/10 rounded-sm transition-colors"
+                    title="Next match (Enter)"
+                  >
+                    <ChevronDown className="h-3 w-3" />
+                  </button>
+                </div>
               </div>
             )}
           </motion.div>

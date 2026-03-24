@@ -140,7 +140,19 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       ? [GitHub({ clientId: env.GITHUB_CLIENT_ID, clientSecret: env.GITHUB_CLIENT_SECRET })]
       : []),
     ...(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET
-      ? [Google({ clientId: env.GOOGLE_CLIENT_ID, clientSecret: env.GOOGLE_CLIENT_SECRET })]
+      ? [
+          Google({
+            clientId: env.GOOGLE_CLIENT_ID,
+            clientSecret: env.GOOGLE_CLIENT_SECRET,
+            authorization: {
+              params: {
+                scope: "openid email profile https://www.googleapis.com/auth/drive.readonly",
+                access_type: "offline",
+                prompt: "consent",
+              },
+            },
+          }),
+        ]
       : []),
   ],
   pages: {

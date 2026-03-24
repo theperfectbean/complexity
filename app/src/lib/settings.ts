@@ -11,6 +11,11 @@ const SENSITIVE_KEYS = [
   "XAI_API_KEY",
   "PERPLEXITY_API_KEY",
   "LOCAL_OPENAI_API_KEY",
+  "GOOGLE_CLIENT_ID",
+  "GOOGLE_CLIENT_SECRET",
+  "GOOGLE_API_KEY",
+  "GITHUB_CLIENT_ID",
+  "GITHUB_CLIENT_SECRET",
 ];
 
 export async function getSetting(key: string): Promise<string | null> {

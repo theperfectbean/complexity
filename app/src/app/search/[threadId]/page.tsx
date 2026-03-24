@@ -130,8 +130,6 @@ export function ThreadChat({
   const [hasMore, setHasMore] = useState(initialHasMore);
   const [nextCursor, setNextCursor] = useState(initialNextCursor);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searchMatches, setSearchMatches] = useState(0);
   const hasSubmittedInitialQuery = useRef(false);
   const triggerRef = useRef<string | undefined>(undefined);
 
@@ -246,6 +244,34 @@ export function ThreadChat({
     return initialHistory;
   }, [initialHistory, messages]);
 
+  const [searchQuery, setSearchQuery] = useState("");
+  const [currentSearchIndex, setCurrentSearchIndex] = useState(0);
+
+  const matchingMessageIds = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q || q.length < 2) return [];
+    return mergedMessages
+      .filter((m) => m.content.toLowerCase().includes(q))
+      .map((m) => m.id);
+  }, [mergedMessages, searchQuery]);
+
+  const handleSearch = useCallback((query: string) => {
+    setSearchQuery(query);
+    setCurrentSearchIndex(0);
+  }, []);
+
+  const handleNextSearch = useCallback(() => {
+    if (matchingMessageIds.length === 0) return;
+    setCurrentSearchIndex((prev) => (prev + 1) % matchingMessageIds.length);
+  }, [matchingMessageIds.length]);
+
+  const handlePrevSearch = useCallback(() => {
+    if (matchingMessageIds.length === 0) return;
+    setCurrentSearchIndex((prev) => (prev - 1 + matchingMessageIds.length) % matchingMessageIds.length);
+  }, [matchingMessageIds.length]);
+
+  const currentMatchId = matchingMessageIds[currentSearchIndex];
+
   const chatErrorMessage = getChatErrorMessage(error);
 
   const handleEditMessage = useCallback(
@@ -277,18 +303,6 @@ export function ThreadChat({
     },
     [router],
   );
-
-  const handleSearch = useCallback((query: string) => {
-    setSearchQuery(query);
-    if (!query.trim() || query.length < 2) {
-      setSearchMatches(0);
-      return;
-    }
-    const count = mergedMessages.filter(m => 
-      m.content.toLowerCase().includes(query.toLowerCase())
-    ).length;
-    setSearchMatches(count);
-  }, [mergedMessages]);
 
   const handleThreadSettingsUpdate = useCallback((data: { systemPrompt?: string | null; pinned?: boolean; tags?: string[] }) => {
     if (data.systemPrompt !== undefined) setThreadSystemPrompt(data.systemPrompt);
@@ -443,7 +457,13 @@ export function ThreadChat({
 
       <div className="mb-8 flex items-start justify-end gap-4">
         <div className="flex items-center gap-2 flex-shrink-0">
-          <ThreadSearchBar onSearch={handleSearch} matchCount={searchMatches} />
+          <ThreadSearchBar 
+            onSearch={handleSearch} 
+            matchCount={matchingMessageIds.length} 
+            currentIndex={currentSearchIndex}
+            onNext={handleNextSearch}
+            onPrev={handlePrevSearch}
+          />
           <ThreadSettingsDialog 
             threadId={threadId} 
             initialSystemPrompt={threadSystemPrompt} 
@@ -462,6 +482,7 @@ export function ThreadChat({
           branches={branches}
           onBranchChange={handleBranchChange}
           searchQuery={searchQuery}
+          currentMatchId={currentMatchId}
           onLoadMore={loadMoreMessages}
           hasMore={hasMore}
           isLoadingMore={isLoadingMore}

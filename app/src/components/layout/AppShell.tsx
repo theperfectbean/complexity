@@ -1,7 +1,7 @@
 "use client";
 
 import { ReactNode, useState } from "react";
-import { Command, Menu } from "lucide-react";
+import { Menu } from "lucide-react";
 import { useSession } from "next-auth/react";
 
 import { CommandPalette } from "@/components/layout/CommandPalette";
@@ -34,7 +34,6 @@ export function AppShell({ children, contentClassName }: AppShellProps) {
           <MobileNav
             open={mobileOpen}
             onClose={() => setMobileOpen(false)}
-            onOpenCommandPalette={() => setCommandOpen(true)}
           />
           <CommandPalette open={commandOpen} onOpenChange={setCommandOpen} />
         </>
@@ -52,14 +51,7 @@ export function AppShell({ children, contentClassName }: AppShellProps) {
               <Menu className="h-4 w-4" />
             </button>
             <p className="font-semibold tracking-tight">Complexity</p>
-            <button
-              type="button"
-              onClick={() => setCommandOpen(true)}
-              className="inline-flex items-center justify-center rounded-full border bg-card p-2 text-foreground shadow-2xs"
-              aria-label="Open command palette"
-            >
-              <Command className="h-4 w-4" />
-            </button>
+            <div className="w-8" /> {/* Spacer to keep title centered */}
           </header>
         )}
         <div className={cn("min-w-0 flex-1", contentClassName)}>{children}</div>

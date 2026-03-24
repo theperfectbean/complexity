@@ -1,6 +1,6 @@
 "use client";
 
-import { Brain, Command, Home, BookOpen, Users, LogOut, Webhook } from "lucide-react";
+import { Brain, Home, BookOpen, Users, LogOut, Webhook } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
 import Link from "next/link";
 import { Drawer } from "vaul";
@@ -10,10 +10,9 @@ import { ThemeToggle } from "@/components/shared/ThemeToggle";
 type MobileNavProps = {
   open: boolean;
   onClose: () => void;
-  onOpenCommandPalette?: () => void;
 };
 
-export function MobileNav({ open, onClose, onOpenCommandPalette }: MobileNavProps) {
+export function MobileNav({ open, onClose }: MobileNavProps) {
   const { data: session } = useSession();
 
   return (
@@ -67,17 +66,6 @@ export function MobileNav({ open, onClose, onOpenCommandPalette }: MobileNavProp
               <Webhook className="h-4 w-4" />
               Webhooks
             </Link>
-            <button
-              type="button"
-              className="flex w-full items-center gap-2 rounded-lg border bg-card px-3 py-2 text-left hover:bg-black/5 dark:hover:bg-white/5"
-              onClick={() => {
-                onOpenCommandPalette?.();
-                onClose();
-              }}
-            >
-              <Command className="h-4 w-4" />
-              Open command palette
-            </button>
           </nav>
 
           <div className="mt-6 space-y-3 border-t border-sidebar-border pt-4">

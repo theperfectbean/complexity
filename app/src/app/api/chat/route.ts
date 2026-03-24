@@ -44,6 +44,7 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
+    log.info({ messageCount: body.messages?.length, lastMessageParts: body.messages?.[body.messages.length - 1]?.parts }, "Received chat request");
     const parsed = schema.safeParse(body);
     if (!parsed.success) {
       log.warn({ err: parsed.error.format() }, "Invalid payload");

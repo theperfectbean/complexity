@@ -19,6 +19,7 @@ import {
   FileCode2,
   Pin,
   Webhook,
+  Settings,
 } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
 import Link from "next/link";
@@ -129,6 +130,7 @@ export function Sidebar({ collapsed = false, onToggle, onNavigate }: SidebarProp
   const navItems = [
     { href: "/", label: "Home", icon: Home },
     { href: "/roles", label: "Roles", icon: Users },
+    { href: session?.user?.isAdmin ? "/settings/admin" : "/settings/profile", label: "Settings", icon: Settings },
   ];
 
   const pinnedThreads = threads.filter((t) => t.pinned);

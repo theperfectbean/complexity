@@ -44,6 +44,7 @@ type MessageListProps = {
   branches?: ChatBranch[];
   onBranchChange?: (threadId: string) => void;
   searchQuery?: string;
+  currentMatchId?: string;
   emptyLabel: string;
   onRetry?: () => void;
   onRewrite?: (modelId: string) => void;
@@ -80,6 +81,7 @@ const MessageItem = memo(function MessageItem({
   branches,
   onBranchChange,
   searchQuery,
+  currentMatchId,
   isStreaming, 
   onRetry, 
   onRewrite,
@@ -95,6 +97,7 @@ const MessageItem = memo(function MessageItem({
   branches?: ChatBranch[];
   onBranchChange?: (threadId: string) => void;
   searchQuery?: string;
+  currentMatchId?: string;
   isStreaming?: boolean;
   onRetry?: () => void;
   onRewrite?: (modelId: string) => void;
@@ -224,24 +227,27 @@ const MessageItem = memo(function MessageItem({
     return message.content.toLowerCase().includes(searchQuery.toLowerCase());
   }, [message.content, searchQuery]);
 
+  const isCurrentMatch = message.id === currentMatchId;
+
   const itemRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (isSearchMatch && searchQuery) {
+    if (isCurrentMatch && searchQuery) {
       // Small delay to ensure rendering is complete
       const timer = setTimeout(() => {
         itemRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
       }, 100);
       return () => clearTimeout(timer);
     }
-  }, [isSearchMatch, searchQuery]);
+  }, [isCurrentMatch, searchQuery]);
 
   return (
     <div 
       ref={itemRef} 
       className={cn(
         "transition-all duration-500 rounded-2xl",
-        isSearchMatch ? "bg-primary/10 ring-2 ring-primary/20 p-2 -mx-2" : ""
+        isSearchMatch ? "bg-primary/5 ring-1 ring-primary/10 p-2 -mx-2" : "",
+        isCurrentMatch ? "bg-primary/20 ring-2 ring-primary/40 shadow-sm" : ""
       )}
     >
       <article 
@@ -564,7 +570,23 @@ const MessageItem = memo(function MessageItem({
   );
 });
 
-export function MessageList({ messages, branches, onBranchChange, searchQuery, emptyLabel, onRetry, onRewrite, onDelete, onEditMessage, onLoadMore, hasMore, isLoadingMore, isStreaming, onDownload }: MessageListProps) {
+export function MessageList({ 
+  messages, 
+  branches, 
+  onBranchChange, 
+  searchQuery, 
+  currentMatchId,
+  emptyLabel, 
+  onRetry, 
+  onRewrite, 
+  onDelete, 
+  onEditMessage, 
+  onLoadMore, 
+  hasMore, 
+  isLoadingMore, 
+  isStreaming, 
+  onDownload 
+}: MessageListProps) {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [showScrollButton, setShowScrollButton] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -677,6 +699,7 @@ export function MessageList({ messages, branches, onBranchChange, searchQuery, e
           branches={branches}
           onBranchChange={onBranchChange}
           searchQuery={searchQuery}
+          currentMatchId={currentMatchId}
           isStreaming={isStreaming}
           onRetry={onRetry}
           onRewrite={onRewrite}

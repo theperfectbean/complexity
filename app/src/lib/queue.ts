@@ -53,8 +53,10 @@ export function getDocumentQueue() {
 export async function queueDocumentProcessing(data: {
   documentId: string;
   roleId: string;
+  userId?: string;
   fileBase64?: string;
   filePath?: string;
+  googleDriveFileId?: string;
   fileName: string;
   fileType: string;
   text?: string;

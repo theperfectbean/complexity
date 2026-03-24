@@ -2,7 +2,7 @@
 
 import { Command as CommandIcon, CornerDownLeft, Search } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Command } from "cmdk";
 
 type Thread = {
@@ -20,30 +20,46 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
   const router = useRouter();
   const [threads, setThreads] = useState<Thread[]>([]);
   const [query, setQuery] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     if (!open) {
+      setQuery("");
+      setThreads([]);
       return;
     }
 
     let active = true;
-    fetch("/api/threads")
-      .then((response) => (response.ok ? response.json() : Promise.reject(new Error("Failed to load threads"))))
-      .then((payload: { threads: Thread[] }) => {
-        if (active) {
-          setThreads(payload.threads.slice(0, 30));
+    const controller = new AbortController();
+
+    const fetchThreads = async () => {
+      setIsLoading(true);
+      try {
+        const url = query.trim() ? `/api/threads?q=${encodeURIComponent(query.trim())}` : "/api/threads";
+        const response = await fetch(url, { signal: controller.signal });
+        if (response.ok) {
+          const payload: { threads: Thread[] } = await response.json();
+          if (active) {
+            setThreads(payload.threads);
+          }
         }
-      })
-      .catch(() => {
-        if (active) {
-          setThreads([]);
+      } catch (err) {
+        if (err instanceof Error && err.name !== "AbortError") {
+          console.error("Failed to load threads:", err);
         }
-      });
+      } finally {
+        if (active) setIsLoading(false);
+      }
+    };
+
+    const timer = setTimeout(fetchThreads, query ? 300 : 0);
 
     return () => {
       active = false;
+      controller.abort();
+      clearTimeout(timer);
     };
-  }, [open]);
+  }, [open, query]);
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -56,15 +72,6 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [onOpenChange, open]);
-
-  const filteredThreads = useMemo(() => {
-    const normalized = query.trim().toLowerCase();
-    if (!normalized) {
-      return threads;
-    }
-
-    return threads.filter((thread) => thread.title.toLowerCase().includes(normalized));
-  }, [query, threads]);
 
   return (
     <Command.Dialog
@@ -81,11 +88,14 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
           placeholder="Search threads..."
           className="h-9 w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
         />
+        {isLoading && (
+          <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+        )}
       </div>
 
       <Command.List className="max-h-96 overflow-y-auto p-2">
         <Command.Empty className="rounded-md px-3 py-6 text-center text-sm text-muted-foreground">
-          No matching threads.
+          {isLoading ? "Searching..." : "No matching threads."}
         </Command.Empty>
 
         <Command.Group heading="Actions" className="mb-2 text-xs text-muted-foreground">
@@ -103,7 +113,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
         </Command.Group>
 
         <Command.Group heading="Recent threads" className="text-xs text-muted-foreground">
-          {filteredThreads.map((thread) => (
+          {threads.map((thread) => (
             <Command.Item
               key={thread.id}
               value={`${thread.title} ${thread.id}`}

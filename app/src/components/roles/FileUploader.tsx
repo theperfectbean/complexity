@@ -1,8 +1,9 @@
 "use client";
 
 import { ChangeEvent, useRef, useState } from "react";
-import { Plus, Loader2, Link2 } from "lucide-react";
+import { Plus, Loader2, Link2, Database } from "lucide-react";
 import { toast } from "sonner";
+import useDrivePicker from "react-google-drive-picker";
 
 type FileUploaderProps = {
   roleId: string;
@@ -15,6 +16,59 @@ export function FileUploader({ roleId, onUploaded, variant = "button" }: FileUpl
   const [showUrlInput, setShowUrlInput] = useState(false);
   const [urlValue, setUrlValue] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [openPicker] = useDrivePicker();
+
+  const handleGoogleDriveSelect = async () => {
+    setUploading(true);
+    try {
+      const configRes = await fetch("/api/settings/google-config");
+      if (!configRes.ok) {
+        if (configRes.status === 404) {
+          throw new Error("Google account not linked or API keys not configured.");
+        }
+        throw new Error("Failed to get Google config");
+      }
+      const { clientId, apiKey } = await configRes.json();
+
+      openPicker({
+        clientId,
+        developerKey: apiKey,
+        viewId: "DOCS",
+        showUploadView: true,
+        showUploadFolders: true,
+        supportDrives: true,
+        multiselect: true,
+        callbackFunction: async (data) => {
+          if (data.action === "picked") {
+            try {
+              const response = await fetch(`/api/roles/${roleId}/drive`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ files: data.docs }),
+              });
+
+              if (!response.ok) {
+                const errData = await response.json();
+                throw new Error(errData.error || "Failed to import from Drive");
+              }
+
+              toast.success(`${data.docs.length} files imported from Google Drive`);
+              onUploaded();
+            } catch (err) {
+              toast.error(err instanceof Error ? err.message : "Drive import failed");
+            } finally {
+              setUploading(false);
+            }
+          } else if (data.action === "cancel" || data.action === "close") {
+            setUploading(false);
+          }
+        },
+      });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to open Google Drive");
+      setUploading(false);
+    }
+  };
 
   async function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
     const files = event.target.files;
@@ -94,12 +148,23 @@ export function FileUploader({ roleId, onUploaded, variant = "button" }: FileUpl
           disabled={uploading}
           className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground/60 transition-colors hover:bg-muted/60 hover:text-foreground disabled:opacity-50"
           aria-label="Upload file"
+          title="Upload local file"
         >
           {uploading ? (
             <Loader2 className="h-4 w-4 animate-spin" />
           ) : (
             <Plus className="h-5 w-5" />
           )}
+        </button>
+        <button
+          type="button"
+          onClick={handleGoogleDriveSelect}
+          disabled={uploading}
+          className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground/60 transition-colors hover:bg-muted/60 hover:text-foreground disabled:opacity-50"
+          aria-label="Google Drive"
+          title="Import from Google Drive"
+        >
+          <Database className="h-4 w-4" />
         </button>
         {showUrlInput ? (
           <div className="flex items-center gap-1">
@@ -147,30 +212,50 @@ export function FileUploader({ roleId, onUploaded, variant = "button" }: FileUpl
 
   return (
     <div className="space-y-3">
-      <div className="group relative flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-border/40 bg-muted/20 p-8 transition-colors hover:border-border/60 hover:bg-muted/40">
-        <input
-          type="file"
-          ref={fileInputRef}
-          className="absolute inset-0 cursor-pointer opacity-0"
-          accept=".pdf,.docx,.txt,.md"
-          onChange={handleFileChange}
-          disabled={uploading}
-          multiple
-        />
-        <div className="flex flex-col items-center gap-3 text-center">
-          {uploading ? (
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          ) : (
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-background shadow-sm transition-transform group-hover:scale-110">
-              <Plus className="h-6 w-6 text-muted-foreground" />
+      <div className="grid grid-cols-2 gap-3">
+        <div className="group relative flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-border/40 bg-muted/20 p-8 transition-colors hover:border-border/60 hover:bg-muted/40">
+          <input
+            type="file"
+            ref={fileInputRef}
+            className="absolute inset-0 cursor-pointer opacity-0"
+            accept=".pdf,.docx,.txt,.md"
+            onChange={handleFileChange}
+            disabled={uploading}
+            multiple
+          />
+          <div className="flex flex-col items-center gap-3 text-center">
+            {uploading ? (
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            ) : (
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-background shadow-sm transition-transform group-hover:scale-110">
+                <Plus className="h-6 w-6 text-muted-foreground" />
+              </div>
+            )}
+            <div className="space-y-1">
+              <p className="text-sm font-medium">Local files</p>
+              <p className="text-xs text-muted-foreground">PDF, DOCX, TXT, MD</p>
             </div>
-          )}
-          <div className="space-y-1">
-            <p className="text-sm font-medium">Click or drag to upload files</p>
-            <p className="text-xs text-muted-foreground">PDF, DOCX, TXT, or MD up to 50MB each</p>
           </div>
         </div>
+
+        <button
+          type="button"
+          onClick={handleGoogleDriveSelect}
+          disabled={uploading}
+          className="group flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-border/40 bg-muted/20 p-8 transition-colors hover:border-border/60 hover:bg-muted/40"
+        >
+          <div className="flex flex-col items-center gap-3 text-center">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-background shadow-sm transition-transform group-hover:scale-110">
+              <Database className="h-6 w-6 text-muted-foreground" />
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm font-medium">Google Drive</p>
+              <p className="text-xs text-muted-foreground">Import docs directly</p>
+            </div>
+          </div>
+        </button>
       </div>
+
       {/* URL ingestion row */}
       <div className="flex items-center gap-2">
         <Link2 className="h-4 w-4 shrink-0 text-muted-foreground" />

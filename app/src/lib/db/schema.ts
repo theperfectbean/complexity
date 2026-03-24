@@ -239,6 +239,8 @@ export const documents = pgTable("documents", {
   sizeBytes: integer("size_bytes"),
   status: varchar("status", { length: 20 }).notNull().default("processing"), // 'processing', 'ready', 'error'
   extractedText: text("extracted_text"),
+  source: varchar("source", { length: 50 }).notNull().default("local"), // 'local', 'google_drive'
+  externalId: varchar("external_id", { length: 255 }), // Stores the Google Drive File ID
   roleId: text("role_id")
     .notNull()
     .references(() => roles.id, { onDelete: "cascade" }),
@@ -247,6 +249,8 @@ export const documents = pgTable("documents", {
 }, (table) => [
   index("documents_status_idx").on(table.status),
   index("documents_role_idx").on(table.roleId),
+  index("documents_source_idx").on(table.source),
+  index("documents_external_id_idx").on(table.externalId),
 ]);
 
 export const chunks = pgTable(

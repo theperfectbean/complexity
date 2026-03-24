@@ -21,6 +21,7 @@ const envSchema = z.object({
   GITHUB_CLIENT_SECRET: z.string().optional(),
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
+  GOOGLE_API_KEY: z.string().optional(),
   TAVILY_API_KEY: z.string().optional(),
   EMBEDDER_URL: z.string().url().default("http://embedder:8000"),
   NODE_ENV: z

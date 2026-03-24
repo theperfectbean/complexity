@@ -218,7 +218,13 @@ export async function runGeneration(options: GenerationOptions): Promise<Generat
       data: { callId: "model-gen", toolName: "Reasoning", input: { model: options.modelId } },
     } as UIMessageChunk);
 
-    const coreMessages = await convertToModelMessages(options.messages);
+    const coreMessages = await Promise.all(options.messages.map(async (msg) => {
+      const text = await (await import("./chat-utils")).extractTextFromMessage(msg);
+      return {
+        role: msg.role as "user" | "assistant" | "system",
+        content: text,
+      };
+    }));
     
     const result = streamText({
       model,

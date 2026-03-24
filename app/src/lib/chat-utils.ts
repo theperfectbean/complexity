@@ -69,6 +69,8 @@ export function collectFileParts(message: UIMessage): FilePart[] {
 }
 
 export async function extractTextFromMessage(message: UIMessage): Promise<string> {
+  logger.info({ id: message.id, role: message.role, hasParts: !!message.parts, partsCount: message.parts?.length }, "Extracting text from message");
+  
   const partsText =
     message.parts
       ?.filter((part) => part.type === "text")
@@ -77,10 +79,12 @@ export async function extractTextFromMessage(message: UIMessage): Promise<string
       .trim() ?? "";
 
   let finalText = partsText;
+  logger.info({ partsTextSnippet: partsText.slice(0, 50) }, "Extracted parts text");
 
   if (!finalText) {
     const messageRecord = asRecord(message);
     const rawContent = messageRecord?.content;
+    logger.info({ contentType: typeof rawContent }, "Falling back to raw content");
 
     if (typeof rawContent === "string") {
       finalText = rawContent.trim();
@@ -109,6 +113,7 @@ export async function extractTextFromMessage(message: UIMessage): Promise<string
   }
 
   const fileParts = collectFileParts(message);
+  logger.info({ filePartsCount: fileParts.length }, "Collected file parts");
 
   let attachmentsInfo = "";
   if (fileParts.length > 0) {
@@ -132,7 +137,9 @@ export async function extractTextFromMessage(message: UIMessage): Promise<string
         }
 
         try {
+          logger.info({ filename: name, mediaType }, "Extracting text from attachment");
           const content = await extractTextFromDataUrl(att.url, String(name), String(mediaType));
+          logger.info({ filename: name, contentSnippet: content.slice(0, 100) }, "Extraction successful");
           return `--- START ATTACHED FILE: ${name} ---
 ${content}
 --- END ATTACHED FILE: ${name} ---`;

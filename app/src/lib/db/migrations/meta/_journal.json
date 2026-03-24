@@ -99,6 +99,13 @@
       "when": 1774138364440,
       "tag": "0013_role_memory_isolation_v2",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1774245578465,
+      "tag": "0014_fast_shinko_yamashiro",
+      "breakpoints": true
     }
   ]
 }

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { useSession } from "next-auth/react";
 
@@ -23,6 +23,7 @@ export default function RecentPage() {
   const [threads, setThreads] = useState<Thread[]>([]);
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
+  const [searching, setSearching] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -32,39 +33,41 @@ export default function RecentPage() {
     }
 
     let active = true;
-    setLoading(true);
-    fetch("/api/threads")
-      .then((response) => (response.ok ? response.json() : Promise.reject(new Error("Failed to load threads"))))
-      .then((payload: { threads: Thread[] }) => {
-        if (!active) {
-          return;
+    const controller = new AbortController();
+
+    const fetchThreads = async () => {
+      if (!query.trim()) setLoading(true);
+      else setSearching(true);
+
+      try {
+        const url = query.trim() ? `/api/threads?q=${encodeURIComponent(query.trim())}` : "/api/threads";
+        const response = await fetch(url, { signal: controller.signal });
+        if (response.ok) {
+          const payload: { threads: Thread[] } = await response.json();
+          if (active) {
+            setThreads(payload.threads);
+          }
         }
-        setThreads(payload.threads);
-      })
-      .catch(() => {
-        if (active) {
-          setThreads([]);
+      } catch (err) {
+        if (err instanceof Error && err.name !== "AbortError") {
+          console.error("Failed to load threads:", err);
         }
-      })
-      .finally(() => {
+      } finally {
         if (active) {
           setLoading(false);
+          setSearching(false);
         }
-      });
+      }
+    };
+
+    const timer = setTimeout(fetchThreads, query ? 400 : 0);
 
     return () => {
       active = false;
+      controller.abort();
+      clearTimeout(timer);
     };
-  }, [status]);
-
-  const filteredThreads = useMemo(() => {
-    const normalized = query.trim().toLowerCase();
-    if (!normalized) {
-      return threads;
-    }
-
-    return threads.filter((thread) => thread.title.toLowerCase().includes(normalized));
-  }, [query, threads]);
+  }, [status, query]);
 
   async function handleDelete(threadId: string) {
     setDeletingId(threadId);
@@ -107,22 +110,27 @@ export default function RecentPage() {
       <h1 className="font-[var(--font-accent)] text-2xl font-semibold">Recent</h1>
       <p className="mt-2 text-sm text-muted-foreground">Search and manage your recent threads.</p>
 
-      <div className="mt-4">
+      <div className="mt-4 relative">
         <input
           className="w-full max-w-md rounded-md border bg-card px-3 py-2"
           placeholder="Search by thread title"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
         />
+        {searching && (
+          <div className="absolute left-[390px] top-1/2 -translate-y-1/2">
+            <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+          </div>
+        )}
       </div>
 
       <div className="mt-4 space-y-2">
         {loading ? <LoadingSkeleton lines={4} /> : null}
-        {!loading && filteredThreads.length === 0 ? (
+        {!loading && threads.length === 0 ? (
           <EmptyState title="No matching threads" description="Try a different title search or start a new thread." />
         ) : null}
 
-        {filteredThreads.map((thread) => (
+        {threads.map((thread) => (
           <article key={thread.id} className="flex items-center justify-between rounded-lg border bg-card p-3 shadow-2xs">
             <button type="button" className="min-w-0 flex-1 text-left" onClick={() => router.push(`/search/${thread.id}`)}>
               <p className="truncate font-medium">{thread.title}</p>

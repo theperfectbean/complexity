@@ -107,6 +107,28 @@ const PROVIDERS: ProviderConfig[] = [
   },
 ];
 
+const INTEGRATIONS = [
+  {
+    id: "google-drive",
+    name: "Google Drive (RAG)",
+    description: "Allow users to import documents from Google Drive. Requires a Google Cloud Project.",
+    fields: [
+      { key: "GOOGLE_CLIENT_ID", label: "Client ID", placeholder: "your-client-id.apps.googleusercontent.com" },
+      { key: "GOOGLE_CLIENT_SECRET", label: "Client Secret", placeholder: "GOCSPX-...", type: "password" },
+      { key: "GOOGLE_API_KEY", label: "API Key (Picker)", placeholder: "AIza...", type: "password" },
+    ]
+  },
+  {
+    id: "github",
+    name: "GitHub Auth",
+    description: "Enable signing in with GitHub.",
+    fields: [
+      { key: "GITHUB_CLIENT_ID", label: "Client ID", placeholder: "ov2-..." },
+      { key: "GITHUB_CLIENT_SECRET", label: "Client Secret", placeholder: "github_pat_...", type: "password" },
+    ]
+  }
+];
+
 export default function AdminSettingsPage() {
   const { data: session, status } = useSession();
   const [details, setDetails] = useState<Record<string, SettingInfo>>({});
@@ -140,21 +162,20 @@ export default function AdminSettingsPage() {
         setDetails(data.details);
         const initialForm: Record<string, string> = {};
         
-        PROVIDERS.forEach(provider => {
-          const keyInfo = data.details[provider.keyName];
-          const toggleInfo = provider.toggleName ? data.details[provider.toggleName] : null;
-          
-          if (keyInfo?.source === "db") {
-            initialForm[provider.keyName] = keyInfo.value || "";
+        // Load all database-sourced settings into form
+        Object.entries(data.details).forEach(([key, info]) => {
+          const settingInfo = info as SettingInfo;
+          if (settingInfo.source === "db") {
+            initialForm[key] = settingInfo.value || "";
           }
-          
-          if (provider.toggleName) {
-            if (toggleInfo?.source === "db") {
-              initialForm[provider.toggleName] = toggleInfo.value || "false";
-            } else {
-              const hasKey = keyInfo && keyInfo.source !== "none";
-              initialForm[provider.toggleName] = hasKey ? "true" : "false";
-            }
+        });
+
+        // Set default toggles if they weren't in DB
+        PROVIDERS.forEach(provider => {
+          if (provider.toggleName && !initialForm[provider.toggleName]) {
+            const keyInfo = data.details[provider.keyName];
+            const hasKey = keyInfo && keyInfo.source !== "none";
+            initialForm[provider.toggleName] = hasKey ? "true" : "false";
           }
         });
 
@@ -427,6 +448,56 @@ export default function AdminSettingsPage() {
               </section>
             );
           })}
+
+          <div className="pt-8 border-t">
+            <h2 className="text-xl font-bold font-[var(--font-accent)] mb-1">External Integrations</h2>
+            <p className="text-sm text-muted-foreground mb-6">Configure OAuth and third-party services.</p>
+          </div>
+
+          {INTEGRATIONS.map((integration) => (
+            <section key={integration.id} className="rounded-2xl border bg-card p-6 shadow-xs transition-shadow hover:shadow-sm">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/5 text-primary">
+                  <ShieldCheck className="h-5 w-5" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold">{integration.name}</h2>
+                  <p className="text-xs text-muted-foreground">{integration.description}</p>
+                </div>
+              </div>
+
+              <div className="space-y-6">
+                {integration.fields.map((field) => {
+                  const keyInfo = details[field.key] || { value: null, source: "none" };
+                  return (
+                    <div key={field.key} className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label htmlFor={field.key} className="text-sm font-semibold">{field.label}</label>
+                        {keyInfo.source === "env" && !formData[field.key] && (
+                          <div className="flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-600">
+                            <Check className="h-3 w-3" /> SET VIA ENVIRONMENT
+                          </div>
+                        )}
+                        {keyInfo.source === "db" && (
+                          <div className="flex items-center gap-1.5 rounded-full bg-blue-500/10 px-2 py-0.5 text-[10px] font-bold text-blue-600">
+                            <ShieldCheck className="h-3 w-3" /> STORED IN DATABASE
+                          </div>
+                        )}
+                      </div>
+                      <input
+                        id={field.key}
+                        type={(field.type as string) === "password" ? "password" : "text"}
+                        className="w-full rounded-xl border bg-background/50 px-4 py-2.5 text-sm transition-all focus:border-primary focus:ring-4 focus:ring-primary/5 outline-hidden"
+                        placeholder={field.placeholder}
+                        value={formData[field.key] || ""}
+                        onChange={(e) => updateField(field.key, e.target.value)}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          ))}
         </div>
       ) : activeTab === "models" ? (
         <div className="mt-8 space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
