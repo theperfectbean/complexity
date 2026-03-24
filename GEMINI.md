@@ -89,6 +89,13 @@ This strategy ensures all dependencies (Postgres, Redis, Embedder) are running w
 
 ## Key Findings & Implementation Notes
 
+### Production Hardening (2026-03-24)
+- **CI Pipeline**: Added `.github/workflows/ci.yml` to automatically run `lint`, `build`, and `vitest` on pushes and pull requests to `main`, ensuring no regressions are introduced without detection.
+- **Context Window Management**: Implemented message truncation in `app/src/lib/chat-service.ts` to keep only the last 30 messages in the context window. This prevents token limit errors on long threads and controls runaway API costs.
+- **Documentation**: Updated `docs/RUNBOOK.md` with explicit details for Reverse Proxy/TLS setup (Nginx/Caddy), Upgrade and Rollback procedures, and clarified the persistence scope of `.data/` mounts to ensure safe operations.
+- **Observability Cleanup**: Audited the codebase (`app/src/lib/worker.ts`, `app/src/lib/chat/ChatHistoryManager.ts`, `app/src/lib/chat-service.ts`) and replaced silent `catch` blocks with explicit `log.warn` calls to improve diagnosing failures from Docker logs.
+- **Auth Endpoint Rate Limiting**: Replaced manual, inline rate-limiting logic in `/api/auth/register` and `/api/auth/forgot-password` with the robust, Redis-backed `checkRateLimit` utility. Set a conservative limit of 5 requests per minute per IP to prevent brute-force abuse.
+
 ### Chat UI Polish & Perplexity Alignment (2026-03-21)
 - **User Message Hover Actions**: Grouped "Edit" and "Copy" actions into a cleaner, integrated hover container to the left of user messages.
 - **Branch Navigation**: Moved the version navigator ("1 / 2") into the same message-level hover container for a more cohesive experience.
