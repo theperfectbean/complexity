@@ -779,3 +779,7 @@ This strategy ensures all dependencies (Postgres, Redis, Embedder) are running w
 
 
 
+
+### Migration Resilience (2026-03-25)
+- **Problem**: When multiple agents generate or run Drizzle migrations locally, schema discrepancies (like trying to add a column that already exists) can cause `drizzle-kit migrate` to crash, preventing subsequent migrations from running. This led to a 500 error when querying the `messages` table for new columns, which the frontend incorrectly surfaced as 'Conversation not found'.
+- **Fix**: Updated migration SQL files (e.g., `0015`) to use `IF NOT EXISTS` to ensure idempotency. Also removed duplicate column creations from generated `0016` to ensure clean migration runs inside the Docker container.
