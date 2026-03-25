@@ -300,9 +300,9 @@ export async function runGeneration(options: GenerationOptions): Promise<Generat
 
     const finalUsage = await result.usage;
     usage = {
-      // @ts-expect-error - some SDK versions use snake_case, others camelCase
+      // @ts-expect-error - AI SDK v6 type mismatch on usage properties
       promptTokens: (finalUsage as Record<string, unknown>).promptTokens ?? (finalUsage as Record<string, unknown>).prompt_tokens,
-      // @ts-expect-error
+      // @ts-expect-error - AI SDK v6 type mismatch on usage properties
       completionTokens: (finalUsage as Record<string, unknown>).completionTokens ?? (finalUsage as Record<string, unknown>).completion_tokens,
     };
   } catch (error) {
