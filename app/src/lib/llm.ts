@@ -300,10 +300,10 @@ export async function runGeneration(options: GenerationOptions): Promise<Generat
 
     const finalUsage = await result.usage;
     usage = {
-      // @ts-ignore - some SDK versions use snake_case, others camelCase
-      promptTokens: finalUsage.promptTokens ?? (finalUsage as any).prompt_tokens,
-      // @ts-ignore
-      completionTokens: finalUsage.completionTokens ?? (finalUsage as any).completion_tokens,
+      // @ts-expect-error - some SDK versions use snake_case, others camelCase
+      promptTokens: (finalUsage as Record<string, unknown>).promptTokens ?? (finalUsage as Record<string, unknown>).prompt_tokens,
+      // @ts-expect-error
+      completionTokens: (finalUsage as Record<string, unknown>).completionTokens ?? (finalUsage as Record<string, unknown>).completion_tokens,
     };
   } catch (error) {
     log.error({ err: error, modelId: options.modelId }, "Direct model generation failed");

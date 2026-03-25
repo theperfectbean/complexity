@@ -4,7 +4,6 @@ import NextAuth, { type DefaultSession } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import GitHub from "next-auth/providers/github";
 import Google from "next-auth/providers/google";
-import { type JWT } from "next-auth/jwt";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { verifySync } from "otplib";
