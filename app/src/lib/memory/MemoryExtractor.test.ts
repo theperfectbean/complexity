@@ -40,7 +40,7 @@ describe("MemoryExtractor", () => {
     it("should extract new memories from LLM response", async () => {
       vi.mocked(generateText).mockResolvedValue({
         text: JSON.stringify({ added: ["Fact 1", "Fact 2"], deleted_ids: [] }),
-      } as any);
+      } as unknown as Awaited<ReturnType<typeof generateText>>);
 
       const result = await extractMemories({
         userMessage: "Hello",
@@ -55,7 +55,7 @@ describe("MemoryExtractor", () => {
     it("should filter out short or existing memories", async () => {
       vi.mocked(generateText).mockResolvedValue({
         text: JSON.stringify({ added: ["No", "Already exists", "Valid fact"], deleted_ids: [] }),
-      } as any);
+      } as unknown as Awaited<ReturnType<typeof generateText>>);
 
       const result = await extractMemories({
         userMessage: "Hello",
@@ -85,9 +85,9 @@ describe("MemoryExtractor", () => {
       vi.mocked(MemoryStore.getExistingMemories).mockResolvedValue([]);
       vi.mocked(generateText).mockResolvedValue({
         text: JSON.stringify({ added: ["New Fact"], deleted_ids: [] }),
-      } as any);
+      } as unknown as Awaited<ReturnType<typeof generateText>>);
 
-      const result = await saveExtractedMemories({
+      await saveExtractedMemories({
         userId: "u1",
         threadId: "t1",
         userMessage: "Hello",
