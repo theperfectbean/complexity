@@ -22,7 +22,7 @@ jobs:
           cache-dependency-path: app/package-lock.json
 
       - name: Install dependencies
-        run: cd app && npm ci --loglevel=error
+        run: cd app && npm ci --loglevel=error --legacy-peer-deps
 
       - name: Run ESLint
         run: cd app && npm run lint

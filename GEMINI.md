@@ -73,6 +73,9 @@ This strategy ensures all dependencies (Postgres, Redis, Embedder) are running w
     npm run lint
     ```
 
+- **CI Status Monitoring:**
+  - The agent MUST check the GitHub CI status (`gh run list`) after every push to ensure the build and tests pass in the remote environment. If the CI fails, the agent must investigate and fix the issues immediately.
+
 - **Database Management:**
   - Drizzle ORM is used for schema management and migrations (`app/src/lib/db/schema.ts`).
   - To generate or run migrations, use the scripts in `app/package.json`:
