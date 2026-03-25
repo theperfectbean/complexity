@@ -33,6 +33,12 @@ export interface GenerationOptions {
 export interface GenerationResult {
   text: string;
   citations: Citation[];
+  usage?: {
+    promptTokens?: number;
+    completionTokens?: number;
+    searchCount?: number;
+    fetchCount?: number;
+  };
 }
 
 const PROVIDER_PREFIX_MAP: Record<string, ProviderType> = {
@@ -221,6 +227,7 @@ export async function runGeneration(options: GenerationOptions): Promise<Generat
       return {
         text: result.text,
         citations: extractCitationsFromResponse(result.completedResponse),
+        usage: result.usage,
       };
     } catch (error) {
       log.error({ err: error }, "Perplexity Agent generation failed");
@@ -234,6 +241,7 @@ export async function runGeneration(options: GenerationOptions): Promise<Generat
   // Direct Vercel AI SDK Providers
   let assistantText = "";
   let hasSentConnected = false;
+  let usage: GenerationResult["usage"] = undefined;
 
   try {
     const model = getLanguageModel(options.modelId, options.keys);
@@ -289,6 +297,12 @@ export async function runGeneration(options: GenerationOptions): Promise<Generat
         options.writer.write({ type: "text-delta", id: options.textId, delta: part.text });
       }
     }
+
+    const finalUsage = await result.usage;
+    usage = {
+      promptTokens: finalUsage.promptTokens,
+      completionTokens: finalUsage.completionTokens,
+    };
   } catch (error) {
     log.error({ err: error, modelId: options.modelId }, "Direct model generation failed");
     const message = error instanceof Error ? error.message : "Direct model request failed";
@@ -302,7 +316,7 @@ export async function runGeneration(options: GenerationOptions): Promise<Generat
     options.writer.write({ type: "text-delta", id: options.textId, delta: assistantText });
   }
 
-  return { text: assistantText, citations: [] };
+  return { text: assistantText, citations: [], usage };
 }
 
 export function isPerplexityProvider(modelId: string): boolean {

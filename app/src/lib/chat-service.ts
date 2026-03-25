@@ -187,7 +187,7 @@ export class ChatService {
             });
 
             await this.history.setCache(this.session, cacheKey, { text: assistantText, citations });
-            await this.history.saveAssistantMessage(this.session, responseMessageId, assistantText, citations, memoriesFound > 0);
+            await this.history.saveAssistantMessage(this.session, responseMessageId, assistantText, citations, memoriesFound > 0, result.usage);
 
             if (thread.memoryEnabled) {
               const memoryPromise = saveExtractedMemories({

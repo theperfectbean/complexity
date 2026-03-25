@@ -69,12 +69,16 @@ export async function GET() {
     `),
     db.select({ 
       model: messages.model, 
+      promptTokens: sql<number>`sum(coalesce(prompt_tokens, 0))::int`,
+      completionTokens: sql<number>`sum(coalesce(completion_tokens, 0))::int`,
+      searchCount: sql<number>`sum(coalesce(search_count, 0))::int`,
+      fetchCount: sql<number>`sum(coalesce(fetch_count, 0))::int`,
       totalChars: sql<number>`sum(length(content))::int` 
     })
     .from(messages)
     .where(eq(messages.role, 'assistant'))
     .groupBy(messages.model)
-    .orderBy(desc(sql`sum(length(content))`)),
+    .orderBy(desc(sql`sum(coalesce(prompt_tokens, 0) + coalesce(completion_tokens, 0))`)),
   ]);
 
   return NextResponse.json({
@@ -90,9 +94,23 @@ export async function GET() {
     userActivity,
     roleActivity,
     dailyActivity,
-    tokens: tokenEstimation.map((t: { model: string | null; totalChars: number | null }) => ({
+    tokens: tokenEstimation.map((t: { 
+      model: string | null; 
+      promptTokens: number; 
+      completionTokens: number; 
+      searchCount: number; 
+      fetchCount: number; 
+      totalChars: number | null; 
+    }) => ({
       model: t.model,
-      estimatedTokens: Math.round((t.totalChars || 0) / 4) // Rough proxy: 4 chars per token
+      promptTokens: t.promptTokens,
+      completionTokens: t.completionTokens,
+      searchCount: t.searchCount,
+      fetchCount: t.fetchCount,
+      // For old messages without token counts, provide the rough estimate
+      estimatedTokens: t.promptTokens + t.completionTokens > 0 
+        ? t.promptTokens + t.completionTokens 
+        : Math.round((t.totalChars || 0) / 4)
     })),
   });
 }

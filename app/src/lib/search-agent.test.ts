@@ -9,29 +9,51 @@ vi.mock("./agent-client", () => ({
 
 describe("search-agent.ts", () => {
   describe("runSearchAgent", () => {
-    it("throws an error if client fails immediately", async () => {
+    it("returns usage info on success", async () => {
       const mockClient = {
         responses: {
-          create: vi.fn().mockRejectedValue(new Error("API Error")),
+          create: vi.fn().mockResolvedValue({
+            output_text: "Final response",
+            response: { output: [] }
+          }),
         },
       };
       vi.mocked(createAgentClient).mockReturnValue(mockClient as unknown as ReturnType<typeof createAgentClient>);
+
+      // Mock fetch to simulate a stream that finishes early without text
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        body: {
+          getReader: () => ({
+            read: vi.fn()
+              .mockResolvedValueOnce({ value: new TextEncoder().encode("data: {\"type\": \"response.reasoning.search_queries\", \"queries\": [\"test\"]}\n\n"), done: false })
+              .mockResolvedValueOnce({ value: new TextEncoder().encode("data: {\"type\": \"response.reasoning.fetch_url_queries\", \"urls\": [\"http://example.com\"]}\n\n"), done: false })
+              .mockResolvedValueOnce({ value: new TextEncoder().encode("data: [DONE]\n\n"), done: false })
+              .mockResolvedValue({ value: undefined, done: true }),
+          }),
+        },
+      });
 
       const agentInput: Responses.InputItem[] = [
         { type: "message", role: "user", content: [{ type: "input_text", text: "hello" }] },
       ];
 
-      await expect(
-        runSearchAgent({
-          modelId: "sonar-pro",
-          agentInput,
-          instructions: "System",
-          webSearch: true,
-          writer: { write: vi.fn() },
-          textId: "test-text-id",
-          requestId: "test-request-id",
-        })
-      ).rejects.toThrow("API Error");
+      const result = await runSearchAgent({
+        modelId: "pro-search",
+        agentInput,
+        instructions: "System",
+        webSearch: true,
+        writer: { write: vi.fn() },
+        textId: "test-text-id",
+        requestId: "test-request-id",
+      });
+
+      expect(result.text).toBe("Final response");
+      expect(result.usage).toBeDefined();
+      expect(result.usage.searchCount).toBe(1);
+      expect(result.usage.fetchCount).toBe(1);
+      expect(result.usage.promptTokens).toBeGreaterThan(0);
+      expect(result.usage.completionTokens).toBeGreaterThan(0);
     });
   });
 });

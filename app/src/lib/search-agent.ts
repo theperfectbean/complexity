@@ -1,5 +1,6 @@
 import { UIMessageChunk } from "ai";
 import { Responses } from "@perplexity-ai/perplexity_ai/resources/responses";
+import { encode } from "gpt-tokenizer";
 import { createAgentClient } from "./agent-client";
 import { isPresetModel } from "./models";
 import { safeParseJsonLine } from "./sse";
@@ -38,24 +39,33 @@ interface AgentEvent {
     message?: string;
   };
 }
-export async function runSearchAgent(options: SearchAgentOptions) {
+
+export interface SearchAgentResult {
+  text: string;
+  completedResponse: Record<string, unknown> | null;
+  usage: {
+    promptTokens: number;
+    completionTokens: number;
+    searchCount: number;
+    fetchCount: number;
+  };
+}
+
+export async function runSearchAgent(options: SearchAgentOptions): Promise<SearchAgentResult> {
   const { modelId: rawModelId, agentInput, instructions, webSearch, apiKey, writer, textId, requestId } = options;
   const log = getLogger(requestId);
 
   let modelConfig: Record<string, unknown> = {};
   if (Array.isArray(rawModelId)) {
-    // If it's an array, we pass it as 'models' for fallback
     modelConfig = { models: rawModelId };
   } else {
-    // Single model logic
     const isPreset = isPresetModel(rawModelId) || ["fast-search", "pro-search", "deep-research", "advanced-deep-research"].includes(rawModelId);
     modelConfig = isPreset ? { preset: rawModelId } : { model: rawModelId };
   }
 
-  // We no longer map fast-search to sonar because fast-search is the actual native preset name
-  // in the Perplexity Agent API, which includes built-in web_search.
-
   let assistantText = "";
+  let searchCount = 0;
+  let fetchCount = 0;
 
   let completedResponse: Record<string, unknown> | null = null;
   let hasWrittenTextDelta = false;
@@ -63,7 +73,6 @@ export async function runSearchAgent(options: SearchAgentOptions) {
 
   const client = createAgentClient(apiKey);
   
-  // Filter out system messages from input to avoid redundancy with instructions
   const filteredInput = agentInput.filter(item => {
     if (item.type === "message" && item.role === "system") return false;
     return true;
@@ -80,6 +89,21 @@ export async function runSearchAgent(options: SearchAgentOptions) {
     ...requestBodyBase,
     stream: true,
   } as Responses.ResponseCreateParamsStreaming;
+
+  // Calculate prompt tokens
+  const promptText = [
+    instructions,
+    ...filteredInput.map(item => {
+      if (item.type === "message") {
+        const content = Array.isArray(item.content) 
+          ? item.content.map(c => ("text" in c ? c.text : ("input_text" in c ? c.input_text : ""))).join("\n")
+          : item.content;
+        return `${item.role}: ${content}`;
+      }
+      return "";
+    })
+  ].join("\n\n");
+  const promptTokens = encode(promptText).length;
 
   let streamEventCount = 0;
   let streamingFailed = false;
@@ -125,7 +149,6 @@ export async function runSearchAgent(options: SearchAgentOptions) {
         }
       }
 
-      // Process any remaining data in the buffer after the stream is closed
       if (buffer.trim()) {
         processLine(buffer);
       }
@@ -134,7 +157,7 @@ export async function runSearchAgent(options: SearchAgentOptions) {
         if (line.startsWith('data: ')) {
           const dataStr = line.slice(6).trim();
           if (dataStr === '[DONE]') {
-            streamingFailed = false; // Finished normally
+            streamingFailed = false;
             return;
           }
           if (!dataStr) return;
@@ -152,6 +175,7 @@ export async function runSearchAgent(options: SearchAgentOptions) {
           }
 
           if (eventRecord.type === "response.reasoning.search_queries") {
+            searchCount += 1;
             const queries = eventRecord.queries || [];
             writer.write({
               type: "data-call-start",
@@ -169,6 +193,7 @@ export async function runSearchAgent(options: SearchAgentOptions) {
           }
 
           if (eventRecord.type === "response.reasoning.fetch_url_queries") {
+            fetchCount += (eventRecord.urls || []).length;
             const urls = eventRecord.urls || [];
             writer.write({
               type: "data-call-start",
@@ -282,11 +307,6 @@ export async function runSearchAgent(options: SearchAgentOptions) {
     }
   }
 
-  // --- FALLBACK TO NON-STREAMING ---
-  // We fall back if:
-  // 1. streamingFailed was set (e.g. 400 error or reasoning failure)
-  // 2. We got NO events at all
-  // 3. We finished the stream but still have no text (happens if reasoning finishes but generation doesn't start)
   if (streamingFailed || streamEventCount === 0 || (!assistantText.trim() && !completedResponse)) {
     try {
       const nonStreamingResponse = await client.responses.create(
@@ -309,6 +329,16 @@ export async function runSearchAgent(options: SearchAgentOptions) {
     }
   }
 
+  const completionTokens = encode(assistantText).length;
 
-  return { text: assistantText, completedResponse };
+  return { 
+    text: assistantText, 
+    completedResponse,
+    usage: {
+      promptTokens,
+      completionTokens,
+      searchCount,
+      fetchCount
+    }
+  };
 }

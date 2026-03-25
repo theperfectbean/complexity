@@ -16,7 +16,14 @@ type AnalyticsData = {
   userActivity: { email: string; name: string | null; count: number }[];
   roleActivity: { roleName: string | null; count: number }[];
   dailyActivity: { day: string; threads: number }[];
-  tokens: { model: string | null; estimatedTokens: number }[];
+  tokens: { 
+    model: string | null; 
+    estimatedTokens: number;
+    promptTokens: number;
+    completionTokens: number;
+    searchCount: number;
+    fetchCount: number;
+  }[];
 };
 
 const STAT_META = [
@@ -188,26 +195,51 @@ export function AnalyticsDashboard() {
         </div>
 
         <div className="rounded-2xl border bg-card p-6 shadow-xs">
-          <h3 className="mb-4 text-sm font-semibold">Estimated Tokens (Assistant)</h3>
+          <h3 className="mb-4 text-sm font-semibold">Detailed Resource Usage (Assistant)</h3>
           {loading ? (
             <div className="space-y-2">
               {[...Array(3)].map((_, i) => <div key={i} className="h-8 animate-pulse rounded bg-muted/40" />)}
             </div>
           ) : data?.tokens && data.tokens.length > 0 ? (
-            <div className="space-y-2">
-              {data.tokens.map(({ model, estimatedTokens }) => {
-                const total = data.tokens.reduce((s, m) => s + m.estimatedTokens, 0);
-                const pct = total > 0 ? Math.round((estimatedTokens / total) * 100) : 0;
+            <div className="space-y-4">
+              {data.tokens.map((t) => {
+                const totalTokens = data.tokens.reduce((s, m) => s + m.estimatedTokens, 0);
+                const pct = totalTokens > 0 ? Math.round((t.estimatedTokens / totalTokens) * 100) : 0;
+                const isPerplexity = t.model?.includes("perplexity") || t.model === "fast-search" || t.model === "pro-search" || t.model === "sonar";
+                
                 return (
-                  <div key={model || "unknown"} className="flex items-center gap-3">
-                    <span className="w-32 truncate text-xs text-muted-foreground" title={model || "Default"}>{model || "Default"}</span>
-                    <div className="flex-1 rounded-full bg-muted/40 h-2 overflow-hidden">
-                      <div
-                        className="h-full rounded-full bg-amber-500 transition-all"
-                        style={{ width: `${pct}%` }}
-                      />
+                  <div key={t.model || "unknown"} className="space-y-1.5">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="truncate text-xs font-medium text-muted-foreground" title={t.model || "Default"}>
+                        {t.model || "Default"}
+                      </span>
+                      <span className="text-[10px] font-semibold text-amber-500 tabular-nums">
+                        {(t.estimatedTokens / 1000).toFixed(1)}k tokens
+                      </span>
                     </div>
-                    <span className="w-16 text-right text-xs font-medium tabular-nums">{(estimatedTokens / 1000).toFixed(1)}k</span>
+                    <div className="flex items-center gap-3">
+                      <div className="flex-1 rounded-full bg-muted/40 h-2 overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-amber-500 transition-all"
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                      <span className="w-8 text-right text-[10px] text-muted-foreground">{pct}%</span>
+                    </div>
+                    {(t.promptTokens > 0 || t.searchCount > 0 || t.fetchCount > 0) && (
+                      <div className="flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-muted-foreground/70">
+                        {t.promptTokens > 0 && (
+                          <span>In: {t.promptTokens.toLocaleString()} • Out: {t.completionTokens.toLocaleString()}</span>
+                        )}
+                        {isPerplexity && (t.searchCount > 0 || t.fetchCount > 0) && (
+                          <span className="text-cyan-600 font-medium">
+                            {t.searchCount > 0 && `Searches: ${t.searchCount}`}
+                            {t.searchCount > 0 && t.fetchCount > 0 && " • "}
+                            {t.fetchCount > 0 && `Fetches: ${t.fetchCount}`}
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
                 );
               })}
