@@ -124,6 +124,8 @@ export const runtimeConfig = {
     emptyResponseFallbackText: env.CHAT_EMPTY_RESPONSE_FALLBACK_TEXT ?? "I couldn't generate a response. Please try again.",
     memoryEventTimeoutMs: env.CHAT_MEMORY_EVENT_TIMEOUT_MS ?? 15000,
     maxAttachmentBytes: env.CHAT_MAX_ATTACHMENT_BYTES ?? 5 * 1024 * 1024,
+    defaultWebSearch: (env.CHAT_DEFAULT_WEB_SEARCH ?? "false") === "true",
+    enableTitleGeneration: (env.CHAT_ENABLE_TITLE_GENERATION ?? "false") === "true",
     titlingModel: env.CHAT_TITLING_MODEL ?? "anthropic/claude-4-5-haiku-latest",
   },
   uploads: {

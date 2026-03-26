@@ -6,6 +6,7 @@ import { useRef, useState, useEffect, useCallback } from "react";
 import TextareaAutosize from "react-textarea-autosize";
 
 import { getDefaultModel } from "@/lib/models";
+import { runtimeConfig } from "@/lib/config";
 import { cn } from "@/lib/utils";
 
 import { VoiceInput } from "./parts/VoiceInput";
@@ -53,7 +54,7 @@ export function SearchBar({
   onAttachClick,
   attachments: externalAttachments = EMPTY_ATTACHMENTS,
   onRemoveAttachment,
-  webSearchEnabled = true,
+  webSearchEnabled = runtimeConfig.chat.defaultWebSearch,
   onWebSearchChange,
   autoFilter = true,
   "data-testid": dataTestId,

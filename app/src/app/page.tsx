@@ -7,6 +7,7 @@ import { FormEvent, useState } from "react";
 import { toast } from "sonner";
 
 import { SearchBar } from "@/components/search/SearchBar";
+import { runtimeConfig } from "@/lib/config";
 import { getDefaultModel } from "@/lib/models";
 import { saveAttachmentsToSession } from "@/lib/utils";
 
@@ -17,7 +18,7 @@ export default function Home() {
   const [model, setModel] = useState<string>(getDefaultModel());
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
-  const [webSearchEnabled, setWebSearchEnabled] = useState(true);
+  const [webSearchEnabled, setWebSearchEnabled] = useState(runtimeConfig.chat.defaultWebSearch);
   const [attachments, setAttachments] = useState<File[]>([]);
 
   async function startThread(event: FormEvent<HTMLFormElement>) {

@@ -77,18 +77,19 @@ export async function POST(request: Request) {
   const safeModel = await resolveRequestedModel(parsed.data.model);
 
   let title = parsed.data.title;
-  if (!title && parsed.data.initialMessage) {
+  if (!title && parsed.data.initialMessage && runtimeConfig.chat.enableTitleGeneration) {
     try {
       const keys = await getApiKeys();
-      // Use the dedicated titling model to save costs
       const titlingModelId = runtimeConfig.chat.titlingModel;
       title = await generateThreadTitle(parsed.data.initialMessage, titlingModelId, keys);
     } catch {
-      // Fallback to truncation if summarize fails
-      title = parsed.data.initialMessage.slice(0, 60);
-      if (parsed.data.initialMessage.length > 60) {
-        title += "...";
-      }
+    }
+  }
+
+  if (!title && parsed.data.initialMessage) {
+    title = parsed.data.initialMessage.slice(0, 60);
+    if (parsed.data.initialMessage.length > 60) {
+      title += "...";
     }
   }
 

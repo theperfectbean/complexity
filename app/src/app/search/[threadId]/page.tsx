@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 
 import { ChatMessageItem } from "@/components/chat/MessageList";
+import { runtimeConfig } from "@/lib/config";
 import { getDefaultModel } from "@/lib/models";
 import { getAttachmentsFromSession } from "@/lib/utils";
 import { ThreadChat, ThreadPayload, normalizeCitations } from "./ThreadChat";
@@ -150,7 +151,10 @@ export default function ThreadPage() {
     };
   }, [threadId, searchParams]);
 
-  const webSearchDefault = searchParams.get("web") !== "false";
+  const webSearchParam = searchParams.get("web");
+  const webSearchDefault = webSearchParam === null
+    ? runtimeConfig.chat.defaultWebSearch
+    : webSearchParam !== "false";
 
   return (
     <main className="relative mx-auto flex h-full min-h-screen w-full max-w-3xl flex-col px-6 pt-16 pb-48">

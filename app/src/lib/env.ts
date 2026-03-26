@@ -78,6 +78,8 @@ const envSchema = z.object({
   CHAT_EMPTY_RESPONSE_FALLBACK_TEXT: z.string().default("I couldn't generate a response. Please try again."),
   CHAT_MEMORY_EVENT_TIMEOUT_MS: z.coerce.number().int().positive().default(1200),
   CHAT_MAX_ATTACHMENT_BYTES: z.coerce.number().int().positive().default(5 * 1024 * 1024),
+  CHAT_DEFAULT_WEB_SEARCH: z.enum(["true", "false"]).default("false"),
+  CHAT_ENABLE_TITLE_GENERATION: z.enum(["true", "false"]).default("false"),
   CHAT_TITLING_MODEL: z.string().optional(),
   ROLE_UPLOAD_MAX_FILE_SIZE: z.coerce.number().int().positive().default(50 * 1024 * 1024),
   AUTH_PASSWORD_MIN_LENGTH: z.coerce.number().int().positive().default(8),

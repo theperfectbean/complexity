@@ -48,6 +48,38 @@ ${content}`;
     }
   }
 
+  private shouldUseRag(userText: string): boolean {
+    const normalized = userText.trim().toLowerCase();
+    if (!normalized) return false;
+
+    const retrievalSignals = [
+      "document",
+      "documents",
+      "file",
+      "files",
+      "pdf",
+      "docx",
+      "txt",
+      "markdown",
+      "md",
+      "uploaded",
+      "upload",
+      "knowledge base",
+      "knowledgebase",
+      "according to",
+      "from the docs",
+      "from my docs",
+      "in the docs",
+      "in the files",
+      "based on the files",
+      "use the role",
+      "use the documents",
+      "what does the document say",
+    ];
+
+    return retrievalSignals.some((signal) => normalized.includes(signal));
+  }
+
   async assemble(session: ChatSession, thread: ThreadInfo, userText: string, writer: { write: (chunk: UIMessageChunk) => void }): Promise<{ instructions: string; ragCitations: Citation[]; memoriesFound: number }> {
     const { roleId, memoryEnabled, userId } = thread;
     const { roleInstructions } = thread;
@@ -55,7 +87,7 @@ ${content}`;
     let ragContext = "";
     const ragCitations: Citation[] = [];
 
-    if (roleId) {
+    if (roleId && this.shouldUseRag(userText)) {
       writer.write({ type: "data-call-start", data: { callId: "rag-search", toolName: "Retrieval", input: { query: userText } } } as UIMessageChunk);
       try {
         const [embedding] = await getEmbeddings([userText]);
@@ -77,6 +109,8 @@ ${content}`;
         this.log.error({ err: error }, "RAG search failed");
         writer.write({ type: "data-call-result", data: { callId: "rag-search", result: "Search failed, continuing with web search." } } as UIMessageChunk);
       }
+    } else if (roleId) {
+      this.log.info("Skipping RAG retrieval for prompt without document signals");
     }
 
     const externalContext = roleId ? await this.loadExternalData(roleId) : "";

@@ -15,6 +15,7 @@ import { RoleSettingsDialog } from "@/components/roles/RoleSettingsDialog";
 import { RoleInstructionsDialog } from "@/components/roles/RoleInstructionsDialog";
 import { FileUploader } from "@/components/roles/FileUploader";
 import { LoadingSkeleton } from "@/components/shared/LoadingSkeleton";
+import { runtimeConfig } from "@/lib/config";
 import { getDefaultModel } from "@/lib/models";
 import { SearchBar } from "@/components/search/SearchBar";
 import { saveAttachmentsToSession } from "@/lib/utils";
@@ -49,7 +50,7 @@ export default function RoleDetailPage() {
   const [model, setModel] = useState<string>(getDefaultModel());
   const [prompt, setPrompt] = useState("");
   const [creatingThread, setCreatingThread] = useState(false);
-  const [webSearchEnabled, setWebSearchEnabled] = useState(true);
+  const [webSearchEnabled, setWebSearchEnabled] = useState(runtimeConfig.chat.defaultWebSearch);
   const [attachments, setAttachments] = useState<File[]>([]);
 
   const loadDocuments = useCallback(async () => {

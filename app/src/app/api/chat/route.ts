@@ -15,7 +15,7 @@ const schema = z.object({
   model: z.string().min(1),
   messages: z.array(z.unknown()),
   roleId: z.string().nullable().optional(),
-  webSearch: z.boolean().optional().default(true),
+  webSearch: z.boolean().optional().default(runtimeConfig.chat.defaultWebSearch),
   trigger: z.string().optional(),
 });
 
