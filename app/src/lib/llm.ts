@@ -7,14 +7,14 @@ import { createOllama } from "ai-sdk-ollama";
 import { LanguageModel, streamText, UIMessageChunk, UIMessage, generateText } from "ai";
 import type { Responses } from "@perplexity-ai/perplexity_ai/resources/responses";
 import { runSearchAgent } from "./search-agent";
-import { runtimeConfig, type ModelOption } from "./config";
+import { runtimeConfig } from "./config";
 import { env } from "./env";
 import { extractCitationsFromResponse, type Citation } from "./extraction-utils";
 import { isPresetModel } from "./models";
 import { webSearchTool } from "./tools/search";
 import { getLogger } from "./logger";
 import { getDetailedSettings } from "./settings";
-import { getConfiguredModels, filterModelsByConfiguration, MODEL_SETTINGS_KEYS } from "./model-registry";
+import { getConfiguredModels, MODEL_SETTINGS_KEYS } from "./model-registry";
 
 export type ProviderType = "perplexity" | "anthropic" | "openai" | "google" | "xai" | "ollama" | "local-openai";
 

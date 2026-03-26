@@ -576,7 +576,7 @@ export default function AdminSettingsPage() {
                       <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">Capability Tier</label>
                       <select 
                         value={model.capability || "medium"} 
-                        onChange={(e) => updateModelField(model.id, { capability: e.target.value as any })}
+                        onChange={(e) => updateModelField(model.id, { capability: e.target.value as ModelOption["capability"] })}
                         className="w-full bg-muted/30 rounded-md px-2 py-1 text-xs outline-hidden focus:ring-1 focus:ring-primary/30"
                       >
                         <option value="high">High (Reasoning/Complex)</option>
