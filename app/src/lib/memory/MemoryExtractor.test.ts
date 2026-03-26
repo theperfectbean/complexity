@@ -81,6 +81,19 @@ describe("MemoryExtractor", () => {
       expect(MemoryStore.getExistingMemories).not.toHaveBeenCalled();
     });
 
+    it("should return 0 for ephemeral turns even when schedule matches", async () => {
+      const result = await saveExtractedMemories({
+        userId: "u1",
+        threadId: "t1",
+        userMessage: "What is the weather today?",
+        assistantMessage: "It is sunny.",
+        conversationMessages: 7,
+      });
+
+      expect(result).toBe(0);
+      expect(MemoryStore.getExistingMemories).not.toHaveBeenCalled();
+    });
+
     it("should process memories on schedule (e.g. 7 messages = 3 exchanges)", async () => {
       vi.mocked(MemoryStore.getExistingMemories).mockResolvedValue([]);
       vi.mocked(generateText).mockResolvedValue({
@@ -90,8 +103,8 @@ describe("MemoryExtractor", () => {
       await saveExtractedMemories({
         userId: "u1",
         threadId: "t1",
-        userMessage: "Hello",
-        assistantMessage: "Hi",
+        userMessage: "Please remember that I prefer concise answers in future chats.",
+        assistantMessage: "I will keep responses concise.",
         conversationMessages: 7, // 3 exchanges
       });
 

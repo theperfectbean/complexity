@@ -5,6 +5,7 @@ import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { createId } from "@/lib/db/cuid";
 import { documents, roles, users } from "@/lib/db/schema";
+import { runtimeConfig } from "@/lib/config";
 import { queueDocumentProcessing } from "@/lib/queue";
 import { ApiResponse } from "@/lib/api-response";
 import { logger } from "@/lib/logger";
@@ -84,15 +85,15 @@ export async function POST(
     return ApiResponse.badRequest(`Content type "${contentType}" is not supported. Use a URL that serves text, HTML, PDF, or DOCX.`);
   }
 
-  const MAX_BYTES = 10 * 1024 * 1024; // 10 MB
+  const MAX_BYTES = runtimeConfig.uploads.maxRoleFileSizeBytes;
   const contentLength = fetchResponse.headers.get("content-length");
   if (contentLength && parseInt(contentLength, 10) > MAX_BYTES) {
-    return ApiResponse.badRequest("URL content exceeds the 10 MB size limit.");
+    return ApiResponse.badRequest(`URL content exceeds the ${Math.floor(MAX_BYTES / (1024 * 1024))} MB size limit.`);
   }
 
   const buffer = Buffer.from(await fetchResponse.arrayBuffer());
   if (buffer.length > MAX_BYTES) {
-    return ApiResponse.badRequest("URL content exceeds the 10 MB size limit.");
+    return ApiResponse.badRequest(`URL content exceeds the ${Math.floor(MAX_BYTES / (1024 * 1024))} MB size limit.`);
   }
   const fileName = urlToFilename(url, title, contentType);
 

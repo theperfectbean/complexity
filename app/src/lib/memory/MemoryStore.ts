@@ -4,6 +4,34 @@ import { memories } from "@/lib/db/schema";
 import { getRedisClient } from "@/lib/redis";
 import { runtimeConfig } from "../config";
 
+function shouldUseSemanticMemorySearch(userText: string, memoryCount: number, topK: number): boolean {
+  if (memoryCount <= Math.max(topK * 2, 12)) {
+    return false;
+  }
+
+  const normalized = userText.trim().toLowerCase();
+  if (!normalized) {
+    return false;
+  }
+
+  const retrievalSignals = [
+    "remember",
+    "previous",
+    "last time",
+    "as i said",
+    "my preference",
+    "my preferences",
+    "my setup",
+    "my project",
+    "my workflow",
+    "for me",
+    "about me",
+    "personalize",
+  ];
+
+  return retrievalSignals.some((signal) => normalized.includes(signal)) || normalized.split(/\s+/).length >= 16;
+}
+
 export async function getMemoryContents(userId: string, roleId?: string | null, useCache = true): Promise<string[]> {
   const redis = getRedisClient();
   const cacheKey = roleId 
@@ -84,6 +112,10 @@ export async function searchMemories(userId: string, userText?: string, roleId?:
   const allMemories = await getMemoryContents(userId, roleId, true);
   if (allMemories.length <= k) {
     return allMemories;
+  }
+
+  if (!shouldUseSemanticMemorySearch(userText, allMemories.length, k)) {
+    return allMemories.slice(0, k);
   }
 
   try {

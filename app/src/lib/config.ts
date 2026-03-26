@@ -130,6 +130,8 @@ export const runtimeConfig = {
   },
   uploads: {
     maxRoleFileSizeBytes: env.ROLE_UPLOAD_MAX_FILE_SIZE ?? 50 * 1024 * 1024,
+    maxRoleExtractedChars: env.ROLE_UPLOAD_MAX_EXTRACTED_CHARS ?? 250_000,
+    maxRoleChunks: env.ROLE_UPLOAD_MAX_CHUNKS ?? 200,
   },
   auth: {
     passwordMinLength: env.AUTH_PASSWORD_MIN_LENGTH ?? 8,

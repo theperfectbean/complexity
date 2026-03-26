@@ -71,4 +71,29 @@ describe("Worker Resilience", () => {
     await expect(processor(mockJob)).rejects.toThrow("Extraction failed");
     expect(db.update).toHaveBeenCalled();
   });
+
+  it("should mark document as failed if chunk count exceeds cap", async () => {
+    const { chunkText } = await import("./rag");
+    const chunkTextMock = chunkText as unknown as ReturnType<typeof vi.fn>;
+    chunkTextMock.mockReturnValueOnce(Array.from({ length: 201 }, (_, i) => `chunk-${i}`));
+
+    const { Worker } = await import("bullmq");
+    startWorker();
+    const workerMock = Worker as unknown as ReturnType<typeof vi.fn>;
+    const processor = workerMock.mock.calls[0]?.[1] as (job: { id: string; data: Record<string, unknown> }) => Promise<unknown>;
+
+    const mockJob = {
+      id: "job-2",
+      data: {
+        documentId: "doc-2",
+        roleId: "role-1",
+        fileBase64: "SGVsbG8=",
+        fileName: "test.txt",
+        fileType: "text/plain",
+      },
+    };
+
+    await expect(processor(mockJob)).rejects.toThrow("Document exceeds 200 chunk limit");
+    expect(db.update).toHaveBeenCalled();
+  });
 });

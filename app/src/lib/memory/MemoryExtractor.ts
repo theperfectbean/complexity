@@ -45,6 +45,63 @@ export type ExtractionResult = {
   deletedIds: string[];
 };
 
+function shouldExtractMemoriesFromTurn(userMessage: string, assistantMessage: string): boolean {
+  const normalizedUser = userMessage.trim().toLowerCase();
+  const normalizedAssistant = assistantMessage.trim().toLowerCase();
+
+  if (!normalizedUser || !normalizedAssistant) {
+    return false;
+  }
+
+  const durableSignals = [
+    "i am ",
+    "i'm ",
+    "my name is",
+    "i live",
+    "i work",
+    "my job",
+    "my role",
+    "i prefer",
+    "i like",
+    "i dislike",
+    "i hate",
+    "my favorite",
+    "remember that",
+    "please remember",
+    "for future reference",
+    "always",
+    "never",
+    "use ",
+    "don't use ",
+  ];
+
+  const ephemeralSignals = [
+    "thank",
+    "thanks",
+    "hello",
+    "hi ",
+    "what is",
+    "what's",
+    "summarize",
+    "explain",
+    "search",
+    "look up",
+    "today",
+    "latest",
+    "news",
+  ];
+
+  if (durableSignals.some((signal) => normalizedUser.includes(signal))) {
+    return true;
+  }
+
+  if (ephemeralSignals.some((signal) => normalizedUser.includes(signal))) {
+    return false;
+  }
+
+  return normalizedUser.split(/\s+/).length >= 12;
+}
+
 function normalizeMemory(value: string): string {
   return value.trim().replace(/\s+/g, " ").toLowerCase();
 }
@@ -123,6 +180,10 @@ export async function saveExtractedMemories(params: {
   const { userId, threadId, userMessage, assistantMessage, conversationMessages, roleId } = params;
 
   if (!userMessage.trim() || !assistantMessage.trim()) {
+    return 0;
+  }
+
+  if (!shouldExtractMemoriesFromTurn(userMessage, assistantMessage)) {
     return 0;
   }
 

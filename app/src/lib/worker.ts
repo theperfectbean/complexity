@@ -9,6 +9,7 @@ import { extractTextFromFile, type DocumentFileLike } from "./documents";
 import { chunkText, getEmbeddings } from "./rag";
 import { assertSafeWebhookUrl, decryptWebhookSecret, signWebhookPayload, WEBHOOK_DELIVERY_TIMEOUT_MS } from "./webhooks";
 import { GoogleDriveService } from "./google-drive";
+import { runtimeConfig } from "./config";
 import fs from "fs/promises";
 
 const REDIS_URL = env.REDIS_URL;
@@ -81,10 +82,20 @@ export function startWorker() {
           log.info("Using pre-provided text for re-processing");
         }
 
+        if (text.length > runtimeConfig.uploads.maxRoleExtractedChars) {
+          throw new Error(
+            `Extracted text exceeds ${runtimeConfig.uploads.maxRoleExtractedChars.toLocaleString()} characters`
+          );
+        }
+
         const splitChunks = chunkText(text);
         
         if (splitChunks.length === 0) {
           throw new Error("No text extracted from file");
+        }
+
+        if (splitChunks.length > runtimeConfig.uploads.maxRoleChunks) {
+          throw new Error(`Document exceeds ${runtimeConfig.uploads.maxRoleChunks} chunk limit`);
         }
 
         log.info({ chunkCount: splitChunks.length }, "Generating embeddings");

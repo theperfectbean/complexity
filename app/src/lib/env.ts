@@ -82,6 +82,8 @@ const envSchema = z.object({
   CHAT_ENABLE_TITLE_GENERATION: z.enum(["true", "false"]).default("false"),
   CHAT_TITLING_MODEL: z.string().optional(),
   ROLE_UPLOAD_MAX_FILE_SIZE: z.coerce.number().int().positive().default(50 * 1024 * 1024),
+  ROLE_UPLOAD_MAX_EXTRACTED_CHARS: z.coerce.number().int().positive().default(250_000),
+  ROLE_UPLOAD_MAX_CHUNKS: z.coerce.number().int().positive().default(200),
   AUTH_PASSWORD_MIN_LENGTH: z.coerce.number().int().positive().default(8),
   AUTH_PASSWORD_REQUIRE_COMPLEXITY: z.enum(["true", "false"]).default("true"),
   AUTH_BCRYPT_COST: z.coerce.number().int().positive().default(12),
