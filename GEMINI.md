@@ -475,6 +475,16 @@ This strategy ensures all dependencies (Postgres, Redis, Embedder) are running w
   - Refactored `llm.ts` and `MemoryExtractor.ts` to consume the renamed generic client abstractions.
 - **Preservation**: Crucially, left `.env` variables (`PERPLEXITY_API_KEY`), model ID prefixes (`perplexity/sonar`), database columns (`perplexity_api_key`), and test artifacts untouched to preserve fully functional connectivity with the Perplexity API without breaking backwards compatibility.
 
+### Provider-Agnostic Model Abstraction (2026-03-26)
+- **Problem**: Hardcoded provider model IDs (like `sonar-pro` or `claude-3-5-sonnet`) in the business logic created a maintenance trap and prevented true provider agnosticism.
+- **Solution**: Implemented a dynamic mapping layer that decouples application-level model aliases from provider-specific IDs.
+- **Implementation**:
+  - Enhanced `ModelOption` with `providerModelId` (the actual ID sent to the API) and `capability` (high/medium/low tier) fields.
+  - Refactored `llm.ts` to use async resolution (`resolveDynamicModel`), prioritizing database-configured mappings over static fallbacks.
+  - Updated the **Admin Console** (Manage Models tab) to allow administrators to directly edit the `providerModelId` and `capability` tier for any model.
+  - Made `getLanguageModel` async across the system, requiring updates to `ChatService`, `MemoryExtractor`, and instruction generation routes.
+- **Benefit**: The application can now be updated to support new models or switch providers (including local runners like Ollama) entirely via the UI without code changes or deployments.
+
 ### Perplexity Agent API Preset and Prefix Fix (2026-03-19)
 - **Problem**: Users encountered `400 Bad Request` with `validation failed: model "sonar-pro" is not supported` when using presets like "Pro Search" or direct Perplexity models.
 - **Root Cause 1 (Preset Misplacement)**: Presets like `pro-search` and `fast-search` were being included in the `models` fallback array. The Perplexity Agent API (`/v1/responses`) requires presets to be passed via the `preset` parameter as a single string, and it does not allow them in the `models` array.
