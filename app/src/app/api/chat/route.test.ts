@@ -36,6 +36,15 @@ vi.mock("@/lib/rag", () => ({
 
 vi.mock("@/lib/settings", () => ({
   getApiKeys: vi.fn().mockResolvedValue({ PERPLEXITY_API_KEY: "test-key" }),
+  getDetailedSettings: vi.fn().mockResolvedValue({}),
+}));
+
+vi.mock("@/lib/model-registry", () => ({
+  getConfiguredModels: vi.fn().mockReturnValue([]),
+  MODEL_SETTINGS_KEYS: [],
+  getModelProvider: vi.fn().mockReturnValue("perplexity"),
+  getModelHealthTargetId: vi.fn().mockReturnValue("sonar"),
+  isModelEnabled: vi.fn().mockReturnValue(true),
 }));
 
 vi.mock("@/lib/webhooks", () => ({

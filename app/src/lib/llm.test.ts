@@ -7,6 +7,16 @@ vi.mock("./search-agent", () => ({
   runSearchAgent: vi.fn(),
 }));
 
+vi.mock("./settings", () => ({
+  getDetailedSettings: vi.fn().mockResolvedValue({}),
+  getApiKeys: vi.fn().mockResolvedValue({}),
+}));
+
+vi.mock("./model-registry", () => ({
+  getConfiguredModels: vi.fn().mockReturnValue([]),
+  MODEL_SETTINGS_KEYS: [],
+}));
+
 vi.mock("ai", async (importOriginal) => {
   const actual = await importOriginal<typeof import("ai")>();
   return {
@@ -90,11 +100,11 @@ describe("llm.ts", () => {
   });
 
   describe("getLanguageModel", () => {
-    it("throws if API key is missing", () => {
-      expect(() => getLanguageModel("anthropic/claude-3", {})).toThrow("ANTHROPIC_API_KEY is not configured");
+    it("throws if API key is missing", async () => {
+      await expect(getLanguageModel("anthropic/claude-3", {})).rejects.toThrow("ANTHROPIC_API_KEY is not configured");
     });
 
-    it("resolves anthropic model with alias", () => {
+    it("resolves anthropic model with alias", async () => {
         // We can't easily check the returned model object because it's an internal AI SDK object,
         // but we verified the logic doesn't crash and throws the right error when keys are missing.
     });
