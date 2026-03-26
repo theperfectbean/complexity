@@ -127,11 +127,20 @@ export const runtimeConfig = {
     defaultWebSearch: (env.CHAT_DEFAULT_WEB_SEARCH ?? "false") === "true",
     enableTitleGeneration: (env.CHAT_ENABLE_TITLE_GENERATION ?? "false") === "true",
     titlingModel: env.CHAT_TITLING_MODEL ?? "anthropic/claude-4-5-haiku-latest",
+    roleInstructionModel: env.CHAT_ROLE_INSTRUCTION_MODEL ?? "anthropic/claude-4-5-haiku-latest",
+    roleInstructionCacheTtlSeconds: env.CHAT_ROLE_INSTRUCTION_CACHE_TTL_SECONDS ?? 60 * 60 * 24,
+    dailyInputTokenBudget: env.CHAT_DAILY_INPUT_TOKEN_BUDGET ?? 500_000,
+    dailyOutputTokenBudget: env.CHAT_DAILY_OUTPUT_TOKEN_BUDGET ?? 250_000,
+    dailySearchBudget: env.CHAT_DAILY_SEARCH_BUDGET ?? 50,
+    dailyFetchBudget: env.CHAT_DAILY_FETCH_BUDGET ?? 100,
   },
   uploads: {
     maxRoleFileSizeBytes: env.ROLE_UPLOAD_MAX_FILE_SIZE ?? 50 * 1024 * 1024,
     maxRoleExtractedChars: env.ROLE_UPLOAD_MAX_EXTRACTED_CHARS ?? 250_000,
     maxRoleChunks: env.ROLE_UPLOAD_MAX_CHUNKS ?? 200,
+  },
+  cache: {
+    ragQueryTtlSeconds: env.RAG_QUERY_CACHE_TTL_SECONDS ?? 60 * 10,
   },
   auth: {
     passwordMinLength: env.AUTH_PASSWORD_MIN_LENGTH ?? 8,

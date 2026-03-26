@@ -1,11 +1,14 @@
-import { streamText, ModelMessage } from "ai";
+import { generateText, ModelMessage } from "ai";
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import crypto from "node:crypto";
 
 import { auth } from "../../../../auth";
 import { resolveRequestedModel } from "../../../../lib/available-models";
 import { getLanguageModel } from "../../../../lib/llm";
 import { getApiKeys } from "../../../../lib/settings";
+import { runtimeConfig } from "../../../../lib/config";
+import { getRedisClient } from "../../../../lib/redis";
 
 const schema = z.object({
   prompt: z.string().min(1),
@@ -25,8 +28,10 @@ export async function POST(request: Request) {
   }
 
   const { prompt, model: requestedModel } = parsed.data;
-  const safeModel = await resolveRequestedModel(requestedModel, { preferNonPreset: true });
+  const safeModel = await resolveRequestedModel(requestedModel ?? runtimeConfig.chat.roleInstructionModel, { preferNonPreset: true });
   const keys = await getApiKeys();
+  const redis = getRedisClient();
+  const cacheKey = `cache:role-instructions:${safeModel}:${crypto.createHash("sha256").update(prompt).digest("hex")}`;
 
   console.log(`[generate-instructions] Requested: ${requestedModel}, Resolved: ${safeModel}`);
 
@@ -39,16 +44,34 @@ Focus on:
 3. Knowledge and Constraints: What are its boundaries?
 4. Format: How should it structure its output?
 
-Output ONLY the instructions text. DO NOT include any preamble like "Here are the instructions..." or conversational filler. DO NOT wrap the output in markdown code blocks. Just provide the raw text that will be used as the system prompt.`;
+  Output ONLY the instructions text. DO NOT include any preamble like "Here are the instructions..." or conversational filler. DO NOT wrap the output in markdown code blocks. Just provide the raw text that will be used as the system prompt.`;
 
   try {
+    if (redis) {
+      const cached = await redis.get(cacheKey);
+      if (cached) {
+        return new Response(cached, {
+          status: 200,
+          headers: { "Content-Type": "text/plain; charset=utf-8" },
+        });
+      }
+    }
+
     const langModel = await getLanguageModel(safeModel, keys);
-    const result = streamText({
+    const result = await generateText({
       model: langModel,
       system: systemInstructions,
       messages: [{ role: "user", content: [{ type: "text", text: prompt }] }] as ModelMessage[],
     });
-    return result.toUIMessageStreamResponse();
+
+    if (redis && result.text) {
+      await redis.set(cacheKey, result.text, "EX", runtimeConfig.chat.roleInstructionCacheTtlSeconds);
+    }
+
+    return new Response(result.text, {
+      status: 200,
+      headers: { "Content-Type": "text/plain; charset=utf-8" },
+    });
   } catch (error) {
     console.error("[generate-instructions] Error:", error);
     return NextResponse.json({ error: "Failed to generate instructions" }, { status: 500 });

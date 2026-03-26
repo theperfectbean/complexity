@@ -29,3 +29,15 @@ export function getDefaultModel(): ModelId {
 
   return preferred?.id || models[0]?.id || "anthropic/claude-4-5-haiku-latest";
 }
+
+export function getBudgetFallbackModel(): ModelId {
+  const localModel =
+    MODELS.find((model) => model.id.startsWith("ollama/")) ??
+    MODELS.find((model) => model.id.startsWith("local-openai/"));
+
+  const cheapRemoteModel =
+    MODELS.find((model) => !model.isPreset && model.capability === "low") ??
+    MODELS.find((model) => !model.isPreset && model.capability === "medium");
+
+  return (localModel?.id || cheapRemoteModel?.id || getDefaultModel()) as ModelId;
+}

@@ -8,6 +8,7 @@ import { MODELS } from "../models";
 import { type Citation } from "../extraction-utils";
 import type { ChatSession, ThreadInfo } from "./types";
 import type { UIMessageChunk } from "ai";
+import { shouldUseRag } from "../chat-routing";
 
 export class ContextAssembler {
   private log;
@@ -48,36 +49,9 @@ ${content}`;
     }
   }
 
-  private shouldUseRag(userText: string): boolean {
-    const normalized = userText.trim().toLowerCase();
-    if (!normalized) return false;
-
-    const retrievalSignals = [
-      "document",
-      "documents",
-      "file",
-      "files",
-      "pdf",
-      "docx",
-      "txt",
-      "markdown",
-      "md",
-      "uploaded",
-      "upload",
-      "knowledge base",
-      "knowledgebase",
-      "according to",
-      "from the docs",
-      "from my docs",
-      "in the docs",
-      "in the files",
-      "based on the files",
-      "use the role",
-      "use the documents",
-      "what does the document say",
-    ];
-
-    return retrievalSignals.some((signal) => normalized.includes(signal));
+  private getRagCacheKey(roleId: string, userText: string): string {
+    const normalized = userText.trim().toLowerCase().replace(/\s+/g, " ").slice(0, 400);
+    return `cache:rag:${roleId}:${Buffer.from(normalized).toString("base64")}`;
   }
 
   async assemble(session: ChatSession, thread: ThreadInfo, userText: string, writer: { write: (chunk: UIMessageChunk) => void }): Promise<{ instructions: string; ragCitations: Citation[]; memoriesFound: number }> {
@@ -87,11 +61,35 @@ ${content}`;
     let ragContext = "";
     const ragCitations: Citation[] = [];
 
-    if (roleId && this.shouldUseRag(userText)) {
+    if (roleId && (session.routing?.useRag ?? shouldUseRag(userText))) {
       writer.write({ type: "data-call-start", data: { callId: "rag-search", toolName: "Retrieval", input: { query: userText } } } as UIMessageChunk);
       try {
-        const [embedding] = await getEmbeddings([userText]);
-        const results = await hybridSearch(roleId, userText, embedding, runtimeConfig.rag.similarityTopK);
+        let results: Awaited<ReturnType<typeof hybridSearch>> | null = null;
+        const cacheKey = this.getRagCacheKey(roleId, userText);
+
+        if (session.redis) {
+          try {
+            const cached = await session.redis.get(cacheKey);
+            if (cached) {
+              results = JSON.parse(cached) as Awaited<ReturnType<typeof hybridSearch>>;
+            }
+          } catch {
+            // Ignore cache read errors.
+          }
+        }
+
+        if (!results) {
+          const [embedding] = await getEmbeddings([userText]);
+          results = await hybridSearch(roleId, userText, embedding, runtimeConfig.rag.similarityTopK);
+          if (session.redis) {
+            try {
+              await session.redis.set(cacheKey, JSON.stringify(results), "EX", runtimeConfig.cache.ragQueryTtlSeconds);
+            } catch {
+              // Ignore cache write errors.
+            }
+          }
+        }
+
         this.log.info({ count: results.length }, "Hybrid search complete");
         if (results.length > 0) {
           ragContext = results.map((c, i) => `(${i + 1}) ${c.content}`).join("\n\n");
@@ -118,12 +116,14 @@ ${content}`;
     let memoryPrompt = "";
     let memoriesFound = 0;
     
-    if (memoryEnabled) {
+    if (memoryEnabled && (session.routing?.useMemory ?? true)) {
       writer.write({ type: "data-call-start", data: { callId: "memory-search", toolName: "Recall", input: { query: userText } } } as UIMessageChunk);
       const memResult = await getMemoryPrompt(userId, userText, roleId);
       memoryPrompt = memResult.prompt;
       memoriesFound = memResult.count;
       writer.write({ type: "data-call-result", data: { callId: "memory-search", result: memoriesFound > 0 ? `Recalled ${memoriesFound} relevant memories.` : "No relevant memories found." } } as UIMessageChunk);
+    } else if (memoryEnabled) {
+      this.log.info("Skipping memory retrieval for prompt without personalization signals");
     }
     
     const agenticGuidelines = `

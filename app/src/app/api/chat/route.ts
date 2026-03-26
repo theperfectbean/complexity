@@ -9,6 +9,7 @@ import { z } from "zod";
 import { UIMessage } from "ai";
 import { requireUserOrApiToken } from "@/lib/auth-server";
 import { ApiResponse } from "@/lib/api-response";
+import { getChatRoutingDecision } from "@/lib/chat-routing";
 
 const schema = z.object({
   threadId: z.string().min(1),
@@ -71,6 +72,19 @@ export async function POST(request: Request) {
     }
 
     const redis = getRedisClient();
+    const lastTextPart = lastParts.find((part): part is { type?: string; text?: string } => {
+      if (!part || typeof part !== "object") return false;
+      return (part as Record<string, unknown>).type === "text" && typeof (part as Record<string, unknown>).text === "string";
+    });
+    const userText = typeof lastTextPart?.text === "string" ? lastTextPart.text : "";
+    const webSearchExplicit = Object.prototype.hasOwnProperty.call(body, "webSearch");
+    const routing = getChatRoutingDecision({
+      userText,
+      roleId: parsed.data.roleId,
+      webSearchRequested: parsed.data.webSearch,
+      webSearchExplicit,
+    });
+
     const chatSession: ChatSession = {
       requestId,
       userEmail,
@@ -79,8 +93,10 @@ export async function POST(request: Request) {
       messages: parsed.data.messages as UIMessage[],
       roleId: parsed.data.roleId,
       webSearch: parsed.data.webSearch,
+      webSearchExplicit,
       trigger: parsed.data.trigger,
       redis,
+      routing,
     };
 
     const chatService = new ChatService(chatSession);

@@ -12,6 +12,8 @@ import { runtimeConfig } from "./config";
 import { createId } from "./db/cuid";
 import { estimateUsageCostUsd } from "./cost-estimation";
 import type { Responses } from "@perplexity-ai/perplexity_ai/resources/responses";
+import { applyBudgetGuardrails, getChatBudgetState, recordChatBudgetUsage } from "./chat-budget";
+import { getChatRoutingDecision } from "./chat-routing";
 
 import { ChatSessionValidator } from "./chat/ChatSessionValidator";
 import { ChatHistoryManager } from "./chat/ChatHistoryManager";
@@ -159,8 +161,23 @@ export class ChatService {
             writer.write({ type: "text-start", id: textId });
 
             const keys = await getApiKeys();
+            const initialRouting = this.session.routing ?? getChatRoutingDecision({
+              userText,
+              roleId: thread.roleId,
+              memoryEnabled: thread.memoryEnabled,
+              webSearchRequested: !!webSearch,
+              webSearchExplicit: this.session.webSearchExplicit,
+            });
+            const budgetState = await getChatBudgetState(this.session.redis, this.session.userEmail);
+            const budgeted = applyBudgetGuardrails(model, initialRouting, budgetState);
+            this.session.model = budgeted.modelId;
+            this.session.routing = budgeted.routing;
 
             const { instructions, ragCitations, memoriesFound } = await this.assembler.assemble(this.session, thread, userText, writer);
+
+            if (budgeted.notices.length > 0) {
+              writer.write({ type: "data-json", data: { kind: "budget-applied", notices: budgeted.notices } } as UIMessageChunk);
+            }
 
             // Write RAG citations early so they appear in the UI
             ragCitations.forEach((c, i) => {
@@ -177,7 +194,7 @@ export class ChatService {
                 keys,
                 requestId,
                 textId,
-                webSearch: !!webSearch,
+                webSearch: budgeted.routing.allowWebSearch,
                 writer,
               });
             } catch (genError) {
@@ -204,6 +221,13 @@ export class ChatService {
 
             await this.history.setCache(this.session, cacheKey, { text: assistantText, citations });
             await this.history.saveAssistantMessage(this.session, responseMessageId, assistantText, citations, memoriesFound > 0, result.usage);
+            await recordChatBudgetUsage(this.session.redis, this.session.userEmail, {
+              modelId: this.session.model,
+              promptTokens: result.usage?.promptTokens,
+              completionTokens: result.usage?.completionTokens,
+              searchCount: result.usage?.searchCount,
+              fetchCount: result.usage?.fetchCount,
+            });
 
             if (thread.memoryEnabled) {
               const memoryPromise = saveExtractedMemories({

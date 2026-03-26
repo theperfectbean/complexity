@@ -1,5 +1,6 @@
 import type { UIMessage } from "ai";
 import type Redis from "ioredis";
+import type { ChatRoutingDecision } from "../chat-routing";
 
 export type Citation = {
   url?: string;
@@ -20,8 +21,10 @@ export interface ChatSession {
   messages: UIMessage[];
   roleId?: string | null;
   webSearch?: boolean;
+  webSearchExplicit?: boolean;
   trigger?: string;
   redis: Redis | null;
+  routing?: ChatRoutingDecision;
 }
 
 export interface ThreadInfo {
