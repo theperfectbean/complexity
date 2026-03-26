@@ -76,6 +76,7 @@ describe("llm.ts", () => {
         completedResponse: {}, 
         usage: { promptTokens: 10, completionTokens: 5 } 
       };
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       vi.mocked(searchAgent.runSearchAgent).mockResolvedValue(mockResult as any);
 
       const mockWriter = { write: vi.fn() };
