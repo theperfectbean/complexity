@@ -6,6 +6,15 @@ import { runtimeConfig } from "../config";
 import { createId } from "../db/cuid";
 import crypto from "node:crypto";
 import type { ChatSession, CachedChatPayload, Citation } from "./types";
+import { asRecord } from "../extraction-utils";
+
+type StoredAttachment = {
+  url?: string;
+  contentType?: string;
+  mediaType?: string;
+  filename?: string;
+  name?: string;
+};
 
 export class ChatHistoryManager {
   private log;
@@ -45,8 +54,8 @@ export class ChatHistoryManager {
     const userMessageId = lastMessage?.id || createId();
     
     if (!isRegenerate) {
-      const lastMsg = lastMessage as any;
-      const attachments = lastMsg?.experimental_attachments || lastMsg?.attachments || null;
+      const lastMsg = asRecord(lastMessage);
+      const attachments = (lastMsg?.experimental_attachments || lastMsg?.attachments || null) as StoredAttachment[] | null;
 
       this.log.info({ userMessageId, threadId, hasAttachments: !!attachments }, "Saving user message to DB");
 
@@ -75,7 +84,7 @@ export class ChatHistoryManager {
       searchCount?: number;
       fetchCount?: number;
     },
-    attachments?: any[]
+    attachments?: StoredAttachment[]
   ): Promise<void> {
     const { threadId, model } = session;
     await db.insert(messages).values({

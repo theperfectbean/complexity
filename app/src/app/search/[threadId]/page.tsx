@@ -30,7 +30,19 @@ type ThreadPayload = {
     role: string;
     content: string;
     citations: unknown;
+    memoriesUsed?: boolean;
+    attachments?: unknown;
   }>;
+};
+
+type MessagePart =
+  | { type: "text"; text: string }
+  | { type: "file"; url: string; mediaType: string; filename: string };
+
+type StoredAttachment = {
+  url?: string;
+  contentType?: string;
+  name?: string;
 };
 
 function getChatErrorMessage(error: Error | undefined): string {
@@ -390,7 +402,7 @@ function ThreadChat({
           ),
         );
 
-        const parts: any[] = [];
+        const parts: MessagePart[] = [];
         if (initialQuery) {
           parts.push({ type: "text", text: initialQuery });
         }
@@ -408,8 +420,10 @@ function ThreadChat({
 
         console.log(`Sending initial query with ${parts.length} parts (text: ${!!initialQuery}, files: ${fileParts.length})`);
 
+        const outgoingMessage = { parts } as Parameters<typeof sendMessage>[0];
+
         await sendMessage(
-          { parts } as any,
+          outgoingMessage,
           {
             body: {
               threadId,
@@ -729,7 +743,7 @@ export default function ThreadPage() {
             content: message.content,
             citations: normalizeCitations(message.citations),
             memoriesUsed: (message as { memoriesUsed?: boolean }).memoriesUsed ?? false,
-            attachments: (message as any).attachments,
+            attachments: message.attachments as StoredAttachment[] | undefined,
           })),
           hasMore: payload.hasMore,
           nextCursor: payload.nextCursor,

@@ -2,7 +2,7 @@ import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { encode } from "gpt-tokenizer";
 import type { ChatMessageItem, ChatCitation, ChatThinkingPart } from "@/components/chat/MessageList";
-import { collectTextStrings } from "./extraction-utils";
+import { asRecord, collectTextStrings } from "./extraction-utils";
 
 /**
  * Formats a model ID or label into a human-readable string.
@@ -188,15 +188,22 @@ export function normalizeUIMessage(message: unknown): ChatMessageItem {
   }
 
   const attachments: Array<{ url?: string; contentType?: string; name?: string }> = [];
+  type RawAttachment = {
+    url?: string;
+    contentType?: string;
+    mediaType?: string;
+    name?: string;
+  };
 
   // SDK v6 puts them in experimental_attachments or attachments
-  const rawAttachments = (msg.experimental_attachments || msg.attachments || []) as any[];
+  const rawAttachments = (msg.experimental_attachments || msg.attachments || []) as unknown[];
   rawAttachments.forEach((a) => {
-    if (a && typeof a === "object") {
+    const attachment = asRecord(a) as RawAttachment | null;
+    if (attachment) {
       attachments.push({
-        url: a.url as string,
-        contentType: (a.contentType as string) || (a.mediaType as string),
-        name: a.name as string,
+        url: attachment.url,
+        contentType: attachment.contentType || attachment.mediaType,
+        name: attachment.name,
       });
     }
   });

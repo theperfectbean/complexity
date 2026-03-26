@@ -4,7 +4,7 @@ import OpenAI from "openai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createXai } from "@ai-sdk/xai";
 import { createOllama } from "ai-sdk-ollama";
-import { LanguageModel, streamText, UIMessageChunk, UIMessage, generateText, ModelMessage } from "ai";
+import { LanguageModel, streamText, UIMessageChunk, UIMessage, generateText } from "ai";
 import type { Responses } from "@perplexity-ai/perplexity_ai/resources/responses";
 import { runSearchAgent } from "./search-agent";
 import { runtimeConfig } from "./config";
@@ -62,6 +62,15 @@ export interface GenerationResult {
     fetchCount?: number;
   };
 }
+
+type CoreMessageContent =
+  | { type: "text"; text: string }
+  | { type: "image"; image: Buffer };
+
+type CoreMessage = {
+  role: "user" | "assistant" | "system";
+  content: CoreMessageContent[];
+};
 
 const PROVIDER_PREFIX_MAP: Record<string, ProviderType> = {
   "perplexity/": "perplexity",
@@ -279,7 +288,7 @@ export async function runGeneration(options: GenerationOptions): Promise<Generat
           const { extractTextFromMessage, collectFileParts } = await import("./chat-utils");
           const text = await extractTextFromMessage(msg);
           
-          const content: any[] = [];
+          const content: CoreMessageContent[] = [];
           if (text.trim()) {
             content.push({ type: "text", text });
           }
@@ -305,13 +314,13 @@ export async function runGeneration(options: GenerationOptions): Promise<Generat
           return {
             role: msg.role as "user" | "assistant" | "system",
             content,
-          };
+          } satisfies CoreMessage;
         }));
 
         const { text } = await generateText({
           model: langModel,
           system: options.system,
-          messages: coreMessages as any,
+          messages: coreMessages as never,
         });
 
         return {
@@ -341,7 +350,7 @@ export async function runGeneration(options: GenerationOptions): Promise<Generat
       const { extractTextFromMessage, collectFileParts } = await import("./chat-utils");
       const text = await extractTextFromMessage(msg);
       
-      const content: any[] = [];
+      const content: CoreMessageContent[] = [];
       if (text.trim()) {
         content.push({ type: "text", text });
       }
@@ -367,13 +376,13 @@ export async function runGeneration(options: GenerationOptions): Promise<Generat
       return {
         role: msg.role as "user" | "assistant" | "system",
         content,
-      };
+      } satisfies CoreMessage;
     }));
 
     const result = streamText({
       model,
       system: options.system,
-      messages: coreMessages as any,
+      messages: coreMessages as never,
       tools: options.webSearch && env.TAVILY_API_KEY ? { webSearch: webSearchTool } : undefined,
       // @ts-expect-error - maxSteps is not recognized in this version of streamText
       maxSteps: options.webSearch ? 5 : 1,
