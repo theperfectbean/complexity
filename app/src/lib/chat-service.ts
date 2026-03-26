@@ -10,6 +10,7 @@ import { eq } from "drizzle-orm";
 import { extractTextFromMessage, collectFileParts } from "./chat-utils";
 import { runtimeConfig } from "./config";
 import { createId } from "./db/cuid";
+import { estimateUsageCostUsd } from "./cost-estimation";
 import type { Responses } from "@perplexity-ai/perplexity_ai/resources/responses";
 
 import { ChatSessionValidator } from "./chat/ChatSessionValidator";
@@ -188,6 +189,13 @@ export class ChatService {
 
             const assistantText = result.text || runtimeConfig.chat.emptyResponseFallbackText;
             const citations = [...ragCitations, ...(result.citations || [])];
+            const estimatedCostUsd = estimateUsageCostUsd({
+              modelId: model,
+              promptTokens: result.usage?.promptTokens,
+              completionTokens: result.usage?.completionTokens,
+              searchCount: result.usage?.searchCount,
+              fetchCount: result.usage?.fetchCount,
+            });
 
             citations.forEach((c: { url?: string; title?: string }, i: number) => {
               if (c.url?.startsWith("complexity://")) return; // Already written
@@ -220,7 +228,14 @@ export class ChatService {
               }
             }
 
-            this.log.info({ duration: Date.now() - startTime }, "Finished request");
+            this.log.info({
+              duration: Date.now() - startTime,
+              promptTokens: result.usage?.promptTokens,
+              completionTokens: result.usage?.completionTokens,
+              searchCount: result.usage?.searchCount,
+              fetchCount: result.usage?.fetchCount,
+              estimatedCostUsd,
+            }, "Finished request");
 
             // Trigger Webhooks
             void triggerWebhook(thread.userId, "thread.completed", {

@@ -4,6 +4,7 @@ import { sql, desc, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { users, threads, messages, memories, documents, chunks, roles } from "@/lib/db/schema";
 import { requireAdmin } from "@/lib/auth-server";
+import { estimateUsageCostUsd } from "@/lib/cost-estimation";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +24,9 @@ export async function GET() {
       roleActivity: [],
       dailyActivity: [],
       tokens: [],
+      costs: {
+        totalAssistantCostUsd: 0,
+      },
     });
   }
 
@@ -99,6 +103,36 @@ export async function GET() {
     .orderBy(desc(sql`sum(coalesce(prompt_tokens, 0) + coalesce(completion_tokens, 0))`)),
   ]);
 
+  const tokens = tokenEstimation.map((t: {
+    model: string | null;
+    promptTokens: number;
+    completionTokens: number;
+    searchCount: number;
+    fetchCount: number;
+    totalChars: number | null;
+  }) => {
+    const estimatedTokens = t.promptTokens + t.completionTokens > 0
+      ? t.promptTokens + t.completionTokens
+      : Math.round((t.totalChars || 0) / 4);
+    const estimatedCostUsd = estimateUsageCostUsd({
+      modelId: t.model,
+      promptTokens: t.promptTokens,
+      completionTokens: t.completionTokens,
+      searchCount: t.searchCount,
+      fetchCount: t.fetchCount,
+    });
+
+    return {
+      model: t.model,
+      promptTokens: t.promptTokens,
+      completionTokens: t.completionTokens,
+      searchCount: t.searchCount,
+      fetchCount: t.fetchCount,
+      estimatedTokens,
+      estimatedCostUsd,
+    };
+  });
+
   return NextResponse.json({
     totals: {
       users: userCount.count,
@@ -112,23 +146,9 @@ export async function GET() {
     userActivity,
     roleActivity,
     dailyActivity,
-    tokens: tokenEstimation.map((t: { 
-      model: string | null; 
-      promptTokens: number; 
-      completionTokens: number; 
-      searchCount: number; 
-      fetchCount: number; 
-      totalChars: number | null; 
-    }) => ({
-      model: t.model,
-      promptTokens: t.promptTokens,
-      completionTokens: t.completionTokens,
-      searchCount: t.searchCount,
-      fetchCount: t.fetchCount,
-      // For old messages without token counts, provide the rough estimate
-      estimatedTokens: t.promptTokens + t.completionTokens > 0 
-        ? t.promptTokens + t.completionTokens 
-        : Math.round((t.totalChars || 0) / 4)
-    })),
+    tokens,
+    costs: {
+      totalAssistantCostUsd: Number(tokens.reduce((sum, token) => sum + token.estimatedCostUsd, 0).toFixed(6)),
+    },
   });
 }

@@ -16,9 +16,13 @@ type AnalyticsData = {
   userActivity: { email: string; name: string | null; count: number }[];
   roleActivity: { roleName: string | null; count: number }[];
   dailyActivity: { day: string; threads: number }[];
+  costs: {
+    totalAssistantCostUsd: number;
+  };
   tokens: { 
     model: string | null; 
     estimatedTokens: number;
+    estimatedCostUsd: number;
     promptTokens: number;
     completionTokens: number;
     searchCount: number;
@@ -195,7 +199,20 @@ export function AnalyticsDashboard() {
         </div>
 
         <div className="rounded-2xl border bg-card p-6 shadow-xs">
-          <h3 className="mb-4 text-sm font-semibold">Detailed Resource Usage (Assistant)</h3>
+          <div className="mb-4 flex items-start justify-between gap-4">
+            <div>
+              <h3 className="text-sm font-semibold">Detailed Resource Usage (Assistant)</h3>
+              <p className="text-[11px] text-muted-foreground">
+                Heuristic cost estimate from stored tokens and search/fetch counts.
+              </p>
+            </div>
+            <div className="text-right">
+              <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Approx. Total</p>
+              <p className="text-sm font-semibold tabular-nums text-amber-600">
+                ${loading ? "—" : (data?.costs.totalAssistantCostUsd ?? 0).toFixed(2)}
+              </p>
+            </div>
+          </div>
           {loading ? (
             <div className="space-y-2">
               {[...Array(3)].map((_, i) => <div key={i} className="h-8 animate-pulse rounded bg-muted/40" />)}
@@ -213,9 +230,14 @@ export function AnalyticsDashboard() {
                       <span className="truncate text-xs font-medium text-muted-foreground" title={t.model || "Default"}>
                         {t.model || "Default"}
                       </span>
-                      <span className="text-[10px] font-semibold text-amber-500 tabular-nums">
-                        {(t.estimatedTokens / 1000).toFixed(1)}k tokens
-                      </span>
+                      <div className="text-right">
+                        <p className="text-[10px] font-semibold text-amber-500 tabular-nums">
+                          ${(t.estimatedCostUsd || 0).toFixed(2)}
+                        </p>
+                        <p className="text-[10px] text-muted-foreground tabular-nums">
+                          {(t.estimatedTokens / 1000).toFixed(1)}k tokens
+                        </p>
+                      </div>
                     </div>
                     <div className="flex items-center gap-3">
                       <div className="flex-1 rounded-full bg-muted/40 h-2 overflow-hidden">
