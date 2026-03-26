@@ -246,7 +246,21 @@ export async function runGeneration(options: GenerationOptions): Promise<Generat
   const log = getLogger(options.requestId);
 
   if (provider === "perplexity") {
-    log.info({ modelId: options.modelId, modelName }, "Routing to Perplexity Agent");
+    const shouldUsePerplexityAgent =
+      !!options.webSearch ||
+      isPresetModel(options.modelId) ||
+      ["fast-search", "pro-search", "deep-research", "advanced-deep-research"].includes(options.modelId);
+
+    if (!shouldUsePerplexityAgent) {
+      log.info({ modelId: options.modelId, modelName }, "Routing Perplexity model through standard chat path");
+    } else {
+      log.info({ modelId: options.modelId, modelName }, "Routing to Perplexity Agent");
+    }
+  }
+
+  if (provider === "perplexity" && (!!options.webSearch ||
+      isPresetModel(options.modelId) ||
+      ["fast-search", "pro-search", "deep-research", "advanced-deep-research"].includes(options.modelId))) {
     try {
       const primaryModel = mapToPerplexityModel(modelName);
       

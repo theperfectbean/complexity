@@ -70,7 +70,7 @@ describe("llm.ts", () => {
   });
 
   describe("runGeneration", () => {
-    it("routes perplexity agent models to runSearchAgent and maps model ID", async () => {
+    it("routes Perplexity search presets to runSearchAgent", async () => {
       const mockResult = { 
         text: "hello", 
         completedResponse: {}, 
@@ -82,7 +82,7 @@ describe("llm.ts", () => {
       const mockWriter = { write: vi.fn() };
 
       const result = await runGeneration({
-        modelId: "perplexity/anthropic/claude-4-6-sonnet-latest",
+        modelId: "pro-search",
         messages: [{ role: "user", content: "hello" } as unknown as UIMessage],
         system: "System prompt",
         agentInput: [],
@@ -93,7 +93,7 @@ describe("llm.ts", () => {
       });
 
       expect(searchAgent.runSearchAgent).toHaveBeenCalledWith(expect.objectContaining({
-        modelId: ["sonar-reasoning-pro", "perplexity/sonar"],
+        modelId: "pro-search",
       }));
       expect(result.text).toBe("hello");
     });

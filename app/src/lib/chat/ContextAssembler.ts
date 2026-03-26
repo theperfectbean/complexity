@@ -133,6 +133,11 @@ ${content}`;
 - Your goal is to provide the final answer or ask a specific clarifying question about the topic.
 - Do not ask for permission to search; assume you have it.
 - If you are "thinking," do it silently via the tool-calling mechanism, not by generating conversational text about your internal process.`;
+    const conversationalGuidelines = `
+- Respond naturally and proportionally to the user's prompt.
+- For simple greetings or casual chat, reply briefly and conversationally.
+- Do not define obvious words or give encyclopedic explanations unless the user asked for that.
+- Only use a formal, structured answer when the prompt actually calls for it.`;
 
     const chartInstructions = `
 
@@ -144,7 +149,7 @@ CRITICAL: If the user asks to visualize data (like time-series or numerical trac
 
     const instructions = [
       identityGuidelines,
-      agenticGuidelines,
+      session.routing?.allowWebSearch ? agenticGuidelines : conversationalGuidelines,
       memoryPrompt,
       roleInstructions,
       thread.systemPrompt ? `User's Thread-Specific Instructions:
