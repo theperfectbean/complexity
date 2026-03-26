@@ -9,6 +9,7 @@ import { threads } from "@/lib/db/schema";
 import { resolveRequestedModel } from "@/lib/available-models";
 import { generateThreadTitle } from "@/lib/llm";
 import { getApiKeys } from "@/lib/settings";
+import { runtimeConfig } from "@/lib/config";
 
 const createSchema = z.object({
   title: z.string().min(1).max(200).optional(),
@@ -79,7 +80,9 @@ export async function POST(request: Request) {
   if (!title && parsed.data.initialMessage) {
     try {
       const keys = await getApiKeys();
-      title = await generateThreadTitle(parsed.data.initialMessage, safeModel, keys);
+      // Use the dedicated titling model to save costs
+      const titlingModelId = runtimeConfig.chat.titlingModel;
+      title = await generateThreadTitle(parsed.data.initialMessage, titlingModelId, keys);
     } catch {
       // Fallback to truncation if summarize fails
       title = parsed.data.initialMessage.slice(0, 60);

@@ -107,8 +107,8 @@ export class ChatService {
       });
     }
 
-    // Context Window Management: truncate history to the last 30 messages
-    const MAX_CONTEXT_MESSAGES = 30;
+    // Context Window Management: truncate history to the last 12 messages
+    const MAX_CONTEXT_MESSAGES = 12;
     const contextMessages = inputMessages.length > MAX_CONTEXT_MESSAGES 
       ? inputMessages.slice(-MAX_CONTEXT_MESSAGES) 
       : inputMessages;
@@ -128,10 +128,7 @@ export class ChatService {
 
       collectFileParts(msg).forEach((att) => {
         if (att.url?.startsWith("data:") && (att.mediaType || att.contentType || "").startsWith("image/")) {
-          const base64 = att.url.split(",")[1];
-          if (base64) {
-            content.push({ type: "input_image", image: base64 } as any);
-          }
+          content.push({ type: "input_image", image_url: att.url });
         }
       });
 

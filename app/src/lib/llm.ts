@@ -237,6 +237,7 @@ export async function runGeneration(options: GenerationOptions): Promise<Generat
   const log = getLogger(options.requestId);
 
   if (provider === "perplexity") {
+    log.info({ modelId: options.modelId, modelName }, "Routing to Perplexity Agent");
     try {
       const primaryModel = mapToPerplexityModel(modelName);
       

@@ -90,6 +90,9 @@ export async function runSearchAgent(options: SearchAgentOptions): Promise<Searc
     stream: true,
   } as Responses.ResponseCreateParamsStreaming;
 
+  log.info({ modelConfig, inputCount: filteredInput.length, instructionsLength: instructions.length }, "Sending request to Perplexity Agent API");
+  // log.debug({ requestBody }, "Perplexity Agent API request body"); // Use with caution, can be very large with images
+
   // Calculate prompt tokens
   const promptText = [
     instructions,
@@ -288,6 +291,7 @@ export async function runSearchAgent(options: SearchAgentOptions): Promise<Searc
 
           if (eventRecord.type === "response.failed") {
             const message = eventRecord.error?.message || "";
+            log.error({ eventRecord }, "Perplexity Agent API reported failure");
             if (!hasWrittenTextDelta) {
               streamingFailed = true;
               return;
@@ -330,6 +334,7 @@ export async function runSearchAgent(options: SearchAgentOptions): Promise<Searc
   }
 
   const completionTokens = encode(assistantText).length;
+  log.info({ assistantTextLength: assistantText.length, completionTokens }, "Perplexity Agent generation complete");
 
   return { 
     text: assistantText, 
