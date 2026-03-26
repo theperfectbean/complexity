@@ -46,7 +46,7 @@ Output ONLY the instructions text. DO NOT include any preamble like "Here are th
     const result = streamText({
       model: langModel,
       system: systemInstructions,
-      prompt,
+      messages: [{ role: "user", content: prompt }] as any[],
     });
     return result.toUIMessageStreamResponse();
   } catch (error) {

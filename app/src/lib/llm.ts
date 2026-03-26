@@ -111,18 +111,42 @@ export function getProviderAndModel(modelId: string): { provider: ProviderType; 
 }
 
 /**
+ * Resolves a model name to a specific ID that Perplexity understands.
+ * Handles both modern 'latest' IDs and legacy IDs for backwards compatibility.
+ */
+function resolvePerplexityModelName(modelName: string): string {
+  const mapping: Record<string, string> = {
+    "anthropic/claude-4-5-haiku-latest": "sonar-pro",
+    "anthropic/claude-4-6-sonnet-latest": "sonar-reasoning-pro",
+    "anthropic/claude-4-6-opus-latest": "sonar-reasoning-pro",
+    "google/gemini-3.1-pro-preview": "sonar-reasoning-pro",
+    "google/gemini-3-flash-preview": "sonar-pro",
+    "openai/gpt-5.4": "sonar-reasoning-pro",
+    "openai/gpt-4o": "sonar-reasoning-pro",
+    // Legacy IDs currently in user databases
+    "anthropic/claude-haiku-4-5": "sonar-pro",
+    "anthropic/claude-sonnet-4-6": "sonar-reasoning-pro",
+    "anthropic/claude-opus-4-6": "sonar-reasoning-pro",
+  };
+
+  return mapping[modelName] || modelName;
+}
+
+/**
  * Maps internal model IDs to IDs that Perplexity API understands.
  * Native models (sonar) require the 'perplexity/' prefix in the Agent API,
  * while presets (fast-search) and third-party models (anthropic/claude-...) do not.
  */
 function mapToPerplexityModel(modelName: string): string {
-  if (["fast-search", "pro-search", "deep-research", "advanced-deep-research"].includes(modelName)) {
-    return modelName;
+  const resolved = resolvePerplexityModelName(modelName);
+
+  if (["fast-search", "pro-search", "deep-research", "advanced-deep-research"].includes(resolved)) {
+    return resolved;
   }
-  if (modelName.includes("/")) {
-    return modelName;
+  if (resolved === "sonar") {
+    return "perplexity/sonar";
   }
-  return `perplexity/${modelName}`;
+  return resolved;
 }
 
 export async function getLanguageModel(modelId: string, keys: Record<string, string | null>): Promise<LanguageModel> {
@@ -188,20 +212,7 @@ export async function getLanguageModel(modelId: string, keys: Record<string, str
     const perplexityKey = keys["PERPLEXITY_API_KEY"];
     if (!perplexityKey) throw new Error("PERPLEXITY_API_KEY is not configured");
     
-    // Static Fallback Mappings if dynamic mapping is missing
-    const perplexityMapping: Record<string, string> = {
-      "anthropic/claude-4-5-haiku-latest": "sonar-pro",
-      "anthropic/claude-4-6-sonnet-latest": "sonar-reasoning-pro",
-      "anthropic/claude-4-6-opus-latest": "sonar-reasoning-pro",
-      "google/gemini-3.1-pro-preview": "sonar-reasoning-pro",
-      "google/gemini-3-flash-preview": "sonar-pro",
-      "openai/gpt-5.4": "sonar-reasoning-pro",
-      "openai/gpt-4o": "sonar-reasoning-pro",
-    };
-
-    const mappedModel = perplexityMapping[modelName] || modelName;
-    const isNativePerplexity = !mappedModel.includes("/") || mappedModel === "sonar";
-    const effectiveModel = isNativePerplexity ? mapToPerplexityModel(mappedModel) : mappedModel;
+    const effectiveModel = mapToPerplexityModel(modelName);
 
     return createOpenAI({
       apiKey: perplexityKey,
@@ -254,14 +265,36 @@ export async function runGeneration(options: GenerationOptions): Promise<Generat
       };
     } catch (error) {
       log.error({ err: error }, "Perplexity Agent generation failed");
-      const message = error instanceof Error ? error.message : "Perplexity Agent request failed";
-      const assistantText = `Model request failed: ${message}`;
-      options.writer.write({ type: "text-delta", id: options.textId, delta: assistantText });
-      return { text: assistantText, citations: [] };
+      
+      // Fallback to basic Chat API if Agent API fails
+      try {
+        const langModel = await getLanguageModel(options.modelId, options.keys);
+        
+        const coreMessages = await Promise.all(options.messages.map(async (msg) => {
+          const text = await (await import("./chat-utils")).extractTextFromMessage(msg);
+          return {
+            role: msg.role as "user" | "assistant" | "system",
+            content: text,
+          } as CoreMessage;
+        }));
+
+        const { text } = await generateText({
+          model: langModel,
+          system: options.system,
+          messages: coreMessages,
+        });
+
+        return {
+          text,
+          citations: [],
+        };
+      } catch (fallbackError) {
+        log.error({ err: fallbackError }, "Perplexity Fallback generation failed");
+        throw fallbackError;
+      }
     }
   }
 
-  // Direct Vercel AI SDK Providers
   let assistantText = "";
   let hasSentConnected = false;
   let usage: GenerationResult["usage"] = undefined;
@@ -279,74 +312,62 @@ export async function runGeneration(options: GenerationOptions): Promise<Generat
       return {
         role: msg.role as "user" | "assistant" | "system",
         content: text,
-      };
+      } as CoreMessage;
     }));
-    
+
     const result = streamText({
       model,
       system: options.system,
       messages: coreMessages,
-      tools: options.webSearch && env.TAVILY_API_KEY ? {
-        web_search: webSearchTool,
-      } : undefined,
-      // @ts-expect-error - AI SDK version mismatch on maxSteps
+      tools: options.webSearch && env.TAVILY_API_KEY ? { webSearch: webSearchTool } : undefined,
       maxSteps: options.webSearch ? 5 : 1,
+      onStepFinish: (step) => {
+        if (step.toolCalls.length > 0) {
+          log.info({ toolCalls: step.toolCalls.length }, "Tool calls completed");
+        }
+      },
+      onFinish: (finish) => {
+        usage = {
+          promptTokens: finish.usage.promptTokens,
+          completionTokens: finish.usage.completionTokens,
+        };
+      }
     });
 
-    for await (const part of result.fullStream) {
-      if (part.type === "tool-call") {
+    for await (const chunk of result.fullStream) {
+      if (chunk.type === "text-delta") {
+        if (!hasSentConnected) {
+          options.writer.write({ type: "data-json", data: { type: "connected" } } as UIMessageChunk);
+          hasSentConnected = true;
+        }
+        assistantText += chunk.textDelta;
+        options.writer.write({ type: "text-delta", textDelta: chunk.textDelta } as UIMessageChunk);
+      } else if (chunk.type === "tool-call") {
         options.writer.write({
           type: "data-call-start",
           data: { 
-            callId: part.toolCallId, 
-            toolName: "Web Search", 
-            input: "args" in part ? (part as { args: unknown }).args : ("input" in part ? (part as { input: unknown }).input : {})
+            callId: chunk.toolCallId, 
+            toolName: chunk.toolName === "webSearch" ? "Web Search" : chunk.toolName, 
+            input: chunk.args 
           },
         } as UIMessageChunk);
-      } else if (part.type === "tool-result") {
+      } else if (chunk.type === "tool-result") {
         options.writer.write({
           type: "data-call-result",
-          data: { callId: part.toolCallId, result: "Search completed." },
+          data: { callId: chunk.toolCallId, result: chunk.result },
         } as UIMessageChunk);
-      } else if (part.type === "text-delta") {
-        if (!hasSentConnected) {
-          options.writer.write({
-            type: "data-call-result",
-            data: { callId: "model-gen", result: "Connected." },
-          } as UIMessageChunk);
-          hasSentConnected = true;
-        }
-        assistantText += part.text;
-        options.writer.write({ type: "text-delta", id: options.textId, delta: part.text });
       }
     }
 
-    const finalUsage = await result.usage;
-    usage = {
-      // @ts-expect-error - AI SDK v6 type mismatch on usage properties
-      promptTokens: (finalUsage as Record<string, unknown>).promptTokens ?? (finalUsage as Record<string, unknown>).prompt_tokens,
-      // @ts-expect-error - AI SDK v6 type mismatch on usage properties
-      completionTokens: (finalUsage as Record<string, unknown>).completionTokens ?? (finalUsage as Record<string, unknown>).completion_tokens,
+    return {
+      text: assistantText,
+      citations: [],
+      usage,
     };
   } catch (error) {
-    log.error({ err: error, modelId: options.modelId }, "Direct model generation failed");
-    const message = error instanceof Error ? error.message : "Direct model request failed";
-    assistantText = `Model request failed: ${message}`;
-    if (!hasSentConnected) {
-      options.writer.write({
-        type: "data-call-result",
-        data: { callId: "model-gen", result: "Failed." },
-      } as UIMessageChunk);
-    }
-    options.writer.write({ type: "text-delta", id: options.textId, delta: assistantText });
+    log.error({ err: error }, "Direct provider generation failed");
+    throw error;
   }
-
-  return { text: assistantText, citations: [], usage };
-}
-
-export function isPerplexityProvider(modelId: string): boolean {
-  const { provider } = getProviderAndModel(modelId);
-  return provider === "perplexity";
 }
 
 /**
@@ -382,14 +403,14 @@ export async function generateImage(prompt: string, keys: Record<string, string 
 
 /**
  * Summarizes a user's initial query into a concise thread title.
- * Includes a 3-second timeout to prevent blocking thread creation.
+ * Includes a 3-second timeout to prevent blocking navigation on slow LLM responses.
  */
 export async function generateThreadTitle(query: string, modelId: string, keys: Record<string, string | null>): Promise<string> {
   try {
     const model = await getLanguageModel(modelId, keys);
     const { text } = await generateText({
       model,
-      system: "You are a helpful assistant that summarizes user queries into a concise, high-quality thread title (3-6 words). Do not use quotes or punctuation. Return ONLY the title.",
+      system: "You are a concise assistant that summarizes user queries into a concise, high-quality thread title (3-6 words). Do not use quotes or punctuation. Return ONLY the title.",
       prompt: `Summarize this query: ${query}`,
       abortSignal: AbortSignal.timeout(3000),
     });
