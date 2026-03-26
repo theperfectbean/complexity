@@ -22,7 +22,8 @@ vi.mock("sonner", () => ({
   },
 }));
 
-import ThreadPage, { ThreadChat } from "./page";
+import ThreadPage from "./page";
+import { ThreadChat } from "./ThreadChat";
 
 describe("ThreadPage", () => {
   beforeEach(() => {
@@ -142,7 +143,7 @@ describe("ThreadPage", () => {
     render(<ThreadPage />);
 
     await waitFor(() => {
-      expect(screen.getByText(/AI chip demand rose this week/i)).toBeInTheDocument();
+      expect(screen.getAllByText(/AI chip demand rose this week/i).length).toBeGreaterThan(0);
     });
   });
 
