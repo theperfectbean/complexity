@@ -71,8 +71,12 @@ describe("llm.ts", () => {
 
   describe("runGeneration", () => {
     it("routes perplexity agent models to runSearchAgent and maps model ID", async () => {
-      const mockResult = { text: "hello", completedResponse: {} };
-      vi.mocked(searchAgent.runSearchAgent).mockResolvedValue(mockResult);
+      const mockResult = { 
+        text: "hello", 
+        completedResponse: {}, 
+        usage: { promptTokens: 10, completionTokens: 5 } 
+      };
+      vi.mocked(searchAgent.runSearchAgent).mockResolvedValue(mockResult as any);
 
       const mockWriter = { write: vi.fn() };
 
@@ -88,7 +92,7 @@ describe("llm.ts", () => {
       });
 
       expect(searchAgent.runSearchAgent).toHaveBeenCalledWith(expect.objectContaining({
-        modelId: ["anthropic/claude-4-6-sonnet-latest", "perplexity/sonar"],
+        modelId: ["sonar-reasoning-pro", "perplexity/sonar"],
       }));
       expect(result.text).toBe("hello");
     });

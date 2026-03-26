@@ -4,7 +4,7 @@ import OpenAI from "openai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createXai } from "@ai-sdk/xai";
 import { createOllama } from "ai-sdk-ollama";
-import { LanguageModel, streamText, UIMessageChunk, UIMessage, generateText } from "ai";
+import { LanguageModel, streamText, UIMessageChunk, UIMessage, generateText, ModelMessage } from "ai";
 import type { Responses } from "@perplexity-ai/perplexity_ai/resources/responses";
 import { runSearchAgent } from "./search-agent";
 import { runtimeConfig } from "./config";
@@ -274,8 +274,8 @@ export async function runGeneration(options: GenerationOptions): Promise<Generat
           const text = await (await import("./chat-utils")).extractTextFromMessage(msg);
           return {
             role: msg.role as "user" | "assistant" | "system",
-            content: text,
-          } as CoreMessage;
+            content: [{ type: "text", text }],
+          } as ModelMessage;
         }));
 
         const { text } = await generateText({
@@ -311,8 +311,8 @@ export async function runGeneration(options: GenerationOptions): Promise<Generat
       const text = await (await import("./chat-utils")).extractTextFromMessage(msg);
       return {
         role: msg.role as "user" | "assistant" | "system",
-        content: text,
-      } as CoreMessage;
+        content: [{ type: "text", text }],
+      } as ModelMessage;
     }));
 
     const result = streamText({
@@ -320,6 +320,7 @@ export async function runGeneration(options: GenerationOptions): Promise<Generat
       system: options.system,
       messages: coreMessages,
       tools: options.webSearch && env.TAVILY_API_KEY ? { webSearch: webSearchTool } : undefined,
+      // @ts-expect-error - maxSteps is not recognized in this version of streamText
       maxSteps: options.webSearch ? 5 : 1,
       onStepFinish: (step) => {
         if (step.toolCalls.length > 0) {
@@ -328,8 +329,10 @@ export async function runGeneration(options: GenerationOptions): Promise<Generat
       },
       onFinish: (finish) => {
         usage = {
-          promptTokens: finish.usage.promptTokens,
-          completionTokens: finish.usage.completionTokens,
+          // @ts-expect-error - AI SDK version mismatch on usage properties
+          promptTokens: finish.usage.promptTokens ?? finish.usage.prompt_tokens,
+          // @ts-expect-error - AI SDK version mismatch on usage properties
+          completionTokens: finish.usage.completionTokens ?? finish.usage.completion_tokens,
         };
       }
     });
@@ -340,21 +343,24 @@ export async function runGeneration(options: GenerationOptions): Promise<Generat
           options.writer.write({ type: "data-json", data: { type: "connected" } } as UIMessageChunk);
           hasSentConnected = true;
         }
-        assistantText += chunk.textDelta;
-        options.writer.write({ type: "text-delta", textDelta: chunk.textDelta } as UIMessageChunk);
+        assistantText += chunk.text;
+        options.writer.write({ type: "text-delta", delta: chunk.text, id: options.textId } as UIMessageChunk);
       } else if (chunk.type === "tool-call") {
         options.writer.write({
           type: "data-call-start",
           data: { 
             callId: chunk.toolCallId, 
             toolName: chunk.toolName === "webSearch" ? "Web Search" : chunk.toolName, 
-            input: chunk.args 
+            input: "args" in chunk ? (chunk as { args: unknown }).args : ("input" in chunk ? (chunk as { input: unknown }).input : {})
           },
         } as UIMessageChunk);
       } else if (chunk.type === "tool-result") {
         options.writer.write({
           type: "data-call-result",
-          data: { callId: chunk.toolCallId, result: chunk.result },
+          data: { 
+            callId: chunk.toolCallId, 
+            result: "result" in chunk ? (chunk as { result: unknown }).result : ("output" in chunk ? (chunk as { output: unknown }).output : {})
+          },
         } as UIMessageChunk);
       }
     }

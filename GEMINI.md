@@ -188,7 +188,7 @@ This strategy ensures all dependencies (Postgres, Redis, Embedder) are running w
 - **ANTHROPIC_API_KEY**: Made `ANTHROPIC_API_KEY` optional in `src/lib/env.ts` to prevent the application from crashing on startup if the key is not provided in the environment.
 - **NextAuth BasePath**: Added `basePath: "/api/auth"` to the `NextAuth` configuration in `src/auth.ts` and identically to the client-side `<SessionProvider basePath="/api/auth">` in `src/lib/auth-client.tsx`. This ensures that Auth.js correctly identifies its API routes across both server and client, preventing "Unexpected token '<'" errors or `ClientFetchError` failures on the frontend caused by missing the Next.js catch-all route.
 - **Missing Tables**: If you see "failed to start thread" or a 500 error mentioning `relation "users" does not exist`, it means the database migrations have not been run. 
-- **Automatic Migrations**: The project is intended to run in Docker. While the current Dockerfile does not auto-migrate, you can run migrations manually using `docker exec complexity-app npm run db:migrate` if the `src` directory is available, or better yet, run them from the host with `cd app && DATABASE_URL=... npm run db:migrate`.
+- **Automatic Migrations**: The project is intended to run in Docker. While the current Dockerfile does not auto-migrate, you can run migrations manually using `docker compose exec complexity-app npm run db:migrate` if the `src` directory is available, or better yet, run them from the host with `cd app && DATABASE_URL=... npm run db:migrate`.
 - **Session Persistence**: Because the app uses JWT sessions, a user can appear to be "logged in" even if the database has been cleared. In this case, API calls will fail with 404 "User not found". The fix is to sign out and register/sign in again to re-sync the database record.
 
 ### Perplexity SDK v0.26 Upgrade
@@ -199,7 +199,7 @@ This strategy ensures all dependencies (Postgres, Redis, Embedder) are running w
 
 ### Docker & Next.js (SWC)
 - **Binary Mismatch**: When using Alpine-based Docker images, ensure `@next/swc-linux-x64-musl` is installed. 
-- **Volume Isolation**: To prevent host-to-container binary conflicts (glibc vs musl), use a named volume for `node_modules` in `docker-compose.dev.yml` (e.g., `- node_modules:/app/node_modules`).
+- **Volume Isolation**: To prevent host-to-container binary conflicts (glibc vs musl), use a named volume for `node_modules` in `docker-compose.dev.yml` (e.g., `- node_modules:/app/node_modules`). 
 
 ### Anthropic vs. Perplexity Benchmarking (2026-03-13)
 - **Model Access**: Successfully benchmarked **Claude Sonnet 4.6** and **Claude Haiku 4.5** (latest models as of March 2026).
@@ -233,8 +233,8 @@ This strategy ensures all dependencies (Postgres, Redis, Embedder) are running w
 - **Problem**: Calling `signOut({ callbackUrl: "/login" })` was still redirecting to `http://localhost:3002/login` when accessed via an external proxy (`https://complexity.internal.lan`). 
 - **Finding**: Even with `trustHost: true`, the `NEXTAUTH_URL` environment variable acts as a canonical base URL that overrides dynamic host detection in NextAuth v5. If `NEXTAUTH_URL` is hardcoded to `localhost`, the server will absolute-ify all relative redirect URLs using that base.
 - **Fix**: 
-  1. Added a custom `redirect` callback in `app/src/auth.ts` to allow relative URLs.
-  2. Recommended that users either remove `NEXTAUTH_URL` entirely (to let `trustHost: true` work dynamically) or set it to their actual public URL in their `.env`.
+  1. Added a custom `redirect` callback in `app/src/auth.ts` to allow relative URLs. 
+  2. Recommended that users either remove `NEXTAUTH_URL` entirely (to let `trustHost: true` work dynamically) or set it to their actual public URL in their `.env`. 
   3. Added manual host detection as a fallback in `forgot-password/route.ts` to construct reset links correctly even if `NEXTAUTH_URL` is misconfigured.
 
 
@@ -288,7 +288,7 @@ This strategy ensures all dependencies (Postgres, Redis, Embedder) are running w
 ### External Data Injection (Implemented 2026-03-14)
 - **Feature**: Allows specific roles to have "Live" access to external files (like CGM data) without hardcoding personal info.
 - **Architecture**:
-  1. Generic mount: `./.data/external` on host is mapped to `/app/external` in the container.
+  1. Generic mount: `./.data/external` on host is mapped to `/app/external" in the container.
   2. Dynamic Mapping: The `ROLE_EXTERNAL_DATA` environment variable holds a JSON mapping of Role IDs to their respective data files.
   3. Prompt Injection: The `/api/chat` route detects the active Role ID and automatically injects the file's contents into the system prompt as high-priority context.
 - **Privacy**: The `.data/` directory is `.gitignore`ed, ensuring personal health or private data is never committed to source control.
@@ -347,7 +347,7 @@ This strategy ensures all dependencies (Postgres, Redis, Embedder) are running w
 - **Experimental Options**: Removed deprecated `experimental.instrumentationHook: true` from `next.config.ts` as it is now default in v16.
 - **Type Augmentation**: Added proper module augmentation for `next-auth` and `next-auth/jwt` in `src/auth.ts` to support the custom `isAdmin` property on user sessions, resolving TypeScript compilation errors.
 - **LLM Provider Compatibility**: Updated `app/src/lib/llm.ts` to remove the unsupported `compatibility: "compatible"` property from `createOpenAI` and corrected the Perplexity `baseURL` to include `/v1`.
-- **UI Component Resilience**: Refactored `UserManagement.tsx` to use native HTML/Tailwind elements, removing a broken dependency on missing `@/components/ui` components while maintaining consistent styling.
+- **UI Component Resilience**: Refactored `UserManagement.tsx` to use native HTML/Tailwind elements, removing a broken dependency on missing `@/components/ui" components while maintaining consistent styling.
 - **Type Safety Hardening**: Resolved several `any` type issues in `perplexity-agent.ts` and `api-response.ts` by using proper interfaces and explicit type guards, satisfying strict linting rules.
 - **Build Performance**: Fixed build-time EACCES errors by ensuring proper cleanup of host-mapped `.next` directories.
 
@@ -376,7 +376,7 @@ This strategy ensures all dependencies (Postgres, Redis, Embedder) are running w
 - **Documentation**: Generated an internal codebase fitness report during the 2026-03-17 audit.
 
 ### Codebase Fitness Report Implementation (2026-03-17)
-- **Security Hardening**:
+- **Security Hardening**: 
   - Implemented robust Content Security Policy (CSP) headers via Next.js `middleware.ts`.
   - Added Cross-Site Request Forgery (CSRF) protection by strictly validating `Origin` and `Host` headers for all state-mutating requests (`POST`, `PUT`, `PATCH`, `DELETE`).
   - Implemented Redis-backed rate limiting for `/api/auth/register` (5 attempts/10min), `/api/auth/forgot-password` (3 attempts/10min), and the NextAuth `signIn` callback (10 attempts/10min) to prevent brute-force and enumeration attacks.
@@ -386,7 +386,7 @@ This strategy ensures all dependencies (Postgres, Redis, Embedder) are running w
 - **Testing**: Added rigorous unit tests for `llm.ts`, `memory.ts`, and `perplexity-agent.ts` with mocked dependencies. The full suite of 103 unit tests are fully passing.
 
 ### Phase 1 Implementation: Security & Observability (2026-03-17)
-- **API Key Encryption at Rest**:
+- **API Key Encryption at Rest**: 
   - Implemented authenticated encryption using `AES-256-GCM` via a new `app/src/lib/encryption.ts` utility.
   - Sensitive configuration keys (`*_API_KEY`) are now automatically encrypted before being stored in the `settings` table and decrypted upon retrieval.
   - Added a mandatory `ENCRYPTION_KEY` requirement (32 characters) to the environment.
@@ -411,16 +411,16 @@ This strategy ensures all dependencies (Postgres, Redis, Embedder) are running w
 - **Service Decomposition**: 
   - Refactored `ChatService` by extracting logic into `ChatSessionValidator`, `ContextAssembler`, and `ChatHistoryManager` within `app/src/lib/chat/`. Reduced `chat-service.ts` from 364 to 161 lines.
   - Refactored the `memory` module by separating `MemoryStore` and `MemoryExtractor` into a dedicated `app/src/lib/memory/` directory. Reduced `memory.ts` from 323 lines to just 8 lines of exports.
-- **LLM Routing Simplification**:
+- **LLM Routing Simplification**: 
   - Implemented a map-driven provider routing factory in `llm.ts`, replacing complex if-else chains.
   - Resolved a critical bug where Perplexity-hosted third-party models (e.g., `claude-4-6-sonnet-latest`) were failing to return search results due to incorrect model ID prefixing and tool-call handling.
   - Added robust model ID mapping (`mapToPerplexityModel`) to ensure the Perplexity Agent API receives IDs it understands.
 - **Streaming Reliability**: Fixed a bug in `runPerplexityAgent` where the final event in a stream was occasionally lost if the buffer didn't end with a newline character.
 - **Auth Hardening**: Created `app/src/lib/auth-server.ts` to centralize repetitive authentication and admin-check logic, simplifying API route implementations.
-- **Test Suite Modernization**:
+- **Test Suite Modernization**: 
   - Streamlined `api/chat/route.test.ts` by extracting repetitive mock setups into shared helpers.
   - Updated the test suite to support background document processing (BullMQ) and unified API response structures.
-- **Verification**: Confirmed system stability with 123 passing unit tests and resolved several long-standing linting issues related to `any` type usage.
+- **Verification**: Confirmed system stability with 123 passing unit tests and resolved several long-standing linting issues related to `any" type usage.
 
 ### Model Validity Fix (2026-03-17)
 - **Validation Error Addressed**: Prevented `400 Bad Request` from AI providers by updating mock model identifiers (like `claude-sonnet-4-6`) to their official API names (`claude-4-6-sonnet-latest`, `claude-4-5-haiku-latest`, `claude-3-opus-20240229`).
@@ -459,10 +459,10 @@ This strategy ensures all dependencies (Postgres, Redis, Embedder) are running w
 - **Finding**: Investigative tests confirmed that Perplexity's `sonar-pro` (and potentially other models) can hallucinate their identity based on the conversation context. If the history contains mentions of "Claude Haiku", the model may adopt that persona when questioned about its identity.
 - **Root Cause**: The system instructions did not explicitly define the model's identity, leaving it susceptible to "identity drift" from the context.
 - **Fix**: Updated `ContextAssembler.ts` to automatically inject the human-readable model label (e.g., "Pro Search", "Claude 4.6 Sonnet") into the system prompt guidelines. This provides a clear anchor for the model's self-identification, preventing it from being swayed by contextual mentions of other models.
-### Perplexity Agent API Presets & Search Bug Fix (2026-03-18)
+### Perplexity Agent API Preset and Search Bug Fix (2026-03-18)
 - **Problem**: The "Fast Search" and "Pro Search" options in the UI were failing to trigger web searches (e.g., returning "clueless" answers about new models like GPT-5.4). Furthermore, "Pro Search" was marked as `unavailable` and hidden from the UI.
 - **Root Cause 1 (Errant Mapping)**: In `llm.ts` and `perplexity-agent.ts`, the preset IDs `fast-search` and `pro-search` were being explicitly mapped to `sonar` and `sonar-pro`. However, `sonar` is a base model, while `fast-search` is a **native preset** on the Perplexity Agent API (`/v1/responses`). By mapping them to base models, the API was stripping away their built-in tools (like `web_search`), causing them to fail when asked to search.
-- **Root Cause 2 (Health Checks)**: The dynamic model discovery API (`/v1/models`) does not return native presets like `sonar-pro` or `fast-search`. The health check marked them as `unavailable` because they were missing from the discovered list.
+- **Root Cause 2 (Health Checks)**: The dynamic model discovery API (`/v1/models`) does not return native presets like `sonar-pro` and `fast-search`. The health check marked them as `unavailable` because they were missing from the discovered list.
 - **Fix 1**: Removed the errant mapping. `fast-search` and `pro-search` are now passed directly to the Agent API as the `preset` value, allowing the API to apply its built-in `web_search` and `fetch_url` tools natively.
 - **Fix 2**: Updated `provider-models.ts` to hardcode core Perplexity presets (including `fast-search` and `pro-search`) into the discovered list, ensuring they remain healthy and available in the UI regardless of the dynamic API response.
 - **Fix 3**: Removed the `identityGuidelines` for Perplexity models in `ContextAssembler.ts` to prevent "competence hallucination" where the model skips searching because it incorrectly assumes it knows the answer based on its identity prompt.
@@ -470,7 +470,7 @@ This strategy ensures all dependencies (Postgres, Redis, Embedder) are running w
 ### Architectural Decoupling from Perplexity (2026-03-19)
 - **Motivation**: The project expanded beyond its initial scope as purely a frontend for the Perplexity Agent API. The core abstractions and UI text were overly coupled to the "Perplexity" name, rather than accurately reflecting a generic "Agentic" or "Answer Engine" workspace.
 - **Implementation**: 
-  - Renamed `perplexity-agent.ts` to `search-agent.ts` and `perplexity.ts` to `agent-client.ts` to generalize the core AI routing abstractions.
+  - Renamed `perplexity-agent.ts` to `search-agent.ts` and `perplexity.ts` to `agent-client.ts" to generalize the core AI routing abstractions.
   - Updated UI copy in `layout.tsx` and `page.tsx` from "Perplexity-style" to "Agentic" and "AI search".
   - Refactored `llm.ts` and `MemoryExtractor.ts` to consume the renamed generic client abstractions.
 - **Preservation**: Crucially, left `.env` variables (`PERPLEXITY_API_KEY`), model ID prefixes (`perplexity/sonar`), database columns (`perplexity_api_key`), and test artifacts untouched to preserve fully functional connectivity with the Perplexity API without breaking backwards compatibility.
@@ -482,7 +482,8 @@ This strategy ensures all dependencies (Postgres, Redis, Embedder) are running w
   - Enhanced `ModelOption` with `providerModelId` (the actual ID sent to the API) and `capability` (high/medium/low tier) fields.
   - Refactored `llm.ts` to use async resolution (`resolveDynamicModel`), prioritizing database-configured mappings over static fallbacks.
   - Updated the **Admin Console** (Manage Models tab) to allow administrators to directly edit the `providerModelId` and `capability` tier for any model.
-  - Made `getLanguageModel` async across the system, requiring updates to `ChatService`, `MemoryExtractor`, and instruction generation routes.
+  - Resolved build failures caused by Vercel AI SDK v6 type changes by migrating to `ModelMessage` and correctly structured `text-delta` chunks.
+  - Restored functional "Role Instruction Generation" by ensuring all generation paths support the new async model resolution.
 - **Benefit**: The application can now be updated to support new models or switch providers (including local runners like Ollama) entirely via the UI without code changes or deployments.
 
 ### Perplexity Agent API Preset and Prefix Fix (2026-03-19)
@@ -491,305 +492,4 @@ This strategy ensures all dependencies (Postgres, Redis, Embedder) are running w
 - **Root Cause 2 (Missing Prefix)**: Native Perplexity models (e.g., `sonar`) require the `perplexity/` prefix (i.e., `perplexity/sonar`) in the `model` or `models` field of the Agent API, unlike third-party models which are passed as-is (e.g., `anthropic/claude-...`).
 - **Root Cause 3 (Deprecated Models)**: Model IDs like `sonar-pro`, `sonar-reasoning`, and `sonar-reasoning-pro` are no longer supported by the `/v1/responses` endpoint in the current API version; `perplexity/sonar` is the only valid native model ID found in the `/v1/models` list.
 - **Fixes**:
-  - Updated `runGeneration` in `app/src/lib/llm.ts` to skip the fallback chain for presets, passing them as single strings to trigger the `preset` logic in `runSearchAgent`.
-  - Updated `mapToPerplexityModel` in `app/src/lib/llm.ts` to automatically re-add the `perplexity/` prefix to native models before they are sent to the Agent API.
-  - Removed unsupported `sonar-pro` and other non-existent models from the fallback chain and the UI's `corePresets` list in `app/src/lib/provider-models.ts`.
-  - Verified that `preset: "pro-search"` and `model: "perplexity/sonar"` are fully functional and correctly return grounded responses with citations.
-
-### Clipboard Copy Robustness & LAN Support (2026-03-19)
-- **Problem**: The "Copy" buttons (for both messages and code blocks) were failing for users accessing the application over a local network (LAN) via an IP address.
-- **Root Cause**: The modern `navigator.clipboard` API is restricted to "secure contexts" (HTTPS or localhost). Accessing the app via a LAN IP (e.g., `http://192.168.1.50:3002`) is considered an insecure context, causing `navigator.clipboard` to be undefined or throw permission errors.
-- **Fix**: 
-  - Implemented a centralized `copyToClipboard` utility in `app/src/lib/utils.ts`.
-  - The utility uses a **hybrid approach**: it attempts to use the modern `navigator.clipboard` API first (if in a secure context), and falls back to a hidden `textarea` with `document.execCommand('copy')` for insecure contexts.
-  - Updated `MarkdownRenderer.tsx` and `MessageList.tsx` to use this new utility, ensuring the "Copy" feature works across all deployment scenarios.
-  - Added unit tests in `app/src/lib/utils.test.ts` to verify both the modern and fallback paths.
-
-### Copy Feature Markdown Cleaning (2026-03-19)
-- **Problem**: When copying a full assistant message, internal UI-only markup (specifically ` ```chart ... ``` ` blocks) was included in the clipboard content.
-- **Fix**: 
-  - Implemented `cleanMarkdownForCopy` in `app/src/lib/utils.ts` to strip out ` ```chart ``` ` blocks using regex.
-  - Updated `MessageList.tsx` to pass the message content through this cleaner before sending it to the clipboard.
-  - Added unit tests to ensure chart blocks are removed while standard code blocks remain intact.
-### External Links Update (2026-03-19)
-- **Feature**: All markdown links now open in a new browser tab/window.
-- **Implementation**: Added a custom anchor (`a`) handler to `react-markdown` components in `app/src/components/shared/MarkdownRenderer.tsx` that automatically applies `target="_blank"` and `rel="noopener noreferrer"`.
-
-### Document Chunk Viewer (2026-03-19)
-- **Feature**: Added a visual browser for extracted document chunks in the Role detail page (B5).
-- **Implementation**:
-  - Created a new API endpoint `GET /api/roles/[roleId]/documents/[documentId]/chunks` to retrieve all chunks for a specific document, ordered by index.
-  - Developed a `DocumentChunksDialog` component using Radix UI and Tailwind CSS to display chunk content in a modal.
-  - Added a "View Chunks" button (Eye icon) to each document card in the `DocumentList` component, visible on hover.
-  - Included real-time chunk filtering/search within the dialog for easier navigation of large documents.
-- **Testing**: Added unit tests for the chunks API route to verify authentication, ownership checks, and correct data retrieval.
-
-### Conversation Branching (2026-03-19)
-- **Feature**: Implemented non-destructive message editing through conversation branching (A2).
-- **Implementation**:
-  - Enhanced `PATCH /api/threads/[threadId]` with a `branch` action that clones the current thread and its messages up to the point of divergence.
-  - Created `GET /api/threads/[threadId]/branches` to discover all threads within the same family (sharing a `parentThreadId`).
-  - Updated `MessageList` and `MessageItem` to include a branch navigation UI (e.g., "1 / 2") on user messages that have been branched.
-  - Integrated branching into the "Edit Message" flow, redirecting users to a new branched thread upon editing a prior message.
-- **Testing**: Added unit tests for the new branches API endpoint.
-
-### Streaming Request Cancellation (2026-03-19)
-- **Feature**: Added the ability to stop an in-progress AI response generation (I2).
-- **Implementation**:
-  - Updated the `SearchBar` component to support an optional `onStop` callback and display a "Stop" button (Square icon) when it is provided.
-  - Leveraged the `stop` function from the Vercel AI SDK's `useChat` hook in the `ThreadChat` component.
-  - Configured the UI to replace the "Send" button with the "Stop" button specifically when the chat status is "streaming".
-  - Ensured that stopping a request gracefully halts the stream and allows the user to immediately send a new message or edit the previous one.
-
-### Code Execution Sandbox (2026-03-19)
-- **Feature**: Added a client-side Python execution environment for code blocks (H3).
-- **Implementation**:
-  - Developed a `PythonExecutor` component that integrates **Pyodide** (Python in WebAssembly) to execute code directly in the user's browser.
-  - Intercepted `language-python` code blocks in `MarkdownRenderer` to display the sandbox UI instead of a static code block.
-  - Provided "Run" and "Reset" controls with real-time `stdout` capture and error reporting.
-  - Used a lazy-loading strategy for the Pyodide runtime to maintain fast initial page loads.
-- **Security**: Execution is fully isolated within the browser's WebAssembly sandbox, protecting the server and other users from malicious code.
-
-### Hybrid Search Refinements (2026-03-19)
-- **Feature**: Significantly improved RAG retrieval quality using Cross-Encoder reranking (B3).
-- **Implementation**:
-  - Updated the `embedder` microservice to include a `/rerank` endpoint using the `cross-encoder/ms-marco-MiniLM-L-6-v2` model.
-  - Enhanced the `hybridSearch` logic in `app/src/lib/rag.ts` to perform a second-stage reranking after the initial RRF (Reciprocal Rank Fusion) step.
-  - The reranker re-scores the top candidates using the full query context, providing much more accurate relevance sorting before the final MMR (Maximal Marginal Relevance) diversification.
-  - Added configurable environment variables: `RAG_RERANK_ENABLED` and `EMBEDDER_RERANK_MODEL`.
-- **Testing**: Added unit tests for the `rerank` utility and verified service integration.
-
-### Web Search for Direct Providers (2026-03-19)
-- **Feature**: Added web search capabilities to non-Perplexity LLMs (Anthropic, OpenAI, etc.) using tool calling (H2).
-- **Implementation**:
-  - Developed a `webSearchTool` using the **Tavily Search API** to fetch real-time information and context.
-  - Integrated the tool into the `runGeneration` function in `llm.ts`, allowing models to autonomously decide when to perform a web search.
-  - Added visual streaming feedback for tool calls, showing "Web Search..." and the query in the UI while the search is in progress.
-  - Configured `maxSteps` to allow models to reason about search results and perform follow-up actions in a single response.
-
-### Advanced Chunking & Retrieval (2026-03-19)
-- **Feature**: Implemented Sliding Window Chunking for improved context coverage.
-- **Implementation**:
-  - Replaced basic token-window chunking with an intelligent sliding window algorithm in `rag.ts`.
-  - Added **boundary detection** that prioritizes splitting at paragraphs (`\n\n`) or sentence ends (`. `, `! `, `? `) within a tolerance range.
-  - This ensures that chunks are semantically coherent and don't cut off mid-sentence, leading to significantly higher retrieval quality.
-
-### Thread UI & Sidebar Refinements (2026-03-19)
-- **Feature**: Enhanced navigation and media visibility within threads.
-- **Implementation**:
-  - **Branch Browser**: Added a dedicated family/branch browser to the `Sidebar` that appears when viewing a thread, allowing users to see and jump between all related conversation paths.
-  - **Image Gallery**: Developed a thread-level Image Gallery component that automatically extracts all user attachments and AI-generated images.
-  - **Lightbox**: Included a full-screen lightbox for the gallery with support for high-resolution viewing and direct downloads.
-
-### Per-Thread System Prompt Override (2026-03-19)
-- **Feature**: Allowed users to add custom system instructions specifically for a single thread (A4).
-- **Implementation**:
-  - Updated the database schema (`threads` table) to include a `systemPrompt` column.
-  - Enhanced the `PATCH /api/threads/[threadId]` API to allow updating the thread-specific prompt.
-  - Refactored `ContextAssembler.ts` and `ChatSessionValidator.ts` to fetch and inject this prompt into the LLM instructions.
-  - Added a "Thread Settings" dialog (Gear icon) in the thread header for editing instructions.
-- **Testing**: Verified end-to-end flow from UI update to LLM prompt injection.
-
-### Search Within Thread (2026-03-19)
-- **Feature**: Added client-side keyword search specifically for the current conversation (A7).
-- **Implementation**:
-  - Developed a `ThreadSearchBar` component with keyboard shortcut support (Cmd/Ctrl + F) and automatic focus.
-  - Updated `MessageList` and `MessageItem` to support real-time highlighting of search matches.
-  - Implemented automatic "scroll to match" logic using `scrollIntoView` when keywords are found.
-  - Integrated match counting and visual feedback in the thread header.
-- **Benefit**: Allows users to quickly locate specific information or keywords in very long conversation histories.
-
-### OCR for Scanned PDFs (2026-03-19)
-- **Feature**: Added OCR support for image-based/scanned PDF files (H5).
-- **Implementation**:
-  - Updated the `embedder` microservice with Tesseract OCR and Poppler dependencies.
-  - Added a new `/ocr` endpoint to the Python service that converts PDF pages to images and extracts text.
-  - Enhanced the BullMQ `document-processing` worker in the Next.js app to automatically fall back to OCR if a PDF yields no text through standard extraction.
-- **Benefit**: Allows the RAG system to index and search content within scanned documents and image-heavy PDFs that were previously unreadable.
-
-### Enhanced Usage Analytics (2026-03-19)
-- **Feature**: Implemented deeper per-user and per-model reporting in the Admin Console (E2).
-- **Implementation**:
-  - Expanded the `/api/admin/analytics` endpoint to perform multi-table joins for user message counts and role usage frequency.
-  - Added aggregate token estimation based on character-to-token proxies across all assistant messages.
-  - Updated `AnalyticsDashboard.tsx` with new visual sections:
-    - **Top Users**: Ranked by total messages sent.
-    - **Popular Roles**: Identified which spaces/roles are most active.
-    - **Token Usage**: Model-by-model breakdown of estimated resource consumption.
-- **Benefit**: Provides administrators with clear visibility into platform growth, resource hotspots, and user engagement levels.
-
-### Role Sharing & Permissions (2026-03-19)
-- **Feature**: Implemented collaborative role sharing and public roles (B8).
-- **Implementation**:
-  - **Database**: Added `is_public` to `roles` and created a `role_access` junction table for granular user-to-role permissions.
-  - **API**: 
-    - Updated `/api/roles` to return owned, shared, and public roles.
-    - Added `/api/roles/[roleId]/share` for managing granular user access (Owner-only).
-    - Hardened `ChatSessionValidator` and document APIs to verify shared/public access.
-  - **UI**: 
-    - Developed `RoleShareDialog` for toggling public access and inviting users by email.
-    - Updated Roles gallery to categorize into "Your Roles" and "Shared & Public".
-- **Benefit**: Transforms the platform into a collaborative environment where knowledge bases (Spaces) can be shared across the entire self-hosted instance or with specific team members.
-
-### System Audit Log (2026-03-19)
-- **Feature**: Implemented a comprehensive audit trail for administrative and security-sensitive actions (E4).
-- **Implementation**:
-  - **Database**: Added `audit_logs` table to store events, user IDs, actions, metadata (JSON), and request context (IP/UA).
-  - **Core Utility**: Created `logAuditEvent` helper in `app/src/lib/audit.ts` using Next.js `headers()` for secure context extraction.
-  - **Logging Coverage**: Injected audit triggers into Settings updates, User role changes, Role sharing, and Role deletion.
-  - **Admin UI**: Added a dedicated **Audit Log** tab to the Admin Console with chronological event browsing and metadata inspection.
-- **Benefit**: Provides a verifiable paper trail for accountability, especially important for public or multi-user self-hosted instances.
-
-### RAG Chunk Attribution (2026-03-19)
-- **Feature**: Enhanced the Source Carousel to show specific text snippets from documents used for grounding (B7).
-- **Implementation**:
-  - Updated `ContextAssembler.ts` to capture and return the specific database chunks used during hybrid search.
-  - Refactored `ChatService.ts` to stream these RAG citations to the UI early and persist them in the message history.
-  - Upgraded `SourceCarousel.tsx` to display interactive cards with text previews.
-  - Added a "Source Attribution" modal (Radix Dialog) to allow users to read the full context chunk without leaving the chat.
-- **Benefit**: Improves grounding transparency, allowing users to instantly verify AI claims against their own uploaded documents.
-
-### Memory Visibility & Transparency (2026-03-19)
-- **Feature**: Added a visual indicator when the AI uses past memories to personalize its response (C5).
-- **Implementation**:
-  - **Database**: Added a `memories_used` boolean column to the `messages` table.
-  - **Backend**: Updated `ContextAssembler.ts` to track if any relevant memories were recalled and injected into the prompt.
-  - **API**: Modified `ChatService.ts` to save the `memories_used` status for each assistant message and stream a "Recall" status event to the UI during reasoning.
-  - **UI**: Integrated a "Context: Recalled Memories" badge (Brain icon) in `MessageList.tsx` that appears above messages influenced by the memory system.
-- **Benefit**: Provides users with clarity on why the AI might be referencing personal facts or preferences from previous conversations.
-
-### Document Re-processing & RAG Maintenance (2026-03-19)
-- **Feature**: Added ability to re-index documents without re-uploading the original files (B6).
-- **Implementation**:
-  - **Schema Update**: Added `extracted_text`, `mime_type`, and `size_bytes` to the `documents` table.
-  - **Persistence**: Modified the background worker to save the raw extracted text into the database after initial processing.
-  - **API**: Created endpoints for bulk and individual re-processing that re-enqueue jobs using the stored text.
-  - **UI**: Integrated "Sync" icons in the Role Detail page and individual document cards to trigger re-indexing.
-- **Benefit**: Essential for maintaining search quality when global chunking parameters or embedding models are updated, allowing for easy "refresh" of the entire knowledge base.
-
-
-
-
-### Webhooks & Automation (2026-03-19)
-- **Feature**: Implemented an outgoing webhook system for real-time automation (G2).
-- **Implementation**:
-  - **Database**: Added `webhooks` and `webhook_deliveries` tables to store endpoints, signing secrets, and delivery history.
-  - **Background Worker**: Developed a new BullMQ `webhooks` queue and worker to handle outgoing POST requests with automatic retries and exponential backoff.
-  - **Security**: Implemented HMAC SHA-256 signatures (included in `X-Complexity-Signature` header) to allow receiving servers to verify payload integrity.
-  - **Trigger**: Integrated `thread.completed` event into `ChatService`, which fires as soon as an AI response is finished and persisted.
-  - **UI**: Created a comprehensive **Webhooks** management page in User Settings for creating hooks and inspecting delivery logs.
-- **Benefit**: Enables seamless integration with tools like n8n, Zapier, and custom dashboards, turning Complexity into a trigger for larger automated workflows.
-
-### Role Memory Isolation (2026-03-22)
-- **Feature**: Implemented isolated memory spaces for Roles while retaining access to global user memory.
-- **Architecture**:
-  - **Database**: Added `roleId` to the `memories` table (referencing `roles.id` with cascade delete).
-  - **Retrieval**: `MemoryStore` functions (`getMemoryContents`, `searchMemories`, `getExistingMemories`) now accept an optional `roleId`. If provided, they fetch memories where `roleId IS NULL OR roleId = roleId` (unifying global and role-specific memory). If not provided, they fetch only global memory (`roleId IS NULL`).
-  - **Storage**: `insertMemories` saves new memories with the thread's `roleId`. Global chats save with `roleId = null`.
-  - **Deduplication**: The memory extractor dedups new facts against *both* global and role memory, preventing a role from learning and storing a fact already known globally.
-  - **Caching**: Updated Redis invalidation to correctly clear role-specific caches or globally scan and wipe all caches when a global memory is modified.
-
-### Major Plan Update & Roadmap (2026-03-19)
-- **Status**: Re-evaluated the project plan to reflect massive recent progress (all Tier 1 and most Tier 2 tasks completed).
-- **Roadmap Refinement**:
-  - Categorized remaining tasks into **Short-term** (Polish & Transparency), **Mid-term** (Governance & Scale), and **Long-term** (Operational Excellence).
-  - Moved **Conversation Templates (I4)** and **Session Management (F4)** to a "Future Roadmap" list to prioritize UI simplicity and v1.0 stability.
-  - Synchronized the internal feature roadmap with the latest 30+ implemented features.
-- **Goal**: Focused the next 2 weeks on RAG precision (Chunk Attribution) and Memory transparency.
-
-
-
-
-
-### Message Pagination (2026-03-19)
-... (rest of the file)
-
-### RAG & Streaming UI Polish (2026-03-22)
-- **Titling Delay Fix**: Added a 3-second timeout to `generateThreadTitle` in `app/src/lib/llm.ts` to prevent slow LLM responses from blocking the creation of new threads and delaying navigation.
-- **RAG Search Fix**: Resolved a critical `DrizzleQueryError` in `hybridSearch` where the `rank` alias was not recognized in the `orderBy` clause. Fixed by using the full expression in `orderBy` and ensuring `desc` is properly imported.
-- **Streaming Jitter Reduction**:
-  - Reduced `LoadingSkeleton` from 2 lines to 1 to minimize the "flashing block" effect.
-  - Added a `hasThinking` prop to `MarkdownRenderer` to hide the skeleton entirely when "Thinking" indicators are already visible, replacing it with a subtle spacer.
-  - Ensured all placeholder states maintain the `markdown-body` class for consistent layout and testability.
-- **Context Clarity**: Enhanced the RAG context prompt in `ContextAssembler.ts` to explicitly label retrieved information as "UPLOADED FILES CONTENT," improving the LLM's ability to recognize and summarize local documents.
-- **Model Selector Robustness**: Added `AbortController` to the `ModelSelector`'s model-fetching effect to prevent `TypeError: Failed to fetch` errors when navigating away or reloading during a fetch.
-
-### Thread Pinning & Tagging (2026-03-19)
-- **Feature**: Added ability to pin important conversations and organize threads with custom tags (I3).
-- **Implementation**:
-  - Updated the database schema (`threads` table) with `pinned` (boolean) and `tags` (jsonb array) columns.
-  - Enhanced the `PATCH /api/threads/[threadId]` API to handle pinning and tag management.
-  - Updated the `Sidebar` to include a dedicated **Pinned** section and display tag chips under thread titles.
-  - Added pinning and tagging controls to the **Thread Settings** dialog for easy organization.
-- **Benefit**: Provides users with better tools for organizing long-term projects or frequently referenced conversations.
-
-
-
-
-
-
-### Context Window Transparency (2026-03-19)
-- **Feature**: Displayed indicators for token consumption and usage for the current thread (A5/A6).
-- **Implementation**:
-  - Integrated `gpt-tokenizer` in `app/src/lib/utils.ts` with a new `countTokens` utility.
-  - Updated `ThreadSettingsDialog` to calculate and display the total estimated tokens for the entire conversation.
-  - Added a visual usage breakdown in the settings modal, showing both raw token count and estimated word count (using a 0.75 tokens/word ratio).
-- **Benefit**: Provides users with immediate visibility into how much of the LLM context window is being consumed.
-
-### PWA Support (2026-03-19)
-- **Feature**: Made the application a Progressive Web App (G5) for installability on mobile and desktop.
-- **Implementation**:
-  - Integrated `@ducanh2912/next-pwa` for robust service worker management in Next.js 16.
-  - Created `public/manifest.json` defining app identity, standalone display mode, and theme colors.
-  - Updated `next.config.ts` to wrap the configuration with PWA support.
-  - Enhanced `app/layout.tsx` with PWA-specific metadata (manifest link, apple-mobile-web-app tags).
-- **Benefit**: Users can "install" Complexity as a native-like application with its own icon and splash screen, improving accessibility on all devices.
-
-### UI Performance & Polish E2E Audit (2026-03-23)
-- **Feature**: Added a dedicated `ui-performance-audit.test.ts` to track rendering timings, layout shifts (CLS), and visual stability during RAG and general queries.
-- **Findings**: 
-  - General Time-to-First-Token (TTFT) was observed around 1.1s - 2.2s.
-  - Cumulative Layout Shift (CLS) during streaming was consistently around ~0.22, showing mostly smooth rendering but some minimal shifts remaining.
-  - Asserted lack of horizontal scrollbars and robust visibility of RAG citation elements.
-
-### Thinking... Indicator & Latency Fix (2026-03-23)
-- **Problem**: Users reported "screen inactivity" after sending a prompt, especially when using complex roles like the Diabetes Assistant which involves heavy RAG or external data processing. The "Thinking..." indicator was also missing during tool calls.
-- **Implementation**:
-  - Updated `ThreadChat` to consider the `submitted` state (waiting for server response) as "streaming," ensuring UI feedback starts immediately.
-  - Added a global "Thinking..." indicator at the end of the `MessageList` that appears as soon as the user message is sent.
-  - Fixed a logic bug where the zero-width space (`\u200B`) used as a placeholder for empty messages was being treated as "content," hiding the thinking indicator.
-  - Refactored `MessageList` to *always* show "Thinking..." while waiting for text content, even if intermediate tool-call results (like Retrieval or Recall) are already visible.
-- **Benefit**: Immediate visual feedback after user input, eliminating the "dead air" period during RAG retrieval and improving the perceived responsiveness of the platform.
-
-### Sidebar Synchronization (2026-03-23)
-- **Problem**: The sidebar thread list and pinned roles only updated after a manual page refresh or navigating between pages, causing a lag in UI consistency.
-- **Implementation**:
-  - Established a standardized `thread-list-updated` custom event to signal sidebar data refreshes.
-  - Updated `Sidebar.tsx` to listen for this event and immediately refetch both threads and pinned roles.
-  - Integrated event dispatching into all state-mutating actions across the app:
-    - **Thread Creation**: Home page and Role detail pages.
-    - **Thread Deletion**: Recent history page and sidebar itself.
-    - **Thread Settings**: Pinning and tag updates in the chat interface.
-    - **Conversation Branching**: When editing previous messages.
-    - **Role Management**: Creation, deletion, renaming, and pinning in the Roles gallery and detail pages.
-- **Benefit**: The sidebar now stays perfectly in sync with user actions in real-time, providing a more fluid and reactive experience across the entire workspace.
-
-### Role Instructions Modal & Typewriter Tuning (2026-03-23)
-- **Feature**: Refactored role instruction editing from an inline form to a dedicated modal (`RoleInstructionsDialog.tsx`).
-- **Implementation**:
-  - The new modal provides a larger, more focused environment for managing complex system prompts.
-  - Retained and integrated the AI-powered instruction generator directly into the editing modal.
-  - Removed the inline editing state from the role detail page, simplifying the main UI.
-- **Typewriter Optimization**:
-  - Slowed down the streaming typewriter effect (from 30ms to 40ms intervals) and reduced adaptive character increments.
-  - This results in a more readable, less "frantic" streaming experience that still maintains responsiveness through adaptive catch-up.
-- **Benefit**: Improved ergonomics for role management and a more polished, readable chat interface.
-
-
-
-
-
-
-### Migration Resilience (2026-03-25)
-- **Problem**: When multiple agents generate or run Drizzle migrations locally, schema discrepancies (like trying to add a column that already exists) can cause `drizzle-kit migrate` to crash, preventing subsequent migrations from running. This led to a 500 error when querying the `messages` table for new columns, which the frontend incorrectly surfaced as 'Conversation not found'.
-- **Fix**: Updated migration SQL files (e.g., `0015`) to use `IF NOT EXISTS` to ensure idempotency. Also removed duplicate column creations from generated `0016` to ensure clean migration runs inside the Docker container.
+  - Updated `runGeneration` in `app/src/lib/llm.ts` to skip the fallback chain for presets, passing them as single strings to trigger the `preset

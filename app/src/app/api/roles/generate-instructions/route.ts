@@ -1,11 +1,11 @@
-import { streamText } from "ai";
+import { streamText, ModelMessage } from "ai";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { auth } from "@/auth";
-import { resolveRequestedModel } from "@/lib/available-models";
-import { getLanguageModel } from "@/lib/llm";
-import { getApiKeys } from "@/lib/settings";
+import { auth } from "../../../../auth";
+import { resolveRequestedModel } from "../../../../lib/available-models";
+import { getLanguageModel } from "../../../../lib/llm";
+import { getApiKeys } from "../../../../lib/settings";
 
 const schema = z.object({
   prompt: z.string().min(1),
@@ -46,7 +46,7 @@ Output ONLY the instructions text. DO NOT include any preamble like "Here are th
     const result = streamText({
       model: langModel,
       system: systemInstructions,
-      messages: [{ role: "user", content: prompt }] as any[],
+      messages: [{ role: "user", content: [{ type: "text", text: prompt }] }] as ModelMessage[],
     });
     return result.toUIMessageStreamResponse();
   } catch (error) {
