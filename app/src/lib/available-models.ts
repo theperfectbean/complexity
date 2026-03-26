@@ -66,6 +66,7 @@ export async function resolveRequestedModel(
   options?: { preferNonPreset?: boolean }
 ): Promise<string> {
   const { models } = await getAvailableModels({ refreshHealthIfStale: false });
+  const fallbackDefaultModel = getDefaultModel();
   
   if (requestedModel) {
     // 1. Exact match
@@ -88,5 +89,10 @@ export async function resolveRequestedModel(
     if (nonPreset) return nonPreset.id;
   }
 
-  return models[0]?.id ?? getDefaultModel();
+  const configuredDefault = models.find((model) => model.id === fallbackDefaultModel);
+  if (configuredDefault && (!options?.preferNonPreset || !configuredDefault.isPreset)) {
+    return configuredDefault.id;
+  }
+
+  return models[0]?.id ?? fallbackDefaultModel;
 }

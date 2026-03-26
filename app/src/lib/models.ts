@@ -21,5 +21,11 @@ export function getDefaultModel(): ModelId {
   if (defaultModelId && MODEL_IDS.includes(defaultModelId)) {
     return defaultModelId;
   }
-  return models[0]?.id || "anthropic/claude-4-6-sonnet-latest";
+
+  const preferred =
+    models.find((model) => !model.isPreset && model.capability === "low") ??
+    models.find((model) => !model.isPreset && model.capability === "medium") ??
+    models.find((model) => !model.isPreset);
+
+  return preferred?.id || models[0]?.id || "anthropic/claude-4-5-haiku-latest";
 }

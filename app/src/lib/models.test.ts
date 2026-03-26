@@ -8,6 +8,10 @@ describe("models helpers", () => {
     expect(isValidModelId(defaultModel)).toBe(true);
   });
 
+  it("prefers a non-preset lower-cost default when no override is configured", () => {
+    expect(getDefaultModel()).toBe("anthropic/claude-4-5-haiku-latest");
+  });
+
   it("identifies preset models", () => {
     expect(isPresetModel("fast-search")).toBe(true);
     expect(isPresetModel("pro-search")).toBe(true);
