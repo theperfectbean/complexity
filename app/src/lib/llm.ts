@@ -18,6 +18,30 @@ import { getConfiguredModels, MODEL_SETTINGS_KEYS } from "./model-registry";
 
 export type ProviderType = "perplexity" | "anthropic" | "openai" | "google" | "xai" | "ollama" | "local-openai";
 
+const PERPLEXITY_PRESET_MODELS = ["fast-search", "pro-search", "deep-research", "advanced-deep-research"] as const;
+const OPEN_MODEL_PREFIXES = [
+  "llama",
+  "qwen",
+  "deepseek",
+  "mistral",
+  "mixtral",
+  "gemma",
+  "phi",
+  "command-r",
+  "dolphin",
+  "nous",
+  "yi-",
+];
+
+function isPerplexityPresetModel(modelId: string): boolean {
+  return PERPLEXITY_PRESET_MODELS.includes(modelId as typeof PERPLEXITY_PRESET_MODELS[number]);
+}
+
+function looksLikeOpenModel(modelId: string): boolean {
+  const normalized = modelId.toLowerCase();
+  return OPEN_MODEL_PREFIXES.some((prefix) => normalized.startsWith(prefix));
+}
+
 /**
  * Resolves an internal model ID to its actual provider and specific model ID.
  * Prioritizes dynamic configuration from the database.
@@ -114,69 +138,44 @@ export function getProviderAndModel(modelId: string): { provider: ProviderType; 
   if (modelId.startsWith("grok-")) {
     return { provider: "xai", model: modelId };
   }
+  if (looksLikeOpenModel(modelId)) {
+    return { provider: "local-openai", model: modelId };
+  }
 
-  // Default to perplexity but this is the "risky" path we want to minimize via provider-models.ts updates
-  return { provider: "perplexity", model: modelId };
+  // Unknown models should default to user-controlled OpenAI-compatible backends.
+  return { provider: "local-openai", model: modelId };
 }
 
 /**
- * Resolves a model name to a specific ID that Perplexity understands.
- * Handles both modern 'latest' IDs and legacy IDs for backwards compatibility.
+ * Normalizes explicit Perplexity model IDs for the target API surface.
+ * Direct wrapped models like `perplexity/anthropic/...` should remain intact.
  */
 function resolvePerplexityModelName(modelName: string): string {
-  const mapping: Record<string, string> = {
-    "anthropic/claude-4-5-haiku-latest": "sonar-pro",
-    "anthropic/claude-4-6-sonnet-latest": "sonar-reasoning-pro",
-    "anthropic/claude-4-6-opus-latest": "sonar-reasoning-pro",
-    "google/gemini-3.1-pro-preview": "sonar-reasoning-pro",
-    "google/gemini-3-flash-preview": "sonar-pro",
-    "openai/gpt-5.4": "sonar-reasoning-pro",
-    "openai/gpt-4o": "sonar-reasoning-pro",
-    // Legacy IDs currently in user databases
-    "anthropic/claude-haiku-4-5": "sonar-pro",
-    "anthropic/claude-sonnet-4-6": "sonar-reasoning-pro",
-    "anthropic/claude-opus-4-6": "sonar-reasoning-pro",
-  };
-
-  return mapping[modelName] || modelName;
+  if (modelName.startsWith("perplexity/")) {
+    return modelName.slice("perplexity/".length);
+  }
+  return modelName;
 }
 
 /**
  * Maps internal model IDs to IDs that Perplexity API understands.
- * Native models (sonar) require the 'perplexity/' prefix in the Agent API,
- * while presets (fast-search) and third-party models (anthropic/claude-...) do not.
+ * Native Perplexity chat models require the `perplexity/` prefix in the Agent API,
+ * while presets and wrapped third-party models should be passed through unchanged.
  */
 function mapToPerplexityModel(modelName: string): string {
   const resolved = resolvePerplexityModelName(modelName);
 
-  if (["fast-search", "pro-search", "deep-research", "advanced-deep-research"].includes(resolved)) {
+  if (isPerplexityPresetModel(resolved)) {
     return resolved;
   }
   if (resolved === "sonar") {
     return "perplexity/sonar";
   }
-  return resolved;
+  return modelName.startsWith("perplexity/") ? modelName : resolved;
 }
 
 export async function getLanguageModel(modelId: string, keys: Record<string, string | null>): Promise<LanguageModel> {
-  let { provider, model: modelName } = await resolveDynamicModel(modelId);
-
-  // Fallback to Perplexity if primary provider key is missing but Perplexity key is available
-  if (provider !== "perplexity" && provider !== "ollama" && provider !== "local-openai") {
-    const primaryKeyMap: Record<string, string> = {
-      anthropic: "ANTHROPIC_API_KEY",
-      openai: "OPENAI_API_KEY",
-      google: "GOOGLE_GENERATIVE_AI_API_KEY",
-      xai: "XAI_API_KEY",
-    };
-    const primaryKey = primaryKeyMap[provider];
-    if (primaryKey && !keys[primaryKey] && keys["PERPLEXITY_API_KEY"]) {
-      provider = "perplexity";
-      // When falling back to Perplexity, we use the full original modelId (e.g. anthropic/claude-...)
-      // so the perplexity block can map it correctly.
-      modelName = modelId;
-    }
-  }
+  const { provider, model: modelName } = await resolveDynamicModel(modelId);
 
   const factories: Record<Exclude<ProviderType, "perplexity">, () => LanguageModel> = {
     anthropic: () => {
@@ -249,7 +248,7 @@ export async function runGeneration(options: GenerationOptions): Promise<Generat
     const shouldUsePerplexityAgent =
       !!options.webSearch ||
       isPresetModel(options.modelId) ||
-      ["fast-search", "pro-search", "deep-research", "advanced-deep-research"].includes(options.modelId);
+      isPerplexityPresetModel(options.modelId);
 
     if (!shouldUsePerplexityAgent) {
       log.info({ modelId: options.modelId, modelName }, "Routing Perplexity model through standard chat path");
@@ -260,14 +259,14 @@ export async function runGeneration(options: GenerationOptions): Promise<Generat
 
   if (provider === "perplexity" && (!!options.webSearch ||
       isPresetModel(options.modelId) ||
-      ["fast-search", "pro-search", "deep-research", "advanced-deep-research"].includes(options.modelId))) {
+      isPerplexityPresetModel(options.modelId))) {
     try {
       const primaryModel = mapToPerplexityModel(modelName);
       
       // Determine if it's a preset. Presets should not use a fallback chain
       // as they handle their own internal routing and tools in the Agent API.
       const isPreset = isPresetModel(options.modelId) || 
-                       ["fast-search", "pro-search", "deep-research", "advanced-deep-research"].includes(options.modelId);
+                       isPerplexityPresetModel(options.modelId);
 
       // Build a fallback chain ONLY for non-preset models: primary model -> standard model
       const modelId = isPreset ? primaryModel : Array.from(new Set([

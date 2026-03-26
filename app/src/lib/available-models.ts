@@ -77,7 +77,8 @@ export async function resolveRequestedModel(
 
     // 2. Base ID match (e.g. "anthropic/claude-..." matching "perplexity/anthropic/claude-...")
     const baseRequested = requestedModel.includes("/") ? requestedModel.split("/").slice(-2).join("/") : requestedModel;
-    const fuzzyMatch = models.find(m => m.id.endsWith(baseRequested));
+    const fuzzyMatches = models.filter((model) => model.id.endsWith(baseRequested));
+    const fuzzyMatch = fuzzyMatches.find((model) => !model.id.startsWith("perplexity/")) ?? fuzzyMatches[0];
     if (fuzzyMatch && (!options?.preferNonPreset || !fuzzyMatch.isPreset)) {
       return fuzzyMatch.id;
     }

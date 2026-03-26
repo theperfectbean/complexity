@@ -6,7 +6,7 @@ const envSchema = z.object({
     .url()
     .default("postgresql://postgres:postgres@localhost:5432/postgres"),
   REDIS_URL: z.string().url().optional(),
-  PERPLEXITY_API_KEY: z.string().min(1, "PERPLEXITY_API_KEY is required"),
+  PERPLEXITY_API_KEY: z.string().min(1).optional(),
   ANTHROPIC_API_KEY: z.string().min(1).optional(),
   OPENAI_API_KEY: z.string().min(1).optional(),
   GOOGLE_GENERATIVE_AI_API_KEY: z.string().min(1).optional(),
@@ -52,7 +52,7 @@ const envSchema = z.object({
   RAG_MMR_LAMBDA: z.coerce.number().min(0).max(1).default(0.6),
   MEMORY_CACHE_TTL_SECONDS: z.coerce.number().int().positive().default(60 * 5),
   MEMORY_CACHE_PREFIX: z.string().default("memories"),
-  MEMORY_EXTRACTION_MODEL: z.string().default("perplexity/sonar"),
+  MEMORY_EXTRACTION_MODEL: z.string().default("anthropic/claude-4-5-haiku-latest"),
   MEMORY_MAX_MEMORIES: z.coerce.number().int().positive().default(100),
   MEMORY_TOP_K: z.coerce.number().int().positive().default(10),
   MEMORY_EXTRACTION_MIN_EXCHANGES: z.coerce.number().int().positive().default(3),

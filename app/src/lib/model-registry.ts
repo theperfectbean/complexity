@@ -75,6 +75,25 @@ const PROVIDER_SETTINGS: Record<
   },
 };
 
+const OPEN_MODEL_PREFIXES = [
+  "llama",
+  "qwen",
+  "deepseek",
+  "mistral",
+  "mixtral",
+  "gemma",
+  "phi",
+  "command-r",
+  "dolphin",
+  "nous",
+  "yi-",
+];
+
+function looksLikeOpenModel(modelId: string): boolean {
+  const normalized = modelId.toLowerCase();
+  return OPEN_MODEL_PREFIXES.some((prefix) => normalized.startsWith(prefix));
+}
+
 function isValidModelOption(value: unknown): value is ModelOption {
   if (!value || typeof value !== "object") return false;
   const record = value as Record<string, unknown>;
@@ -130,8 +149,9 @@ export function getModelProvider(model: Pick<ModelLike, "id" | "isPreset">): Mod
   }
   if (model.id.startsWith("gemini-")) return "google";
   if (model.id.startsWith("grok-")) return "xai";
+  if (looksLikeOpenModel(model.id)) return "local-openai";
 
-  return "perplexity";
+  return "local-openai";
 }
 
 export function getModelHealthTargetId(model: { id: string; providerModelId?: string }): string {

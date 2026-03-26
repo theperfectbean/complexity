@@ -3,6 +3,23 @@ import { runGeneration, getProviderAndModel, getLanguageModel, GenerationOptions
 import * as searchAgent from "./search-agent";
 import { UIMessage, generateText } from "ai";
 
+const { mockOpenAIChat, mockCreateOpenAI } = vi.hoisted(() => {
+  const mockOpenAIChat = vi.fn((model: string) => ({ provider: "chat", model }));
+  const mockCreateOpenAI = vi.fn(() => {
+    const instance = ((model: string) => ({ provider: "openai", model })) as ((model: string) => { provider: string; model: string }) & {
+      chat: typeof mockOpenAIChat;
+    };
+    instance.chat = mockOpenAIChat;
+    return instance;
+  });
+
+  return { mockOpenAIChat, mockCreateOpenAI };
+});
+
+vi.mock("@ai-sdk/openai", () => ({
+  createOpenAI: mockCreateOpenAI,
+}));
+
 vi.mock("./search-agent", () => ({
   runSearchAgent: vi.fn(),
 }));
@@ -55,10 +72,16 @@ describe("llm.ts", () => {
       expect(model).toBe("anthropic/claude-4-6-sonnet-latest");
     });
 
-    it("defaults to perplexity for unknown models", () => {
+    it("defaults unknown models to local-openai", () => {
       const { provider, model } = getProviderAndModel("unknown-model");
-      expect(provider).toBe("perplexity");
+      expect(provider).toBe("local-openai");
       expect(model).toBe("unknown-model");
+    });
+
+    it("routes open model families to local-openai", () => {
+      const { provider, model } = getProviderAndModel("qwen3-32b");
+      expect(provider).toBe("local-openai");
+      expect(model).toBe("qwen3-32b");
     });
 
     it("identifies preset models as perplexity", () => {
@@ -107,6 +130,20 @@ describe("llm.ts", () => {
   describe("getLanguageModel", () => {
     it("throws if API key is missing", async () => {
       await expect(getLanguageModel("anthropic/claude-3", {})).rejects.toThrow("ANTHROPIC_API_KEY is not configured");
+    });
+
+    it("does not silently fall back to perplexity for missing direct provider keys", async () => {
+      await expect(
+        getLanguageModel("anthropic/claude-3", { PERPLEXITY_API_KEY: "test" })
+      ).rejects.toThrow("ANTHROPIC_API_KEY is not configured");
+    });
+
+    it("keeps explicit Perplexity-wrapped models instead of translating them to Sonar", async () => {
+      await getLanguageModel("perplexity/anthropic/claude-4-5-haiku-latest", {
+        PERPLEXITY_API_KEY: "test",
+      });
+
+      expect(mockOpenAIChat).toHaveBeenCalledWith("anthropic/claude-4-5-haiku-latest");
     });
 
     it("resolves anthropic model with alias", async () => {

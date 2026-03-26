@@ -11,9 +11,6 @@ export type ModelOption = {
 
 const DEFAULT_MODELS: ModelOption[] = [
   { id: "anthropic/claude-4-6-sonnet-latest", label: "Claude 4.6 Sonnet", category: "Anthropic", isPreset: false, capability: "high" },
-  { id: "fast-search", label: "Fast Search", category: "Presets", isPreset: true, providerModelId: "fast-search", capability: "medium" },
-  { id: "pro-search", label: "Pro Search", category: "Presets", isPreset: true, providerModelId: "pro-search", capability: "high" },
-  { id: "perplexity/sonar", label: "Perplexity Sonar", category: "Perplexity", isPreset: false, providerModelId: "sonar", capability: "medium" },
   { id: "anthropic/claude-4-6-opus-latest", label: "Claude 4.6 Opus", category: "Anthropic", isPreset: false, capability: "high" },
   { id: "anthropic/claude-4-5-haiku-latest", label: "Claude 4.5 Haiku", category: "Anthropic", isPreset: false, capability: "low" },
   { id: "openai/gpt-5.4", label: "GPT-5.4", category: "OpenAI", isPreset: false, capability: "high" },
@@ -23,6 +20,9 @@ const DEFAULT_MODELS: ModelOption[] = [
   { id: "ollama/llama3", label: "Ollama: Llama 3", category: "Local", isPreset: false, capability: "medium" },
   { id: "ollama/mistral", label: "Ollama: Mistral", category: "Local", isPreset: false, capability: "medium" },
   { id: "local-openai/custom-model", label: "Local OpenAI API", category: "Local", isPreset: false, capability: "high" },
+  { id: "fast-search", label: "Fast Search", category: "Search", isPreset: true, providerModelId: "fast-search", capability: "medium" },
+  { id: "pro-search", label: "Pro Search", category: "Search", isPreset: true, providerModelId: "pro-search", capability: "high" },
+  { id: "perplexity/sonar", label: "Perplexity Sonar", category: "Search", isPreset: false, providerModelId: "sonar", capability: "medium" },
 ];
 
 const DEFAULT_MODEL_ID = null;
