@@ -8,6 +8,24 @@ import { requireAdmin } from "@/lib/auth-server";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
+  if (process.env.IS_NEXT_BUILD === "true") {
+    return NextResponse.json({
+      totals: {
+        users: 0,
+        threads: 0,
+        messages: 0,
+        memories: 0,
+        documents: 0,
+        chunks: 0,
+      },
+      modelBreakdown: [],
+      userActivity: [],
+      roleActivity: [],
+      dailyActivity: [],
+      tokens: [],
+    });
+  }
+
   const authResult = await requireAdmin();
   if (authResult instanceof NextResponse) return authResult;
 

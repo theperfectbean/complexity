@@ -102,7 +102,7 @@ type ThreadChatProps = {
   isLoading?: boolean;
 };
 
-export function ThreadChat({
+function ThreadChat({
   threadId,
   initialTitle,
   initialModel,

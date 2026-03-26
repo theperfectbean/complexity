@@ -49,6 +49,9 @@
   --shadow-lg-token: 0 14px 36px oklch(0.1 0 0 / 0.14);
   --shadow-xl-token: 0 24px 56px oklch(0.1 0 0 / 0.16);
   --shadow-2xl-token: 0 36px 72px oklch(0.1 0 0 / 0.2);
+  --font-dm-sans: "Aptos", "Segoe UI Variable", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --font-be-vietnam: "Aptos Display", "Avenir Next", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --font-serif: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
 
   color-scheme: light;
 }
