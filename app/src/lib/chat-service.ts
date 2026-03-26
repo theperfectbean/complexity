@@ -166,17 +166,25 @@ export class ChatService {
               writer.write({ type: "source-url", sourceId: `rag-${i}`, url: c.url, title: c.title } as UIMessageChunk);
             });
 
-            const result = await runGeneration({
-              modelId: model,
-              messages: contextMessages,
-              agentInput,
-              system: instructions,
-              keys,
-              requestId,
-              textId,
-              webSearch: !!webSearch,
-              writer,
-            });
+            let result;
+            try {
+              result = await runGeneration({
+                modelId: model,
+                messages: contextMessages,
+                agentInput,
+                system: instructions,
+                keys,
+                requestId,
+                textId,
+                webSearch: !!webSearch,
+                writer,
+              });
+            } catch (genError) {
+              const message = genError instanceof Error ? genError.message : "Generation failed";
+              const assistantText = `Model request failed: ${message}`;
+              await this.history.saveAssistantMessage(this.session, responseMessageId, assistantText, [], false);
+              throw genError; // Re-throw to be handled by the outer stream catch for UI streaming
+            }
 
             const assistantText = result.text || runtimeConfig.chat.emptyResponseFallbackText;
             const citations = [...ragCitations, ...(result.citations || [])];
@@ -227,11 +235,10 @@ export class ChatService {
           } catch (error: unknown) {
             this.log.error({ err: error }, "Stream Execution Error");
             const message = error instanceof Error ? error.message : "Internal Stream Error";
-            const assistantText = `\n\n⚠️ **Streaming Error**: ${message}`;
             
             // Try to write the error to the stream so the user knows what happened
             try {
-              writer.write({ type: "text-delta", id: textId, delta: assistantText });
+              writer.write({ type: "text-delta", id: textId, delta: `\n\n⚠️ **Streaming Error**: ${message}` });
               writer.write({ type: "text-end", id: textId });
               writer.write({ type: "finish" });
             } catch (writeError) {
