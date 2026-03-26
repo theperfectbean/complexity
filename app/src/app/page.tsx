@@ -8,6 +8,7 @@ import { toast } from "sonner";
 
 import { SearchBar } from "@/components/search/SearchBar";
 import { getDefaultModel } from "@/lib/models";
+import { saveAttachmentsToSession } from "@/lib/utils";
 
 export default function Home() {
   const { data: session, status } = useSession();
@@ -41,18 +42,16 @@ export default function Home() {
         throw new Error(errorData.error || "Failed to start thread");
       }
 
-      const payload = (await response.json()) as { thread: { id: string } };
+      const payload = (await response.json()) as { thread: { id: string, title: string, model: string, roleId: string | null } };
       
       // Notify sidebar to refresh
       window.dispatchEvent(new CustomEvent("thread-list-updated"));
       
-      // Note: In a production app, we would upload these files immediately or store them in a persistent draft state.
-      // For this implementation, since SearchBar state is lost on redirect, we notify the user.
-      // Alternatively, we could base64 encode them into the URL, but that's risky for large files.
-      // Best approach for now: redirect, then the user can re-attach, or we could handle the first message here.
-      
+      // Save metadata for robust fallback on the next page
+      sessionStorage.setItem(`thread-meta-${payload.thread.id}`, JSON.stringify(payload.thread));
+
       if (attachments.length > 0) {
-        toast.info("Thread created! Please re-attach your files in the chat.");
+        await saveAttachmentsToSession(payload.thread.id, attachments);
       }
 
       router.push(`/search/${payload.thread.id}?q=${encodeURIComponent(query.trim())}&web=${webSearchEnabled}`);

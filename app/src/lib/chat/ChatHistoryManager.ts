@@ -45,12 +45,18 @@ export class ChatHistoryManager {
     const userMessageId = lastMessage?.id || createId();
     
     if (!isRegenerate) {
+      const lastMsg = lastMessage as any;
+      const attachments = lastMsg?.experimental_attachments || lastMsg?.attachments || null;
+
+      this.log.info({ userMessageId, threadId, hasAttachments: !!attachments }, "Saving user message to DB");
+
       await db.insert(messages).values({
         id: userMessageId,
         threadId,
         role: "user",
         content: text,
         model,
+        attachments: attachments ? JSON.parse(JSON.stringify(attachments)) : null,
         createdAt: new Date(),
       });
     }
@@ -68,7 +74,8 @@ export class ChatHistoryManager {
       completionTokens?: number;
       searchCount?: number;
       fetchCount?: number;
-    }
+    },
+    attachments?: any[]
   ): Promise<void> {
     const { threadId, model } = session;
     await db.insert(messages).values({
@@ -83,6 +90,7 @@ export class ChatHistoryManager {
       completionTokens: usage?.completionTokens,
       searchCount: usage?.searchCount,
       fetchCount: usage?.fetchCount,
+      attachments: attachments ? JSON.parse(JSON.stringify(attachments)) : null,
     });
     await db.update(threads).set({ model, updatedAt: new Date() }).where(eq(threads.id, threadId));
   }

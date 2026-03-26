@@ -209,6 +209,7 @@ export const messages = pgTable(
     completionTokens: integer("completion_tokens"),
     searchCount: integer("search_count"),
     fetchCount: integer("fetch_count"),
+    attachments: jsonb("attachments"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [index("messages_thread_created_idx").on(table.threadId, table.createdAt)],

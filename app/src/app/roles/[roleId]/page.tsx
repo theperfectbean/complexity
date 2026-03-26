@@ -17,6 +17,7 @@ import { FileUploader } from "@/components/roles/FileUploader";
 import { LoadingSkeleton } from "@/components/shared/LoadingSkeleton";
 import { getDefaultModel } from "@/lib/models";
 import { SearchBar } from "@/components/search/SearchBar";
+import { saveAttachmentsToSession } from "@/lib/utils";
 
 type Role = {
   id: string;
@@ -142,7 +143,7 @@ export default function RoleDetailPage() {
   async function onStartChat(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const currentPrompt = prompt.trim();
-    if (!currentPrompt || creatingThread) {
+    if (!currentPrompt && attachments.length === 0 || creatingThread) {
       return;
     }
 
@@ -152,7 +153,7 @@ export default function RoleDetailPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          initialMessage: currentPrompt,
+          initialMessage: currentPrompt || (attachments.length > 0 ? attachments[0].name : "New Chat"),
           model,
           roleId,
         }),
@@ -163,17 +164,19 @@ export default function RoleDetailPage() {
         return;
       }
 
-      const payload = (await response.json()) as { thread: { id: string } };
+      const payload = (await response.json()) as { thread: { id: string, title: string, model: string, roleId: string | null } };
       
       // Notify sidebar to refresh
       window.dispatchEvent(new CustomEvent("thread-list-updated"));
       
+      // Save metadata for robust fallback on the next page
+      sessionStorage.setItem(`thread-meta-${payload.thread.id}`, JSON.stringify(payload.thread));
+
       if (attachments.length > 0) {
-        toast.info("Thread created! Please re-attach your files in the chat.");
+        await saveAttachmentsToSession(payload.thread.id, attachments);
       }
 
       setPrompt("");
-      setAttachments([]);
       router.push(`/search/${payload.thread.id}?q=${encodeURIComponent(currentPrompt)}&web=${webSearchEnabled}`);
     } finally {
       setCreatingThread(false);

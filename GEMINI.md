@@ -475,7 +475,27 @@ This strategy ensures all dependencies (Postgres, Redis, Embedder) are running w
   - Refactored `llm.ts` and `MemoryExtractor.ts` to consume the renamed generic client abstractions.
 - **Preservation**: Crucially, left `.env` variables (`PERPLEXITY_API_KEY`), model ID prefixes (`perplexity/sonar`), database columns (`perplexity_api_key`), and test artifacts untouched to preserve fully functional connectivity with the Perplexity API without breaking backwards compatibility.
 
+### Robust Attachment & Thread Initialization (2026-03-26)
+- **Problem**: Passing attachments from the Home/Role page to the Chat page via URL was limited by length and caused "Conversation not found" or "Please re-attach" errors during race conditions or redirects.
+- **Solution**:
+  - **Session Persistence**: Implemented `saveAttachmentsToSession` and `getAttachmentsFromSession` in `utils.ts` to transfer encoded files through `sessionStorage`, keyed by the `threadId`.
+  - **Metadata Fallback**: Added `thread-meta-${threadId}` persistence in `sessionStorage` during thread creation. The `ThreadPage` now uses this metadata as a high-priority fallback if the initial API fetch fails or returns 404.
+  - **Sync & Cleanup**: `ThreadChat` now explicitly clears both attachments and metadata from `sessionStorage` once the initial query has been successfully submitted via `useChat`.
+  - **Role Detail Fix**: Updated `RoleDetailPage` to allow starting a thread with only an attachment (no text), mirroring the logic in the main `Home` search bar.
+- **Benefit**: Zero-latency thread starts with full image/file context, resilient to network jitter and URL length constraints.
+
+### Image Handling and Memory Logic Fixes (2026-03-26)
+- **Image Persistence**: Added a `jsonb` `attachments` column to the `messages` table and updated `ChatHistoryManager` to save and load user/assistant attachments (including SDK `experimental_attachments`). This ensures images are preserved across page refreshes and thread history loads.
+- **Image Rendering**: Updated `normalizeUIMessage` to preserve attachments and `MessageList` to use the typed property for rendering, fixing a bug where uploaded images were not visible in the chat UI.
+- **Image LLM Context**: Fixed a critical gap in `llm.ts` where images were being ignored for non-Perplexity providers (Anthropic, OpenAI, Google). Images are now correctly mapped to `image` parts in the AI SDK's `ModelMessage` structure.
+- **Memory Extraction Fix**: Resolved an issue where the memory extraction model (`perplexity/sonar`) was failing because the Chat completions API was being called with an invalid `perplexity/` prefix.
+- **Proactive Memory**: Lowered the memory extraction threshold (`minExchanges`: 3 -> 1, `everyN`: 4 -> 2) and increased the UI event timeout from 1200ms to 15000ms in `config.ts` to ensure users see "Memory Saved" more reliably and early in the conversation.
+- **Verification**: Successfully implemented and ran a new E2E test suite (`app/e2e/memory.test.ts`) that verifies automatic extraction and persistence.
+- **Test User Cleanup**: Implemented automated test user cleanup in the E2E suite using direct database execution via `psql` to ensure system hygiene after every test run.
+
 ### Provider-Agnostic Model Abstraction (2026-03-26)
+... (previous content) ...
+... (previous content) ...
 - **Problem**: Hardcoded provider model IDs (like `sonar-pro` or `claude-3-5-sonnet`) in the business logic created a maintenance trap and prevented true provider agnosticism.
 - **Solution**: Implemented a dynamic mapping layer that decouples application-level model aliases from provider-specific IDs.
 - **Implementation**:

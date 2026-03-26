@@ -31,6 +31,7 @@ export type ChatMessageItem = {
   citations?: ChatCitation[];
   thinking?: ChatThinkingPart[];
   memoriesUsed?: boolean;
+  attachments?: Array<{ url?: string; contentType?: string; name?: string }>;
 };
 
 export type ChatBranch = {
@@ -377,8 +378,7 @@ const MessageItem = memo(function MessageItem({
           ) : (
             <div className="rounded-2xl bg-muted/60 px-5 py-3.5 text-left">
               {(() => {
-                const msgRecord = message as Record<string, unknown>;
-                const attachments = (msgRecord.experimental_attachments || msgRecord.attachments || []) as Array<{ url?: string; contentType?: string; name?: string }>;
+                const attachments = message.attachments || [];
                 const images = attachments.filter((a) => a.contentType?.startsWith("image/") || a.url?.startsWith("data:image/"));
                 return images.length > 0 ? (
                   <div className="flex flex-wrap gap-2 mb-2">

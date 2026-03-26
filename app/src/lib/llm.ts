@@ -212,7 +212,11 @@ export async function getLanguageModel(modelId: string, keys: Record<string, str
     const perplexityKey = keys["PERPLEXITY_API_KEY"];
     if (!perplexityKey) throw new Error("PERPLEXITY_API_KEY is not configured");
     
-    const effectiveModel = mapToPerplexityModel(modelName);
+    // For Chat completions API, we want the resolved name WITHOUT the 'perplexity/' prefix
+    let effectiveModel = resolvePerplexityModelName(modelName);
+    if (effectiveModel.startsWith("perplexity/")) {
+      effectiveModel = effectiveModel.slice("perplexity/".length);
+    }
 
     return createOpenAI({
       apiKey: perplexityKey,
@@ -271,17 +275,34 @@ export async function runGeneration(options: GenerationOptions): Promise<Generat
         const langModel = await getLanguageModel(options.modelId, options.keys);
         
         const coreMessages = await Promise.all(options.messages.map(async (msg) => {
-          const text = await (await import("./chat-utils")).extractTextFromMessage(msg);
+          const { extractTextFromMessage, collectFileParts } = await import("./chat-utils");
+          const text = await extractTextFromMessage(msg);
+          
+          const content: any[] = [];
+          if (text.trim()) {
+            content.push({ type: "text", text });
+          }
+
+          collectFileParts(msg).forEach((att) => {
+            if (att.url?.startsWith("data:") && (att.mediaType || att.contentType || "").startsWith("image/")) {
+              content.push({ type: "image", image: att.url });
+            }
+          });
+
+          if (content.length === 0) {
+            content.push({ type: "text", text: " " });
+          }
+
           return {
             role: msg.role as "user" | "assistant" | "system",
-            content: [{ type: "text", text }],
-          } as ModelMessage;
+            content,
+          };
         }));
 
         const { text } = await generateText({
           model: langModel,
           system: options.system,
-          messages: coreMessages,
+          messages: coreMessages as any,
         });
 
         return {
@@ -308,17 +329,34 @@ export async function runGeneration(options: GenerationOptions): Promise<Generat
     } as UIMessageChunk);
 
     const coreMessages = await Promise.all(options.messages.map(async (msg) => {
-      const text = await (await import("./chat-utils")).extractTextFromMessage(msg);
+      const { extractTextFromMessage, collectFileParts } = await import("./chat-utils");
+      const text = await extractTextFromMessage(msg);
+      
+      const content: any[] = [];
+      if (text.trim()) {
+        content.push({ type: "text", text });
+      }
+
+      collectFileParts(msg).forEach((att) => {
+        if (att.url?.startsWith("data:") && (att.mediaType || att.contentType || "").startsWith("image/")) {
+          content.push({ type: "image", image: att.url });
+        }
+      });
+
+      if (content.length === 0) {
+        content.push({ type: "text", text: " " });
+      }
+
       return {
         role: msg.role as "user" | "assistant" | "system",
-        content: [{ type: "text", text }],
-      } as ModelMessage;
+        content,
+      };
     }));
 
     const result = streamText({
       model,
       system: options.system,
-      messages: coreMessages,
+      messages: coreMessages as any,
       tools: options.webSearch && env.TAVILY_API_KEY ? { webSearch: webSearchTool } : undefined,
       // @ts-expect-error - maxSteps is not recognized in this version of streamText
       maxSteps: options.webSearch ? 5 : 1,

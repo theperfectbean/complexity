@@ -13,7 +13,7 @@ import { ThreadSettingsDialog } from "./ThreadSettingsDialog";
 import { ThreadSearchBar } from "./ThreadSearchBar";
 import { getDefaultModel } from "@/lib/models";
 
-import { normalizeUIMessage } from "@/lib/utils";
+import { normalizeUIMessage, getAttachmentsFromSession, clearAttachmentsFromSession } from "@/lib/utils";
 
 type ThreadPayload = {
   thread: {
@@ -99,6 +99,7 @@ type ThreadChatProps = {
   initialWebSearch: boolean;
   attachments: File[];
   setAttachments: React.Dispatch<React.SetStateAction<File[]>>;
+  isLoading?: boolean;
 };
 
 export function ThreadChat({
@@ -115,6 +116,7 @@ export function ThreadChat({
   initialWebSearch,
   attachments,
   setAttachments,
+  isLoading,
 }: ThreadChatProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -224,24 +226,23 @@ export function ThreadChat({
   const normalizedCacheRef = useRef<Record<string, { msg: ChatMessageItem; original: UIMessage }>>({});
 
   const mergedMessages = useMemo<ChatMessageItem[]>(() => {
-    // If the SDK has messages (including initial history), use them as the source of truth.
-    // This ensures that when regenerate() slices the state, the UI correctly reflects it.
-    if (messages.length > 0) {
-      return messages.map((message) => {
-        const cached = normalizedCacheRef.current[message.id];
-        // If we have a cached version and the original reference hasn't changed, reuse it.
-        // useChat maintains stable references for non-changing messages.
-        if (cached && cached.original === message) {
-          return cached.msg;
-        }
+    const sdkMessages = messages.map((message) => {
+      const cached = normalizedCacheRef.current[message.id];
+      if (cached && cached.original === message) {
+        return cached.msg;
+      }
 
-        const normalized = normalizeUIMessage(message);
-        normalizedCacheRef.current[message.id] = { msg: normalized, original: message };
-        return normalized;
-      });
-    }
-    // Fallback only if messages is completely empty (e.g. initial load before hook settles)
-    return initialHistory;
+      const normalized = normalizeUIMessage(message);
+      normalizedCacheRef.current[message.id] = { msg: normalized, original: message };
+      return normalized;
+    });
+
+    if (initialHistory.length === 0) return sdkMessages;
+
+    const historyIds = new Set(initialHistory.map(m => m.id));
+    const newSdkMessages = sdkMessages.filter(m => !historyIds.has(m.id));
+
+    return [...initialHistory, ...newSdkMessages];
   }, [initialHistory, messages]);
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -351,34 +352,88 @@ export function ThreadChat({
   }, [threadId, messages, setMessages]);
 
   useEffect(() => {
-    if (!initialQuery || hasSubmittedInitialQuery.current) {
+    if (isLoading || !initialQuery || hasSubmittedInitialQuery.current) {
       return;
     }
 
-    if (initialHistory.length > 0) {
+    // If we already have history, we've already started this conversation
+    if (initialHistory && initialHistory.length > 0) {
       hasSubmittedInitialQuery.current = true;
       router.replace(`/search/${threadId}`);
       return;
     }
 
-    hasSubmittedInitialQuery.current = true;
-    void sendMessage(
-      { text: initialQuery },
-      {
-        body: {
-          threadId,
-          model,
-          roleId,
-        },
-      },
-    )
-      .then(() => {
+    const processAndSendInitialQuery = async () => {
+      // If we've already started submitting, or we have messages, don't re-send
+      if (hasSubmittedInitialQuery.current || messages.length > 0) return;
+
+      // Mark as submitted immediately (synchronously)
+      hasSubmittedInitialQuery.current = true;
+
+      // Delay slightly to let the hook settle
+      await new Promise(r => setTimeout(r, 500));
+      
+      try {
+        const currentAttachments = [...attachments];
+        // Clear immediately so they don't get processed again if the effect re-runs
+        setAttachments([]);
+
+        const fileParts = await Promise.all(
+          currentAttachments.map(
+            (file) =>
+              new Promise<{ type: "file"; url: string; mediaType: string; filename: string }>((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve({ type: "file", url: String(reader.result || ""), mediaType: file.type, filename: file.name });
+                reader.onerror = () => reject(new Error("Failed to read file"));
+                reader.readAsDataURL(file);
+              }),
+          ),
+        );
+
+        const parts: any[] = [];
+        if (initialQuery) {
+          parts.push({ type: "text", text: initialQuery });
+        }
+        
+        fileParts.forEach(fp => {
+          if (fp && fp.url) {
+            parts.push(fp);
+          }
+        });
+
+        if (parts.length === 0) {
+          console.log("No parts to send for initial query");
+          return;
+        }
+
+        console.log(`Sending initial query with ${parts.length} parts (text: ${!!initialQuery}, files: ${fileParts.length})`);
+
+        await sendMessage(
+          { parts } as any,
+          {
+            body: {
+              threadId,
+              model,
+              roleId,
+            },
+          },
+        );
+        
+        // Clear session storage once successfully sent
+        clearAttachmentsFromSession(threadId);
+        sessionStorage.removeItem(`thread-meta-${threadId}`);
+
         router.replace(`/search/${threadId}`);
-      })
-      .catch(() => {
+      } catch (err) {
+        console.error("Failed to send initial query with attachments:", err);
         toast.error("Failed to send initial query");
-      });
-  }, [initialQuery, initialHistory.length, model, roleId, router, sendMessage, threadId]);
+        // Restore attachments on failure
+        setAttachments(attachments);
+      }
+    };
+
+    void processAndSendInitialQuery();
+  }, [initialQuery, initialHistory.length, model, roleId, router, sendMessage, threadId, attachments, setAttachments, messages.length, isLoading]);
 
   useEffect(() => {
     if (error) {
@@ -597,15 +652,69 @@ export default function ThreadPage() {
   const [loading, setLoading] = useState(true);
   const [attachments, setAttachments] = useState<File[]>([]);
 
+  // Effect to parse attachments from session once
+  useEffect(() => {
+    // Only parse once when the page loads
+    if (threadData) return;
+
+    const reconstructedFiles = getAttachmentsFromSession(threadId);
+    if (reconstructedFiles.length > 0) {
+      setAttachments(reconstructedFiles);
+      // We clear it after reading so a page refresh doesn't re-trigger the initial query with files
+      // if we've already successfully started the thread.
+      // But wait, if we clear it here, and the initialHistory is empty, 
+      // the second useEffect will use it. If we refresh BEFORE it sends, it's gone.
+      // Actually, ThreadChat clears it too.
+    }
+  }, [threadId, threadData]);
+
   useEffect(() => {
     let active = true;
+    let retryCount = 0;
+    const maxRetries = 3;
 
-    fetch(`/api/threads/${threadId}?limit=20`)
-      .then((response) => (response.ok ? response.json() : Promise.reject(new Error("Failed to load thread"))))
-      .then((payload: ThreadPayload & { hasMore: boolean; nextCursor: string | null }) => {
-        if (!active) {
-          return;
+    const fetchThread = async () => {
+      let success = false;
+      try {
+        const response = await fetch(`/api/threads/${threadId}?limit=20`);
+        if (!response.ok) {
+          // Check session storage for meta as a high-priority fallback
+          const metaJson = sessionStorage.getItem(`thread-meta-${threadId}`);
+          if (metaJson) {
+            try {
+              const meta = JSON.parse(metaJson);
+              setThreadData({
+                title: meta.title || "New Conversation",
+                model: meta.model || getDefaultModel(),
+                roleId: meta.roleId || null,
+                systemPrompt: meta.systemPrompt || null,
+                pinned: meta.pinned || false,
+                tags: meta.tags || [],
+                history: [],
+                hasMore: false,
+                nextCursor: null,
+              });
+              setLoading(false);
+              return;
+            } catch (e) {
+              console.error("Failed to parse thread meta from session", e);
+            }
+          }
+
+          if (response.status === 404 && retryCount < maxRetries) {
+            retryCount++;
+            console.log(`Thread not found, retrying... (${retryCount}/${maxRetries})`);
+            setTimeout(() => {
+              if (active) void fetchThread();
+            }, 1000 * retryCount);
+            return;
+          }
+          throw new Error("Failed to load thread");
         }
+
+        const payload = (await response.json()) as ThreadPayload & { hasMore: boolean; nextCursor: string | null };
+        
+        if (!active) return;
 
         setThreadData({
           title: payload.thread.title,
@@ -620,21 +729,58 @@ export default function ThreadPage() {
             content: message.content,
             citations: normalizeCitations(message.citations),
             memoriesUsed: (message as { memoriesUsed?: boolean }).memoriesUsed ?? false,
+            attachments: (message as any).attachments,
           })),
           hasMore: payload.hasMore,
           nextCursor: payload.nextCursor,
         });
-      })
-      .catch(() => {
+        success = true;
+      } catch (err) {
         if (active) {
-          setThreadData(null);
+          console.error("Fetch error:", err);
+          
+          // CRITICAL: If we have an initial query 'q', we assume this is a new thread 
+          // and we MUST allow ThreadChat to mount so it can send the message.
+          if (searchParams.get("q")) {
+            setThreadData({
+              title: "New Conversation",
+              model: getDefaultModel(),
+              roleId: searchParams.get("roleId"),
+              systemPrompt: null,
+              pinned: false,
+              tags: [],
+              history: [],
+              hasMore: false,
+              nextCursor: null,
+            });
+            setLoading(false);
+            return;
+          }
+
+          // For new threads without 'q' or other errors, fallback to default state
+          if (retryCount >= maxRetries) {
+            setThreadData({
+              title: "New Conversation",
+              model: getDefaultModel(),
+              roleId: null,
+              systemPrompt: null,
+              pinned: false,
+              tags: [],
+              history: [],
+              hasMore: false,
+              nextCursor: null,
+            });
+            setLoading(false);
+          }
         }
-      })
-      .finally(() => {
-        if (active) {
+      } finally {
+        if (active && (success || retryCount >= maxRetries)) {
           setLoading(false);
         }
-      });
+      }
+    };
+
+    void fetchThread();
 
     return () => {
       active = false;
@@ -665,6 +811,7 @@ export default function ThreadPage() {
           initialWebSearch={webSearchDefault}
           attachments={attachments}
           setAttachments={setAttachments}
+          isLoading={loading}
         />
       ) : (
         <div className="text-center py-12">

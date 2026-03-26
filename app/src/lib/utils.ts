@@ -187,11 +187,112 @@ export function normalizeUIMessage(message: unknown): ChatMessageItem {
     });
   }
 
+  const attachments: Array<{ url?: string; contentType?: string; name?: string }> = [];
+
+  // SDK v6 puts them in experimental_attachments or attachments
+  const rawAttachments = (msg.experimental_attachments || msg.attachments || []) as any[];
+  rawAttachments.forEach((a) => {
+    if (a && typeof a === "object") {
+      attachments.push({
+        url: a.url as string,
+        contentType: (a.contentType as string) || (a.mediaType as string),
+        name: a.name as string,
+      });
+    }
+  });
+
+  // Also check parts for images/files if attachments is still empty
+  if (attachments.length === 0 && Array.isArray(msg.parts)) {
+    msg.parts.forEach((part: unknown) => {
+      if (part && typeof part === "object") {
+        const p = part as Record<string, unknown>;
+        console.log(`[normalizeUIMessage] Part type: ${p.type}, mediaType: ${p.mediaType}, contentType: ${p.contentType}`);
+        if (p.type === "image" || p.type === "file") {
+          const url = (p.url as string) || (p.image as string);
+          if (url) {
+            let contentType = (p.contentType as string) || (p.mediaType as string);
+            if (!contentType && (p.type === "image" || url.startsWith("data:image/"))) {
+              contentType = "image/png";
+            }
+            console.log(`[normalizeUIMessage] Found attachment: ${contentType}`);
+            attachments.push({
+              url,
+              contentType,
+              name: (p.name as string) || (p.filename as string) || (p.type === "image" ? "image.png" : "file"),
+            });
+          }
+        }
+      }
+    });
+  }
+
+
   return {
     id: (msg.id as string) || String(Math.random()),
     role: (msg.role as string) || "assistant",
     content: text || "\u200B",
     citations: citations.length > 0 ? citations : undefined,
     thinking: thinking.length > 0 ? thinking : undefined,
+    attachments: attachments.length > 0 ? attachments : undefined,
   };
+}
+
+/**
+ * Stores attachments in sessionStorage for retrieval after redirect.
+ */
+export async function saveAttachmentsToSession(threadId: string, files: File[]): Promise<void> {
+  if (typeof window === "undefined" || files.length === 0) return;
+  
+  try {
+    const encodedFiles = await Promise.all(files.map(async (file) => {
+      return new Promise<{name: string, type: string, data: string}>((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve({
+          name: file.name,
+          type: file.type,
+          data: String(reader.result)
+        });
+        reader.readAsDataURL(file);
+      });
+    }));
+    
+    sessionStorage.setItem(`attachments-${threadId}`, JSON.stringify(encodedFiles));
+  } catch (e) {
+    console.error("Failed to save attachments to session", e);
+  }
+}
+
+/**
+ * Retrieves attachments from sessionStorage.
+ */
+export function getAttachmentsFromSession(threadId: string): File[] {
+  if (typeof window === "undefined") return [];
+  
+  const filesJson = sessionStorage.getItem(`attachments-${threadId}`);
+  if (!filesJson) return [];
+  
+  try {
+    const encodedFiles = JSON.parse(filesJson) as Array<{name: string, type: string, data: string}>;
+    return encodedFiles.map(f => {
+      const base64 = f.data.split(",")[1];
+      const byteCharacters = atob(base64);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      return new File([byteArray], f.name, { type: f.type });
+    });
+  } catch (e) {
+    console.error("Failed to reconstruct files from session", e);
+    return [];
+  }
+}
+
+/**
+ * Clears attachments from sessionStorage.
+ */
+export function clearAttachmentsFromSession(threadId: string): void {
+  if (typeof window === "undefined") return;
+  sessionStorage.removeItem(`attachments-${threadId}`);
 }
