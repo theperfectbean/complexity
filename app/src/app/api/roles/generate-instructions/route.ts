@@ -42,7 +42,7 @@ Focus on:
 Output ONLY the instructions text. DO NOT include any preamble like "Here are the instructions..." or conversational filler. DO NOT wrap the output in markdown code blocks. Just provide the raw text that will be used as the system prompt.`;
 
   try {
-    const langModel = getLanguageModel(safeModel, keys);
+    const langModel = await getLanguageModel(safeModel, keys);
     const result = streamText({
       model: langModel,
       system: systemInstructions,

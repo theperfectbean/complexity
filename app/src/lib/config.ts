@@ -5,22 +5,24 @@ export type ModelOption = {
   label: string;
   category: string;
   isPreset: boolean;
+  providerModelId?: string; // The actual ID used by the provider (e.g. sonar-pro)
+  capability?: "high" | "medium" | "low"; // Used for generic fallbacks
 };
 
 const DEFAULT_MODELS: ModelOption[] = [
-  { id: "anthropic/claude-4-6-sonnet-latest", label: "Claude 4.6 Sonnet", category: "Anthropic", isPreset: false },
-  { id: "fast-search", label: "Fast Search", category: "Presets", isPreset: true },
-  { id: "pro-search", label: "Pro Search", category: "Presets", isPreset: true },
-  { id: "perplexity/sonar", label: "Perplexity Sonar", category: "Perplexity", isPreset: false },
-  { id: "anthropic/claude-4-6-opus-latest", label: "Claude 4.6 Opus", category: "Anthropic", isPreset: false },
-  { id: "anthropic/claude-4-5-haiku-latest", label: "Claude 4.5 Haiku", category: "Anthropic", isPreset: false },
-  { id: "openai/gpt-5.4", label: "GPT-5.4", category: "OpenAI", isPreset: false },
-  { id: "google/gemini-3.1-pro-preview", label: "Gemini 3.1 Pro Preview", category: "Google", isPreset: false },
-  { id: "google/gemini-3-flash-preview", label: "Gemini 3 Flash Preview", category: "Google", isPreset: false },
-  { id: "xai/grok-4.20-beta", label: "Grok 4.20 Beta", category: "xAI", isPreset: false },
-  { id: "ollama/llama3", label: "Ollama: Llama 3", category: "Local", isPreset: false },
-  { id: "ollama/mistral", label: "Ollama: Mistral", category: "Local", isPreset: false },
-  { id: "local-openai/custom-model", label: "Local OpenAI API", category: "Local", isPreset: false },
+  { id: "anthropic/claude-4-6-sonnet-latest", label: "Claude 4.6 Sonnet", category: "Anthropic", isPreset: false, capability: "high" },
+  { id: "fast-search", label: "Fast Search", category: "Presets", isPreset: true, providerModelId: "fast-search", capability: "medium" },
+  { id: "pro-search", label: "Pro Search", category: "Presets", isPreset: true, providerModelId: "pro-search", capability: "high" },
+  { id: "perplexity/sonar", label: "Perplexity Sonar", category: "Perplexity", isPreset: false, providerModelId: "sonar", capability: "medium" },
+  { id: "anthropic/claude-4-6-opus-latest", label: "Claude 4.6 Opus", category: "Anthropic", isPreset: false, capability: "high" },
+  { id: "anthropic/claude-4-5-haiku-latest", label: "Claude 4.5 Haiku", category: "Anthropic", isPreset: false, capability: "low" },
+  { id: "openai/gpt-5.4", label: "GPT-5.4", category: "OpenAI", isPreset: false, capability: "high" },
+  { id: "google/gemini-3.1-pro-preview", label: "Gemini 3.1 Pro Preview", category: "Google", isPreset: false, capability: "high" },
+  { id: "google/gemini-3-flash-preview", label: "Gemini 3 Flash Preview", category: "Google", isPreset: false, capability: "medium" },
+  { id: "xai/grok-4.20-beta", label: "Grok 4.20 Beta", category: "xAI", isPreset: false, capability: "high" },
+  { id: "ollama/llama3", label: "Ollama: Llama 3", category: "Local", isPreset: false, capability: "medium" },
+  { id: "ollama/mistral", label: "Ollama: Mistral", category: "Local", isPreset: false, capability: "medium" },
+  { id: "local-openai/custom-model", label: "Local OpenAI API", category: "Local", isPreset: false, capability: "high" },
 ];
 
 const DEFAULT_MODEL_ID = null;

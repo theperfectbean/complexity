@@ -59,7 +59,7 @@ export async function runSearchAgent(options: SearchAgentOptions): Promise<Searc
   if (Array.isArray(rawModelId)) {
     modelConfig = { models: rawModelId };
   } else {
-    const isPreset = isPresetModel(rawModelId) || ["fast-search", "pro-search", "deep-research", "advanced-deep-research"].includes(rawModelId);
+    const isPreset = isPresetModel(rawModelId) || ["fast-search", "pro-search", "deep-research", "advanced-deep-research", "sonar-reasoning-pro", "sonar-pro"].includes(rawModelId);
     modelConfig = isPreset ? { preset: rawModelId } : { model: rawModelId };
   }
 

@@ -105,7 +105,7 @@ export async function refreshModelHealthSnapshot(options?: {
 
   for (const model of activeModels) {
     const provider = getModelProvider(model);
-    const targetId = getModelHealthTargetId(model.id);
+    const targetId = getModelHealthTargetId(model);
     const providerStatus = discovery.statuses[provider];
 
     if (!isModelEnabled(model, settings)) {

@@ -29,7 +29,7 @@ export const MODEL_SETTINGS_KEYS = [
   "CUSTOM_MODEL_LIST",
 ] as const;
 
-type ModelLike = Pick<ModelOption, "id" | "label" | "category" | "isPreset">;
+type ModelLike = Pick<ModelOption, "id" | "label" | "category" | "isPreset" | "providerModelId" | "capability">;
 
 const PROVIDER_PREFIXES: Array<{ prefix: string; provider: ModelProviderId }> = [
   { prefix: "perplexity/", provider: "perplexity" },
@@ -134,10 +134,12 @@ export function getModelProvider(model: Pick<ModelLike, "id" | "isPreset">): Mod
   return "perplexity";
 }
 
-export function getModelHealthTargetId(modelId: string): string {
-  // We no longer map presets to underlying models for health checks,
-  // as the presets themselves are evaluated.
-  return modelId;
+export function getModelHealthTargetId(model: { id: string; providerModelId?: string }): string {
+  // Prefer the actual provider model ID if it's explicitly defined
+  if (model.providerModelId) {
+    return model.providerModelId;
+  }
+  return model.id;
 }
 
 export function isProviderEnabled(

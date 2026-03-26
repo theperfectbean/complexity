@@ -7,14 +7,36 @@ import { createOllama } from "ai-sdk-ollama";
 import { LanguageModel, streamText, UIMessageChunk, UIMessage, generateText } from "ai";
 import type { Responses } from "@perplexity-ai/perplexity_ai/resources/responses";
 import { runSearchAgent } from "./search-agent";
-import { runtimeConfig } from "./config";
+import { runtimeConfig, type ModelOption } from "./config";
 import { env } from "./env";
 import { extractCitationsFromResponse, type Citation } from "./extraction-utils";
 import { isPresetModel } from "./models";
 import { webSearchTool } from "./tools/search";
 import { getLogger } from "./logger";
+import { getDetailedSettings } from "./settings";
+import { getConfiguredModels, filterModelsByConfiguration, MODEL_SETTINGS_KEYS } from "./model-registry";
 
 export type ProviderType = "perplexity" | "anthropic" | "openai" | "google" | "xai" | "ollama" | "local-openai";
+
+/**
+ * Resolves an internal model ID to its actual provider and specific model ID.
+ * Prioritizes dynamic configuration from the database.
+ */
+async function resolveDynamicModel(modelId: string): Promise<{ provider: ProviderType; model: string }> {
+  // 1. Fetch current dynamic configuration
+  const settings = await getDetailedSettings([...MODEL_SETTINGS_KEYS]);
+  const allModels = getConfiguredModels(settings);
+  const modelDef = allModels.find(m => m.id === modelId);
+
+  // 2. If the model has a specific providerModelId mapped in the DB, use it
+  if (modelDef?.providerModelId) {
+    const { provider } = getProviderAndModel(modelId); // Still use prefix to determine provider
+    return { provider, model: modelDef.providerModelId };
+  }
+
+  // 3. Fallback to existing static resolution if no dynamic mapping exists
+  return getProviderAndModel(modelId);
+}
 
 export interface GenerationOptions {
   modelId: string;
@@ -103,8 +125,8 @@ function mapToPerplexityModel(modelName: string): string {
   return `perplexity/${modelName}`;
 }
 
-export function getLanguageModel(modelId: string, keys: Record<string, string | null>): LanguageModel {
-  let { provider, model: modelName } = getProviderAndModel(modelId);
+export async function getLanguageModel(modelId: string, keys: Record<string, string | null>): Promise<LanguageModel> {
+  let { provider, model: modelName } = await resolveDynamicModel(modelId);
 
   // Fallback to Perplexity if primary provider key is missing but Perplexity key is available
   if (provider !== "perplexity" && provider !== "ollama" && provider !== "local-openai") {
@@ -166,14 +188,15 @@ export function getLanguageModel(modelId: string, keys: Record<string, string | 
     const perplexityKey = keys["PERPLEXITY_API_KEY"];
     if (!perplexityKey) throw new Error("PERPLEXITY_API_KEY is not configured");
     
-    // Mapping for Perplexity-hosted models that use different IDs than standard
+    // Static Fallback Mappings if dynamic mapping is missing
     const perplexityMapping: Record<string, string> = {
-      "anthropic/claude-4-5-haiku-latest": "anthropic/claude-haiku-4-5",
-      "anthropic/claude-4-6-sonnet-latest": "anthropic/claude-sonnet-4-6",
-      "anthropic/claude-4-6-opus-latest": "anthropic/claude-opus-4-6",
-      "google/gemini-3.1-pro-preview": "google/gemini-3.1-pro-preview",
-      "google/gemini-3-flash-preview": "google/gemini-3-flash-preview",
-      "openai/gpt-5.4": "openai/gpt-5.4",
+      "anthropic/claude-4-5-haiku-latest": "sonar-pro",
+      "anthropic/claude-4-6-sonnet-latest": "sonar-reasoning-pro",
+      "anthropic/claude-4-6-opus-latest": "sonar-reasoning-pro",
+      "google/gemini-3.1-pro-preview": "sonar-reasoning-pro",
+      "google/gemini-3-flash-preview": "sonar-pro",
+      "openai/gpt-5.4": "sonar-reasoning-pro",
+      "openai/gpt-4o": "sonar-reasoning-pro",
     };
 
     const mappedModel = perplexityMapping[modelName] || modelName;
@@ -195,7 +218,7 @@ export function getLanguageModel(modelId: string, keys: Record<string, string | 
 }
 
 export async function runGeneration(options: GenerationOptions): Promise<GenerationResult> {
-  const { provider, model: modelName } = getProviderAndModel(options.modelId);
+  const { provider, model: modelName } = await resolveDynamicModel(options.modelId);
   const log = getLogger(options.requestId);
 
   if (provider === "perplexity") {
@@ -244,7 +267,7 @@ export async function runGeneration(options: GenerationOptions): Promise<Generat
   let usage: GenerationResult["usage"] = undefined;
 
   try {
-    const model = getLanguageModel(options.modelId, options.keys);
+    const model = await getLanguageModel(options.modelId, options.keys);
 
     options.writer.write({
       type: "data-call-start",
@@ -363,7 +386,7 @@ export async function generateImage(prompt: string, keys: Record<string, string 
  */
 export async function generateThreadTitle(query: string, modelId: string, keys: Record<string, string | null>): Promise<string> {
   try {
-    const model = getLanguageModel(modelId, keys);
+    const model = await getLanguageModel(modelId, keys);
     const { text } = await generateText({
       model,
       system: "You are a helpful assistant that summarizes user queries into a concise, high-quality thread title (3-6 words). Do not use quotes or punctuation. Return ONLY the title.",

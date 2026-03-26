@@ -78,7 +78,7 @@ export async function extractMemories({
   const existingNormalized = new Set(existingMemories.map((item) => normalizeMemory(item.content)));
   
   const keys = await getApiKeys();
-  const model = getLanguageModel(runtimeConfig.memory.extractionModel, keys);
+  const model = await getLanguageModel(runtimeConfig.memory.extractionModel, keys);
 
   const { text: raw } = await generateText({
     model,

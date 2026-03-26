@@ -32,6 +32,8 @@ type ModelOption = {
   label: string;
   category: string;
   isPreset: boolean;
+  providerModelId?: string;
+  capability?: "high" | "medium" | "low";
 };
 
 type DiscoveredModel = {
@@ -261,7 +263,9 @@ export default function AdminSettingsPage() {
       id,
       label: discovered.name,
       category: discovered.provider,
-      isPreset: false
+      isPreset: false,
+      providerModelId: discovered.id,
+      capability: "medium"
     };
     setActiveModels([...activeModels, newModel]);
   };
@@ -270,8 +274,8 @@ export default function AdminSettingsPage() {
     setActiveModels(activeModels.filter(m => m.id !== id));
   };
 
-  const updateModelLabel = (id: string, label: string) => {
-    setActiveModels(activeModels.map(m => m.id === id ? { ...m, label } : m));
+  const updateModelField = (id: string, updates: Partial<ModelOption>) => {
+    setActiveModels(activeModels.map(m => m.id === id ? { ...m, ...updates } : m));
   };
 
   useEffect(() => {
@@ -522,40 +526,69 @@ export default function AdminSettingsPage() {
                 <Reorder.Item 
                   key={model.id} 
                   value={model}
-                  className="group flex items-center gap-3 rounded-xl border bg-background/50 p-3 shadow-2xs hover:shadow-sm transition-all"
+                  className="group flex flex-col gap-3 rounded-xl border bg-background/50 p-4 shadow-2xs hover:shadow-sm transition-all"
                 >
-                  <GripVertical className="h-4 w-4 cursor-grab text-muted-foreground/40 group-active:cursor-grabbing" />
-                  {(() => {
-                    const health = modelHealth[model.id];
-                    return (
-                      <div className="flex-1 space-y-1">
-                        <div className="flex items-center gap-2">
-                          <input 
-                            type="text" 
-                            value={model.label} 
-                            onChange={(e) => updateModelLabel(model.id, e.target.value)}
-                            className="bg-transparent text-sm font-semibold outline-hidden focus:text-primary"
-                          />
-                          <span className="rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">{model.category}</span>
-                          {health && (
-                            <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${healthBadgeStyles[health.status]}`}>
-                              {health.status}
-                            </span>
-                          )}
+                  <div className="flex items-center gap-3">
+                    <GripVertical className="h-4 w-4 cursor-grab text-muted-foreground/40 group-active:cursor-grabbing" />
+                    {(() => {
+                      const health = modelHealth[model.id];
+                      return (
+                        <div className="flex-1 space-y-1">
+                          <div className="flex items-center gap-2">
+                            <input 
+                              type="text" 
+                              value={model.label} 
+                              onChange={(e) => updateModelField(model.id, { label: e.target.value })}
+                              className="bg-transparent text-sm font-semibold outline-hidden focus:text-primary"
+                              placeholder="Display Label"
+                            />
+                            <span className="rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">{model.category}</span>
+                            {health && (
+                              <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${healthBadgeStyles[health.status]}`}>
+                                {health.status}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[10px] font-mono text-muted-foreground/60">{model.id}</p>
                         </div>
-                        <p className="text-[10px] font-mono text-muted-foreground/60">{model.id}</p>
-                        {health?.reason && (
-                          <p className="text-[11px] text-muted-foreground">{health.reason}</p>
-                        )}
-                      </div>
-                    );
-                  })()}
-                  <button 
-                    onClick={() => removeModel(model.id)}
-                    className="rounded-lg p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors md:opacity-0 md:group-hover:opacity-100"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+                      );
+                    })()}
+                    <button 
+                      onClick={() => removeModel(model.id)}
+                      className="rounded-lg p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors md:opacity-0 md:group-hover:opacity-100"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+
+                  <div className="ml-7 grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-muted/30">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">Provider Model ID</label>
+                      <input 
+                        type="text" 
+                        value={model.providerModelId || ""} 
+                        onChange={(e) => updateModelField(model.id, { providerModelId: e.target.value })}
+                        className="w-full bg-muted/30 rounded-md px-2 py-1 text-xs font-mono outline-hidden focus:ring-1 focus:ring-primary/30"
+                        placeholder={model.id.split("/").pop()}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">Capability Tier</label>
+                      <select 
+                        value={model.capability || "medium"} 
+                        onChange={(e) => updateModelField(model.id, { capability: e.target.value as any })}
+                        className="w-full bg-muted/30 rounded-md px-2 py-1 text-xs outline-hidden focus:ring-1 focus:ring-primary/30"
+                      >
+                        <option value="high">High (Reasoning/Complex)</option>
+                        <option value="medium">Medium (Standard)</option>
+                        <option value="low">Low (Fast/Simple)</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {modelHealth[model.id]?.reason && (
+                    <p className="ml-7 text-[11px] text-destructive/80 font-medium">{modelHealth[model.id].reason}</p>
+                  )}
                 </Reorder.Item>
               ))}
               {activeModels.length === 0 && (
