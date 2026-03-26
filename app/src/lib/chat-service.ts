@@ -128,7 +128,10 @@ export class ChatService {
 
       collectFileParts(msg).forEach((att) => {
         if (att.url?.startsWith("data:") && (att.mediaType || att.contentType || "").startsWith("image/")) {
-          content.push({ type: "input_image", image_url: att.url });
+          const base64 = att.url.split(",")[1];
+          if (base64) {
+            content.push({ type: "input_image", image: base64 } as any);
+          }
         }
       });
 

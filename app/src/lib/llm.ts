@@ -285,7 +285,15 @@ export async function runGeneration(options: GenerationOptions): Promise<Generat
 
           collectFileParts(msg).forEach((att) => {
             if (att.url?.startsWith("data:") && (att.mediaType || att.contentType || "").startsWith("image/")) {
-              content.push({ type: "image", image: att.url });
+              try {
+                const base64Data = att.url.split(",")[1];
+                if (base64Data) {
+                  const buffer = Buffer.from(base64Data, "base64");
+                  content.push({ type: "image", image: buffer });
+                }
+              } catch (e) {
+                log.error({ err: e }, "Failed to convert image data URL to buffer");
+              }
             }
           });
 
@@ -339,7 +347,15 @@ export async function runGeneration(options: GenerationOptions): Promise<Generat
 
       collectFileParts(msg).forEach((att) => {
         if (att.url?.startsWith("data:") && (att.mediaType || att.contentType || "").startsWith("image/")) {
-          content.push({ type: "image", image: att.url });
+          try {
+            const base64Data = att.url.split(",")[1];
+            if (base64Data) {
+              const buffer = Buffer.from(base64Data, "base64");
+              content.push({ type: "image", image: buffer });
+            }
+          } catch (e) {
+            log.error({ err: e }, "Failed to convert image data URL to buffer");
+          }
         }
       });
 

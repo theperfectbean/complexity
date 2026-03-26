@@ -485,6 +485,12 @@ This strategy ensures all dependencies (Postgres, Redis, Embedder) are running w
 - **Benefit**: Zero-latency thread starts with full image/file context, resilient to network jitter and URL length constraints.
 
 ### Image Handling and Memory Logic Fixes (2026-03-26)
+- **Problem**: Encountered "⚠️ Streaming Error: URL scheme must be http or https, got data:" when uploading images.
+- **Root Cause**: The Vercel AI SDK validates image URLs for direct providers (Anthropic, OpenAI, etc.), and the Perplexity Agent API requires a specific `image` property for base64 data rather than `image_url`.
+- **Solution**:
+  - **Direct Providers & Chat API**: Updated `app/src/lib/llm.ts` to convert data URLs to `Buffer` (or `Uint8Array`) before passing them to the AI SDK. This bypasses the URL validation logic.
+  - **Agent API**: Updated `app/src/lib/chat-service.ts` to use the `image` property with a raw base64 string (instead of `image_url`) when a data URL is detected, matching the Perplexity Agent API requirements for direct uploads.
+- **Benefit**: Multi-modal support now works across all providers, including Perplexity's Agentic Search and direct Claude/GPT models.
 - **Image Persistence**: Added a `jsonb` `attachments` column to the `messages` table and updated `ChatHistoryManager` to save and load user/assistant attachments (including SDK `experimental_attachments`). This ensures images are preserved across page refreshes and thread history loads.
 - **Image Rendering**: Updated `normalizeUIMessage` to preserve attachments and `MessageList` to use the typed property for rendering, fixing a bug where uploaded images were not visible in the chat UI.
 - **Image LLM Context**: Fixed a critical gap in `llm.ts` where images were being ignored for non-Perplexity providers (Anthropic, OpenAI, Google). Images are now correctly mapped to `image` parts in the AI SDK's `ModelMessage` structure.
