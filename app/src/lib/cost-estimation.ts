@@ -43,8 +43,7 @@ function getRateCard(modelId?: string | null): RateCard {
 
   if (
     normalized.includes("haiku") ||
-    normalized.includes("gemini-3-flash") ||
-    normalized.includes("sonar")
+    normalized.includes("gemini-3-flash")
   ) {
     return {
       inputPerMillionUsd: 1,

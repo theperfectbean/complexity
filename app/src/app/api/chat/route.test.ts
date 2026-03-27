@@ -157,7 +157,7 @@ describe("POST /api/chat", () => {
 
     const request = createPostRequest("http://localhost/api/chat", {
       threadId: "missing-thread",
-      model: "pro-search",
+      model: "perplexity/sonar",
       messages: [{ role: "user", parts: [{ type: "text", text: "hello" }] }],
     });
 
@@ -173,7 +173,7 @@ describe("POST /api/chat", () => {
     const request = createPostRequest("http://localhost/api/chat", {
       threadId: "thread-1",
       roleId: "role-2",
-      model: "pro-search",
+      model: "perplexity/sonar",
       messages: [{ role: "user", parts: [{ type: "text", text: "hello" }] }],
     });
 
@@ -194,7 +194,7 @@ describe("POST /api/chat", () => {
 
     const request = createPostRequest("http://localhost/api/chat", {
       threadId: "thread-1",
-      model: "pro-search",
+      model: "perplexity/sonar",
       messages: [{ role: "user", parts: [{ type: "text", text: "hello" }] }],
     });
 
@@ -214,7 +214,7 @@ describe("POST /api/chat", () => {
 
     const request = createPostRequest("http://localhost/api/chat", {
       threadId: "thread-1",
-      model: "pro-search",
+      model: "perplexity/sonar",
       messages: [{ role: "user", parts: [{ type: "text", text: "hello" }] }],
     });
 
@@ -230,7 +230,7 @@ describe("POST /api/chat", () => {
     const request = createPostRequest("http://localhost/api/chat", {
       threadId: "thread-1",
       roleId: "role-1",
-      model: "pro-search",
+      model: "perplexity/sonar",
       messages: [{ role: "user", parts: [{ type: "text", text: "hello" }] }],
     });
 
@@ -259,7 +259,8 @@ describe("POST /api/chat", () => {
 
     const request = createPostRequest("http://localhost/api/chat", {
       threadId: "thread-1",
-      model: "pro-search",
+      model: "perplexity/sonar",
+      webSearch: true,
       messages: [{ role: "user", parts: [{ type: "text", text: "hello" }] }],
     });
 
@@ -305,7 +306,8 @@ describe("POST /api/chat", () => {
 
     const request = createPostRequest("http://localhost/api/chat", {
       threadId: "thread-1",
-      model: "pro-search",
+      model: "perplexity/sonar",
+      webSearch: true,
       messages: [{ role: "user", parts: [{ type: "text", text: "hello" }] }],
     });
 
@@ -350,7 +352,8 @@ describe("POST /api/chat", () => {
 
     const request = createPostRequest("http://localhost/api/chat", {
       threadId: "thread-1",
-      model: "pro-search",
+      model: "perplexity/sonar",
+      webSearch: true,
       messages: [{ role: "user", parts: [{ type: "text", text: "hello" }] }],
     });
 
@@ -387,7 +390,8 @@ describe("POST /api/chat", () => {
 
     const request = createPostRequest("http://localhost/api/chat", {
       threadId: "thread-1",
-      model: "pro-search",
+      model: "perplexity/sonar",
+      webSearch: true,
       messages: [{ role: "user", parts: [{ type: "text", text: "hello" }] }],
     });
 
@@ -424,7 +428,8 @@ describe("POST /api/chat", () => {
 
     const request = createPostRequest("http://localhost/api/chat", {
       threadId: "thread-1",
-      model: "pro-search",
+      model: "perplexity/sonar",
+      webSearch: true,
       messages: [{ role: "user", parts: [{ type: "text", text: "hello" }] }],
     });
 

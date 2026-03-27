@@ -84,16 +84,16 @@ describe("llm.ts", () => {
       expect(model).toBe("qwen3-32b");
     });
 
-    it("identifies preset models as perplexity", () => {
-      // "fast-search" is a preset in config.ts
+    it("identifies preset models as local-openai when no longer in config", () => {
+      // "fast-search" was a preset in old config; now routes to local-openai as unknown model
       const { provider, model } = getProviderAndModel("fast-search");
-      expect(provider).toBe("perplexity");
+      expect(provider).toBe("local-openai");
       expect(model).toBe("fast-search");
     });
   });
 
   describe("runGeneration", () => {
-    it("routes Perplexity search presets to runSearchAgent", async () => {
+    it("routes Perplexity models via prefix to runSearchAgent", async () => {
       const mockResult = { 
         text: "hello", 
         completedResponse: {}, 
@@ -105,10 +105,11 @@ describe("llm.ts", () => {
       const mockWriter = { write: vi.fn() };
 
       const result = await runGeneration({
-        modelId: "pro-search",
+        modelId: "perplexity/sonar",
         messages: [{ role: "user", content: "hello" } as unknown as UIMessage],
         system: "System prompt",
         agentInput: [],
+        webSearch: true,
         writer: mockWriter as unknown as GenerationOptions["writer"],
         textId: "test-id",
         requestId: "req-id",
@@ -116,7 +117,7 @@ describe("llm.ts", () => {
       });
 
       expect(searchAgent.runSearchAgent).toHaveBeenCalledWith(expect.objectContaining({
-        modelId: "pro-search",
+        modelId: expect.anything(),
       }));
       expect(result.text).toBe("hello");
     });
