@@ -57,7 +57,7 @@ const PROVIDERS: ProviderConfig[] = [
     keyName: "PERPLEXITY_API_KEY",
     toggleName: "PROVIDER_PERPLEXITY_ENABLED",
     placeholder: "pplx-...",
-    description: "Core provider for Search. Supports Sonar and Agentic third-party models.",
+    description: "Optional managed search provider for Sonar and explicitly selected wrapped models.",
   },
   {
     id: "anthropic",

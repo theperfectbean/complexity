@@ -10,8 +10,17 @@ export type ProviderModel = {
   normalizedId: string;
 };
 
+const PERPLEXITY_SEARCH_PRESETS = ["fast-search", "pro-search", "deep-research", "advanced-deep-research"] as const;
+const PERPLEXITY_DISCOVERY_FALLBACK_MODELS = [
+  { id: "fast-search", name: "Fast Search", provider: "Perplexity" },
+  { id: "pro-search", name: "Pro Search", provider: "Perplexity" },
+  { id: "deep-research", name: "Deep Research", provider: "Perplexity" },
+  { id: "advanced-deep-research", name: "Advanced Deep Research", provider: "Perplexity" },
+  { id: "perplexity/sonar", name: "Sonar", provider: "Perplexity" },
+] as const;
+
 function normalizePerplexityModelId(id: string): string {
-  if (["fast-search", "pro-search", "deep-research", "advanced-deep-research"].includes(id)) {
+  if (PERPLEXITY_SEARCH_PRESETS.includes(id as typeof PERPLEXITY_SEARCH_PRESETS[number])) {
     return id;
   }
   return id.startsWith("perplexity/") ? id : `perplexity/${id}`;
@@ -72,18 +81,9 @@ export async function fetchProviderModelsWithStatus(): Promise<ProviderDiscovery
   
   const promises: Promise<void>[] = [];
 
-  // 0. Perplexity (Sonar models and supported third-party models via Agent API)
+  // 0. Perplexity search provider
   if (keys["PERPLEXITY_API_KEY"]) {
     promises.push((async () => {
-      // Core presets that we know exist on the Agent API
-      const corePresets = [
-        { id: "fast-search", name: "Fast Search", provider: "Perplexity" },
-        { id: "pro-search", name: "Pro Search", provider: "Perplexity" },
-        { id: "deep-research", name: "Deep Research", provider: "Perplexity" },
-        { id: "advanced-deep-research", name: "Advanced Deep Research", provider: "Perplexity" },
-        { id: "perplexity/sonar", name: "Sonar", provider: "Perplexity" },
-      ];
-
       try {
         const res = await fetch("https://api.perplexity.ai/v1/models", {
           headers: { Authorization: `Bearer ${keys["PERPLEXITY_API_KEY"]}` },
@@ -92,13 +92,14 @@ export async function fetchProviderModelsWithStatus(): Promise<ProviderDiscovery
         if (res.ok) {
           const data = await res.json() as { data?: { id: string }[] };
           
-          // Add core presets first
-          corePresets.forEach((m) => allModels.push(createProviderModel("perplexity", m.provider, m.id, m.name)));
+          // Add search presets first.
+          PERPLEXITY_DISCOVERY_FALLBACK_MODELS.forEach((m) => {
+            allModels.push(createProviderModel("perplexity", m.provider, m.id, m.name));
+          });
 
           data.data?.forEach((m) => {
             const normalized = normalizePerplexityModelId(m.id);
-            // Skip if already added via presets
-            if (!corePresets.some(p => p.id === normalized)) {
+            if (!PERPLEXITY_DISCOVERY_FALLBACK_MODELS.some((preset) => preset.id === normalized)) {
               allModels.push(createProviderModel("perplexity", "Perplexity", normalized, normalized));
             }
           });
@@ -108,17 +109,10 @@ export async function fetchProviderModelsWithStatus(): Promise<ProviderDiscovery
         }
       } catch (e) {
         console.warn("Falling back to static Perplexity model list", e);
-        // Fallback to known stable models if dynamic discovery fails
-        [
-          ...corePresets,
-          { id: "perplexity/anthropic/claude-4-6-opus-latest", name: "Claude 4.6 Opus (via Perplexity)", provider: "Perplexity" },
-          { id: "perplexity/anthropic/claude-4-6-sonnet-latest", name: "Claude 4.6 Sonnet (via Perplexity)", provider: "Perplexity" },
-          { id: "perplexity/anthropic/claude-4-5-haiku-latest", name: "Claude 4.5 Haiku (via Perplexity)", provider: "Perplexity" },
-          { id: "perplexity/openai/gpt-5.4", name: "GPT-5.4 (via Perplexity)", provider: "Perplexity" },
-          { id: "perplexity/openai/gpt-4o", name: "GPT-4o (via Perplexity)", provider: "Perplexity" },
-          { id: "perplexity/google/gemini-3.1-pro-preview", name: "Gemini 3.1 Pro (via Perplexity)", provider: "Perplexity" },
-          { id: "perplexity/google/gemini-3-flash-preview", name: "Gemini 3 Flash (via Perplexity)", provider: "Perplexity" },
-        ].forEach((m) => allModels.push(createProviderModel("perplexity", m.provider, m.id, m.name)));
+        // Fallback to Perplexity's core search catalog only.
+        PERPLEXITY_DISCOVERY_FALLBACK_MODELS.forEach((m) => {
+          allModels.push(createProviderModel("perplexity", m.provider, m.id, m.name));
+        });
         statuses.perplexity = { state: "fallback", error: e instanceof Error ? e.message : String(e) };
       }
     })());

@@ -22,7 +22,7 @@ const DEFAULT_MODELS: ModelOption[] = [
   { id: "local-openai/custom-model", label: "Local OpenAI API", category: "Local", isPreset: false, capability: "high" },
   { id: "fast-search", label: "Fast Search", category: "Search", isPreset: true, providerModelId: "fast-search", capability: "medium" },
   { id: "pro-search", label: "Pro Search", category: "Search", isPreset: true, providerModelId: "pro-search", capability: "high" },
-  { id: "perplexity/sonar", label: "Perplexity Sonar", category: "Search", isPreset: false, providerModelId: "sonar", capability: "medium" },
+  { id: "perplexity/sonar", label: "Sonar (Search)", category: "Search", isPreset: false, providerModelId: "sonar", capability: "medium" },
 ];
 
 const DEFAULT_MODEL_ID = null;

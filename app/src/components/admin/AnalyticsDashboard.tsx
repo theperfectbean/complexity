@@ -222,7 +222,7 @@ export function AnalyticsDashboard() {
               {data.tokens.map((t) => {
                 const totalTokens = data.tokens.reduce((s, m) => s + m.estimatedTokens, 0);
                 const pct = totalTokens > 0 ? Math.round((t.estimatedTokens / totalTokens) * 100) : 0;
-                const isPerplexity = t.model?.includes("perplexity") || t.model === "fast-search" || t.model === "pro-search" || t.model === "sonar";
+                const showsSearchMetrics = t.searchCount > 0 || t.fetchCount > 0;
                 
                 return (
                   <div key={t.model || "unknown"} className="space-y-1.5">
@@ -253,7 +253,7 @@ export function AnalyticsDashboard() {
                         {t.promptTokens > 0 && (
                           <span>In: {t.promptTokens.toLocaleString()} • Out: {t.completionTokens.toLocaleString()}</span>
                         )}
-                        {isPerplexity && (t.searchCount > 0 || t.fetchCount > 0) && (
+                        {showsSearchMetrics && (
                           <span className="text-cyan-600 font-medium">
                             {t.searchCount > 0 && `Searches: ${t.searchCount}`}
                             {t.searchCount > 0 && t.fetchCount > 0 && " • "}
