@@ -1,7 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextResponse } from "next/server";
-import { generateText } from "ai";
 import { runtimeConfig } from "@/lib/config";
 
 // EVERYTHING used in vi.mock MUST be in vi.hoisted
@@ -74,30 +73,18 @@ vi.mock("@/lib/agent-client", () => ({
   createAgentClient: vi.fn(),
 }));
 
-vi.mock("@/lib/llm", async (importOriginal) => {
-  const actual = await importOriginal() as any;
-  return {
-    ...actual,
-    getLanguageModel: vi.fn(),
-    runGeneration: actual.runGeneration,
-  };
-});
+vi.mock("@/lib/llm", () => ({
+  getLanguageModel: vi.fn(),
+  runGeneration: vi.fn(),
+}));
 
 vi.mock("@/lib/memory", () => ({
   getMemoryPrompt: vi.fn().mockResolvedValue(""),
   saveExtractedMemories: vi.fn().mockResolvedValue(0),
 }));
 
-vi.mock("ai", async (importOriginal) => {
-  const actual = await importOriginal() as any;
-  return {
-    ...actual,
-    generateText: vi.fn(),
-  };
-});
-
 import { POST } from "./route";
-import { createAgentClient } from "@/lib/agent-client";
+import { runGeneration } from "@/lib/llm";
 
 // Helper to create a request
 function createPostRequest(url: string, body: any) {
@@ -247,15 +234,14 @@ describe("POST /api/chat", () => {
     }));
     vi.mocked(mockDb.insert).mockReturnValue({ values } as any);
 
-    const mockAgent = {
-      responses: {
-        create: vi.fn().mockResolvedValue({
-          output_text: "agent answer",
-          usage: { prompt_tokens: 10, completion_tokens: 5 }
-        })
-      }
-    };
-    vi.mocked(createAgentClient).mockReturnValue(mockAgent as any);
+    vi.mocked(runGeneration).mockImplementation(async (options) => {
+      options.writer.write({ type: "text-delta", id: options.textId, delta: "agent answer" } as any);
+      return {
+        text: "agent answer",
+        citations: [],
+        usage: { promptTokens: 10, completionTokens: 5, searchCount: 0, fetchCount: 0 },
+      };
+    });
 
     const request = createPostRequest("http://localhost/api/chat", {
       threadId: "thread-1",
@@ -288,21 +274,15 @@ describe("POST /api/chat", () => {
     }));
     vi.mocked(mockDb.insert).mockReturnValue({ values } as any);
 
-    const mockStream = new ReadableStream({
-      start(controller) {
-        controller.enqueue(new TextEncoder().encode('data: {"type":"response.output_text.delta","delta":"streamed "}\n\n'));
-        controller.enqueue(new TextEncoder().encode('data: {"type":"response.output_text.delta","delta":"answer"}\n\n'));
-        controller.enqueue(new TextEncoder().encode('data: {"type":"response.output_text.done","text":"streamed answer"}\n\n'));
-        controller.enqueue(new TextEncoder().encode('data: {"type":"response.completed","response":{}}\n\n'));
-        controller.enqueue(new TextEncoder().encode('data: [DONE]\n\n'));
-        controller.close();
-      }
+    vi.mocked(runGeneration).mockImplementation(async (options) => {
+      options.writer.write({ type: "text-delta", id: options.textId, delta: "streamed " } as any);
+      options.writer.write({ type: "text-delta", id: options.textId, delta: "answer" } as any);
+      return {
+        text: "streamed answer",
+        citations: [],
+        usage: { promptTokens: 10, completionTokens: 5, searchCount: 0, fetchCount: 0 },
+      };
     });
-
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
-      ok: true,
-      body: mockStream,
-    }));
 
     const request = createPostRequest("http://localhost/api/chat", {
       threadId: "thread-1",
@@ -335,20 +315,14 @@ describe("POST /api/chat", () => {
     }));
     vi.mocked(mockDb.insert).mockReturnValue({ values } as any);
 
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
-      ok: true,
-      body: new ReadableStream({ start(c) { c.close(); } }),
-    }));
-
-    const mockAgent = {
-      responses: {
-        create: vi.fn().mockResolvedValue({
-          output_text: "non-stream answer",
-          usage: { prompt_tokens: 1, completion_tokens: 1 }
-        })
-      }
-    };
-    vi.mocked(createAgentClient).mockReturnValue(mockAgent as any);
+    vi.mocked(runGeneration).mockImplementation(async (options) => {
+      options.writer.write({ type: "text-delta", id: options.textId, delta: "non-stream answer" } as any);
+      return {
+        text: "non-stream answer",
+        citations: [],
+        usage: { promptTokens: 1, completionTokens: 1, searchCount: 0, fetchCount: 0 },
+      };
+    });
 
     const request = createPostRequest("http://localhost/api/chat", {
       threadId: "thread-1",
@@ -378,15 +352,11 @@ describe("POST /api/chat", () => {
       citations: [] 
     }));
 
-    const mockAgent = {
-      responses: {
-        create: vi.fn().mockResolvedValue({
-          output_text: "fresh provider answer",
-          usage: { prompt_tokens: 5, completion_tokens: 5 }
-        })
-      }
-    };
-    vi.mocked(createAgentClient).mockReturnValue(mockAgent as any);
+    vi.mocked(runGeneration).mockResolvedValue({
+      text: "fresh provider answer",
+      citations: [],
+      usage: { promptTokens: 5, completionTokens: 5, searchCount: 0, fetchCount: 0 },
+    });
 
     const request = createPostRequest("http://localhost/api/chat", {
       threadId: "thread-1",
@@ -416,15 +386,7 @@ describe("POST /api/chat", () => {
     }));
     vi.mocked(mockDb.insert).mockReturnValue({ values } as any);
 
-    vi.mocked(createAgentClient).mockImplementation(() => {
-      throw new Error("provider exploded");
-    });
-
-    vi.mocked(generateText).mockResolvedValue({
-      text: "Model request failed: provider exploded",
-      finishReason: "stop",
-      usage: { promptTokens: 0, completionTokens: 0 },
-    } as any);
+    vi.mocked(runGeneration).mockRejectedValue(new Error("provider exploded"));
 
     const request = createPostRequest("http://localhost/api/chat", {
       threadId: "thread-1",
