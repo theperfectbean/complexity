@@ -1,7 +1,6 @@
-import { UIMessageChunk } from "ai";
-import { Responses } from "@perplexity-ai/perplexity_ai/resources/responses";
+import { UIMessageChunk, UIMessage } from "ai";
 import { encode } from "gpt-tokenizer";
-import { createAgentClient } from "./agent-client";
+import { extractTextFromMessage, collectFileParts } from "./chat-utils";
 import { isPresetModel } from "./models";
 import { safeParseJsonLine } from "./sse";
 import { asRecord } from "./extraction-utils";
@@ -11,7 +10,7 @@ import { getLogger } from "./logger";
 
 export interface SearchAgentOptions {
   modelId: string | string[];
-  agentInput: Responses.InputItem[];
+  messages: UIMessage[];
   instructions: string;
   webSearch: boolean;
   apiKey?: string;
@@ -51,8 +50,8 @@ export interface SearchAgentResult {
   };
 }
 
-export async function runSearchAgent(options: SearchAgentOptions): Promise<SearchAgentResult> {
-  const { modelId: rawModelId, agentInput, instructions, webSearch, apiKey, writer, textId, requestId } = options;
+export async function runPerplexityAgent(options: SearchAgentOptions): Promise<SearchAgentResult> {
+  const { modelId: rawModelId, messages, instructions, webSearch, apiKey, writer, textId, requestId } = options;
   const log = getLogger(requestId);
 
   let modelConfig: Record<string, unknown> = {};
@@ -69,10 +68,31 @@ export async function runSearchAgent(options: SearchAgentOptions): Promise<Searc
 
   let completedResponse: Record<string, unknown> | null = null;
   let hasWrittenTextDelta = false;
-  const PERPLEXITY_STREAM_TIMEOUT_MS = runtimeConfig.perplexity.streamTimeoutMs;
+  const STREAM_TIMEOUT_MS = runtimeConfig.searchAgent.streamTimeoutMs;
 
-  const client = createAgentClient(apiKey);
-  
+  const agentInput: Record<string, any>[] = await Promise.all(messages.map(async (msg) => {
+    const text = await extractTextFromMessage(msg);
+    const content: Record<string, unknown>[] = [];
+    
+    if (text.trim()) {
+      content.push({ type: "input_text", text });
+    }
+
+    collectFileParts(msg).forEach((att) => {
+      if (att.url?.startsWith("data:") && (att.mediaType || att.contentType || "").startsWith("image/")) {
+        content.push({ type: "input_image", image_url: att.url });
+      }
+    });
+
+    if (content.length === 0) {
+      content.push({ type: "input_text", text: " " });
+    }
+
+    const role = msg.role === "assistant" || msg.role === "system" ? msg.role : "user";
+
+    return { type: "message", role, content };
+  }));
+
   const filteredInput = agentInput.filter(item => {
     if (item.type === "message" && item.role === "system") return false;
     return true;
@@ -82,16 +102,16 @@ export async function runSearchAgent(options: SearchAgentOptions): Promise<Searc
     ...modelConfig,
     input: filteredInput,
     instructions: instructions,
-    tools: webSearch ? runtimeConfig.perplexity.webTools : [],
+    tools: webSearch ? runtimeConfig.searchAgent.webTools : [],
   };
 
-  const requestBody: Responses.ResponseCreateParamsStreaming = {
+  const requestBody = {
     ...requestBodyBase,
     stream: true,
-  } as Responses.ResponseCreateParamsStreaming;
+  };
 
-  log.info({ modelConfig, inputCount: filteredInput.length, instructionsLength: instructions.length }, "Sending request to Perplexity Agent API");
-  // log.debug({ requestBody }, "Perplexity Agent API request body"); // Use with caution, can be very large with images
+  log.info({ modelConfig, inputCount: filteredInput.length, instructionsLength: instructions.length }, "Sending request to Search Provider Agent API");
+  // log.debug({ requestBody }, "Search Provider Agent API request body");
 
   // Calculate prompt tokens
   const promptText = [
@@ -113,12 +133,12 @@ export async function runSearchAgent(options: SearchAgentOptions): Promise<Searc
 
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), PERPLEXITY_STREAM_TIMEOUT_MS);
+    const timeoutId = setTimeout(() => controller.abort(), STREAM_TIMEOUT_MS);
 
-    const res = await fetch(runtimeConfig.perplexity.apiBaseUrl, {
+    const res = await fetch(runtimeConfig.searchAgent.apiBaseUrl, {
       method: "POST",
       headers: {
-        "Authorization": "Bearer " + (apiKey || env.PERPLEXITY_API_KEY),
+        "Authorization": "Bearer " + (apiKey || runtimeConfig.searchAgent.apiKey || env.PERPLEXITY_API_KEY),
         "Content-Type": "application/json",
         "Accept": "text/event-stream",
       },
@@ -129,10 +149,10 @@ export async function runSearchAgent(options: SearchAgentOptions): Promise<Searc
     if (!res.ok) {
       const errText = await res.text();
       if (res.status === 400) {
-        log.error({ errText, status: 400 }, "Perplexity Agent API Bad Request");
+        log.error({ errText, status: 400 }, "Search Provider Agent API Bad Request");
         streamingFailed = true;
       } else {
-        throw new Error(`Perplexity API Error: ${res.status} ${errText}`);
+        throw new Error(`Search Provider API Error: ${res.status} ${errText}`);
       }
     } else if (res.body) {
       const reader = res.body.getReader();
@@ -303,7 +323,7 @@ export async function runSearchAgent(options: SearchAgentOptions): Promise<Searc
     }
   } catch (error: unknown) {
     const err = error as { message?: string; status?: number };
-    log.error({ err }, "Perplexity Agent streaming encountered an error");
+    log.error({ err }, "Search Provider Agent streaming encountered an error");
     if (!hasWrittenTextDelta && (err.message?.includes("400") || err.status === 400 || streamingFailed === false)) {
       streamingFailed = true;
     } else {
@@ -313,12 +333,29 @@ export async function runSearchAgent(options: SearchAgentOptions): Promise<Searc
 
   if (streamingFailed || streamEventCount === 0 || (!assistantText.trim() && !completedResponse)) {
     try {
-      const nonStreamingResponse = await client.responses.create(
-        requestBodyBase as Responses.ResponseCreateParamsNonStreaming,
-      );
-      completedResponse = (nonStreamingResponse as unknown) as Record<string, unknown>;
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), STREAM_TIMEOUT_MS);
+      
+      const authHeader = "Bearer " + (apiKey || runtimeConfig.searchAgent.apiKey || env.PERPLEXITY_API_KEY);
+      const res = await fetch(runtimeConfig.searchAgent.apiBaseUrl, {
+        method: "POST",
+        headers: {
+          "Authorization": authHeader,
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+        },
+        body: JSON.stringify({ ...requestBodyBase, stream: false }),
+        signal: controller.signal,
+      }).finally(() => clearTimeout(timeoutId));
+      
+      if (!res.ok) {
+        throw new Error(`Search Provider API Error: ${res.status} ${await res.text()}`);
+      }
+
+      const nonStreamingResponse = await res.json() as Record<string, unknown>;
+      completedResponse = nonStreamingResponse;
       if (!assistantText.trim()) {
-        assistantText = nonStreamingResponse.output_text || "";
+        assistantText = (nonStreamingResponse.output_text as string) || "";
         if (assistantText) {
           if (!hasWrittenTextDelta) {
             writer.write({ type: "data-call-result", data: { callId: "model-gen", result: "Finished reasoning." } } as UIMessageChunk);
@@ -328,13 +365,13 @@ export async function runSearchAgent(options: SearchAgentOptions): Promise<Searc
         }
       }
     } catch (fallbackError) {
-      log.error({ err: fallbackError }, "Perplexity Agent non-streaming fallback failed");
+      log.error({ err: fallbackError }, "Search Provider Agent non-streaming fallback failed");
       throw fallbackError;
     }
   }
 
   const completionTokens = encode(assistantText).length;
-  log.info({ assistantTextLength: assistantText.length, completionTokens }, "Perplexity Agent generation complete");
+  log.info({ assistantTextLength: assistantText.length, completionTokens }, "Search Provider Agent generation complete");
 
   return { 
     text: assistantText, 

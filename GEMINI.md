@@ -1,7 +1,19 @@
 # Complexity Workspace
 
 ## Project Overview
-Complexity is a self-hosted, Perplexity-style AI search and Retrieval-Augmented Generation (RAG) workspace. The platform supports authenticated chat, thread persistence, spaces for document-grounded retrieval, and streaming responses from Perplexity's Agent API.
+Complexity is a self-hosted, Agentic AI search and Retrieval-Augmented Generation (RAG) workspace. The platform supports authenticated chat, thread persistence, role-based document retrieval, and streaming responses from multiple providers including Anthropic, OpenAI, and a generic Search Agent architecture.
+
+...
+
+### Architectural Decoupling from Perplexity (2026-03-27)
+- **Problem**: The codebase had a hard dependency on the `@perplexity-ai/perplexity_ai` SDK and proprietary data formats, making Perplexity a mandatory part of the build and runtime even if disabled.
+- **Solution**:
+  - **SDK Removal**: Stripped the Perplexity SDK from `package.json` and replaced all proprietary client calls with standard `fetch` APIs.
+  - **Unified Abstraction**: Switched the entire generation pipeline to use native `UIMessage[]` instead of provider-specific input types.
+  - **Generic Search Agent**: Refactored the core search logic into a provider-agnostic "Search Provider" architecture. Administrators can now toggle between `perplexity` and `tavily` (combined with direct LLMs like Claude) via the Admin Console.
+  - **Citation Parity**: Enhanced the direct provider path (`streamText`) to extract and display citations from tool results (e.g., Tavily), ensuring that non-Perplexity search paths provide the same high-quality attribution.
+  - **Branding Cleanup**: Renamed internal components and logs to "Search Agent" and "Search Provider" to reflect the generic nature of the workspace.
+- **Benefit**: The application is now truly provider-agnostic, with a smaller dependency footprint and a more flexible architecture for future search integrations.
 
 ### Architecture & Technologies
 - **Frontend / API:** Next.js (App Router) located in `app/`.
@@ -474,6 +486,17 @@ This strategy ensures all dependencies (Postgres, Redis, Embedder) are running w
   - Updated UI copy in `layout.tsx` and `page.tsx` from "Perplexity-style" to "Agentic" and "AI search".
   - Refactored `llm.ts` and `MemoryExtractor.ts` to consume the renamed generic client abstractions.
 - **Preservation**: Crucially, left `.env` variables (`PERPLEXITY_API_KEY`), model ID prefixes (`perplexity/sonar`), database columns (`perplexity_api_key`), and test artifacts untouched to preserve fully functional connectivity with the Perplexity API without breaking backwards compatibility.
+
+### Architectural Decoupling from Perplexity (2026-03-27)
+- **Problem**: The codebase had a hard dependency on the `@perplexity-ai/perplexity_ai` SDK, which was heavily imported across the routing and chat-service layers. This meant even if Perplexity was disabled or unconfigured, the types and runtime SDK were still strictly required for the application to function or compile.
+- **Implementation**:
+  - Removed Perplexity SDK types (`Responses`) from `app/src/lib/chat-service.ts` and `app/src/lib/llm.ts`.
+  - Refactored `agentInput` data transformation so that `search-agent.ts` natively accepts standard `UIMessage[]` instead of Perplexity's custom internal formats.
+  - Replaced the heavy `client.responses.create(...)` invocation in `search-agent.ts` with standard `fetch` API calls for both streaming and non-streaming fallback mechanisms.
+  - Obsoleted and deactivated `app/src/lib/agent-client.ts`, which housed the global Perplexity client singleton.
+  - Rewrote the tests (`search-agent.test.ts`) to mock native `global.fetch` instead of the SDK.
+  - Stripped `@perplexity-ai/perplexity_ai` from `package.json` dependencies entirely.
+- **Results**: Perplexity is now a truly optional external provider. The application and build pipeline are 100% agnostic and decoupled from the Perplexity software development kit.
 
 ### Robust Attachment & Thread Initialization (2026-03-26)
 - **Problem**: Passing attachments from the Home/Role page to the Chat page via URL was limited by length and caused "Conversation not found" or "Please re-attach" errors during race conditions or redirects.

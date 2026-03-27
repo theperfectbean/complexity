@@ -11,7 +11,7 @@ import { extractTextFromMessage, collectFileParts } from "./chat-utils";
 import { runtimeConfig } from "./config";
 import { createId } from "./db/cuid";
 import { estimateUsageCostUsd } from "./cost-estimation";
-import type { Responses } from "@perplexity-ai/perplexity_ai/resources/responses";
+
 import { applyBudgetGuardrails, getChatBudgetState, recordChatBudgetUsage } from "./chat-budget";
 import { getChatRoutingDecision } from "./chat-routing";
 
@@ -120,30 +120,6 @@ export class ChatService {
       this.log.warn({ threadId, total: inputMessages.length, kept: MAX_CONTEXT_MESSAGES }, "Truncating context window to prevent token limit errors");
     }
 
-    // Build Agent Input
-    const agentInput: Responses.InputItem[] = await Promise.all(contextMessages.map(async (msg) => {
-      const text = await extractTextFromMessage(msg);
-      const content: Responses.InputItem.InputMessage.ContentPartArray[] = [];
-      
-      if (text.trim()) {
-        content.push({ type: "input_text", text });
-      }
-
-      collectFileParts(msg).forEach((att) => {
-        if (att.url?.startsWith("data:") && (att.mediaType || att.contentType || "").startsWith("image/")) {
-          content.push({ type: "input_image", image_url: att.url });
-        }
-      });
-
-      if (content.length === 0) {
-        content.push({ type: "input_text", text: " " });
-      }
-
-      const role: Responses.InputItem.InputMessage["role"] =
-        msg.role === "assistant" || msg.role === "system" ? msg.role : "user";
-
-      return { type: "message", role, content };
-    }));
 
     return createUIMessageStreamResponse({
       stream: createUIMessageStream({
@@ -189,7 +165,6 @@ export class ChatService {
               result = await runGeneration({
                 modelId: model,
                 messages: contextMessages,
-                agentInput,
                 system: instructions,
                 keys,
                 requestId,

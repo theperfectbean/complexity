@@ -11,6 +11,8 @@ const envSchema = z.object({
   OPENAI_API_KEY: z.string().min(1).optional(),
   GOOGLE_GENERATIVE_AI_API_KEY: z.string().min(1).optional(),
   XAI_API_KEY: z.string().min(1).optional(),
+  SEARCH_PROVIDER_TYPE: z.enum(["perplexity", "tavily", "none"]).default("perplexity"),
+  SEARCH_API_KEY: z.string().optional(),
   OLLAMA_BASE_URL: z.string().url().optional().default("http://localhost:11434/api"),
   LOCAL_OPENAI_BASE_URL: z.string().url().optional(),
   LOCAL_OPENAI_API_KEY: z.string().optional(),

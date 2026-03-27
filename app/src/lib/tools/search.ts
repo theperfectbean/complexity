@@ -1,6 +1,5 @@
 import { tool } from "ai";
 import { z } from "zod";
-import { env } from "@/lib/env";
 
 interface TavilyResult {
   title: string;
@@ -10,18 +9,18 @@ interface TavilyResult {
 }
 
 /**
- * Tavily Search Tool for Vercel AI SDK.
+ * Creates a Tavily Search Tool for Vercel AI SDK.
  * Provides web search capabilities to direct LLM providers (Anthropic, OpenAI, etc.)
  */
-export const webSearchTool = tool({
+export const createWebSearchTool = (apiKey: string) => tool({
   description: "Search the web for real-time information, news, and facts.",
   parameters: z.object({
     query: z.string().describe("The search query to look up."),
   }),
   // @ts-expect-error - AI SDK version mismatch on tool execute parameters
   execute: async ({ query }) => {
-    if (!env.TAVILY_API_KEY) {
-      throw new Error("TAVILY_API_KEY is not configured.");
+    if (!apiKey) {
+      throw new Error("Search API key is not configured.");
     }
 
     try {
@@ -31,7 +30,7 @@ export const webSearchTool = tool({
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          api_key: env.TAVILY_API_KEY,
+          api_key: apiKey,
           query,
           search_depth: "smart",
           include_answer: true,
@@ -63,3 +62,4 @@ export const webSearchTool = tool({
     }
   },
 });
+

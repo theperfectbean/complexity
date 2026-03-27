@@ -16,6 +16,8 @@ export const MODEL_SETTINGS_KEYS = [
   "GOOGLE_GENERATIVE_AI_API_KEY",
   "XAI_API_KEY",
   "PERPLEXITY_API_KEY",
+  "SEARCH_API_KEY",
+  "SEARCH_PROVIDER_TYPE",
   "OLLAMA_BASE_URL",
   "LOCAL_OPENAI_BASE_URL",
   "LOCAL_OPENAI_API_KEY",
@@ -29,7 +31,7 @@ export const MODEL_SETTINGS_KEYS = [
   "CUSTOM_MODEL_LIST",
 ] as const;
 
-type ModelLike = Pick<ModelOption, "id" | "label" | "category" | "isPreset" | "providerModelId" | "capability">;
+type ModelLike = Pick<ModelOption, "id" | "label" | "category" | "isPreset" | "providerId" | "providerModelId" | "capability">;
 
 const PROVIDER_PREFIXES: Array<{ prefix: string; provider: ModelProviderId }> = [
   { prefix: "perplexity/", provider: "perplexity" },
@@ -132,9 +134,10 @@ export function getConfiguredModels(
   return [...fallbackModels];
 }
 
-export function getModelProvider(model: Pick<ModelLike, "id" | "isPreset">): ModelProviderId {
+export function getModelProvider(model: Pick<ModelLike, "id" | "isPreset" | "providerId">): ModelProviderId {
   if (model.isPreset) {
-    return "perplexity";
+    if (model.providerId) return model.providerId as ModelProviderId;
+    return (runtimeConfig.searchAgent.provider === "perplexity" ? "perplexity" : "anthropic") as ModelProviderId;
   }
 
   for (const entry of PROVIDER_PREFIXES) {

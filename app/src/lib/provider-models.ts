@@ -1,6 +1,7 @@
 import { getApiKeys } from "./settings";
 import type { ModelProviderId } from "./model-registry";
 import { formatDisplayLabel } from "./utils";
+import { runtimeConfig } from "./config";
 
 export type ProviderModel = {
   id: string;
@@ -10,17 +11,20 @@ export type ProviderModel = {
   normalizedId: string;
 };
 
-const PERPLEXITY_SEARCH_PRESETS = ["fast-search", "pro-search", "deep-research", "advanced-deep-research"] as const;
-const PERPLEXITY_DISCOVERY_FALLBACK_MODELS = [
-  { id: "fast-search", name: "Fast Search", provider: "Perplexity" },
-  { id: "pro-search", name: "Pro Search", provider: "Perplexity" },
-  { id: "deep-research", name: "Deep Research", provider: "Perplexity" },
-  { id: "advanced-deep-research", name: "Advanced Deep Research", provider: "Perplexity" },
+const SEARCH_PRESETS = ["fast-search", "pro-search", "deep-research", "advanced-deep-research"] as const;
+const SEARCH_FALLBACK_MODELS = [
+  { id: "fast-search", name: "Fast Search", provider: "Search Agent" },
+  { id: "pro-search", name: "Pro Search", provider: "Search Agent" },
+  { id: "deep-research", name: "Deep Research", provider: "Search Agent" },
+  { id: "advanced-deep-research", name: "Advanced Deep Research", provider: "Search Agent" },
+] as const;
+
+const PERPLEXITY_ONLY_MODELS = [
   { id: "perplexity/sonar", name: "Sonar", provider: "Perplexity" },
 ] as const;
 
 function normalizePerplexityModelId(id: string): string {
-  if (PERPLEXITY_SEARCH_PRESETS.includes(id as typeof PERPLEXITY_SEARCH_PRESETS[number])) {
+  if (SEARCH_PRESETS.includes(id as typeof SEARCH_PRESETS[number])) {
     return id;
   }
   return id.startsWith("perplexity/") ? id : `perplexity/${id}`;
@@ -81,7 +85,18 @@ export async function fetchProviderModelsWithStatus(): Promise<ProviderDiscovery
   
   const promises: Promise<void>[] = [];
 
-  // 0. Perplexity search provider
+  // 0. Generic Search Agent Presets
+  const searchProvider = runtimeConfig.searchAgent.provider;
+  const searchApiKey = keys["SEARCH_API_KEY"] || keys["PERPLEXITY_API_KEY"] || keys["TAVILY_API_KEY"];
+  
+  if (searchApiKey && searchProvider !== "none") {
+    const searchProviderId = (searchProvider === "perplexity" ? "perplexity" : "anthropic") as ModelProviderId;
+    SEARCH_FALLBACK_MODELS.forEach((m) => {
+      allModels.push(createProviderModel(searchProviderId, m.provider, m.id, m.name));
+    });
+  }
+
+  // 1. Perplexity (Models only, presets handled above)
   if (keys["PERPLEXITY_API_KEY"]) {
     promises.push((async () => {
       try {
@@ -92,14 +107,13 @@ export async function fetchProviderModelsWithStatus(): Promise<ProviderDiscovery
         if (res.ok) {
           const data = await res.json() as { data?: { id: string }[] };
           
-          // Add search presets first.
-          PERPLEXITY_DISCOVERY_FALLBACK_MODELS.forEach((m) => {
+          PERPLEXITY_ONLY_MODELS.forEach((m) => {
             allModels.push(createProviderModel("perplexity", m.provider, m.id, m.name));
           });
 
           data.data?.forEach((m) => {
             const normalized = normalizePerplexityModelId(m.id);
-            if (!PERPLEXITY_DISCOVERY_FALLBACK_MODELS.some((preset) => preset.id === normalized)) {
+            if (!SEARCH_PRESETS.includes(normalized as any) && !PERPLEXITY_ONLY_MODELS.some(pm => pm.id === normalized)) {
               allModels.push(createProviderModel("perplexity", "Perplexity", normalized, normalized));
             }
           });
@@ -109,8 +123,7 @@ export async function fetchProviderModelsWithStatus(): Promise<ProviderDiscovery
         }
       } catch (e) {
         console.warn("Falling back to static Perplexity model list", e);
-        // Fallback to Perplexity's core search catalog only.
-        PERPLEXITY_DISCOVERY_FALLBACK_MODELS.forEach((m) => {
+        PERPLEXITY_ONLY_MODELS.forEach((m) => {
           allModels.push(createProviderModel("perplexity", m.provider, m.id, m.name));
         });
         statuses.perplexity = { state: "fallback", error: e instanceof Error ? e.message : String(e) };
@@ -118,7 +131,7 @@ export async function fetchProviderModelsWithStatus(): Promise<ProviderDiscovery
     })());
   }
 
-  // 1. Anthropic
+  // 2. Anthropic
   if (keys["ANTHROPIC_API_KEY"]) {
     promises.push((async () => {
       try {

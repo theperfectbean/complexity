@@ -1,46 +1,48 @@
-import { describe, expect, it, vi } from "vitest";
-import { runSearchAgent } from "./search-agent";
-import { createAgentClient } from "./agent-client";
-import type { Responses } from "@perplexity-ai/perplexity_ai/resources/responses";
-
-vi.mock("./agent-client", () => ({
-  createAgentClient: vi.fn(),
-}));
+import { describe, expect, it, vi, beforeEach } from "vitest";
+import { runPerplexityAgent } from "./search-agent";
 
 describe("search-agent.ts", () => {
-  describe("runSearchAgent", () => {
+  describe("runPerplexityAgent", () => {
+    beforeEach(() => {
+      vi.unstubAllGlobals();
+    });
+
     it("returns usage info on success", async () => {
-      const mockClient = {
-        responses: {
-          create: vi.fn().mockResolvedValue({
+      // Mock fetch to simulate a stream that finishes early without text,
+      // and then falls back to a non-streaming fetch that returns "Final response".
+      global.fetch = vi.fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          body: {
+            getReader: () => {
+              let i = 0;
+              const chunks = [
+                { value: new TextEncoder().encode("data: {\"type\": \"response.reasoning.search_queries\", \"queries\": [\"test\"]}\n\n"), done: false },
+                { value: new TextEncoder().encode("data: {\"type\": \"response.reasoning.fetch_url_queries\", \"urls\": [\"http://example.com\"]}\n\n"), done: false },
+                { value: new TextEncoder().encode("data: [DONE]\n\n"), done: false },
+                { value: undefined, done: true },
+              ];
+              return {
+                read: vi.fn().mockImplementation(() => Promise.resolve(chunks[i++]))
+              };
+            },
+          },
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: vi.fn().mockResolvedValue({
             output_text: "Final response",
             response: { output: [] }
           }),
-        },
-      };
-      vi.mocked(createAgentClient).mockReturnValue(mockClient as unknown as ReturnType<typeof createAgentClient>);
+        });
 
-      // Mock fetch to simulate a stream that finishes early without text
-      global.fetch = vi.fn().mockResolvedValue({
-        ok: true,
-        body: {
-          getReader: () => ({
-            read: vi.fn()
-              .mockResolvedValueOnce({ value: new TextEncoder().encode("data: {\"type\": \"response.reasoning.search_queries\", \"queries\": [\"test\"]}\n\n"), done: false })
-              .mockResolvedValueOnce({ value: new TextEncoder().encode("data: {\"type\": \"response.reasoning.fetch_url_queries\", \"urls\": [\"http://example.com\"]}\n\n"), done: false })
-              .mockResolvedValueOnce({ value: new TextEncoder().encode("data: [DONE]\n\n"), done: false })
-              .mockResolvedValue({ value: undefined, done: true }),
-          }),
-        },
-      });
-
-      const agentInput: Responses.InputItem[] = [
-        { type: "message", role: "user", content: [{ type: "input_text", text: "hello" }] },
+      const messages = [
+        { id: "1", role: "user" as const, content: "hello", parts: [{ type: "text" as const, text: "hello" }] },
       ];
 
-      const result = await runSearchAgent({
+      const result = await runPerplexityAgent({
         modelId: "pro-search",
-        agentInput,
+        messages,
         instructions: "System",
         webSearch: true,
         writer: { write: vi.fn() },

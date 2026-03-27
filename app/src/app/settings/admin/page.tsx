@@ -128,6 +128,16 @@ const INTEGRATIONS = [
       { key: "GITHUB_CLIENT_ID", label: "Client ID", placeholder: "ov2-..." },
       { key: "GITHUB_CLIENT_SECRET", label: "Client Secret", placeholder: "github_pat_...", type: "password" },
     ]
+  },
+  {
+    id: "search",
+    name: "Search Provider",
+    description: "Configure the generic search engine used for Fast and Pro search presets.",
+    fields: [
+      { key: "SEARCH_PROVIDER_TYPE", label: "Provider Type", placeholder: "perplexity or tavily" },
+      { key: "SEARCH_API_KEY", label: "API Key", placeholder: "tvly-... or pplx-...", type: "password" },
+      { key: "TAVILY_API_KEY", label: "Tavily Key (Legacy)", placeholder: "tvly-...", type: "password" },
+    ]
   }
 ];
 

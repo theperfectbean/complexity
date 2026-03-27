@@ -5,13 +5,12 @@ import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createXai } from "@ai-sdk/xai";
 import { createOllama } from "ai-sdk-ollama";
 import { LanguageModel, streamText, UIMessageChunk, UIMessage, generateText } from "ai";
-import type { Responses } from "@perplexity-ai/perplexity_ai/resources/responses";
-import { runSearchAgent } from "./search-agent";
+import { runPerplexityAgent } from "./search-agent";
 import { runtimeConfig } from "./config";
 import { env } from "./env";
 import { extractCitationsFromResponse, type Citation } from "./extraction-utils";
 import { isPresetModel } from "./models";
-import { webSearchTool } from "./tools/search";
+import { createWebSearchTool } from "./tools/search";
 import { getLogger } from "./logger";
 import { getDetailedSettings } from "./settings";
 import { getConfiguredModels, MODEL_SETTINGS_KEYS } from "./model-registry";
@@ -65,7 +64,6 @@ async function resolveDynamicModel(modelId: string): Promise<{ provider: Provide
 export interface GenerationOptions {
   modelId: string;
   messages: UIMessage[];
-  agentInput: Responses.InputItem[];
   system?: string;
   keys: Record<string, string | null>;
   requestId: string;
@@ -244,42 +242,32 @@ export async function runGeneration(options: GenerationOptions): Promise<Generat
   const { provider, model: modelName } = await resolveDynamicModel(options.modelId);
   const log = getLogger(options.requestId);
 
-  if (provider === "perplexity") {
-    const shouldUsePerplexityAgent =
-      !!options.webSearch ||
-      isPresetModel(options.modelId) ||
-      isPerplexityPresetModel(options.modelId);
+  const isSearchAgentRequest =
+    !!options.webSearch ||
+    isPresetModel(options.modelId) ||
+    isPerplexityPresetModel(options.modelId);
 
-    if (!shouldUsePerplexityAgent) {
-      log.info({ modelId: options.modelId, modelName }, "Routing Perplexity model through standard chat path");
-    } else {
-      log.info({ modelId: options.modelId, modelName }, "Routing to Perplexity Agent");
-    }
-  }
+  const searchAgentProvider = runtimeConfig.searchAgent.provider;
 
-  if (provider === "perplexity" && (!!options.webSearch ||
-      isPresetModel(options.modelId) ||
-      isPerplexityPresetModel(options.modelId))) {
+  if (isSearchAgentRequest && (provider === "perplexity" || searchAgentProvider === "perplexity")) {
+    log.info({ modelId: options.modelId, modelName, provider }, "Routing to Perplexity Agent API");
     try {
       const primaryModel = mapToPerplexityModel(modelName);
       
-      // Determine if it's a preset. Presets should not use a fallback chain
-      // as they handle their own internal routing and tools in the Agent API.
       const isPreset = isPresetModel(options.modelId) || 
                        isPerplexityPresetModel(options.modelId);
 
-      // Build a fallback chain ONLY for non-preset models: primary model -> standard model
       const modelId = isPreset ? primaryModel : Array.from(new Set([
         primaryModel,
-        "perplexity/sonar" // Ensure prefix is here for fallback too
+        "perplexity/sonar"
       ])).slice(0, 5);
 
-      const result = await runSearchAgent({
+      const result = await runPerplexityAgent({
         modelId,
-        agentInput: options.agentInput,
+        messages: options.messages,
         instructions: options.system || "",
         webSearch: !!options.webSearch,
-        apiKey: options.keys["PERPLEXITY_API_KEY"] || undefined,
+        apiKey: options.keys["PERPLEXITY_API_KEY"] || options.keys["SEARCH_API_KEY"] || undefined,
         writer: options.writer,
         textId: options.textId,
         requestId: options.requestId,
@@ -291,20 +279,15 @@ export async function runGeneration(options: GenerationOptions): Promise<Generat
         usage: result.usage,
       };
     } catch (error) {
-      log.error({ err: error }, "Perplexity Agent generation failed");
+      log.error({ err: error }, "Search Provider Agent generation failed");
       
-      // Fallback to basic Chat API if Agent API fails
       try {
         const langModel = await getLanguageModel(options.modelId, options.keys);
-        
         const coreMessages = await Promise.all(options.messages.map(async (msg) => {
           const { extractTextFromMessage, collectFileParts } = await import("./chat-utils");
           const text = await extractTextFromMessage(msg);
-          
           const content: CoreMessageContent[] = [];
-          if (text.trim()) {
-            content.push({ type: "text", text });
-          }
+          if (text.trim()) content.push({ type: "text", text });
 
           collectFileParts(msg).forEach((att) => {
             if (att.url?.startsWith("data:") && (att.mediaType || att.contentType || "").startsWith("image/")) {
@@ -320,14 +303,8 @@ export async function runGeneration(options: GenerationOptions): Promise<Generat
             }
           });
 
-          if (content.length === 0) {
-            content.push({ type: "text", text: " " });
-          }
-
-          return {
-            role: msg.role as "user" | "assistant" | "system",
-            content,
-          } satisfies CoreMessage;
+          if (content.length === 0) content.push({ type: "text", text: " " });
+          return { role: msg.role as "user" | "assistant" | "system", content } satisfies CoreMessage;
         }));
 
         const { text } = await generateText({
@@ -336,12 +313,9 @@ export async function runGeneration(options: GenerationOptions): Promise<Generat
           messages: coreMessages as never,
         });
 
-        return {
-          text,
-          citations: [],
-        };
+        return { text, citations: [] };
       } catch (fallbackError) {
-        log.error({ err: fallbackError }, "Perplexity Fallback generation failed");
+        log.error({ err: fallbackError }, "Search Provider Fallback generation failed");
         throw fallbackError;
       }
     }
@@ -392,11 +366,13 @@ export async function runGeneration(options: GenerationOptions): Promise<Generat
       } satisfies CoreMessage;
     }));
 
+    const searchApiKey = options.keys["SEARCH_API_KEY"] || options.keys["TAVILY_API_KEY"] || env.SEARCH_API_KEY || env.TAVILY_API_KEY;
+
     const result = streamText({
       model,
       system: options.system,
       messages: coreMessages as never,
-      tools: options.webSearch && env.TAVILY_API_KEY ? { webSearch: webSearchTool } : undefined,
+      tools: options.webSearch && searchApiKey ? { webSearch: createWebSearchTool(searchApiKey) } : undefined,
       // @ts-expect-error - maxSteps is not recognized in this version of streamText
       maxSteps: options.webSearch ? 5 : 1,
       onStepFinish: (step) => {
@@ -411,8 +387,28 @@ export async function runGeneration(options: GenerationOptions): Promise<Generat
           // @ts-expect-error - AI SDK version mismatch on usage properties
           completionTokens: finish.usage.completionTokens ?? finish.usage.completion_tokens,
         };
+
+        // Extract citations from tool results if any
+        if (options.webSearch) {
+          const toolCalls = finish.steps.flatMap(s => s.toolCalls);
+          const toolResults = finish.steps.flatMap(s => s.toolResults);
+          
+          toolResults.forEach((result: any) => {
+            if (result.toolName === "webSearch" && result.result?.results) {
+              result.result.results.forEach((r: any) => {
+                citations.push({
+                  url: r.url,
+                  title: r.title,
+                  snippet: r.snippet
+                });
+              });
+            }
+          });
+        }
       }
     });
+
+    const citations: Citation[] = [];
 
     for await (const chunk of result.fullStream) {
       if (chunk.type === "text-delta") {
@@ -444,7 +440,7 @@ export async function runGeneration(options: GenerationOptions): Promise<Generat
 
     return {
       text: assistantText,
-      citations: [],
+      citations,
       usage,
     };
   } catch (error) {

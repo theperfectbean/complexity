@@ -5,6 +5,7 @@ export type ModelOption = {
   label: string;
   category: string;
   isPreset: boolean;
+  providerId?: string; // Explicit provider (e.g. "perplexity", "openai")
   providerModelId?: string; // The actual ID used by the provider (e.g. sonar-pro)
   capability?: "high" | "medium" | "low"; // Used for generic fallbacks
 };
@@ -77,6 +78,17 @@ export const runtimeConfig = {
     localOpenAiApiKeyFallback: env.LOCAL_OPENAI_API_KEY_FALLBACK ?? "none",
   },
   perplexity: {
+    apiBaseUrl: env.PERPLEXITY_API_BASE_URL ?? "https://api.perplexity.ai/v1/responses",
+    streamTimeoutMs: env.PERPLEXITY_STREAM_TIMEOUT_MS ?? 1000 * 60 * 5,
+    webTools: (env.PERPLEXITY_WEB_TOOLS || "web_search,fetch_url")
+      .split(",")
+      .map((tool) => tool.trim())
+      .filter(Boolean)
+      .map((tool) => ({ type: tool })),
+  },
+  searchAgent: {
+    provider: env.SEARCH_PROVIDER_TYPE ?? "perplexity",
+    apiKey: env.SEARCH_API_KEY || env.PERPLEXITY_API_KEY,
     apiBaseUrl: env.PERPLEXITY_API_BASE_URL ?? "https://api.perplexity.ai/v1/responses",
     streamTimeoutMs: env.PERPLEXITY_STREAM_TIMEOUT_MS ?? 1000 * 60 * 5,
     webTools: (env.PERPLEXITY_WEB_TOOLS || "web_search,fetch_url")
