@@ -7,7 +7,7 @@ import { triggerWebhook } from "./webhooks";
 import { db } from "./db";
 import { threads } from "./db/schema";
 import { eq } from "drizzle-orm";
-import { extractTextFromMessage, collectFileParts } from "./chat-utils";
+import { extractTextFromMessage } from "./chat-utils";
 import { runtimeConfig } from "./config";
 import { createId } from "./db/cuid";
 import { estimateUsageCostUsd } from "./cost-estimation";

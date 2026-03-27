@@ -32,7 +32,7 @@ test.describe("Memory Feature", () => {
     try {
       await expect(page.getByText(/Memory saved/i)).toBeVisible({ timeout: 60000 });
       console.log("Memory saved toast appeared.");
-    } catch (e) {
+    } catch {
       console.log("Memory saved toast did not appear in time, checking settings page directly.");
     }
 

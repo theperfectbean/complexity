@@ -113,7 +113,7 @@ export async function fetchProviderModelsWithStatus(): Promise<ProviderDiscovery
 
           data.data?.forEach((m) => {
             const normalized = normalizePerplexityModelId(m.id);
-            if (!SEARCH_PRESETS.includes(normalized as any) && !PERPLEXITY_ONLY_MODELS.some(pm => pm.id === normalized)) {
+            if (!SEARCH_PRESETS.some((preset) => preset === normalized) && !PERPLEXITY_ONLY_MODELS.some(pm => pm.id === normalized)) {
               allModels.push(createProviderModel("perplexity", "Perplexity", normalized, normalized));
             }
           });
