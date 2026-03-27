@@ -233,7 +233,6 @@ export async function POST(request: Request) {
       const result = await runGeneration({
         modelId: parsed.model,
         messages: internalMessages as never,
-        agentInput: [] as never,
         system: system || undefined,
         keys,
         requestId,
@@ -279,7 +278,6 @@ export async function POST(request: Request) {
             await runGeneration({
               modelId: parsed.model,
               messages: internalMessages as never,
-              agentInput: [] as never,
               system: system || undefined,
               keys,
               requestId,
@@ -357,7 +355,6 @@ export async function POST(request: Request) {
           await runGeneration({
             modelId: parsed.model,
             messages: internalMessages as never,
-            agentInput: [] as never,
             system: system || undefined,
             keys,
             requestId,
