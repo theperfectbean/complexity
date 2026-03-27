@@ -3,7 +3,7 @@ import { encode } from "gpt-tokenizer";
 import { extractTextFromMessage, collectFileParts } from "./chat-utils";
 import { isPresetModel } from "./models";
 import { safeParseJsonLine } from "./sse";
-import { asRecord } from "./extraction-utils";
+import { asRecord, extractAssistantText } from "./extraction-utils";
 import { runtimeConfig } from "./config";
 import { env } from "./env";
 import { getLogger } from "./logger";
@@ -50,6 +50,19 @@ export interface SearchAgentResult {
   };
 }
 
+function extractCompletedResponseText(response: unknown): string {
+  const responseRecord = asRecord(response);
+  if (!responseRecord) {
+    return "";
+  }
+
+  if (typeof responseRecord.output_text === "string" && responseRecord.output_text.trim()) {
+    return responseRecord.output_text.trim();
+  }
+
+  return extractAssistantText(responseRecord);
+}
+
 export async function runPerplexityAgent(options: SearchAgentOptions): Promise<SearchAgentResult> {
   const { modelId: rawModelId, messages, instructions, webSearch, apiKey, writer, textId, requestId } = options;
   const log = getLogger(requestId);
@@ -70,7 +83,7 @@ export async function runPerplexityAgent(options: SearchAgentOptions): Promise<S
   let hasWrittenTextDelta = false;
   const STREAM_TIMEOUT_MS = runtimeConfig.searchAgent.streamTimeoutMs;
 
-  const agentInput: Record<string, any>[] = await Promise.all(messages.map(async (msg) => {
+  const agentInput: Record<string, unknown>[] = await Promise.all(messages.map(async (msg) => {
     const text = await extractTextFromMessage(msg);
     const content: Record<string, unknown>[] = [];
     
@@ -130,6 +143,7 @@ export async function runPerplexityAgent(options: SearchAgentOptions): Promise<S
 
   let streamEventCount = 0;
   let streamingFailed = false;
+  const eventTypeCounts: Record<string, number> = {};
 
   try {
     const controller = new AbortController();
@@ -188,6 +202,7 @@ export async function runPerplexityAgent(options: SearchAgentOptions): Promise<S
           const eventRecord = safeParseJsonLine(dataStr) as AgentEvent | null;
           if (!eventRecord) return;
           streamEventCount += 1;
+          eventTypeCounts[eventRecord.type] = (eventTypeCounts[eventRecord.type] ?? 0) + 1;
     
           if (eventRecord.type === "response.reasoning.started") {
             writer.write({
@@ -291,20 +306,7 @@ export async function runPerplexityAgent(options: SearchAgentOptions): Promise<S
           if (eventRecord.type === "response.completed") {
             completedResponse = (eventRecord.response as Record<string, unknown>) || null;
             if (!assistantText) {
-              const responseRecord = asRecord(completedResponse);
-              const output = Array.isArray(responseRecord?.output) ? responseRecord.output : [];
-              for (const item of output) {
-                const itemRecord = asRecord(item);
-                const content = Array.isArray(itemRecord?.content) ? itemRecord.content : [];
-                for (const part of content) {
-                  const partRecord = asRecord(part);
-                  if (typeof partRecord?.text === "string" && partRecord.text) {
-                    assistantText = partRecord.text;
-                    break;
-                  }
-                }
-                if (assistantText) break;
-              }
+              assistantText = extractCompletedResponseText(completedResponse);
             }
             return;
           }
@@ -323,7 +325,7 @@ export async function runPerplexityAgent(options: SearchAgentOptions): Promise<S
     }
   } catch (error: unknown) {
     const err = error as { message?: string; status?: number };
-    log.error({ err }, "Search Provider Agent streaming encountered an error");
+    log.error({ err, streamEventCount, eventTypeCounts }, "Search Provider Agent streaming encountered an error");
     if (!hasWrittenTextDelta && (err.message?.includes("400") || err.status === 400 || streamingFailed === false)) {
       streamingFailed = true;
     } else {
@@ -355,7 +357,7 @@ export async function runPerplexityAgent(options: SearchAgentOptions): Promise<S
       const nonStreamingResponse = await res.json() as Record<string, unknown>;
       completedResponse = nonStreamingResponse;
       if (!assistantText.trim()) {
-        assistantText = (nonStreamingResponse.output_text as string) || "";
+        assistantText = extractCompletedResponseText(nonStreamingResponse);
         if (assistantText) {
           if (!hasWrittenTextDelta) {
             writer.write({ type: "data-call-result", data: { callId: "model-gen", result: "Finished reasoning." } } as UIMessageChunk);
@@ -365,13 +367,13 @@ export async function runPerplexityAgent(options: SearchAgentOptions): Promise<S
         }
       }
     } catch (fallbackError) {
-      log.error({ err: fallbackError }, "Search Provider Agent non-streaming fallback failed");
+      log.error({ err: fallbackError, streamEventCount, eventTypeCounts }, "Search Provider Agent non-streaming fallback failed");
       throw fallbackError;
     }
   }
 
   const completionTokens = encode(assistantText).length;
-  log.info({ assistantTextLength: assistantText.length, completionTokens }, "Search Provider Agent generation complete");
+  log.info({ assistantTextLength: assistantText.length, completionTokens, streamEventCount, eventTypeCounts }, "Search Provider Agent generation complete");
 
   return { 
     text: assistantText, 

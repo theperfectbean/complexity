@@ -57,5 +57,52 @@ describe("search-agent.ts", () => {
       expect(result.usage.promptTokens).toBeGreaterThan(0);
       expect(result.usage.completionTokens).toBeGreaterThan(0);
     });
+
+    it("extracts nested text from the non-streaming fallback response", async () => {
+      global.fetch = vi.fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          body: {
+            getReader: () => {
+              let i = 0;
+              const chunks = [
+                { value: new TextEncoder().encode("data: [DONE]\n\n"), done: false },
+                { value: undefined, done: true },
+              ];
+              return {
+                read: vi.fn().mockImplementation(() => Promise.resolve(chunks[i++]))
+              };
+            },
+          },
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: vi.fn().mockResolvedValue({
+            output: [
+              {
+                content: [
+                  { type: "output_text", text: "Nested fallback response" },
+                ],
+              },
+            ],
+          }),
+        });
+
+      const messages = [
+        { id: "1", role: "user" as const, content: "hello", parts: [{ type: "text" as const, text: "hello" }] },
+      ];
+
+      const result = await runPerplexityAgent({
+        modelId: "pro-search",
+        messages,
+        instructions: "System",
+        webSearch: true,
+        writer: { write: vi.fn() },
+        textId: "test-text-id",
+        requestId: "test-request-id",
+      });
+
+      expect(result.text).toBe("Nested fallback response");
+    });
   });
 });

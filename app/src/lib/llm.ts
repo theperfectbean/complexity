@@ -8,7 +8,7 @@ import { LanguageModel, streamText, UIMessageChunk, UIMessage, generateText } fr
 import { runPerplexityAgent } from "./search-agent";
 import { runtimeConfig } from "./config";
 import { env } from "./env";
-import { extractCitationsFromResponse, type Citation } from "./extraction-utils";
+import { extractAssistantText, extractCitationsFromResponse, type Citation } from "./extraction-utils";
 import { isPresetModel } from "./models";
 import { createWebSearchTool } from "./tools/search";
 import { getLogger } from "./logger";
@@ -172,6 +172,20 @@ function mapToPerplexityModel(modelName: string): string {
   return modelName.startsWith("perplexity/") ? modelName : resolved;
 }
 
+function summarizeChunk(chunk: unknown): Record<string, unknown> {
+  if (!chunk || typeof chunk !== "object") {
+    return {};
+  }
+
+  const record = chunk as Record<string, unknown>;
+  return {
+    type: typeof record.type === "string" ? record.type : undefined,
+    toolName: typeof record.toolName === "string" ? record.toolName : undefined,
+    hasText: typeof record.text === "string" ? record.text.length > 0 : undefined,
+    hasError: "error" in record,
+  };
+}
+
 export async function getLanguageModel(modelId: string, keys: Record<string, string | null>): Promise<LanguageModel> {
   const { provider, model: modelName } = await resolveDynamicModel(modelId);
 
@@ -313,7 +327,13 @@ export async function runGeneration(options: GenerationOptions): Promise<Generat
           messages: coreMessages as never,
         });
 
-        return { text, citations: [] };
+        const fallbackText = text.trim();
+        if (!fallbackText) {
+          log.error({ modelId: options.modelId, provider }, "Search Provider fallback completed without text");
+          throw new Error("Search Provider fallback completed without text output");
+        }
+
+        return { text: fallbackText, citations: [] };
       } catch (fallbackError) {
         log.error({ err: fallbackError }, "Search Provider Fallback generation failed");
         throw fallbackError;
@@ -324,6 +344,10 @@ export async function runGeneration(options: GenerationOptions): Promise<Generat
   let assistantText = "";
   let hasSentConnected = false;
   let usage: GenerationResult["usage"] = undefined;
+  const chunkTypeCounts: Record<string, number> = {};
+  let streamChunkCount = 0;
+  let finishReason: unknown;
+  let finishText = "";
 
   try {
     const model = await getLanguageModel(options.modelId, options.keys);
@@ -387,15 +411,27 @@ export async function runGeneration(options: GenerationOptions): Promise<Generat
           // @ts-expect-error - AI SDK version mismatch on usage properties
           completionTokens: finish.usage.completionTokens ?? finish.usage.completion_tokens,
         };
+        finishReason = "finishReason" in finish ? (finish as Record<string, unknown>).finishReason : undefined;
+        finishText = extractAssistantText(finish);
 
         // Extract citations from tool results if any
         if (options.webSearch) {
-          const toolCalls = finish.steps.flatMap(s => s.toolCalls);
           const toolResults = finish.steps.flatMap(s => s.toolResults);
           
-          toolResults.forEach((result: any) => {
-            if (result.toolName === "webSearch" && result.result?.results) {
-              result.result.results.forEach((r: any) => {
+          toolResults.forEach((result) => {
+            const toolResult = result as {
+              toolName?: string;
+              result?: {
+                results?: Array<{
+                  url?: string;
+                  title?: string;
+                  snippet?: string;
+                }>;
+              };
+            };
+
+            if (toolResult.toolName === "webSearch" && toolResult.result?.results) {
+              toolResult.result.results.forEach((r) => {
                 citations.push({
                   url: r.url,
                   title: r.title,
@@ -410,7 +446,12 @@ export async function runGeneration(options: GenerationOptions): Promise<Generat
 
     const citations: Citation[] = [];
 
+    log.info({ modelId: options.modelId, webSearch: options.webSearch }, "Starting direct provider stream");
+
     for await (const chunk of result.fullStream) {
+      streamChunkCount += 1;
+      chunkTypeCounts[chunk.type] = (chunkTypeCounts[chunk.type] ?? 0) + 1;
+
       if (chunk.type === "text-delta") {
         if (!hasSentConnected) {
           options.writer.write({ type: "data-json", data: { type: "connected" } } as UIMessageChunk);
@@ -419,6 +460,7 @@ export async function runGeneration(options: GenerationOptions): Promise<Generat
         assistantText += chunk.text;
         options.writer.write({ type: "text-delta", delta: chunk.text, id: options.textId } as UIMessageChunk);
       } else if (chunk.type === "tool-call") {
+        log.info({ toolName: chunk.toolName }, "Model requested tool call");
         options.writer.write({
           type: "data-call-start",
           data: { 
@@ -428,6 +470,7 @@ export async function runGeneration(options: GenerationOptions): Promise<Generat
           },
         } as UIMessageChunk);
       } else if (chunk.type === "tool-result") {
+        log.info({ toolName: chunk.toolName }, "Tool call completed");
         options.writer.write({
           type: "data-call-result",
           data: { 
@@ -435,8 +478,43 @@ export async function runGeneration(options: GenerationOptions): Promise<Generat
             result: "result" in chunk ? (chunk as { result: unknown }).result : ("output" in chunk ? (chunk as { output: unknown }).output : {})
           },
         } as UIMessageChunk);
+      } else if (chunk.type === "error") {
+        log.error({ err: chunk.error }, "Stream encountered an error chunk");
+        throw chunk.error;
+      } else {
+        log.debug({ chunk: summarizeChunk(chunk) }, "Received non-text stream chunk");
       }
     }
+
+    if (!assistantText.trim()) {
+      const recoveredText = finishText.trim();
+      if (recoveredText) {
+        assistantText = recoveredText;
+        if (!hasSentConnected) {
+          options.writer.write({ type: "data-json", data: { type: "connected" } } as UIMessageChunk);
+          hasSentConnected = true;
+        }
+        options.writer.write({ type: "text-delta", delta: assistantText, id: options.textId } as UIMessageChunk);
+        log.warn({
+          streamChunkCount,
+          chunkTypeCounts,
+          finishReason,
+          assistantTextLength: assistantText.length,
+        }, "Recovered assistant text from stream finish payload after empty delta stream");
+      } else {
+        log.error({
+          modelId: options.modelId,
+          provider,
+          streamChunkCount,
+          chunkTypeCounts,
+          finishReason,
+          usage,
+        }, "Direct provider stream completed without assistant text");
+        throw new Error("Provider stream completed without text output");
+      }
+    }
+
+    log.info({ assistantTextLength: assistantText.length, streamChunkCount, chunkTypeCounts }, "Direct provider stream complete");
 
     return {
       text: assistantText,

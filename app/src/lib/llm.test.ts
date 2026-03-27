@@ -1,7 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { runGeneration, getProviderAndModel, getLanguageModel, GenerationOptions, generateThreadTitle } from "./llm";
 import * as searchAgent from "./search-agent";
-import { UIMessage, generateText } from "ai";
+import { UIMessage, generateText, streamText } from "ai";
 
 const { mockOpenAIChat, mockCreateOpenAI } = vi.hoisted(() => {
   const mockOpenAIChat = vi.fn((model: string) => ({ provider: "chat", model }));
@@ -41,6 +41,7 @@ vi.mock("ai", async (importOriginal) => {
   return {
     ...actual,
     generateText: vi.fn(),
+    streamText: vi.fn(),
   };
 });
 
@@ -106,6 +107,41 @@ describe("llm.ts", () => {
 
       expect(searchAgent.runPerplexityAgent).toHaveBeenCalled();
       expect(result.text).toBe("hello");
+    });
+
+    it("throws when direct provider streaming completes without text output", async () => {
+      vi.mocked(streamText).mockReturnValue({
+        fullStream: (async function* () {
+          yield { type: "finish" };
+        })(),
+      } as unknown as ReturnType<typeof streamText>);
+
+      const mockWriter = { write: vi.fn() };
+
+      await expect(runGeneration({
+        modelId: "openai/gpt-4o",
+        messages: [{ role: "user", content: "hi" } as unknown as UIMessage],
+        writer: mockWriter as unknown as GenerationOptions["writer"],
+        textId: "test-id",
+        requestId: "req-id",
+        keys: { "OPENAI_API_KEY": "test" },
+      })).rejects.toThrow("Provider stream completed without text output");
+    });
+
+    it("throws when search-provider fallback completes without text output", async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      vi.mocked(searchAgent.runPerplexityAgent).mockRejectedValue(new Error("agent stream failed") as any);
+      vi.mocked(generateText).mockResolvedValue({ text: "   " } as unknown as Awaited<ReturnType<typeof generateText>>);
+
+      await expect(runGeneration({
+        modelId: "perplexity/sonar",
+        messages: [{ role: "user", content: "hi" } as unknown as UIMessage],
+        webSearch: true,
+        writer: { write: vi.fn() } as unknown as GenerationOptions["writer"],
+        textId: "test-id",
+        requestId: "req-id",
+        keys: { "PERPLEXITY_API_KEY": "test" },
+      })).rejects.toThrow("Search Provider fallback completed without text output");
     });
   });
 
