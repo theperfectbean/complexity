@@ -15,7 +15,8 @@
     "test:smoke-route": "RUN_LIVE_CHAT_ROUTE=1 vitest run src/test/live-chat-route.test.ts --reporter=verbose",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "db:encrypt-keys": "tsx src/scripts/encrypt-existing-keys.ts"
+    "db:encrypt-keys": "tsx src/scripts/encrypt-existing-keys.ts",
+    "postbuild": "cp -r public .next/standalone/public && cp -r .next/static .next/standalone/.next/static"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.58",
