@@ -99,6 +99,13 @@ export async function getApiKeys(): Promise<Record<string, string | null>> {
     "OLLAMA_BASE_URL",
     "LOCAL_OPENAI_BASE_URL",
     "LOCAL_OPENAI_API_KEY",
+    "PROVIDER_PERPLEXITY_ENABLED",
+    "PROVIDER_ANTHROPIC_ENABLED",
+    "PROVIDER_OPENAI_ENABLED",
+    "PROVIDER_GOOGLE_ENABLED",
+    "PROVIDER_XAI_ENABLED",
+    "PROVIDER_OLLAMA_ENABLED",
+    "PROVIDER_LOCAL_OPENAI_ENABLED",
   ];
 
   const results = await Promise.all(keys.map(key => getSetting(key)));

@@ -73,6 +73,12 @@ function dedupeModels(models: ProviderModel[]): ProviderModel[] {
   return [...deduped.values()];
 }
 
+function isProviderEnabled(toggleKey: string, keys: Record<string, string | null>): boolean {
+  const val = keys[toggleKey];
+  // If toggle is explicitly disabled, skip; otherwise default to enabled
+  return val !== "false";
+}
+
 export async function fetchProviderModelsWithStatus(): Promise<ProviderDiscoveryResult> {
   const keys = await getApiKeys();
   const allModels: ProviderModel[] = [];
@@ -103,7 +109,7 @@ export async function fetchProviderModelsWithStatus(): Promise<ProviderDiscovery
   }
 
   // 1. Perplexity (Models only, presets handled above)
-  if (keys["PERPLEXITY_API_KEY"]) {
+  if (keys["PERPLEXITY_API_KEY"] && isProviderEnabled("PROVIDER_PERPLEXITY_ENABLED", keys)) {
     promises.push((async () => {
       try {
         const res = await fetch("https://api.perplexity.ai/v1/models", {
@@ -138,7 +144,7 @@ export async function fetchProviderModelsWithStatus(): Promise<ProviderDiscovery
   }
 
   // 2. Anthropic
-  if (keys["ANTHROPIC_API_KEY"]) {
+  if (keys["ANTHROPIC_API_KEY"] && isProviderEnabled("PROVIDER_ANTHROPIC_ENABLED", keys)) {
     promises.push((async () => {
       try {
         const res = await fetch("https://api.anthropic.com/v1/models", {
@@ -164,8 +170,8 @@ export async function fetchProviderModelsWithStatus(): Promise<ProviderDiscovery
     })());
   }
 
-  // 2. OpenAI
-  if (keys["OPENAI_API_KEY"]) {
+  // 3. OpenAI
+  if (keys["OPENAI_API_KEY"] && isProviderEnabled("PROVIDER_OPENAI_ENABLED", keys)) {
     promises.push((async () => {
       try {
         const res = await fetch("https://api.openai.com/v1/models", {
@@ -190,8 +196,8 @@ export async function fetchProviderModelsWithStatus(): Promise<ProviderDiscovery
     })());
   }
 
-  // 3. Google Gemini
-  if (keys["GOOGLE_GENERATIVE_AI_API_KEY"]) {
+  // 4. Google Gemini
+  if (keys["GOOGLE_GENERATIVE_AI_API_KEY"] && isProviderEnabled("PROVIDER_GOOGLE_ENABLED", keys)) {
     promises.push((async () => {
       try {
         const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${keys["GOOGLE_GENERATIVE_AI_API_KEY"]}`, {
@@ -216,8 +222,8 @@ export async function fetchProviderModelsWithStatus(): Promise<ProviderDiscovery
     })());
   }
 
-  // 4. xAI
-  if (keys["XAI_API_KEY"]) {
+  // 5. xAI
+  if (keys["XAI_API_KEY"] && isProviderEnabled("PROVIDER_XAI_ENABLED", keys)) {
     promises.push((async () => {
       try {
         const res = await fetch("https://api.x.ai/v1/models", {
@@ -240,9 +246,9 @@ export async function fetchProviderModelsWithStatus(): Promise<ProviderDiscovery
     })());
   }
 
-  // 5. Ollama
+  // 6. Ollama
   const ollamaUrl = keys["OLLAMA_BASE_URL"];
-  if (ollamaUrl) {
+  if (ollamaUrl && isProviderEnabled("PROVIDER_OLLAMA_ENABLED", keys)) {
     promises.push((async () => {
       try {
         const baseUrl = ollamaUrl.endsWith("/api") ? ollamaUrl.replace("/api", "") : ollamaUrl;
@@ -265,8 +271,8 @@ export async function fetchProviderModelsWithStatus(): Promise<ProviderDiscovery
     })());
   }
 
-  // 6. Local OpenAI
-  if (keys["LOCAL_OPENAI_BASE_URL"]) {
+  // 7. Local OpenAI
+  if (keys["LOCAL_OPENAI_BASE_URL"] && isProviderEnabled("PROVIDER_LOCAL_OPENAI_ENABLED", keys)) {
     promises.push((async () => {
       try {
         const res = await fetch(`${keys["LOCAL_OPENAI_BASE_URL"]}/models`, {
