@@ -260,8 +260,7 @@ export async function runGeneration(options: GenerationOptions): Promise<Generat
   const isSearchAgentRequest =
     !!options.webSearch ||
     isPresetModel(options.modelId) ||
-    isPerplexityPresetModel(options.modelId) ||
-    provider === "perplexity";
+    isPerplexityPresetModel(options.modelId);
 
   const searchAgentProvider = runtimeConfig.searchAgent.provider;
 

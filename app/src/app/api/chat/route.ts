@@ -48,18 +48,19 @@ export async function POST(request: Request) {
   }
 
   try {
-    const body = await request.clone().json();
+    const body = await request.json();
     const lastMessage =
       Array.isArray(body.messages) && body.messages.length > 0
-        ? (body.messages[body.messages.length - 1] as Record<string, any>)
+        ? (body.messages[body.messages.length - 1] as Record<string, unknown>)
         : null;
     const lastParts = Array.isArray(lastMessage?.parts) ? lastMessage.parts : [];
     
     const lastTextPart = lastParts.find((part) => {
       if (!part || typeof part !== "object") return false;
-      return (part as any).type === "text" && typeof (part as any).text === "string";
+      const p = part as Record<string, unknown>;
+      return p.type === "text" && typeof p.text === "string";
     });
-    const userText = (lastTextPart as any)?.text || "";
+    const userText = typeof (lastTextPart as Record<string, unknown> | undefined)?.text === "string" ? (lastTextPart as Record<string, unknown>).text as string : "";
 
     // Process original request body
     const attachmentPartCount = lastParts.filter((part) => {

@@ -42,7 +42,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ thr
     threadId,
     role: parsed.data.role,
     content: parsed.data.content,
-    model: parsed.data.model || 'gemini-cli',
+    model: parsed.data.model ?? null,
   });
 
   return NextResponse.json({ ok: true, id });
