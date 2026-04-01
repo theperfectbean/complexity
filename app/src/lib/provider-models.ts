@@ -100,8 +100,11 @@ export async function fetchProviderModelsWithStatus(): Promise<ProviderDiscovery
   // 0. Generic Search Agent Presets
   const searchProvider = runtimeConfig.searchAgent.provider;
   const searchApiKey = keys["SEARCH_API_KEY"] || keys["PERPLEXITY_API_KEY"] || keys["TAVILY_API_KEY"];
-  
-  if (searchApiKey && searchProvider !== "none") {
+  const searchToggle = searchProvider === "perplexity"
+    ? isProviderEnabled("PROVIDER_PERPLEXITY_ENABLED", keys)
+    : true;
+
+  if (searchApiKey && searchProvider !== "none" && searchToggle) {
     const searchProviderId = (searchProvider === "perplexity" ? "perplexity" : "anthropic") as ModelProviderId;
     SEARCH_FALLBACK_MODELS.forEach((m) => {
       allModels.push(createProviderModel(searchProviderId, m.provider, m.id, m.name));
