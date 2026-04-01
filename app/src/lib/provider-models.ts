@@ -1,3 +1,4 @@
+import { normalizeLegacyModelId } from "./models";
 import { getApiKeys } from "./settings";
 import type { ModelProviderId } from "./model-registry";
 import { formatDisplayLabel } from "./utils";
@@ -38,6 +39,11 @@ export type ProviderDiscoveryResult = {
 };
 
 function normalizeDiscoveredModelId(providerId: ModelProviderId, id: string): string {
+  const baseId = providerId === "perplexity" ? normalizePerplexityModelId(id) : `${providerId}/${id}`;
+  return normalizeLegacyModelId(baseId);
+}
+
+function _old_normalizeDiscoveredModelId(providerId: ModelProviderId, id: string): string {
   if (providerId === "perplexity") {
     return normalizePerplexityModelId(id);
   }
