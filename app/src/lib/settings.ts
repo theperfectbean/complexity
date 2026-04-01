@@ -106,6 +106,8 @@ export async function getApiKeys(): Promise<Record<string, string | null>> {
     "PROVIDER_XAI_ENABLED",
     "PROVIDER_OLLAMA_ENABLED",
     "PROVIDER_LOCAL_OPENAI_ENABLED",
+    "GEMINI_BRIDGE_URL",
+    "GEMINI_BRIDGE_TOKEN",
   ];
 
   const results = await Promise.all(keys.map(key => getSetting(key)));

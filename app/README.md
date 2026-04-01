@@ -24,8 +24,8 @@ Presets:
 Direct models:
 - `anthropic/claude-4-6-sonnet-latest` (default)
 - `perplexity/sonar`
-- `anthropic/claude-opus-4-6`
-- `anthropic/claude-haiku-4-5`
+- `anthropic/claude-4-6-opus-latest`
+- `anthropic/claude-4-5-haiku-latest`
 - `openai/gpt-5.4`
 - `google/gemini-3.1-pro-preview`
 - `google/gemini-3-flash-preview`

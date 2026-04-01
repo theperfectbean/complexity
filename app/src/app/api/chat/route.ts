@@ -28,21 +28,6 @@ export async function POST(request: Request) {
   const requestId = createId();
   const log = getLogger(requestId);
 
-  // INTERNAL: Support posting results from the webhook listener without auth
-  // We use a shared secret for this internal-only bypass
-  const body = await request.clone().json();
-  if (body.action === "post-result" && body.secret === "whsec_61410447261") {
-    log.info({ threadId: body.threadId }, "Posting internal command result");
-    await db.insert(messages).values({
-      id: createId(),
-      threadId: body.threadId,
-      role: "assistant",
-      content: body.content,
-      model: "gemini-cli",
-    });
-    return ApiResponse.success({ ok: true });
-  }
-
   const authResult = await requireUserOrApiToken(request);
   if (authResult instanceof NextResponse) {
     return authResult;
@@ -75,16 +60,6 @@ export async function POST(request: Request) {
       return (part as any).type === "text" && typeof (part as any).text === "string";
     });
     const userText = (lastTextPart as any)?.text || "";
-
-    // INTERCEPTION: If message starts with "/", trigger webhook and exit
-    if (userText.trim().startsWith("/")) {
-      log.info({ userText, userId }, "Intercepted command message");
-      void triggerWebhook(userId, "command.received", {
-        threadId: body.threadId,
-        prompt: userText,
-      });
-      return ApiResponse.success({ ok: true, intercepted: true });
-    }
 
     // Process original request body
     const attachmentPartCount = lastParts.filter((part) => {

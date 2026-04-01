@@ -138,6 +138,15 @@ const INTEGRATIONS = [
       { key: "SEARCH_API_KEY", label: "API Key", placeholder: "tvly-... or pplx-...", type: "password" },
       { key: "TAVILY_API_KEY", label: "Tavily Key (Legacy)", placeholder: "tvly-...", type: "password" },
     ]
+  },
+  {
+    id: "gemini-bridge",
+    name: "Gemini CLI Bridge",
+    description: "Connect to the Gemini CLI bridge service (VM 102) to enable the /gemini slash command in threads.",
+    fields: [
+      { key: "GEMINI_BRIDGE_URL", label: "Bridge URL", placeholder: "http://192.168.0.102:7891" },
+      { key: "GEMINI_BRIDGE_TOKEN", label: "Bearer Token", placeholder: "Bridge auth token", type: "password" },
+    ]
   }
 ];
 

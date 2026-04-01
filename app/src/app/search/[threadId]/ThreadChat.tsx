@@ -584,6 +584,7 @@ export function ThreadChat({
             <SearchBar
               key="thread-searchbar"
               id="thread-searchbar"
+              threadId={threadId}
               value={prompt}
               onChange={setPrompt}
               placeholder="Ask a follow-up..."

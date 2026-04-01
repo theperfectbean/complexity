@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(TEST_EMAIL=\"gary@example.com\" TEST_PASSWORD=\"password123\" npx playwright test e2e/role-summarise-debug.test.ts --reporter=list)",
+      "Bash(npx playwright:*)",
+      "Read(//usr/bin/**)",
+      "Read(//snap/**)",
+      "Bash(PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium TEST_EMAIL=\"gary@example.com\" TEST_PASSWORD=\"password123\" npx playwright test e2e/role-summarise-debug.test.ts --reporter=list 2>&1)"
+    ]
+  }
+}

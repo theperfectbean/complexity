@@ -14,7 +14,11 @@ import { ModelSelector } from "./parts/ModelSelector";
 import { SearchModelOption } from "@/lib/models";
 import { FileAttachments, FileAttachmentsHandle } from "./parts/FileAttachments";
 import { CommandMenu } from "@/components/chat/CommandMenu";
-import { SlashCommand } from "@/plugins/commandRegistry";
+import { useSlashCommands } from "@/lib/hooks/useSlashCommands";
+import { registerGeminiCommand } from "@/plugins/tools/gemini";
+
+// Register slash commands at module level (idempotent)
+registerGeminiCommand();
 
 type SearchBarProps = {
   value: string;
@@ -37,6 +41,7 @@ type SearchBarProps = {
   "data-testid"?: string;
   id?: string;
   roleId?: string;
+  threadId?: string;
 };
 
 const EMPTY_ATTACHMENTS: File[] = [];
@@ -62,15 +67,13 @@ export function SearchBar({
   "data-testid": dataTestId,
   id,
   roleId,
+  threadId,
 }: SearchBarProps) {
   const fileAttachmentsRef = useRef<FileAttachmentsHandle>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [internalAttachments, setInternalAttachments] = useState<File[]>(externalAttachments);
   const [isDragging, setIsDragging] = useState(false);
 
-  // Command Menu State
-  const [showCommandMenu, setShowCommandMenu] = useState(false);
-  const [commandQuery, setCommandQuery] = useState("");
 
   useEffect(() => {
     setInternalAttachments(externalAttachments);
@@ -160,27 +163,8 @@ export function SearchBar({
     handleDrop(event.nativeEvent as DragEvent);
   };
 
-  const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const newValue = e.target.value;
-    onChange(newValue);
-
-    if (newValue.startsWith("/")) {
-      setShowCommandMenu(true);
-      setCommandQuery(newValue.substring(1));
-    } else {
-      setShowCommandMenu(false);
-    }
-  };
-
-  const handleCommandSelect = (command: SlashCommand) => {
-    command.action({
-      insertText: (text) => {
-        onChange(text);
-        setShowCommandMenu(false);
-      },
-      inputValue: value,
-    });
-  };
+  const { showCommandMenu, commandQuery, handleTextChange, handleCommandSelect, closeMenu } =
+    useSlashCommands(onChange, { threadId });
 
   return (
     <motion.div
@@ -202,8 +186,7 @@ export function SearchBar({
         <CommandMenu
           query={commandQuery}
           onSelect={handleCommandSelect}
-          onClose={() => setShowCommandMenu(false)}
-          position={{ top: 0, left: 0 }}
+          onClose={closeMenu}
         />
       )}
       <FileAttachments

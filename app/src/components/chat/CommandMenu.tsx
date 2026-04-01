@@ -8,22 +8,23 @@ interface CommandMenuProps {
   query: string;
   onSelect: (command: SlashCommand) => void;
   onClose: () => void;
-  position: { top: number; left: number };
 }
 
-export function CommandMenu({ query, onSelect, onClose, position }: CommandMenuProps) {
+export function CommandMenu({ query, onSelect, onClose }: CommandMenuProps) {
   const [commands, setCommands] = useState<SlashCommand[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const menuRef = useRef<HTMLDivElement>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   useEffect(() => {
     const matched = commandRegistry.matchCommands(query);
     setCommands(matched);
     setSelectedIndex(0);
     if (matched.length === 0 && query.length > 0) {
-      onClose();
+      onCloseRef.current();
     }
-  }, [query, onClose]);
+  }, [query]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -40,13 +41,13 @@ export function CommandMenu({ query, onSelect, onClose, position }: CommandMenuP
         onSelect(commands[selectedIndex]);
       } else if (e.key === "Escape") {
         e.preventDefault();
-        onClose();
+        onCloseRef.current();
       }
     };
 
     window.addEventListener("keydown", handleKeyDown, true);
     return () => window.removeEventListener("keydown", handleKeyDown, true);
-  }, [commands, selectedIndex, onSelect, onClose]);
+  }, [commands, selectedIndex, onSelect]);
 
   if (commands.length === 0) return null;
 

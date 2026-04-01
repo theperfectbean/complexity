@@ -1,6 +1,7 @@
 export interface CommandContext {
   insertText: (text: string) => void;
   inputValue: string;
+  threadId?: string;
 }
 
 export interface SlashCommand {
@@ -36,23 +37,3 @@ class CommandRegistry {
 
 export const commandRegistry = new CommandRegistry();
 
-// Register default commands
-commandRegistry.register({
-  id: "gemini-cli",
-  trigger: "gemini",
-  label: "Ask Gemini",
-  description: "Trigger the Gemini CLI agent",
-  action: (context) => {
-    context.insertText("/gemini ");
-  },
-});
-
-commandRegistry.register({
-  id: "help-cmd",
-  trigger: "help",
-  label: "Help",
-  description: "Show available commands",
-  action: (context) => {
-    context.insertText("/help ");
-  },
-});
