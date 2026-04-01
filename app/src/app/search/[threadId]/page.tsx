@@ -5,7 +5,7 @@ import { useParams, useSearchParams } from "next/navigation";
 
 import { ChatMessageItem } from "@/components/chat/MessageList";
 import { runtimeConfig } from "@/lib/config";
-import { getDefaultModel } from "@/lib/models";
+import { getDefaultModel, normalizeLegacyModelId } from "@/lib/models";
 import { getAttachmentsFromSession } from "@/lib/utils";
 import { ThreadChat, ThreadPayload, normalizeCitations } from "./ThreadChat";
 
@@ -52,7 +52,7 @@ export default function ThreadPage() {
               const meta = JSON.parse(metaJson);
               setThreadData({
                 title: meta.title || "New Conversation",
-                model: meta.model || getDefaultModel(),
+                model: normalizeLegacyModelId(meta.model || getDefaultModel()),
                 roleId: meta.roleId || null,
                 systemPrompt: meta.systemPrompt || null,
                 pinned: meta.pinned || false,
@@ -85,7 +85,7 @@ export default function ThreadPage() {
 
         setThreadData({
           title: payload.thread.title,
-          model: payload.thread.model || getDefaultModel(),
+          model: normalizeLegacyModelId(payload.thread.model || getDefaultModel()),
           roleId: payload.thread.roleId,
           systemPrompt: payload.thread.systemPrompt,
           pinned: payload.thread.pinned,

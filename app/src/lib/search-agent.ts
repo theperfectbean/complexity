@@ -1,7 +1,7 @@
 import { UIMessageChunk, UIMessage } from "ai";
 import { encode } from "gpt-tokenizer";
 import { extractTextFromMessage, collectFileParts } from "./chat-utils";
-import { isPresetModel } from "./models";
+import { isPresetModel, normalizeLegacyModelId, normalizePerplexityModelId } from "./models";
 import { safeParseJsonLine } from "./sse";
 import { asRecord, extractAssistantText } from "./extraction-utils";
 import { runtimeConfig } from "./config";
@@ -66,13 +66,34 @@ function extractCompletedResponseText(response: unknown): string {
 export async function runPerplexityAgent(options: SearchAgentOptions): Promise<SearchAgentResult> {
   const { modelId: rawModelId, messages, instructions, webSearch, apiKey, writer, textId, requestId } = options;
   const log = getLogger(requestId);
+  const toAgentModelId = (modelId: string): string => {
+    const normalized = normalizeLegacyModelId(modelId);
+
+    if (isPresetModel(normalized) || ["fast-search", "pro-search", "deep-research", "advanced-deep-research", "sonar-reasoning-pro", "sonar-pro"].includes(normalized)) {
+      return normalized;
+    }
+
+    if (normalized.startsWith("perplexity/")) {
+      return normalizePerplexityModelId(normalized);
+    }
+
+    if (normalized === "sonar") {
+      return "perplexity/sonar";
+    }
+
+    return normalizePerplexityModelId(normalized);
+  };
+
+  const normalizedModelId = Array.isArray(rawModelId)
+    ? rawModelId.map((id) => toAgentModelId(id))
+    : toAgentModelId(rawModelId);
 
   let modelConfig: Record<string, unknown> = {};
-  if (Array.isArray(rawModelId)) {
-    modelConfig = { models: rawModelId };
+  if (Array.isArray(normalizedModelId)) {
+    modelConfig = { models: normalizedModelId };
   } else {
-    const isPreset = isPresetModel(rawModelId) || ["fast-search", "pro-search", "deep-research", "advanced-deep-research", "sonar-reasoning-pro", "sonar-pro"].includes(rawModelId);
-    modelConfig = isPreset ? { preset: rawModelId } : { model: rawModelId };
+    const isPreset = isPresetModel(normalizedModelId) || ["fast-search", "pro-search", "deep-research", "advanced-deep-research", "sonar-reasoning-pro", "sonar-pro"].includes(normalizedModelId);
+    modelConfig = isPreset ? { preset: normalizedModelId } : { model: normalizedModelId };
   }
 
   let assistantText = "";

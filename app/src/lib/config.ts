@@ -59,8 +59,11 @@ export const runtimeConfig = {
   llm: {
     modelAliases: {
       anthropic: {
+        "claude-haiku-4-5": "claude-4-5-haiku-latest",
         "claude-4-6-sonnet-latest": "claude-4-6-sonnet-latest",
+        "claude-sonnet-4-6": "claude-4-6-sonnet-latest",
         "claude-4-5-haiku-latest": "claude-4-5-haiku-latest",
+        "claude-opus-4-6": "claude-4-6-opus-latest",
         "claude-4-6-opus-latest": "claude-4-6-opus-latest",
       },
       openai: {

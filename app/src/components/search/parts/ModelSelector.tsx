@@ -3,7 +3,7 @@
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { ChevronDown, Check, Sparkles, Search, Brain, Zap, Globe, Terminal, Cpu, Settings2 } from "lucide-react";
 import { useMemo, useState, useEffect, useCallback } from "react";
-import { MODELS, getDefaultModel, SearchModelOption } from "@/lib/models";
+import { MODELS, getDefaultModel, SearchModelOption, normalizeLegacyModelId } from "@/lib/models";
 import { cn, formatDisplayLabel } from "@/lib/utils";
 
 type ModelSelectorProps = {
@@ -31,6 +31,7 @@ export function ModelSelector({
 }: ModelSelectorProps) {
   const [availableModels, setAvailableModels] = useState<readonly SearchModelOption[]>(providedModelOptions || MODELS);
   const [hasUserSelectedModel, setHasUserSelectedModel] = useState(false);
+  const normalizedModel = normalizeLegacyModelId(model);
 
   // Load saved default model preference from profile
   useEffect(() => {
@@ -39,7 +40,7 @@ export function ModelSelector({
       .then(r => r.ok ? r.json() as Promise<{ defaultModel?: string | null }> : null)
       .then(profile => {
         if (profile?.defaultModel && !hasUserSelectedModel) {
-          onModelChange?.(profile.defaultModel);
+          onModelChange?.(normalizeLegacyModelId(profile.defaultModel));
         }
       })
       .catch(() => undefined);
@@ -56,12 +57,12 @@ export function ModelSelector({
           if (data.models && data.models.length > 0) {
             setAvailableModels(data.models);
             
-            const currentModelIsValid = data.models.some((m: SearchModelOption) => m.id === model);
-            const isInitialDefault = model === getDefaultModel();
+            const currentModelIsValid = data.models.some((m: SearchModelOption) => m.id === normalizedModel);
+            const isInitialDefault = normalizedModel === getDefaultModel();
 
             if (!currentModelIsValid || (!hasUserSelectedModel && isInitialDefault)) {
               const topModel = data.models[0].id;
-              if (topModel && topModel !== model) {
+              if (topModel && topModel !== normalizedModel) {
                 onModelChange?.(topModel);
               }
             }
@@ -75,7 +76,7 @@ export function ModelSelector({
 
       return () => controller.abort();
     }
-  }, [autoFilter, providedModelOptions, model, onModelChange, hasUserSelectedModel]);
+  }, [autoFilter, providedModelOptions, normalizedModel, onModelChange, hasUserSelectedModel]);
 
   const modelOptions = availableModels;
 
@@ -89,8 +90,8 @@ export function ModelSelector({
     }, {});
   }, [modelOptions]);
 
-  const activeModel = modelOptions.find((item) => item.id === model);
-  const activeModelLabel = activeModel ? formatDisplayLabel(activeModel.label) : model;
+  const activeModel = modelOptions.find((item) => item.id === normalizedModel);
+  const activeModelLabel = activeModel ? formatDisplayLabel(activeModel.label) : normalizedModel;
 
   const handleModelSelect = useCallback((id: string) => {
     setHasUserSelectedModel(true);
@@ -139,7 +140,7 @@ export function ModelSelector({
                   onSelect={() => handleModelSelect(option.id)}
                   className={cn(
                     "flex cursor-pointer items-center justify-between rounded-lg px-3 py-2 text-sm outline-none transition-all hover:bg-accent hover:text-accent-foreground",
-                    model === option.id && "bg-primary/10 text-primary font-medium shadow-2xs"
+                    normalizedModel === option.id && "bg-primary/10 text-primary font-medium shadow-2xs"
                   )}
                 >
                   <div className="flex flex-col min-w-0">
@@ -148,7 +149,7 @@ export function ModelSelector({
                       <span aria-hidden="true" className="truncate text-[10px] font-mono opacity-50">{option.id.split('/').pop()}</span>
                     )}
                   </div>
-                  {model === option.id && (
+                  {normalizedModel === option.id && (
                     <Check className="ml-2 h-3.5 w-3.5 shrink-0" />
                   )}
                 </DropdownMenu.Item>

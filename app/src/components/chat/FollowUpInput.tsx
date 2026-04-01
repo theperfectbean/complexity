@@ -1,5 +1,8 @@
+import { useState } from "react";
 import { SendHorizontal } from "lucide-react";
 import TextareaAutosize from "react-textarea-autosize";
+import { CommandMenu } from "./CommandMenu";
+import { SlashCommand } from "@/plugins/commandRegistry";
 
 type FollowUpInputProps = {
   value: string;
@@ -16,15 +19,57 @@ export function FollowUpInput({
   placeholder,
   submitLabel,
 }: FollowUpInputProps) {
+  const [showCommandMenu, setShowCommandMenu] = useState(false);
+  const [commandQuery, setCommandQuery] = useState("");
+
+  const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const newValue = e.target.value;
+    onChange(newValue);
+
+    // Check if the user is typing a command
+    if (newValue.startsWith("/")) {
+      setShowCommandMenu(true);
+      setCommandQuery(newValue.substring(1));
+    } else {
+      setShowCommandMenu(false);
+    }
+  };
+
+  const handleCommandSelect = (command: SlashCommand) => {
+    command.action({
+      insertText: (text) => {
+        onChange(text);
+        setShowCommandMenu(false);
+      },
+      inputValue: value,
+    });
+  };
+
   return (
-    <div className="mt-3 rounded-lg border bg-card p-2 shadow-2xs">
+    <div className="relative mt-3 rounded-lg border bg-card p-2 shadow-2xs">
+      {showCommandMenu && (
+        <CommandMenu
+          query={commandQuery}
+          onSelect={handleCommandSelect}
+          onClose={() => setShowCommandMenu(false)}
+          position={{ top: 0, left: 0 }}
+        />
+      )}
       <div className="flex items-end gap-2">
         <TextareaAutosize
           minRows={1}
           maxRows={8}
           value={value}
-          onChange={(event) => onChange(event.target.value)}
+          onChange={handleTextChange}
           onKeyDown={(event) => {
+            if (showCommandMenu && (event.key === "ArrowUp" || event.key === "ArrowDown" || event.key === "Enter" || event.key === "Tab")) {
+              // Let the CommandMenu handle these
+              if (event.key === "Enter" || event.key === "Tab") {
+                event.preventDefault(); // Prevent form submission while menu is open
+              }
+              return;
+            }
+
             if (event.key === "Enter" && !event.shiftKey) {
               event.preventDefault();
               event.currentTarget.form?.requestSubmit();

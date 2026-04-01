@@ -80,6 +80,12 @@ describe("llm.ts", () => {
       expect(provider).toBe("local-openai");
       expect(model).toBe("unknown-model");
     });
+
+    it("normalizes legacy anthropic aliases", () => {
+      const { provider, model } = getProviderAndModel("anthropic/claude-haiku-4-5");
+      expect(provider).toBe("anthropic");
+      expect(model).toBe("claude-4-5-haiku-latest");
+    });
   });
 
   describe("runGeneration", () => {
@@ -107,6 +113,27 @@ describe("llm.ts", () => {
 
       expect(searchAgent.runPerplexityAgent).toHaveBeenCalled();
       expect(result.text).toBe("hello");
+    });
+
+    it("routes Perplexity provider models through the search agent even without webSearch", async () => {
+      const mockResult = {
+        text: "hello",
+        completedResponse: {},
+        usage: { promptTokens: 10, completionTokens: 5 },
+      };
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      vi.mocked(searchAgent.runPerplexityAgent).mockResolvedValue(mockResult as any);
+
+      await runGeneration({
+        modelId: "perplexity/anthropic/claude-4-5-haiku-latest",
+        messages: [{ role: "user", content: "hello" } as unknown as UIMessage],
+        writer: { write: vi.fn() } as unknown as GenerationOptions["writer"],
+        textId: "test-id",
+        requestId: "req-id",
+        keys: { "PERPLEXITY_API_KEY": "test" },
+      });
+
+      expect(searchAgent.runPerplexityAgent).toHaveBeenCalled();
     });
 
     it("throws when direct provider streaming completes without text output", async () => {
@@ -150,12 +177,38 @@ describe("llm.ts", () => {
       await expect(getLanguageModel("anthropic/claude-3", {})).rejects.toThrow("ANTHROPIC_API_KEY is not configured");
     });
 
-    it("keeps explicit Perplexity-wrapped models instead of translating them to Sonar", async () => {
+    it("keeps explicit Perplexity-wrapped models intact", async () => {
       await getLanguageModel("perplexity/anthropic/claude-4-5-haiku-latest", {
         PERPLEXITY_API_KEY: "test",
       });
 
-      expect(mockOpenAIChat).toHaveBeenCalledWith("anthropic/claude-4-5-haiku-latest");
+      expect(mockOpenAIChat).toHaveBeenCalledWith("anthropic/claude-haiku-4-5");
+    });
+
+    it("normalizes legacy anthropic aliases before routing to the search provider", async () => {
+      const mockResult = {
+        text: "hello",
+        completedResponse: {},
+        usage: { promptTokens: 10, completionTokens: 5 },
+      };
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      vi.mocked(searchAgent.runPerplexityAgent).mockResolvedValue(mockResult as any);
+
+      await runGeneration({
+        modelId: "anthropic/claude-haiku-4-5",
+        messages: [{ role: "user", content: "hello" } as unknown as UIMessage],
+        webSearch: true,
+        writer: { write: vi.fn() } as unknown as GenerationOptions["writer"],
+        textId: "test-id",
+        requestId: "req-id",
+        keys: { "PERPLEXITY_API_KEY": "test" },
+      });
+
+      expect(searchAgent.runPerplexityAgent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          modelId: expect.arrayContaining(["anthropic/claude-haiku-4-5", "perplexity/sonar"]),
+        }),
+      );
     });
   });
 

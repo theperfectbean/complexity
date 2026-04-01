@@ -9,6 +9,7 @@ import { threads } from "./db/schema";
 import { eq } from "drizzle-orm";
 import { extractTextFromMessage } from "./chat-utils";
 import { runtimeConfig } from "./config";
+import { normalizeLegacyModelId } from "./models";
 import { createId } from "./db/cuid";
 import { estimateUsageCostUsd } from "./cost-estimation";
 
@@ -45,6 +46,8 @@ export class ChatService {
 
   async execute() {
     const { requestId, threadId, model, messages: inputMessages, webSearch } = this.session;
+    const normalizedModel = normalizeLegacyModelId(model);
+    this.session.model = normalizedModel;
     
     const thread = await this.validator.validate(this.session);
     const isRegenerate = await this.history.handleRegeneration(this.session);
@@ -124,7 +127,7 @@ export class ChatService {
     return createUIMessageStreamResponse({
       stream: createUIMessageStream({
         execute: async ({ writer }) => {
-          this.log.info({ model, threadId }, "Starting request");
+          this.log.info({ model: normalizedModel, threadId }, "Starting request");
           const startTime = Date.now();
           const responseMessageId = createId();
           const textId = createId();
@@ -145,7 +148,7 @@ export class ChatService {
               webSearchExplicit: this.session.webSearchExplicit,
             });
             const budgetState = await getChatBudgetState(this.session.redis, this.session.userEmail);
-            const budgeted = applyBudgetGuardrails(model, initialRouting, budgetState);
+            const budgeted = applyBudgetGuardrails(normalizedModel, initialRouting, budgetState);
             this.session.model = budgeted.modelId;
             this.session.routing = budgeted.routing;
 
@@ -163,7 +166,7 @@ export class ChatService {
             let result;
             try {
               result = await runGeneration({
-                modelId: model,
+                modelId: normalizedModel,
                 messages: contextMessages,
                 system: instructions,
                 keys,
@@ -182,7 +185,7 @@ export class ChatService {
             const assistantText = result.text || runtimeConfig.chat.emptyResponseFallbackText;
             const citations = [...ragCitations, ...(result.citations || [])];
             const estimatedCostUsd = estimateUsageCostUsd({
-              modelId: model,
+              modelId: normalizedModel,
               promptTokens: result.usage?.promptTokens,
               completionTokens: result.usage?.completionTokens,
               searchCount: result.usage?.searchCount,
@@ -237,15 +240,15 @@ export class ChatService {
             }, "Finished request");
 
             // Trigger Webhooks
-            void triggerWebhook(thread.userId, "thread.completed", {
-              threadId,
-              roleId: thread.roleId,
-              title: threadTitle,
-              model,
-              prompt: userText,
-              response: assistantText,
-              citations,
-            });
+             void triggerWebhook(thread.userId, "thread.completed", {
+               threadId,
+               roleId: thread.roleId,
+               title: threadTitle,
+               model: normalizedModel,
+               prompt: userText,
+               response: assistantText,
+               citations,
+             });
           } catch (error: unknown) {
             this.log.error({ err: error }, "Stream Execution Error");
             const message = error instanceof Error ? error.message : "Internal Stream Error";

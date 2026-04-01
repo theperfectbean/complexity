@@ -9,7 +9,7 @@ import { runPerplexityAgent } from "./search-agent";
 import { runtimeConfig } from "./config";
 import { env } from "./env";
 import { extractAssistantText, extractCitationsFromResponse, type Citation } from "./extraction-utils";
-import { isPresetModel } from "./models";
+import { isPresetModel, normalizeLegacyModelId, normalizePerplexityModelId } from "./models";
 import { createWebSearchTool } from "./tools/search";
 import { getLogger } from "./logger";
 import { getDetailedSettings } from "./settings";
@@ -46,19 +46,21 @@ function looksLikeOpenModel(modelId: string): boolean {
  * Prioritizes dynamic configuration from the database.
  */
 async function resolveDynamicModel(modelId: string): Promise<{ provider: ProviderType; model: string }> {
+  const normalizedModelId = normalizeLegacyModelId(modelId);
+
   // 1. Fetch current dynamic configuration
   const settings = await getDetailedSettings([...MODEL_SETTINGS_KEYS]);
   const allModels = getConfiguredModels(settings);
-  const modelDef = allModels.find(m => m.id === modelId);
+  const modelDef = allModels.find((m) => normalizeLegacyModelId(m.id) === normalizedModelId);
 
   // 2. If the model has a specific providerModelId mapped in the DB, use it
   if (modelDef?.providerModelId) {
-    const { provider } = getProviderAndModel(modelId); // Still use prefix to determine provider
-    return { provider, model: modelDef.providerModelId };
+    const { provider } = getProviderAndModel(normalizedModelId); // Still use prefix to determine provider
+    return { provider, model: normalizeLegacyModelId(modelDef.providerModelId) };
   }
 
   // 3. Fallback to existing static resolution if no dynamic mapping exists
-  return getProviderAndModel(modelId);
+  return getProviderAndModel(normalizedModelId);
 }
 
 export interface GenerationOptions {
@@ -105,43 +107,45 @@ const PROVIDER_PREFIX_MAP: Record<string, ProviderType> = {
 };
 
 export function getProviderAndModel(modelId: string): { provider: ProviderType; model: string } {
+  const normalizedModelId = normalizeLegacyModelId(modelId);
+
   // 1. Check for explicit prefix
   for (const [prefix, provider] of Object.entries(PROVIDER_PREFIX_MAP)) {
-    if (modelId.startsWith(prefix)) {
-      return { provider, model: modelId.slice(prefix.length) };
+    if (normalizedModelId.startsWith(prefix)) {
+      return { provider, model: normalizedModelId.slice(prefix.length) };
     }
   }
 
   // 2. Resolve implicit providers
-  if (isPresetModel(modelId)) {
-    return { provider: "perplexity", model: modelId };
+  if (isPresetModel(normalizedModelId)) {
+    return { provider: "perplexity", model: normalizedModelId };
   }
 
   // 3. Handle specific un-prefixed models
   const knownPerplexityModels = ["sonar"];
-  if (knownPerplexityModels.includes(modelId)) {
-    return { provider: "perplexity", model: modelId };
+  if (knownPerplexityModels.includes(normalizedModelId)) {
+    return { provider: "perplexity", model: normalizedModelId };
   }
 
   // 4. Heuristics for common un-prefixed provider models
-  if (modelId.startsWith("claude-") || modelId.startsWith("claude.")) {
-    return { provider: "anthropic", model: modelId };
+  if (normalizedModelId.startsWith("claude-") || normalizedModelId.startsWith("claude.")) {
+    return { provider: "anthropic", model: normalizedModelId };
   }
-  if (modelId.startsWith("gpt-") || modelId.startsWith("o1") || modelId.startsWith("o3") || modelId.startsWith("o4")) {
-    return { provider: "openai", model: modelId };
+  if (normalizedModelId.startsWith("gpt-") || normalizedModelId.startsWith("o1") || normalizedModelId.startsWith("o3") || normalizedModelId.startsWith("o4")) {
+    return { provider: "openai", model: normalizedModelId };
   }
-  if (modelId.startsWith("gemini-")) {
-    return { provider: "google", model: modelId };
+  if (normalizedModelId.startsWith("gemini-")) {
+    return { provider: "google", model: normalizedModelId };
   }
-  if (modelId.startsWith("grok-")) {
-    return { provider: "xai", model: modelId };
+  if (normalizedModelId.startsWith("grok-")) {
+    return { provider: "xai", model: normalizedModelId };
   }
-  if (looksLikeOpenModel(modelId)) {
-    return { provider: "local-openai", model: modelId };
+  if (looksLikeOpenModel(normalizedModelId)) {
+    return { provider: "local-openai", model: normalizedModelId };
   }
 
   // Unknown models should default to user-controlled OpenAI-compatible backends.
-  return { provider: "local-openai", model: modelId };
+  return { provider: "local-openai", model: normalizedModelId };
 }
 
 /**
@@ -169,7 +173,8 @@ function mapToPerplexityModel(modelName: string): string {
   if (resolved === "sonar") {
     return "perplexity/sonar";
   }
-  return modelName.startsWith("perplexity/") ? modelName : resolved;
+
+  return normalizePerplexityModelId(resolved);
 }
 
 function summarizeChunk(chunk: unknown): Record<string, unknown> {
@@ -232,11 +237,7 @@ export async function getLanguageModel(modelId: string, keys: Record<string, str
     const perplexityKey = keys["PERPLEXITY_API_KEY"];
     if (!perplexityKey) throw new Error("PERPLEXITY_API_KEY is not configured");
     
-    // For Chat completions API, we want the resolved name WITHOUT the 'perplexity/' prefix
-    let effectiveModel = resolvePerplexityModelName(modelName);
-    if (effectiveModel.startsWith("perplexity/")) {
-      effectiveModel = effectiveModel.slice("perplexity/".length);
-    }
+    const effectiveModel = mapToPerplexityModel(modelName);
 
     return createOpenAI({
       apiKey: perplexityKey,
@@ -259,7 +260,8 @@ export async function runGeneration(options: GenerationOptions): Promise<Generat
   const isSearchAgentRequest =
     !!options.webSearch ||
     isPresetModel(options.modelId) ||
-    isPerplexityPresetModel(options.modelId);
+    isPerplexityPresetModel(options.modelId) ||
+    provider === "perplexity";
 
   const searchAgentProvider = runtimeConfig.searchAgent.provider;
 

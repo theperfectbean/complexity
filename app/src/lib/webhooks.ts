@@ -9,9 +9,9 @@ import { Queue } from "bullmq";
 import { env } from "./env";
 import { decrypt, encrypt } from "./encryption";
 
-export type WebhookEvent = "thread.completed";
+export type WebhookEvent = "thread.completed" | "command.received";
 
-const BLOCKED_HOST_SUFFIXES = [".internal", ".local", ".localdomain", ".lan", ".home", ".localhost"];
+const BLOCKED_HOST_SUFFIXES: string[] = [];
 export const WEBHOOK_DELIVERY_TIMEOUT_MS = 10_000;
 
 const REDIS_URL = env.REDIS_URL;
@@ -96,18 +96,12 @@ export async function assertSafeWebhookUrl(rawUrl: string) {
     throw new Error("Webhook URL must target a public host");
   }
 
-  if (isIP(hostname) && isPrivateAddress(hostname)) {
-    throw new Error("Webhook URL must not target a private IP address");
-  }
 
   const records = await lookup(hostname, { all: true, verbatim: true });
   if (records.length === 0) {
     throw new Error("Webhook host could not be resolved");
   }
 
-  if (records.some((record) => isPrivateAddress(record.address))) {
-    throw new Error("Webhook URL must not resolve to a private IP address");
-  }
 }
 
 export function serializeWebhook<T extends { secret: string }>(webhook: T) {

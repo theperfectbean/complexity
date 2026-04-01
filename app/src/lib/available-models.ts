@@ -1,5 +1,5 @@
 import { getDetailedSettings } from "./settings";
-import { getDefaultModel } from "./models";
+import { getDefaultModel, normalizeLegacyModelId } from "./models";
 import { filterModelsByConfiguration, getConfiguredModels, MODEL_SETTINGS_KEYS } from "./model-registry";
 import { getModelHealthSnapshot, type ModelHealthEntry, type ModelHealthStatus } from "./model-health";
 import type { ModelOption } from "./config";
@@ -67,16 +67,19 @@ export async function resolveRequestedModel(
 ): Promise<string> {
   const { models } = await getAvailableModels({ refreshHealthIfStale: false });
   const fallbackDefaultModel = getDefaultModel();
+  const normalizedRequestedModel = requestedModel ? normalizeLegacyModelId(requestedModel) : undefined;
   
-  if (requestedModel) {
+  if (normalizedRequestedModel) {
     // 1. Exact match
-    const exact = models.find((model) => model.id === requestedModel);
+    const exact = models.find((model) => model.id === normalizedRequestedModel);
     if (exact && (!options?.preferNonPreset || !exact.isPreset)) {
       return exact.id;
     }
 
     // 2. Base ID match (e.g. "anthropic/claude-..." matching "perplexity/anthropic/claude-...")
-    const baseRequested = requestedModel.includes("/") ? requestedModel.split("/").slice(-2).join("/") : requestedModel;
+    const baseRequested = normalizedRequestedModel.includes("/")
+      ? normalizedRequestedModel.split("/").slice(-2).join("/")
+      : normalizedRequestedModel;
     const fuzzyMatches = models.filter((model) => model.id.endsWith(baseRequested));
     const fuzzyMatch = fuzzyMatches.find((model) => !model.id.startsWith("perplexity/")) ?? fuzzyMatches[0];
     if (fuzzyMatch && (!options?.preferNonPreset || !fuzzyMatch.isPreset)) {

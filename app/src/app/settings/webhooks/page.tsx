@@ -10,7 +10,9 @@ import {
   Activity, 
   RefreshCw,
   Clock,
-  AlertCircle
+  AlertCircle,
+  Power,
+  PowerOff
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -116,6 +118,21 @@ export default function WebhooksPage() {
       toast.error("Failed to create webhook");
     } finally {
       setIsCreating(false);
+    }
+  };
+
+  const handleToggle = async (id: string, currentActive: boolean) => {
+    try {
+      const res = await fetch(`/api/webhooks/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isActive: !currentActive }),
+      });
+      if (!res.ok) throw new Error("Failed to toggle");
+      toast.success(currentActive ? "Webhook disabled" : "Webhook enabled");
+      void fetchWebhooks();
+    } catch {
+      toast.error("Failed to toggle webhook");
     }
   };
 
@@ -245,6 +262,18 @@ export default function WebhooksPage() {
                       </div>
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button
+                          onClick={() => void handleToggle(hook.id, hook.isActive)}
+                          className={cn(
+                            "rounded-lg p-2 transition-colors",
+                            hook.isActive 
+                              ? "hover:bg-amber-500/10 hover:text-amber-500 text-muted-foreground" 
+                              : "hover:bg-emerald-500/10 hover:text-emerald-500 text-muted-foreground"
+                          )}
+                          title={hook.isActive ? "Disable Webhook" : "Enable Webhook"}
+                        >
+                          {hook.isActive ? <PowerOff className="h-4 w-4" /> : <Power className="h-4 w-4" />}
+                        </button>
+                        <button
                           onClick={() => {
                             setSelectedHookId(hook.id);
                             void fetchDeliveries(hook.id);
@@ -263,6 +292,11 @@ export default function WebhooksPage() {
                         </button>
                       </div>
                     </div>
+                    {!hook.isActive && (
+                      <div className="mb-4 rounded-lg border border-amber-500/20 bg-amber-500/10 p-2 text-xs text-amber-600/90 dark:text-amber-500/90">
+                        This webhook is currently disabled and will not receive events.
+                      </div>
+                    )}
                     <div className="rounded-lg border border-border/50 bg-muted/30 p-3 text-[11px] text-muted-foreground">
                       Signing secrets are shown once at creation and are no longer retrievable from the server.
                     </div>

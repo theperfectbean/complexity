@@ -13,6 +13,8 @@ import { VoiceInput } from "./parts/VoiceInput";
 import { ModelSelector } from "./parts/ModelSelector";
 import { SearchModelOption } from "@/lib/models";
 import { FileAttachments, FileAttachmentsHandle } from "./parts/FileAttachments";
+import { CommandMenu } from "@/components/chat/CommandMenu";
+import { SlashCommand } from "@/plugins/commandRegistry";
 
 type SearchBarProps = {
   value: string;
@@ -65,6 +67,10 @@ export function SearchBar({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [internalAttachments, setInternalAttachments] = useState<File[]>(externalAttachments);
   const [isDragging, setIsDragging] = useState(false);
+
+  // Command Menu State
+  const [showCommandMenu, setShowCommandMenu] = useState(false);
+  const [commandQuery, setCommandQuery] = useState("");
 
   useEffect(() => {
     setInternalAttachments(externalAttachments);
@@ -154,6 +160,28 @@ export function SearchBar({
     handleDrop(event.nativeEvent as DragEvent);
   };
 
+  const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const newValue = e.target.value;
+    onChange(newValue);
+
+    if (newValue.startsWith("/")) {
+      setShowCommandMenu(true);
+      setCommandQuery(newValue.substring(1));
+    } else {
+      setShowCommandMenu(false);
+    }
+  };
+
+  const handleCommandSelect = (command: SlashCommand) => {
+    command.action({
+      insertText: (text) => {
+        onChange(text);
+        setShowCommandMenu(false);
+      },
+      inputValue: value,
+    });
+  };
+
   return (
     <motion.div
       id={id}
@@ -165,11 +193,19 @@ export function SearchBar({
       onDragLeave={handleDragLeave}
       onDrop={onContainerDrop}
       className={cn(
-        "flex flex-col rounded-[22px] border bg-card p-2 shadow-md transition-all duration-200",
+        "relative flex flex-col rounded-[22px] border bg-card p-2 shadow-md transition-all duration-200",
         "focus-within:border-primary/30 focus-within:ring-4 focus-within:ring-primary/5 focus-within:shadow-lg",
         isDragging && "border-primary/50 ring-4 ring-primary/10 bg-primary/5 shadow-xl scale-[1.01]"
       )}
     >
+      {showCommandMenu && (
+        <CommandMenu
+          query={commandQuery}
+          onSelect={handleCommandSelect}
+          onClose={() => setShowCommandMenu(false)}
+          position={{ top: 0, left: 0 }}
+        />
+      )}
       <FileAttachments
         ref={fileAttachmentsRef}
         attachments={internalAttachments}
@@ -185,8 +221,15 @@ export function SearchBar({
           minRows={compact ? 1 : 2}
           maxRows={12}
           value={value}
-          onChange={(event) => onChange(event.target.value)}
+          onChange={handleTextChange}
           onKeyDown={(event) => {
+            if (showCommandMenu && (event.key === "ArrowUp" || event.key === "ArrowDown" || event.key === "Enter" || event.key === "Tab")) {
+              if (event.key === "Enter" || event.key === "Tab") {
+                event.preventDefault();
+              }
+              return;
+            }
+
             if (event.key === "Enter" && !event.shiftKey) {
               event.preventDefault();
               event.currentTarget.form?.requestSubmit();

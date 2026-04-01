@@ -1,5 +1,6 @@
 import { ModelOption, runtimeConfig } from "./config";
 import type { SettingInfo } from "./settings";
+import { normalizeLegacyModelId } from "./models";
 
 export type ModelProviderId =
   | "perplexity"
@@ -129,7 +130,11 @@ export function getConfiguredModels(
 ): ModelOption[] {
   const customModels = parseCustomModelList(settings["CUSTOM_MODEL_LIST"]?.value);
   if (customModels && customModels.length > 0) {
-    return customModels;
+    return customModels.map((model) => ({
+      ...model,
+      id: normalizeLegacyModelId(model.id),
+      providerModelId: model.providerModelId ? normalizeLegacyModelId(model.providerModelId) : model.providerModelId,
+    }));
   }
   return [...fallbackModels];
 }
@@ -160,9 +165,9 @@ export function getModelProvider(model: Pick<ModelLike, "id" | "isPreset" | "pro
 export function getModelHealthTargetId(model: { id: string; providerModelId?: string }): string {
   // Prefer the actual provider model ID if it's explicitly defined
   if (model.providerModelId) {
-    return model.providerModelId;
+    return normalizeLegacyModelId(model.providerModelId);
   }
-  return model.id;
+  return normalizeLegacyModelId(model.id);
 }
 
 export function isProviderEnabled(

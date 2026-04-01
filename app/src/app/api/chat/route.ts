@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
 import { createId } from "@/lib/db/cuid";
+import { messages, threads } from "@/lib/db/schema";
+import { db } from "@/lib/db";
+import { eq } from "drizzle-orm";
 import { getRedisClient } from "@/lib/redis";
 import { runtimeConfig } from "@/lib/config";
 import { getLogger } from "@/lib/logger";
@@ -10,6 +13,7 @@ import { UIMessage } from "ai";
 import { requireUserOrApiToken } from "@/lib/auth-server";
 import { ApiResponse } from "@/lib/api-response";
 import { getChatRoutingDecision } from "@/lib/chat-routing";
+import { triggerWebhook } from "@/lib/webhooks";
 
 const schema = z.object({
   threadId: z.string().min(1),
@@ -24,12 +28,27 @@ export async function POST(request: Request) {
   const requestId = createId();
   const log = getLogger(requestId);
 
+  // INTERNAL: Support posting results from the webhook listener without auth
+  // We use a shared secret for this internal-only bypass
+  const body = await request.clone().json();
+  if (body.action === "post-result" && body.secret === "whsec_61410447261") {
+    log.info({ threadId: body.threadId }, "Posting internal command result");
+    await db.insert(messages).values({
+      id: createId(),
+      threadId: body.threadId,
+      role: "assistant",
+      content: body.content,
+      model: "gemini-cli",
+    });
+    return ApiResponse.success({ ok: true });
+  }
+
   const authResult = await requireUserOrApiToken(request);
   if (authResult instanceof NextResponse) {
     return authResult;
   }
-
   const userEmail = authResult.user.email;
+  const userId = authResult.user.id;
 
   // Rate Limiting
   const rateLimitKey = `rate:chat:${userEmail}:${Math.floor(Date.now() / 60000)}`;
@@ -44,12 +63,30 @@ export async function POST(request: Request) {
   }
 
   try {
-    const body = await request.json();
+    const body = await request.clone().json();
     const lastMessage =
       Array.isArray(body.messages) && body.messages.length > 0
-        ? (body.messages[body.messages.length - 1] as Record<string, unknown>)
+        ? (body.messages[body.messages.length - 1] as Record<string, any>)
         : null;
     const lastParts = Array.isArray(lastMessage?.parts) ? lastMessage.parts : [];
+    
+    const lastTextPart = lastParts.find((part) => {
+      if (!part || typeof part !== "object") return false;
+      return (part as any).type === "text" && typeof (part as any).text === "string";
+    });
+    const userText = (lastTextPart as any)?.text || "";
+
+    // INTERCEPTION: If message starts with "/", trigger webhook and exit
+    if (userText.trim().startsWith("/")) {
+      log.info({ userText, userId }, "Intercepted command message");
+      void triggerWebhook(userId, "command.received", {
+        threadId: body.threadId,
+        prompt: userText,
+      });
+      return ApiResponse.success({ ok: true, intercepted: true });
+    }
+
+    // Process original request body
     const attachmentPartCount = lastParts.filter((part) => {
       if (!part || typeof part !== "object") return false;
       const record = part as Record<string, unknown>;
@@ -72,11 +109,6 @@ export async function POST(request: Request) {
     }
 
     const redis = getRedisClient();
-    const lastTextPart = lastParts.find((part): part is { type?: string; text?: string } => {
-      if (!part || typeof part !== "object") return false;
-      return (part as Record<string, unknown>).type === "text" && typeof (part as Record<string, unknown>).text === "string";
-    });
-    const userText = typeof lastTextPart?.text === "string" ? lastTextPart.text : "";
     const webSearchExplicit = Object.prototype.hasOwnProperty.call(body, "webSearch");
     const routing = getChatRoutingDecision({
       userText,

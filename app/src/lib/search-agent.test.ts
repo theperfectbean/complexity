@@ -104,5 +104,91 @@ describe("search-agent.ts", () => {
 
       expect(result.text).toBe("Nested fallback response");
     });
+
+    it("normalizes legacy model ids before sending the Perplexity request", async () => {
+      const fetchMock = vi.fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          body: {
+            getReader: () => {
+              let i = 0;
+              const chunks = [
+                { value: new TextEncoder().encode("data: [DONE]\n\n"), done: false },
+                { value: undefined, done: true },
+              ];
+              return {
+                read: vi.fn().mockImplementation(() => Promise.resolve(chunks[i++])),
+              };
+            },
+          },
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: vi.fn().mockResolvedValue({ output_text: "Fallback" }),
+        });
+
+      global.fetch = fetchMock as unknown as typeof fetch;
+
+      await runPerplexityAgent({
+        modelId: "anthropic/claude-haiku-4-5",
+        messages: [
+          { id: "1", role: "user" as const, content: "hello", parts: [{ type: "text" as const, text: "hello" }] },
+        ],
+        instructions: "System",
+        webSearch: false,
+        writer: { write: vi.fn() },
+        textId: "test-text-id",
+        requestId: "test-request-id",
+      });
+
+      const requestInit = fetchMock.mock.calls[0]?.[1] as RequestInit | undefined;
+      expect(requestInit?.body).toBeDefined();
+      expect(JSON.parse(String(requestInit?.body))).toMatchObject({
+        model: "anthropic/claude-haiku-4-5",
+      });
+    });
+
+    it("normalizes wrapped legacy model ids before sending the Perplexity request", async () => {
+      const fetchMock = vi.fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          body: {
+            getReader: () => {
+              let i = 0;
+              const chunks = [
+                { value: new TextEncoder().encode("data: [DONE]\n\n"), done: false },
+                { value: undefined, done: true },
+              ];
+              return {
+                read: vi.fn().mockImplementation(() => Promise.resolve(chunks[i++])),
+              };
+            },
+          },
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: vi.fn().mockResolvedValue({ output_text: "Fallback" }),
+        });
+
+      global.fetch = fetchMock as unknown as typeof fetch;
+
+      await runPerplexityAgent({
+        modelId: "perplexity/anthropic/claude-haiku-4-5",
+        messages: [
+          { id: "1", role: "user" as const, content: "hello", parts: [{ type: "text" as const, text: "hello" }] },
+        ],
+        instructions: "System",
+        webSearch: false,
+        writer: { write: vi.fn() },
+        textId: "test-text-id",
+        requestId: "test-request-id",
+      });
+
+      const requestInit = fetchMock.mock.calls[0]?.[1] as RequestInit | undefined;
+      expect(requestInit?.body).toBeDefined();
+      expect(JSON.parse(String(requestInit?.body))).toMatchObject({
+        model: "anthropic/claude-haiku-4-5",
+      });
+    });
   });
 });

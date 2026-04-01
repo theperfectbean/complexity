@@ -17,7 +17,7 @@ import { messages, threads, users } from "@/lib/db/schema";
 const runLive = process.env.RUN_LIVE_CHAT_ROUTE === "1";
 const liveDescribe = runLive ? describe : describe.skip;
 
-const LIVE_MODEL = "anthropic/claude-haiku-4-5";
+const LIVE_MODEL = "anthropic/claude-4-5-haiku-latest";
 const LIVE_QUERY = "what is a vector database?";
 
 liveDescribe("live /api/chat route", () => {
