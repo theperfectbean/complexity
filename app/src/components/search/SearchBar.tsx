@@ -5,7 +5,7 @@ import { motion } from "motion/react";
 import { useRef, useState, useEffect, useCallback } from "react";
 import TextareaAutosize from "react-textarea-autosize";
 
-import { getDefaultModel } from "@/lib/models";
+import { getDefaultModel, isPresetModel } from "@/lib/models";
 import { runtimeConfig } from "@/lib/config";
 import { cn } from "@/lib/utils";
 
@@ -269,7 +269,11 @@ export function SearchBar({
             )}
             aria-label="Toggle web search"
             title={webSearchEnabled
-              ? `Web search active (via ${runtimeConfig.searchAgent.provider === "tavily" ? "Tavily" : "Perplexity"})`
+              ? (() => {
+                  const usesPerplexity = runtimeConfig.searchAgent.provider !== "tavily" &&
+                    (model?.startsWith("perplexity/") || isPresetModel(model));
+                  return `Web search active (via ${usesPerplexity ? "Perplexity" : "Tavily"})`;
+                })()
               : "Enable web search"}
             onClick={() => onWebSearchChange?.(!webSearchEnabled)}
           >
