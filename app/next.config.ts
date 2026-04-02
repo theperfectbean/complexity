@@ -10,6 +10,10 @@ const withPWA = withPWAInit({
 const nextConfig: NextConfig = {
   output: "standalone",
   serverExternalPackages: ["pdf-parse", "mammoth"],
+  // Ensure pdfjs-dist worker (dynamically loaded, not auto-traced) is included in standalone builds
+  outputFileTracingIncludes: {
+    "**/*": ["./node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs"],
+  },
   typescript: {
     tsconfigPath: "./tsconfig.build.json",
   },
