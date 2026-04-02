@@ -98,16 +98,18 @@ export async function fetchProviderModelsWithStatus(): Promise<ProviderDiscovery
   const promises: Promise<void>[] = [];
 
   // 0. Generic Search Agent Presets
-  const searchProvider = runtimeConfig.searchAgent.provider;
+  // Read from DB-sourced keys first, fall back to static runtimeConfig
+  const searchProvider = (keys["SEARCH_PROVIDER_TYPE"] as string | null | undefined) || runtimeConfig.searchAgent.provider;
   const searchApiKey = keys["SEARCH_API_KEY"] || keys["PERPLEXITY_API_KEY"] || keys["TAVILY_API_KEY"];
   const searchToggle = searchProvider === "perplexity"
     ? isProviderEnabled("PROVIDER_PERPLEXITY_ENABLED", keys)
     : true;
 
-  if (searchApiKey && searchProvider !== "none" && searchToggle) {
-    const searchProviderId = (searchProvider === "perplexity" ? "perplexity" : "anthropic") as ModelProviderId;
+  // Only show Perplexity preset models (fast-search, pro-search, etc.) when Perplexity is the
+  // search provider — they are backed exclusively by the Perplexity Agent API in llm.ts.
+  if (searchApiKey && searchProvider === "perplexity" && searchToggle) {
     SEARCH_FALLBACK_MODELS.forEach((m) => {
-      allModels.push(createProviderModel(searchProviderId, m.provider, m.id, m.name));
+      allModels.push(createProviderModel("perplexity", m.provider, m.id, m.name));
     });
   }
 
