@@ -263,7 +263,7 @@ const MessageItem = memo(function MessageItem({
         )}>
           {/* User Message Actions (Left Side) */}
           {!isEditing && (
-            <div className="absolute -left-12 top-1/2 -translate-y-1/2 flex items-center gap-1.5 opacity-0 group-hover/user:opacity-100 transition-all duration-200">
+            <div className="absolute right-full top-1/2 -translate-y-1/2 pr-2 flex items-center gap-1.5 opacity-0 group-hover/user:opacity-100 transition-all duration-200">
               {relevantBranches.length > 1 && onBranchChange && (
                 <div className="flex items-center gap-1 bg-background/80 backdrop-blur-sm px-2 py-1 rounded-full border border-border/40 shadow-sm text-[10px] font-medium text-muted-foreground whitespace-nowrap">
                   <button 
