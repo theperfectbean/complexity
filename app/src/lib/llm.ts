@@ -262,9 +262,16 @@ export async function runGeneration(options: GenerationOptions): Promise<Generat
     isPresetModel(options.modelId) ||
     isPerplexityPresetModel(options.modelId);
 
-  const searchAgentProvider = runtimeConfig.searchAgent.provider;
+  // Wrapped third-party models (e.g. perplexity/anthropic/claude-*) are only valid on the
+  // Agent API, not the chat completions endpoint. Always route them through the Agent API.
+  const isWrappedPerplexityThirdPartyModel =
+    provider === "perplexity" &&
+    !isPresetModel(options.modelId) &&
+    !isPerplexityPresetModel(options.modelId);
 
-  if (isSearchAgentRequest && (provider === "perplexity" || searchAgentProvider === "perplexity")) {
+  const searchAgentProvider = (options.keys["SEARCH_PROVIDER_TYPE"] as string | null | undefined) || runtimeConfig.searchAgent.provider;
+
+  if ((isSearchAgentRequest || isWrappedPerplexityThirdPartyModel) && (provider === "perplexity" || searchAgentProvider === "perplexity")) {
     log.info({ modelId: options.modelId, modelName, provider }, "Routing to Perplexity Agent API");
     try {
       const primaryModel = mapToPerplexityModel(modelName);

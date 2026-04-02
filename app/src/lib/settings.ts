@@ -96,6 +96,7 @@ export async function getApiKeys(): Promise<Record<string, string | null>> {
     "PERPLEXITY_API_KEY",
     "SEARCH_API_KEY",
     "SEARCH_PROVIDER_TYPE",
+    "TAVILY_API_KEY",
     "OLLAMA_BASE_URL",
     "LOCAL_OPENAI_BASE_URL",
     "LOCAL_OPENAI_API_KEY",
