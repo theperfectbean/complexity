@@ -252,3 +252,43 @@ export function startWebhookWorker() {
 
   return worker;
 }
+
+/**
+ * R8: Audit log retention cleanup.
+ * Runs daily, deletes audit_logs older than AUDIT_LOG_RETENTION_DAYS (default 90).
+ */
+export function startAuditLogCleanupWorker() {
+  if (!connection) {
+    logger.error({}, "Redis URL not available, cannot start audit cleanup worker");
+    return;
+  }
+
+  const RETENTION_DAYS = parseInt(process.env.AUDIT_LOG_RETENTION_DAYS || "90", 10);
+
+  // Schedule the cleanup job to run every 24h
+  const queue = new (require("bullmq").Queue)("audit-cleanup", { connection });
+  queue.add(
+    "cleanup",
+    { retentionDays: RETENTION_DAYS },
+    {
+      repeat: { every: 24 * 60 * 60 * 1000 },
+      removeOnComplete: true,
+    }
+  ).catch(() => {}); // Fire-and-forget scheduling
+
+  const worker = new Worker(
+    "audit-cleanup",
+    async () => {
+      const cutoff = new Date(Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000);
+      const { lt } = await import("drizzle-orm");
+      const { auditLogs } = await import("./db/schema");
+      const result = await db.delete(auditLogs).where(lt(auditLogs.createdAt, cutoff));
+      logger.info({ retentionDays: RETENTION_DAYS, cutoff }, "Audit log cleanup completed");
+      return result;
+    },
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    { connection: connection!, concurrency: 1 }
+  );
+
+  return worker;
+}

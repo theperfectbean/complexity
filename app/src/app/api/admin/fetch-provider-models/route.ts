@@ -1,3 +1,4 @@
+import { logger } from "@/lib/logger";
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth-server";
 import { refreshModelHealthSnapshot } from "@/lib/model-health";
@@ -12,7 +13,7 @@ export async function GET() {
     const health = await refreshModelHealthSnapshot({ discovery });
     return NextResponse.json({ models: discovery.models, discovery: discovery.statuses, health });
   } catch (error) {
-    console.error("Failed to fetch provider models API", error);
+    logger.error({ err: error }, "Failed to fetch provider models API");
     return NextResponse.json({ error: "Failed to fetch models" }, { status: 500 });
   }
 }

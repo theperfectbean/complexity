@@ -1,3 +1,4 @@
+import { logger } from "@/lib/logger";
 import { tool } from "ai";
 import { z } from "zod";
 
@@ -55,7 +56,7 @@ export const createWebSearchTool = (apiKey: string) => tool({
         answer: data.answer,
       };
     } catch (error) {
-      console.error("Web search tool failed:", error);
+      logger.error({ err: error }, "Web search tool failed:");
       return {
         error: "Failed to search the web.",
         results: [],

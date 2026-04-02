@@ -1,3 +1,4 @@
+import { logger } from "@/lib/logger";
 import { generateText, ModelMessage } from "ai";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -33,7 +34,7 @@ export async function POST(request: Request) {
   const redis = getRedisClient();
   const cacheKey = `cache:role-instructions:${safeModel}:${crypto.createHash("sha256").update(prompt).digest("hex")}`;
 
-  console.log(`[generate-instructions] Requested: ${requestedModel}, Resolved: ${safeModel}`);
+  logger.debug({}, `[generate-instructions] Requested: ${requestedModel}, Resolved: ${safeModel}`);
 
   const systemInstructions = `You are an expert at creating system prompts and AI personas. 
 Based on the user's specification, generate a detailed, clear, and effective set of custom instructions (system prompt) for an AI role. 
@@ -73,7 +74,7 @@ Focus on:
       headers: { "Content-Type": "text/plain; charset=utf-8" },
     });
   } catch (error) {
-    console.error("[generate-instructions] Error:", error);
+    logger.error({ err: error }, "[generate-instructions] Error:");
     return NextResponse.json({ error: "Failed to generate instructions" }, { status: 500 });
   }
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import * as Dialog from "@radix-ui/react-dialog";
-import { X, Settings, Loader2, Info, Cpu, Pin, Tag } from "lucide-react";
+import { X, Settings, Loader2, Info, Cpu, Pin, Tag, Download } from "lucide-react";
 import { useState, useMemo } from "react";
 import { toast } from "sonner";
 import { countTokens, cn } from "@/lib/utils";
@@ -181,6 +181,55 @@ export function ThreadSettingsDialog({ threadId, initialSystemPrompt, initialPin
               <div className="mt-2 flex items-start gap-2 text-[11px] text-muted-foreground bg-primary/5 p-2 rounded-lg border border-primary/10">
                 <Info className="h-3 w-3 mt-0.5 shrink-0" />
                 <p>These instructions apply only to this thread and are added to the AI&apos;s base instructions.</p>
+              </div>
+            </div>
+
+            <div className="pt-2">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium">Export Conversation</span>
+                <Download className="h-3.5 w-3.5 text-muted-foreground" />
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    const lines = messages.map((m) =>
+                      `## ${m.role === "user" ? "You" : "Assistant"}\n\n${m.content}`
+                    );
+                    const md = lines.join("\n\n---\n\n");
+                    const blob = new Blob([md], { type: "text/markdown" });
+                    const a = document.createElement("a");
+                    a.href = URL.createObjectURL(blob);
+                    a.download = `thread-${threadId}.md`;
+                    a.click();
+                    URL.revokeObjectURL(a.href);
+                  }}
+                  className="flex-1 rounded-lg border border-border py-2 text-xs font-medium hover:bg-muted transition-colors"
+                >
+                  Export Markdown
+                </button>
+                <button
+                  onClick={() => {
+                    const data = {
+                      threadId,
+                      exportedAt: new Date().toISOString(),
+                      messages: messages.map((m) => ({
+                        id: m.id,
+                        role: m.role,
+                        content: m.content,
+                        citations: m.citations,
+                      })),
+                    };
+                    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+                    const a = document.createElement("a");
+                    a.href = URL.createObjectURL(blob);
+                    a.download = `thread-${threadId}.json`;
+                    a.click();
+                    URL.revokeObjectURL(a.href);
+                  }}
+                  className="flex-1 rounded-lg border border-border py-2 text-xs font-medium hover:bg-muted transition-colors"
+                >
+                  Export JSON
+                </button>
               </div>
             </div>
 

@@ -1,3 +1,4 @@
+import { logger } from "@/lib/logger";
 import { cosineDistance, desc, eq, inArray, isNull, or, and } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { memories } from "@/lib/db/schema";
@@ -134,7 +135,7 @@ export async function searchMemories(userId: string, userText?: string, roleId?:
       
     return rows.map((r) => r.content);
   } catch (error) {
-    console.error("[Memory] Semantic search failed:", error);
+    logger.error({ err: error }, "[Memory] Semantic search failed:");
     return allMemories.slice(0, k);
   }
 }

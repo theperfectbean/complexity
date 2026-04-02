@@ -15,8 +15,9 @@ export async function register() {
       console.warn("[Complexity] WARNING: ENCRYPTION_KEY is not set. Sensitive settings (API keys, webhook secrets) will be stored unencrypted. Set a 32-character random key in .env.");
     }
 
-    const { startWorker, startWebhookWorker } = await import("./lib/worker");
+    const { startWorker, startWebhookWorker, startAuditLogCleanupWorker } = await import("./lib/worker");
     startWorker();
     startWebhookWorker();
+    startAuditLogCleanupWorker();
   }
 }

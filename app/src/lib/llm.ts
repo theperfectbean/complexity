@@ -305,29 +305,8 @@ export async function runGeneration(options: GenerationOptions): Promise<Generat
       
       try {
         const langModel = await getLanguageModel(options.modelId, options.keys);
-        const coreMessages = await Promise.all(options.messages.map(async (msg) => {
-          const { extractTextFromMessage, collectFileParts } = await import("./chat-utils");
-          const text = await extractTextFromMessage(msg);
-          const content: CoreMessageContent[] = [];
-          if (text.trim()) content.push({ type: "text", text });
-
-          collectFileParts(msg).forEach((att) => {
-            if (att.url?.startsWith("data:") && (att.mediaType || att.contentType || "").startsWith("image/")) {
-              try {
-                const base64Data = att.url.split(",")[1];
-                if (base64Data) {
-                  const buffer = Buffer.from(base64Data, "base64");
-                  content.push({ type: "image", image: buffer });
-                }
-              } catch (e) {
-                log.error({ err: e }, "Failed to convert image data URL to buffer");
-              }
-            }
-          });
-
-          if (content.length === 0) content.push({ type: "text", text: " " });
-          return { role: msg.role as "user" | "assistant" | "system", content } satisfies CoreMessage;
-        }));
+        const { convertMessagesToCore } = await import("./chat-utils");
+        const coreMessages = await convertMessagesToCore(options.messages, log);
 
         const { text } = await generateText({
           model: langModel,
@@ -365,38 +344,8 @@ export async function runGeneration(options: GenerationOptions): Promise<Generat
       data: { callId: "model-gen", toolName: "Reasoning", input: { model: options.modelId } },
     } as UIMessageChunk);
 
-    const coreMessages = await Promise.all(options.messages.map(async (msg) => {
-      const { extractTextFromMessage, collectFileParts } = await import("./chat-utils");
-      const text = await extractTextFromMessage(msg);
-      
-      const content: CoreMessageContent[] = [];
-      if (text.trim()) {
-        content.push({ type: "text", text });
-      }
-
-      collectFileParts(msg).forEach((att) => {
-        if (att.url?.startsWith("data:") && (att.mediaType || att.contentType || "").startsWith("image/")) {
-          try {
-            const base64Data = att.url.split(",")[1];
-            if (base64Data) {
-              const buffer = Buffer.from(base64Data, "base64");
-              content.push({ type: "image", image: buffer });
-            }
-          } catch (e) {
-            log.error({ err: e }, "Failed to convert image data URL to buffer");
-          }
-        }
-      });
-
-      if (content.length === 0) {
-        content.push({ type: "text", text: " " });
-      }
-
-      return {
-        role: msg.role as "user" | "assistant" | "system",
-        content,
-      } satisfies CoreMessage;
-    }));
+    const { convertMessagesToCore } = await import("./chat-utils");
+    const coreMessages = await convertMessagesToCore(options.messages, log);
 
     const searchIntegrationEnabled = (options.keys["INTEGRATION_SEARCH_ENABLED"] ?? "true") !== "false";
     const searchApiKey = searchIntegrationEnabled

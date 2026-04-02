@@ -1,3 +1,4 @@
+import { logger } from "@/lib/logger";
 import { db } from "./db";
 import { webhooks } from "./db/schema";
 import { eq, and } from "drizzle-orm";
@@ -139,7 +140,7 @@ export async function triggerWebhook(
 
   const queue = getWebhookQueue();
   if (!queue) {
-    console.error("Webhook queue not available (Redis missing?)");
+    logger.error({}, "Webhook queue not available (Redis missing?)");
     return;
   }
 

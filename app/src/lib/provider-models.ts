@@ -1,3 +1,4 @@
+import { logger } from "@/lib/logger";
 import { normalizeLegacyModelId } from "./models";
 import { getApiKeys } from "./settings";
 import type { ModelProviderId } from "./model-registry";
@@ -139,7 +140,7 @@ export async function fetchProviderModelsWithStatus(): Promise<ProviderDiscovery
           throw new Error("Perplexity models endpoint not available");
         }
       } catch (e) {
-        console.warn("Falling back to static Perplexity model list", e);
+        logger.warn({ data: e }, "Falling back to static Perplexity model list");
         PERPLEXITY_ONLY_MODELS.forEach((m) => {
           allModels.push(createProviderModel("perplexity", m.provider, m.id, m.name));
         });
@@ -169,7 +170,7 @@ export async function fetchProviderModelsWithStatus(): Promise<ProviderDiscovery
           statuses.anthropic = { state: "error", error: `Anthropic models endpoint returned ${res.status}` };
         }
       } catch (e) {
-        console.error("Failed to fetch Anthropic models", e);
+        logger.error({ err: e }, "Failed to fetch Anthropic models");
         statuses.anthropic = { state: "error", error: e instanceof Error ? e.message : String(e) };
       }
     })());
@@ -195,7 +196,7 @@ export async function fetchProviderModelsWithStatus(): Promise<ProviderDiscovery
           statuses.openai = { state: "error", error: `OpenAI models endpoint returned ${res.status}` };
         }
       } catch (e) {
-        console.error("Failed to fetch OpenAI models", e);
+        logger.error({ err: e }, "Failed to fetch OpenAI models");
         statuses.openai = { state: "error", error: e instanceof Error ? e.message : String(e) };
       }
     })());
@@ -221,7 +222,7 @@ export async function fetchProviderModelsWithStatus(): Promise<ProviderDiscovery
           statuses.google = { state: "error", error: `Google models endpoint returned ${res.status}` };
         }
       } catch (e) {
-        console.error("Failed to fetch Google models", e);
+        logger.error({ err: e }, "Failed to fetch Google models");
         statuses.google = { state: "error", error: e instanceof Error ? e.message : String(e) };
       }
     })());
@@ -245,7 +246,7 @@ export async function fetchProviderModelsWithStatus(): Promise<ProviderDiscovery
           statuses.xai = { state: "error", error: `xAI models endpoint returned ${res.status}` };
         }
       } catch (e) {
-        console.error("Failed to fetch xAI models", e);
+        logger.error({ err: e }, "Failed to fetch xAI models");
         statuses.xai = { state: "error", error: e instanceof Error ? e.message : String(e) };
       }
     })());
@@ -270,7 +271,7 @@ export async function fetchProviderModelsWithStatus(): Promise<ProviderDiscovery
           statuses.ollama = { state: "error", error: `Ollama tags endpoint returned ${res.status}` };
         }
       } catch (e) {
-        console.error("Failed to fetch Ollama models", e);
+        logger.error({ err: e }, "Failed to fetch Ollama models");
         statuses.ollama = { state: "error", error: e instanceof Error ? e.message : String(e) };
       }
     })());
@@ -294,7 +295,7 @@ export async function fetchProviderModelsWithStatus(): Promise<ProviderDiscovery
           statuses["local-openai"] = { state: "error", error: `Local OpenAI models endpoint returned ${res.status}` };
         }
       } catch (e) {
-        console.error("Failed to fetch Local OpenAI models", e);
+        logger.error({ err: e }, "Failed to fetch Local OpenAI models");
         statuses["local-openai"] = { state: "error", error: e instanceof Error ? e.message : String(e) };
       }
     })());

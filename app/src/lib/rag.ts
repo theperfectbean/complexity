@@ -1,3 +1,4 @@
+import { logger } from "@/lib/logger";
 import { and, cosineDistance, desc, eq, sql } from "drizzle-orm";
 import { encode, decode } from "gpt-tokenizer";
 
@@ -316,7 +317,7 @@ export async function hybridSearch(
         }))
         .sort((a, b) => b.score - a.score);
     } catch (error) {
-      console.error("Reranking failed, falling back to RRF scores:", error);
+      logger.error({ err: error }, "Reranking failed, falling back to RRF scores");
     }
     rerankDuration = Date.now() - rerankStartTime;
   }

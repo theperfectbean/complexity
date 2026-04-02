@@ -166,6 +166,28 @@ export function SearchBar({
   const { showCommandMenu, commandQuery, handleTextChange, handleCommandSelect, closeMenu } =
     useSlashCommands(onChange, { threadId });
 
+  // F5: Restore draft from sessionStorage on mount
+  useEffect(() => {
+    if (!threadId || value) return;
+    try {
+      const draft = sessionStorage.getItem(`draft:${threadId}`);
+      if (draft) onChange(draft);
+    } catch { /* sessionStorage unavailable */ }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [threadId]);
+
+  // F5: Persist draft to sessionStorage when value changes
+  useEffect(() => {
+    if (!threadId) return;
+    try {
+      if (value) {
+        sessionStorage.setItem(`draft:${threadId}`, value);
+      } else {
+        sessionStorage.removeItem(`draft:${threadId}`);
+      }
+    } catch { /* sessionStorage unavailable */ }
+  }, [threadId, value]);
+
   return (
     <motion.div
       id={id}
@@ -246,6 +268,9 @@ export function SearchBar({
                 : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
             )}
             aria-label="Toggle web search"
+            title={webSearchEnabled
+              ? `Web search active (via ${runtimeConfig.searchAgent.provider === "tavily" ? "Tavily" : "Perplexity"})`
+              : "Enable web search"}
             onClick={() => onWebSearchChange?.(!webSearchEnabled)}
           >
             <Globe className={cn("h-4 w-4", webSearchEnabled ? "text-primary" : "opacity-60")} />

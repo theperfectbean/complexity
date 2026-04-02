@@ -1,3 +1,4 @@
+import { logger } from "@/lib/logger";
 import * as bcrypt from "bcrypt-ts";
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
@@ -32,7 +33,7 @@ const schema = z.object({
 });
 
 export async function POST(request: Request) {
-  console.log("[Registration] Received POST request");
+  logger.debug({}, "[Registration] Received POST request");
 
   const ip = request.headers.get("x-forwarded-for")?.split(",")[0] ?? "unknown";
   const allowed = await checkRateLimit({
@@ -64,10 +65,10 @@ export async function POST(request: Request) {
   }
 
   try {
-    console.log("[Registration] Hashing password...");
+    logger.debug({}, "[Registration] Hashing password...");
     const passwordHash = await bcrypt.hash(parsed.data.password, runtimeConfig.auth.bcryptCost);
 
-    console.log("[Registration] Inserting user into DB...");
+    logger.debug({}, "[Registration] Inserting user into DB...");
     await db.insert(users).values({
       id: createId(),
       email,
@@ -91,13 +92,13 @@ export async function POST(request: Request) {
       });
     }
 
-    console.log("[Registration] Success.");
+    logger.debug({}, "[Registration] Success.");
     return NextResponse.json({
       ok: true,
       emailVerificationRequired: runtimeConfig.auth.requireEmailVerification,
     });
   } catch (error) {
-    console.error("[Registration Error]", error);
+    logger.error({ err: error }, "[Registration Error]");
     return NextResponse.json({ error: "Registration failed" }, { status: 500 });
   }
 }

@@ -1,3 +1,4 @@
+import { logger } from "@/lib/logger";
 import Redis from "ioredis";
 
 import { env } from "@/lib/env";
@@ -41,7 +42,7 @@ export function getRedisClient(): Redis | null {
         const redisErr = err as { code?: string; message?: string };
         // Only log in development or if it's not a DNS error
         if (redisErr.code !== "ENOTFOUND" && redisErr.code !== "ECONNREFUSED") {
-          console.error("Redis error:", redisErr);
+          logger.error({ err: redisErr }, "Redis error:");
         }
       }
     });

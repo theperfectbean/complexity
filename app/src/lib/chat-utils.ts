@@ -159,3 +159,45 @@ ${content}
 
   return finalText;
 }
+
+// B10: CoreMessage types (mirrors definition in llm.ts)
+type CoreMessageTextPart = { type: "text"; text: string };
+type CoreMessageImagePart = { type: "image"; image: Buffer };
+export type CoreMessageContent = CoreMessageTextPart | CoreMessageImagePart;
+export type CoreMessageLike = {
+  role: "user" | "assistant" | "system";
+  content: CoreMessageContent[];
+};
+
+/**
+ * B10: Converts an array of UIMessages into CoreMessage format for AI SDK consumption.
+ * Extracts text content and inline image attachments. Deduplicates from llm.ts.
+ */
+export async function convertMessagesToCore(
+  messages: UIMessage[],
+  log: { error: (obj: { err: unknown }, msg: string) => void }
+): Promise<CoreMessageLike[]> {
+  return Promise.all(
+    messages.map(async (msg) => {
+      const text = await extractTextFromMessage(msg);
+      const content: CoreMessageContent[] = [];
+      if (text.trim()) content.push({ type: "text", text });
+
+      collectFileParts(msg).forEach((att) => {
+        if (att.url?.startsWith("data:") && (att.mediaType || att.contentType || "").startsWith("image/")) {
+          try {
+            const base64Data = att.url.split(",")[1];
+            if (base64Data) {
+              content.push({ type: "image", image: Buffer.from(base64Data, "base64") });
+            }
+          } catch (e) {
+            log.error({ err: e }, "Failed to convert image data URL to buffer");
+          }
+        }
+      });
+
+      if (content.length === 0) content.push({ type: "text", text: " " });
+      return { role: msg.role as "user" | "assistant" | "system", content };
+    })
+  );
+}

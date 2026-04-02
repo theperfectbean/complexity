@@ -29,6 +29,7 @@ const ZERO_RATE_CARD: RateCard = {
 
 // NOTE: These are rough estimates only. Rates change frequently.
 // Update as models and pricing evolve.
+// To override, set COST_RATE_CARDS in your environment as JSON (advanced).
 function getRateCard(modelId?: string | null): RateCard {
   const normalized = (modelId || "").toLowerCase();
 

@@ -12,7 +12,8 @@ import {
   Clock,
   AlertCircle,
   Power,
-  PowerOff
+  PowerOff,
+  Send
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -48,6 +49,8 @@ export default function WebhooksPage() {
   const [newUrl, setNewUrl] = useState("");
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [newSigningSecret, setNewSigningSecret] = useState<string | null>(null);
+  const [testingId, setTestingId] = useState<string | null>(null);
+  const [testResult, setTestResult] = useState<{ id: string; success: boolean; status?: number; durationMs?: number; error?: string } | null>(null);
   
   // Delivery history state
   const [selectedHookId, setSelectedHookId] = useState<string | null>(null);
@@ -158,6 +161,25 @@ export default function WebhooksPage() {
     copyToClipboard(text);
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const handleTest = async (id: string) => {
+    setTestingId(id);
+    setTestResult(null);
+    try {
+      const res = await fetch(`/api/webhooks/${id}/test`, { method: "POST" });
+      const data = await res.json() as { success: boolean; status?: number; durationMs?: number; error?: string };
+      setTestResult({ id, ...data });
+      if (data.success) {
+        toast.success(`Test ping delivered (${data.status} in ${data.durationMs}ms)`);
+      } else {
+        toast.error(`Test ping failed: ${data.error ?? data.status}`);
+      }
+    } catch {
+      toast.error("Test ping failed");
+    } finally {
+      setTestingId(null);
+    }
   };
 
   if (status === "loading" || loading) {
@@ -284,6 +306,14 @@ export default function WebhooksPage() {
                           <Activity className="h-4 w-4" />
                         </button>
                         <button
+                          onClick={() => void handleTest(hook.id)}
+                          disabled={testingId === hook.id}
+                          className="rounded-lg p-2 hover:bg-primary/10 hover:text-primary text-muted-foreground transition-colors disabled:opacity-50"
+                          title="Send test ping"
+                        >
+                          {testingId === hook.id ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                        </button>
+                        <button
                           onClick={() => void handleDelete(hook.id)}
                           className="rounded-lg p-2 hover:bg-destructive/10 hover:text-destructive text-muted-foreground transition-colors"
                           title="Delete"
@@ -295,6 +325,13 @@ export default function WebhooksPage() {
                     {!hook.isActive && (
                       <div className="mb-4 rounded-lg border border-amber-500/20 bg-amber-500/10 p-2 text-xs text-amber-600/90 dark:text-amber-500/90">
                         This webhook is currently disabled and will not receive events.
+                      </div>
+                    )}
+                    {testResult?.id === hook.id && (
+                      <div className={`mb-3 rounded-lg border p-2 text-xs ${testResult.success ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-600" : "border-rose-500/20 bg-rose-500/10 text-rose-600"}`}>
+                        {testResult.success
+                          ? `✓ Test ping delivered — HTTP ${testResult.status} in ${testResult.durationMs}ms`
+                          : `✗ Test ping failed: ${testResult.error ?? `HTTP ${testResult.status}`}`}
                       </div>
                     )}
                     <div className="rounded-lg border border-border/50 bg-muted/30 p-3 text-[11px] text-muted-foreground">

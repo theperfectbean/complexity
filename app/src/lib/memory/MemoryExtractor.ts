@@ -1,3 +1,4 @@
+import { logger } from "@/lib/logger";
 import { generateText } from "ai";
 import { getLanguageModel } from "@/lib/llm";
 import { getApiKeys } from "@/lib/settings";
@@ -232,7 +233,7 @@ export async function saveExtractedMemories(params: {
           const { getEmbeddings } = await import("@/lib/rag");
           embeddings = await getEmbeddings(candidates);
         } catch (error) {
-          console.error("[Memory] Failed to generate embeddings for auto-extracted memories:", error);
+          logger.error({ err: error }, "[Memory] Failed to generate embeddings for auto-extracted memories:");
         }
 
         // Semantic deduplication: skip candidates too similar to existing memories
