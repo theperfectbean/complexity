@@ -25,6 +25,8 @@ export const users = pgTable(
     theme: varchar("theme", { length: 50 }),
     memoryEnabled: boolean("memory_enabled").default(true),
     defaultModel: varchar("default_model", { length: 100 }),
+    streamingStyle: varchar("streaming_style", { length: 20 }).default("typewriter"),
+    streamingSpeed: integer("streaming_speed").default(3),
     isAdmin: boolean("is_admin").default(false).notNull(),
     totpSecret: text("totp_secret"),
     totpEnabled: boolean("totp_enabled").default(false).notNull(),

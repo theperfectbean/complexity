@@ -132,6 +132,8 @@ export function ThreadChat({
   const [pinned, setPinned] = useState(initialPinned);
   const [tags, setTags] = useState(initialTags);
   const [webSearchEnabled, setWebSearchEnabled] = useState(initialWebSearch);
+  const [streamingStyle, setStreamingStyle] = useState<"typewriter" | "instant">("typewriter");
+  const [streamingSpeed, setStreamingSpeed] = useState<number>(3);
 
   // Restore web search preference from localStorage after client-side mount.
   // localStorage is unavailable during SSR so useState initializes from the prop (default: false).
@@ -144,6 +146,23 @@ export function ThreadChat({
       }
     } catch {}
   }, [threadId]);
+
+  // Load streaming display preferences from profile on mount.
+  useEffect(() => {
+    fetch('/api/profile')
+      .then(r => r.ok ? r.json() as Promise<{ streamingStyle?: string; streamingSpeed?: number }> : null)
+      .then(data => {
+        if (data) {
+          if (data.streamingStyle === 'instant' || data.streamingStyle === 'typewriter') {
+            setStreamingStyle(data.streamingStyle);
+          }
+          if (typeof data.streamingSpeed === 'number') {
+            setStreamingSpeed(data.streamingSpeed);
+          }
+        }
+      })
+      .catch(() => {/* silently ignore */});
+  }, []);
 
   const handleWebSearchChange = useCallback((enabled: boolean) => {
     setWebSearchEnabled(enabled);
@@ -557,6 +576,8 @@ export function ThreadChat({
           hasMore={hasMore}
           isLoadingMore={isLoadingMore}
           isStreaming={status === "streaming" || status === "submitted"}
+          streamingStyle={streamingStyle}
+          streamingSpeed={streamingSpeed}
           emptyLabel="Start this thread with your first question."
           onDownload={() => exportMessagesAsMarkdown(threadTitle, mergedMessages)}
           onDelete={handleDeleteMessage}

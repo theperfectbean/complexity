@@ -13,6 +13,8 @@ type ProfileData = {
   name: string | null;
   image: string | null;
   theme: string | null;
+  streamingStyle: "typewriter" | "instant";
+  streamingSpeed: number;
 };
 
 type ApiToken = {
@@ -42,6 +44,8 @@ export default function ProfilePage() {
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [name, setName] = useState("");
   const [saving, setSaving] = useState(false);
+  const [streamingStyle, setStreamingStyle] = useState<"typewriter" | "instant">("typewriter");
+  const [streamingSpeed, setStreamingSpeed] = useState<number>(3);
   const [tokens, setTokens] = useState<ApiToken[]>([]);
   const [tokenName, setTokenName] = useState("");
   const [tokenCreating, setTokenCreating] = useState(false);
@@ -54,6 +58,8 @@ export default function ProfilePage() {
         if (data) {
           setProfile(data);
           setName(data.name ?? "");
+          setStreamingStyle(data.streamingStyle ?? "typewriter");
+          setStreamingSpeed(data.streamingSpeed ?? 3);
         }
       })
       .catch(() => toast.error("Failed to load profile"));
@@ -69,6 +75,29 @@ export default function ProfilePage() {
       })
       .catch(() => toast.error("Failed to load API tokens"));
   }, []);
+
+  const saveStreamingPrefs = async (style: "typewriter" | "instant", speed: number) => {
+    try {
+      await fetch("/api/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ streamingStyle: style, streamingSpeed: speed }),
+      });
+      toast.success("Preference saved");
+    } catch {
+      toast.error("Failed to save preference");
+    }
+  };
+
+  const handleStreamingStyleChange = async (style: "typewriter" | "instant") => {
+    setStreamingStyle(style);
+    await saveStreamingPrefs(style, streamingSpeed);
+  };
+
+  const handleStreamingSpeedChange = async (speed: number) => {
+    setStreamingSpeed(speed);
+    await saveStreamingPrefs(streamingStyle, speed);
+  };
 
   const handleSave = async () => {
     setSaving(true);
@@ -209,6 +238,68 @@ export default function ProfilePage() {
           Your theme preference is saved to your account and syncs across devices.
         </p>
         <ThemeToggle />
+      </section>
+
+      {/* Chat Preferences */}
+      <section className="mt-8 rounded-xl border bg-card p-6">
+        <h2 className="mb-4 text-base font-semibold">Chat Preferences</h2>
+        <p className="mb-6 text-sm text-muted-foreground">
+          Control how AI responses are displayed as they stream in.
+        </p>
+
+        <div className="space-y-6">
+          <div>
+            <label className="mb-2 block text-sm font-medium">Response display style</label>
+            <div className="flex gap-3">
+              <button
+                onClick={() => void handleStreamingStyleChange("typewriter")}
+                className={`flex-1 rounded-lg border px-4 py-3 text-sm font-medium transition-colors text-left ${
+                  streamingStyle === "typewriter"
+                    ? "border-primary bg-primary/10 text-primary"
+                    : "border-border bg-background text-muted-foreground hover:bg-muted"
+                }`}
+              >
+                <div className="font-semibold mb-0.5">Typewriter</div>
+                <div className="text-xs opacity-70">Text appears character by character as it arrives</div>
+              </button>
+              <button
+                onClick={() => void handleStreamingStyleChange("instant")}
+                className={`flex-1 rounded-lg border px-4 py-3 text-sm font-medium transition-colors text-left ${
+                  streamingStyle === "instant"
+                    ? "border-primary bg-primary/10 text-primary"
+                    : "border-border bg-background text-muted-foreground hover:bg-muted"
+                }`}
+              >
+                <div className="font-semibold mb-0.5">Instant</div>
+                <div className="text-xs opacity-70">Text appears immediately as chunks arrive from the server</div>
+              </button>
+            </div>
+          </div>
+
+          {streamingStyle === "typewriter" && (
+            <div>
+              <label className="mb-2 block text-sm font-medium">
+                Typewriter speed
+                <span className="ml-2 text-xs font-normal text-muted-foreground">
+                  {["", "Slowest", "Slow", "Normal", "Fast", "Fastest"][streamingSpeed]}
+                </span>
+              </label>
+              <input
+                type="range"
+                min={1}
+                max={5}
+                step={1}
+                value={streamingSpeed}
+                onChange={e => void handleStreamingSpeedChange(Number(e.target.value))}
+                className="w-full accent-primary"
+              />
+              <div className="mt-1 flex justify-between text-xs text-muted-foreground">
+                <span>Slowest</span>
+                <span>Fastest</span>
+              </div>
+            </div>
+          )}
+        </div>
       </section>
 
       {/* API Tokens */}

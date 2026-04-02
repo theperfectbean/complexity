@@ -53,6 +53,8 @@ type MessageListProps = {
   hasMore?: boolean;
   isLoadingMore?: boolean;
   isStreaming?: boolean;
+  streamingStyle?: "typewriter" | "instant";
+  streamingSpeed?: number;
   onDownload?: () => void;
 };
 
@@ -71,6 +73,8 @@ export function MessageList({
   hasMore,
   isLoadingMore,
   isStreaming,
+  streamingStyle,
+  streamingSpeed,
   onDownload,
 }: MessageListProps) {
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -176,6 +180,8 @@ export function MessageList({
           searchQuery={searchQuery}
           currentMatchId={currentMatchId}
           isStreaming={isStreaming}
+          streamingStyle={streamingStyle}
+          streamingSpeed={streamingSpeed}
           onRetry={onRetry}
           onRewrite={onRewrite}
           onDelete={onDelete}

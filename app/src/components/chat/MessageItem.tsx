@@ -38,6 +38,8 @@ export const MessageItem = memo(function MessageItem({
   searchQuery,
   currentMatchId,
   isStreaming,
+  streamingStyle,
+  streamingSpeed,
   onRetry,
   onRewrite,
   onDelete,
@@ -54,6 +56,8 @@ export const MessageItem = memo(function MessageItem({
   searchQuery?: string;
   currentMatchId?: string;
   isStreaming?: boolean;
+  streamingStyle?: "typewriter" | "instant";
+  streamingSpeed?: number;
   onRetry?: () => void;
   onRewrite?: (modelId: string) => void;
   onDelete?: (messageId: string) => void;
@@ -378,6 +382,8 @@ export const MessageItem = memo(function MessageItem({
               <MarkdownRenderer
                 content={message.content}
                 isStreaming={isStreaming && index === totalMessages - 1}
+                streamingStyle={streamingStyle}
+                streamingSpeed={streamingSpeed}
                 hasThinking={
                   (message.thinking && message.thinking.length > 0) ||
                   (isStreaming && index === totalMessages - 1 && (!message.content || message.content === "\u200B"))

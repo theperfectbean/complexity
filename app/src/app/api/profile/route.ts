@@ -11,6 +11,8 @@ const patchSchema = z.object({
   image: z.string().url().nullable().optional(),
   theme: z.string().max(50).nullable().optional(),
   defaultModel: z.string().max(100).nullable().optional(),
+  streamingStyle: z.enum(["typewriter", "instant"]).optional(),
+  streamingSpeed: z.number().int().min(1).max(5).optional(),
 });
 
 export async function GET() {
@@ -25,6 +27,8 @@ export async function GET() {
     image: user.image,
     theme: user.theme,
     defaultModel: user.defaultModel,
+    streamingStyle: user.streamingStyle ?? "typewriter",
+    streamingSpeed: user.streamingSpeed ?? 3,
   });
 }
 
@@ -46,6 +50,8 @@ export async function PATCH(request: Request) {
   if (parsed.data.image !== undefined) updates.image = parsed.data.image;
   if (parsed.data.theme !== undefined) updates.theme = parsed.data.theme;
   if (parsed.data.defaultModel !== undefined) updates.defaultModel = parsed.data.defaultModel;
+  if (parsed.data.streamingStyle !== undefined) updates.streamingStyle = parsed.data.streamingStyle;
+  if (parsed.data.streamingSpeed !== undefined) updates.streamingSpeed = parsed.data.streamingSpeed;
 
   await db.update(users).set(updates).where(eq(users.id, user.id));
 

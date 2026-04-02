@@ -14,6 +14,8 @@ type MarkdownRendererProps = {
   content: string;
   isStreaming?: boolean;
   hasThinking?: boolean;
+  streamingStyle?: "typewriter" | "instant";
+  streamingSpeed?: number;
 };
 
 // Helper to extract plain text from React nodes
@@ -96,7 +98,7 @@ const components: Components = {
     const content = extractText(children).trim();
     
     // Detection for chart data: 
-    if (content.startsWith('{') && content.endsWith('}')) {
+    if (content.startsWith("{") && content.endsWith("}")) {
       if (content.includes('"type"') && content.includes('"data"')) {
         return <ChartRenderer data={content} />;
       }
@@ -141,7 +143,16 @@ const components: Components = {
   }
 };
 
-export const MarkdownRenderer = memo(function MarkdownRenderer({ content, isStreaming, hasThinking }: MarkdownRendererProps) {
+// Speed multipliers for the typewriter adaptive increment (index = speed 1–5)
+const SPEED_MULTIPLIERS = [0, 0.5, 0.75, 1, 2, 4];
+
+export const MarkdownRenderer = memo(function MarkdownRenderer({
+  content,
+  isStreaming,
+  hasThinking,
+  streamingStyle = "typewriter",
+  streamingSpeed = 3,
+}: MarkdownRendererProps) {
   // Track the typewriter-animated content separately; derive the rendered value from isStreaming.
   const [streamedContent, setStreamedContent] = useState(content);
   const contentRef = useRef(content);
@@ -151,9 +162,10 @@ export const MarkdownRenderer = memo(function MarkdownRenderer({ content, isStre
     contentRef.current = content;
   }, [content]);
 
-  // Adaptive typewriter effect — only active during streaming.
+  // Typewriter effect — only active during streaming when style is 'typewriter'.
   useEffect(() => {
-    if (!isStreaming) return;
+
+    const multiplier = SPEED_MULTIPLIERS[Math.max(1, Math.min(5, streamingSpeed))] ?? 1;
 
     const interval = setInterval(() => {
       const targetContent = contentRef.current;
@@ -168,22 +180,24 @@ export const MarkdownRenderer = memo(function MarkdownRenderer({ content, isStre
         else if (diff > 30) increment = 4;
         else if (diff > 10) increment = 2;
 
+        // Apply speed multiplier (minimum 1 char per tick)
+        increment = Math.max(1, Math.round(increment * multiplier));
+
         return targetContent.slice(0, prev.length + increment);
       });
     }, 40);
 
     return () => clearInterval(interval);
-  }, [isStreaming]);
+  }, [isStreaming, streamingStyle, streamingSpeed]);
 
-  // When not streaming, render raw content directly; otherwise use the typewriter value.
-  const displayContent = isStreaming ? streamedContent : content;
+  // When not streaming, or in instant mode, render raw content directly.
+  const displayContent = (isStreaming && streamingStyle === "typewriter") ? streamedContent : content;
 
   // Throttle expensive ReactMarkdown re-parses to at most once per 100 ms during streaming.
   const [throttledStreamedContent, setThrottledStreamedContent] = useState(displayContent);
   const lastUpdateRef = useRef(0);
 
   useEffect(() => {
-    if (!isStreaming) return;
 
     const now = Date.now();
     const timeSinceLastUpdate = now - lastUpdateRef.current;
@@ -198,8 +212,8 @@ export const MarkdownRenderer = memo(function MarkdownRenderer({ content, isStre
   }, [displayContent, isStreaming]);
 
   const throttledContent = isStreaming ? throttledStreamedContent : content;
+  const isActuallyEmpty = !throttledContent || throttledContent.trim() === "";
 
-  const isActuallyEmpty = !throttledContent || throttledContent === "\u200B" || throttledContent.trim().length === 0;
 
   if (isStreaming && isActuallyEmpty) {
     if (hasThinking) {
