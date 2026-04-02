@@ -116,3 +116,29 @@ export async function POST(request: Request) {
     return ApiResponse.error(err.message || "Internal server error", status, err);
   }
 }
+
+/**
+ * GET /api/chat?threadId=<id>
+ * Returns any in-progress buffered stream content stored in Redis so the
+ * client can resume a disconnected stream without losing tokens.
+ */
+export async function GET(request: Request) {
+  try {
+    const user = await requireUserOrApiToken(request);
+    if (!user) return ApiResponse.error("Unauthorized", 401);
+
+    const { searchParams } = new URL(request.url);
+    const threadId = searchParams.get("threadId");
+    if (!threadId) return ApiResponse.error("threadId is required", 400);
+
+    const redis = getRedisClient();
+    if (!redis) return NextResponse.json({ buffered: null, messageId: null });
+
+    const { getStreamBuffer } = await import("@/lib/stream-buffer");
+    const buf = await getStreamBuffer(redis, threadId);
+    return NextResponse.json(buf);
+  } catch (error: unknown) {
+    const err = error as { message?: string };
+    return ApiResponse.error(err.message || "Internal server error", 500);
+  }
+}

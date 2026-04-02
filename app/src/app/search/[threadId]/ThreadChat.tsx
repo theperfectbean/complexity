@@ -132,56 +132,6 @@ export function ThreadChat({
   const [pinned, setPinned] = useState(initialPinned);
   const [tags, setTags] = useState(initialTags);
   const [webSearchEnabled, setWebSearchEnabled] = useState(initialWebSearch);
-  const [streamingStyle, setStreamingStyle] = useState<"typewriter" | "instant">("typewriter");
-  const [streamingSpeed, setStreamingSpeed] = useState<number>(3);
-
-  // Restore web search preference from localStorage after client-side mount.
-  // localStorage is unavailable during SSR so useState initializes from the prop (default: false).
-  // This effect runs after hydration and corrects the state if the user previously saved a preference.
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem(`webSearch:${threadId}`);
-      if (saved !== null) {
-        setWebSearchEnabled(saved === 'true');
-      }
-    } catch {}
-  }, [threadId]);
-
-  // Load streaming display preferences from profile on mount.
-  useEffect(() => {
-    fetch('/api/profile')
-      .then(r => r.ok ? r.json() as Promise<{ streamingStyle?: string; streamingSpeed?: number }> : null)
-      .then(data => {
-        if (data) {
-          if (data.streamingStyle === 'instant' || data.streamingStyle === 'typewriter') {
-            setStreamingStyle(data.streamingStyle);
-          }
-          if (typeof data.streamingSpeed === 'number') {
-            setStreamingSpeed(data.streamingSpeed);
-          }
-        }
-      })
-      .catch(() => {/* silently ignore */});
-  }, []);
-
-  const handleWebSearchChange = useCallback((enabled: boolean) => {
-    setWebSearchEnabled(enabled);
-    try {
-      if (enabled) {
-        localStorage.setItem(`webSearch:${threadId}`, 'true');
-      } else {
-        localStorage.removeItem(`webSearch:${threadId}`);
-      }
-    } catch {}
-    const params = new URLSearchParams(window.location.search);
-    if (enabled) {
-      params.set('web', 'true');
-    } else {
-      params.delete('web');
-    }
-    const newUrl = params.toString() ? `/search/${threadId}?${params.toString()}` : `/search/${threadId}`;
-    router.replace(newUrl, { scroll: false });
-  }, [threadId, router]);
   const [branches, setBranches] = useState<Array<{ id: string; title: string; branchPointMessageId: string | null }>>([]);
   const [hasMore, setHasMore] = useState(initialHasMore);
   const [nextCursor, setNextCursor] = useState(initialNextCursor);
@@ -240,7 +190,45 @@ export function ThreadChat({
         setData((prev) => [...prev, part.data as Record<string, unknown>]);
       }
     },
+    onError() {
+      void resumeStream();
+    },
   });
+
+  /**
+   * Attempts to recover an in-progress assistant message that was buffered in
+   * Redis before the client disconnected. If buffered content exists and the
+   * message isn't already in the message list, it is injected as a partial
+   * assistant message so the user sees what was generated so far.
+   */
+  const resumeStream = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/chat?threadId=${encodeURIComponent(threadId)}`);
+      if (!res.ok) return;
+      const { buffered, messageId } = (await res.json()) as { buffered: string | null; messageId: string | null };
+      if (!buffered || !messageId) return;
+      setMessages((prev) => {
+        if (prev.some((m) => m.id === messageId)) return prev;
+        return [
+          ...prev,
+          {
+            id: messageId,
+            role: "assistant",
+            content: buffered,
+            parts: [{ type: "text", text: buffered }],
+          } as unknown as UIMessage,
+        ];
+      });
+    } catch {
+      // Non-fatal — stream resume is best-effort
+    }
+  }, [threadId, setMessages]);
+
+  // On mount, attempt to restore any buffered stream content from a prior disconnection.
+  useEffect(() => {
+    void resumeStream();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const loadMoreMessages = useCallback(async () => {
     if (isLoadingMore || !hasMore || !nextCursor) return;
@@ -555,6 +543,7 @@ export function ThreadChat({
           />
           <ThreadSettingsDialog
             threadId={threadId}
+            threadTitle={threadTitle}
             initialSystemPrompt={threadSystemPrompt}
             initialPinned={pinned}
             initialTags={tags}
@@ -576,8 +565,6 @@ export function ThreadChat({
           hasMore={hasMore}
           isLoadingMore={isLoadingMore}
           isStreaming={status === "streaming" || status === "submitted"}
-          streamingStyle={streamingStyle}
-          streamingSpeed={streamingSpeed}
           emptyLabel="Start this thread with your first question."
           onDownload={() => exportMessagesAsMarkdown(threadTitle, mergedMessages)}
           onDelete={handleDeleteMessage}
@@ -636,7 +623,6 @@ export function ThreadChat({
             <SearchBar
               key="thread-searchbar"
               id="thread-searchbar"
-              threadId={threadId}
               value={prompt}
               onChange={setPrompt}
               placeholder="Ask a follow-up..."
@@ -648,7 +634,7 @@ export function ThreadChat({
               model={model}
               onModelChange={setModel}
               webSearchEnabled={webSearchEnabled}
-              onWebSearchChange={handleWebSearchChange}
+              onWebSearchChange={setWebSearchEnabled}
               attachments={attachments}
               onRemoveAttachment={(index) => {
                 setAttachments((prev) => prev.filter((_, i) => i !== index));

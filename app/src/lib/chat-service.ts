@@ -12,6 +12,7 @@ import { runtimeConfig } from "./config";
 import { normalizeLegacyModelId } from "./models";
 import { createId } from "./db/cuid";
 import { estimateUsageCostUsd } from "./cost-estimation";
+import { initStreamBuffer, appendStreamBuffer, clearStreamBuffer } from "./stream-buffer";
 
 import { applyBudgetGuardrails, getChatBudgetState, recordChatBudgetUsage } from "./chat-budget";
 import { getChatRoutingDecision } from "./chat-routing";
@@ -139,6 +140,22 @@ export class ChatService {
             writer.write({ type: "start", messageId: responseMessageId });
             writer.write({ type: "text-start", id: textId });
 
+            // Initialise Redis stream buffer so clients can resume after a disconnect.
+            const redis = this.session.redis;
+            if (redis) {
+              void initStreamBuffer(redis, threadId, responseMessageId).catch(() => {});
+            }
+
+            // Proxy writer that also appends text-deltas to the Redis buffer.
+            const bufferingWriter: { write: (chunk: UIMessageChunk) => void } = {
+              write(chunk: UIMessageChunk) {
+                writer.write(chunk);
+                if (redis && chunk.type === "text-delta" && chunk.delta) {
+                  void appendStreamBuffer(redis, threadId, chunk.delta).catch(() => {});
+                }
+              },
+            };
+
             const keys = await getApiKeys();
             const initialRouting = this.session.routing ?? getChatRoutingDecision({
               userText,
@@ -173,7 +190,7 @@ export class ChatService {
                 requestId,
                 textId,
                 webSearch: budgeted.routing.allowWebSearch,
-                writer,
+                writer: bufferingWriter,
               });
             } catch (genError) {
               const message = genError instanceof Error ? genError.message : "Generation failed";
@@ -199,6 +216,8 @@ export class ChatService {
 
             await this.history.setCache(this.session, cacheKey, { text: assistantText, citations });
             await this.history.saveAssistantMessage(this.session, responseMessageId, assistantText, citations, memoriesFound > 0, result.usage);
+            // Stream fully saved — clear the Redis buffer so stale content isn't replayed.
+            if (redis) void clearStreamBuffer(redis, threadId).catch(() => {});
             await recordChatBudgetUsage(this.session.redis, this.session.userEmail, {
               modelId: this.session.model,
               promptTokens: result.usage?.promptTokens,
