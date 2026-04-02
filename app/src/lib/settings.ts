@@ -109,6 +109,10 @@ export async function getApiKeys(): Promise<Record<string, string | null>> {
     "PROVIDER_LOCAL_OPENAI_ENABLED",
     "GEMINI_BRIDGE_URL",
     "GEMINI_BRIDGE_TOKEN",
+    "INTEGRATION_GOOGLE_DRIVE_ENABLED",
+    "INTEGRATION_GITHUB_ENABLED",
+    "INTEGRATION_SEARCH_ENABLED",
+    "INTEGRATION_GEMINI_BRIDGE_ENABLED",
   ];
 
   const results = await Promise.all(keys.map(key => getSetting(key)));

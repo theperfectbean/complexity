@@ -109,11 +109,22 @@ const PROVIDERS: ProviderConfig[] = [
   },
 ];
 
-const INTEGRATIONS = [
+type IntegrationConfig = {
+  id: string;
+  name: string;
+  description: string;
+  toggleName?: string;
+  primaryKey?: string;
+  fields: { key: string; label: string; placeholder: string; type?: string }[];
+};
+
+const INTEGRATIONS: IntegrationConfig[] = [
   {
     id: "google-drive",
     name: "Google Drive (RAG)",
     description: "Allow users to import documents from Google Drive. Requires a Google Cloud Project.",
+    toggleName: "INTEGRATION_GOOGLE_DRIVE_ENABLED",
+    primaryKey: "GOOGLE_CLIENT_ID",
     fields: [
       { key: "GOOGLE_CLIENT_ID", label: "Client ID", placeholder: "your-client-id.apps.googleusercontent.com" },
       { key: "GOOGLE_CLIENT_SECRET", label: "Client Secret", placeholder: "GOCSPX-...", type: "password" },
@@ -124,6 +135,8 @@ const INTEGRATIONS = [
     id: "github",
     name: "GitHub Auth",
     description: "Enable signing in with GitHub.",
+    toggleName: "INTEGRATION_GITHUB_ENABLED",
+    primaryKey: "GITHUB_CLIENT_ID",
     fields: [
       { key: "GITHUB_CLIENT_ID", label: "Client ID", placeholder: "ov2-..." },
       { key: "GITHUB_CLIENT_SECRET", label: "Client Secret", placeholder: "github_pat_...", type: "password" },
@@ -133,6 +146,8 @@ const INTEGRATIONS = [
     id: "search",
     name: "Search Provider",
     description: "Configure the generic search engine used for Fast and Pro search presets.",
+    toggleName: "INTEGRATION_SEARCH_ENABLED",
+    primaryKey: "SEARCH_API_KEY",
     fields: [
       { key: "SEARCH_PROVIDER_TYPE", label: "Provider Type", placeholder: "perplexity or tavily" },
       { key: "SEARCH_API_KEY", label: "API Key", placeholder: "tvly-... or pplx-...", type: "password" },
@@ -143,6 +158,8 @@ const INTEGRATIONS = [
     id: "gemini-bridge",
     name: "Gemini CLI Bridge",
     description: "Connect to the Gemini CLI bridge service (VM 102) to enable the /gemini slash command in threads.",
+    toggleName: "INTEGRATION_GEMINI_BRIDGE_ENABLED",
+    primaryKey: "GEMINI_BRIDGE_URL",
     fields: [
       { key: "GEMINI_BRIDGE_URL", label: "Bridge URL", placeholder: "http://192.168.0.102:7891" },
       { key: "GEMINI_BRIDGE_TOKEN", label: "Bearer Token", placeholder: "Bridge auth token", type: "password" },
@@ -197,6 +214,15 @@ export default function AdminSettingsPage() {
             const keyInfo = data.details[provider.keyName];
             const hasKey = keyInfo && keyInfo.source !== "none";
             initialForm[provider.toggleName] = hasKey ? "true" : "false";
+          }
+        });
+
+        // Set default toggles for integrations
+        INTEGRATIONS.forEach(integration => {
+          if (integration.toggleName && !initialForm[integration.toggleName]) {
+            const keyInfo = integration.primaryKey ? data.details[integration.primaryKey] : null;
+            const hasKey = keyInfo && keyInfo.source !== "none";
+            initialForm[integration.toggleName] = hasKey ? "true" : "false";
           }
         });
 
@@ -479,14 +505,39 @@ export default function AdminSettingsPage() {
 
           {INTEGRATIONS.map((integration) => (
             <section key={integration.id} className="rounded-2xl border bg-card p-6 shadow-xs transition-shadow hover:shadow-sm">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/5 text-primary">
-                  <ShieldCheck className="h-5 w-5" />
+              <div className="flex items-start justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/5 text-primary">
+                    <ShieldCheck className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-bold">{integration.name}</h2>
+                    <p className="text-xs text-muted-foreground">{integration.description}</p>
+                  </div>
                 </div>
-                <div>
-                  <h2 className="text-lg font-bold">{integration.name}</h2>
-                  <p className="text-xs text-muted-foreground">{integration.description}</p>
-                </div>
+                {integration.toggleName && (
+                  <div className="flex items-center gap-2">
+                    {(() => {
+                      const isEnabled = formData[integration.toggleName!] === "true";
+                      return (
+                        <>
+                          <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/60">
+                            {isEnabled ? "Enabled" : "Disabled"}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => updateField(integration.toggleName!, isEnabled ? "false" : "true")}
+                            className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
+                              isEnabled ? "bg-primary" : "bg-muted"
+                            }`}
+                          >
+                            <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${isEnabled ? "translate-x-5" : "translate-x-0"}`} />
+                          </button>
+                        </>
+                      );
+                    })()}
+                  </div>
+                )}
               </div>
 
               <div className="space-y-6">

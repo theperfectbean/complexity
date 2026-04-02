@@ -24,8 +24,13 @@ export async function POST(request: Request) {
     return ApiResponse.badRequest("Invalid payload", parsed.error.format());
   }
 
+  const bridgeEnabled = (await getSetting("INTEGRATION_GEMINI_BRIDGE_ENABLED")) ?? "true";
   const bridgeUrl = (await getSetting("GEMINI_BRIDGE_URL")) ?? process.env.GEMINI_BRIDGE_URL;
   const bridgeToken = (await getSetting("GEMINI_BRIDGE_TOKEN")) ?? process.env.GEMINI_BRIDGE_TOKEN;
+
+  if (bridgeEnabled === "false") {
+    return ApiResponse.error("Gemini CLI bridge is disabled. Enable it in admin settings.", 503);
+  }
 
   if (!bridgeUrl || !bridgeToken) {
     return ApiResponse.error(
