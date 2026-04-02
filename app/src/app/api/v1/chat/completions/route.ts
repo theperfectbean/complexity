@@ -10,6 +10,7 @@ import { getApiKeys } from "@/lib/settings";
 import { runtimeConfig } from "@/lib/config";
 import { runGeneration } from "@/lib/llm";
 import { requireUserOrApiToken } from "@/lib/auth-server";
+import { checkRateLimit } from "@/lib/rate-limit";
 import { buildToolInstructions, parseToolCallPayload, type OpenAIToolChoice, type OpenAIToolDefinition } from "@/lib/openai-v1";
 
 export const dynamic = "force-dynamic";
@@ -172,6 +173,14 @@ async function parseRequest(request: Request) {
 export async function POST(request: Request) {
   const authResult = await requireUserOrApiToken(request);
   if (authResult instanceof NextResponse) return authResult;
+
+  // Rate limiting
+  const rlUser = authResult.user;
+  const rlKey = rlUser.id;
+  const rlAllowed = await checkRateLimit({ key: rlKey, limit: 60, windowSeconds: 61 });
+  if (!rlAllowed) {
+    return NextResponse.json({ error: { message: "Rate limit exceeded. Try again in a minute.", type: "rate_limit_error" } }, { status: 429 });
+  }
 
   const parsed = await parseRequest(request);
   if (!parsed) {

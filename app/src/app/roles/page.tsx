@@ -57,13 +57,7 @@ export default function RolesPage() {
     };
   }, [status]);
 
-  useEffect(() => {
-    if (status === "authenticated" && roles.length > 0) {
-      console.log("[Roles Debug] Session User ID:", session?.user?.id);
-      console.log("[Roles Debug] First Role User ID:", roles[0]?.userId);
-      console.log("[Roles Debug] Ownership Match:", roles[0]?.userId === session?.user?.id);
-    }
-  }, [status, session, roles]);
+
 
   if (!session?.user) {
     return (

@@ -113,8 +113,8 @@ export class ChatService {
       });
     }
 
-    // Context Window Management: truncate history to the last 12 messages
-    const MAX_CONTEXT_MESSAGES = 12;
+    // Context Window Management: truncate history to avoid token limit errors
+    const MAX_CONTEXT_MESSAGES = runtimeConfig.chat.maxContextMessages;
     const contextMessages = inputMessages.length > MAX_CONTEXT_MESSAGES 
       ? inputMessages.slice(-MAX_CONTEXT_MESSAGES) 
       : inputMessages;
@@ -248,7 +248,7 @@ export class ChatService {
                prompt: userText,
                response: assistantText,
                citations,
-             });
+             }).catch((err) => this.log.error({ err }, "Webhook trigger failed"));
           } catch (error: unknown) {
             this.log.error({ err: error }, "Stream Execution Error");
             const message = error instanceof Error ? error.message : "Internal Stream Error";

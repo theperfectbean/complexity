@@ -17,6 +17,8 @@ const SENSITIVE_KEYS = [
   "GOOGLE_API_KEY",
   "GITHUB_CLIENT_ID",
   "GITHUB_CLIENT_SECRET",
+  "TAVILY_API_KEY",
+  "GEMINI_BRIDGE_TOKEN",
 ];
 
 export async function getSetting(key: string): Promise<string | null> {
@@ -62,7 +64,12 @@ export async function getSetting(key: string): Promise<string | null> {
     }
   }
 
-  return value ? decrypt(value) : null;
+  try {
+    return value ? decrypt(value) : null;
+  } catch {
+    // Decryption failure (e.g. wrong key or corrupt data) — return null rather than crashing
+    return null;
+  }
 }
 
 export async function setSetting(key: string, value: string): Promise<void> {
@@ -87,33 +94,61 @@ export async function setSetting(key: string, value: string): Promise<void> {
   }
 }
 
+// Single source of truth for all admin-configurable settings keys.
+// Import this in api/settings/route.ts (ALLOWED_KEYS) and anywhere else
+// that needs to enumerate or fetch the full settings set.
+export const ADMIN_SETTING_KEYS = [
+  // Provider API keys
+  "ANTHROPIC_API_KEY",
+  "OPENAI_API_KEY",
+  "GOOGLE_GENERATIVE_AI_API_KEY",
+  "XAI_API_KEY",
+  "PERPLEXITY_API_KEY",
+  "SEARCH_API_KEY",
+  "SEARCH_PROVIDER_TYPE",
+  "TAVILY_API_KEY",
+  "OLLAMA_BASE_URL",
+  "LOCAL_OPENAI_BASE_URL",
+  "LOCAL_OPENAI_API_KEY",
+  // Provider toggles
+  "PROVIDER_PERPLEXITY_ENABLED",
+  "PROVIDER_ANTHROPIC_ENABLED",
+  "PROVIDER_OPENAI_ENABLED",
+  "PROVIDER_GOOGLE_ENABLED",
+  "PROVIDER_XAI_ENABLED",
+  "PROVIDER_OLLAMA_ENABLED",
+  "PROVIDER_LOCAL_OPENAI_ENABLED",
+  // Custom model list
+  "CUSTOM_MODEL_LIST",
+  // Integration credentials
+  "GOOGLE_CLIENT_ID",
+  "GOOGLE_CLIENT_SECRET",
+  "GOOGLE_API_KEY",
+  "GITHUB_CLIENT_ID",
+  "GITHUB_CLIENT_SECRET",
+  "GEMINI_BRIDGE_URL",
+  "GEMINI_BRIDGE_TOKEN",
+  // Integration toggles
+  "INTEGRATION_GOOGLE_DRIVE_ENABLED",
+  "INTEGRATION_GITHUB_ENABLED",
+  "INTEGRATION_SEARCH_ENABLED",
+  "INTEGRATION_GEMINI_BRIDGE_ENABLED",
+  // Internal operations: model selection
+  "MEMORY_EXTRACTION_MODEL",
+  "CHAT_TITLING_MODEL",
+  "CHAT_ROLE_INSTRUCTION_MODEL",
+  // Internal operations: behaviour toggles
+  "CHAT_ENABLE_TITLE_GENERATION",
+  // Budgets and limits
+  "CHAT_MAX_CONTEXT_MESSAGES",
+  "CHAT_DAILY_INPUT_TOKEN_BUDGET",
+  "CHAT_DAILY_OUTPUT_TOKEN_BUDGET",
+  "CHAT_DAILY_SEARCH_BUDGET",
+  "CHAT_DAILY_FETCH_BUDGET",
+] as const;
+
 export async function getApiKeys(): Promise<Record<string, string | null>> {
-  const keys = [
-    "ANTHROPIC_API_KEY",
-    "OPENAI_API_KEY",
-    "GOOGLE_GENERATIVE_AI_API_KEY",
-    "XAI_API_KEY",
-    "PERPLEXITY_API_KEY",
-    "SEARCH_API_KEY",
-    "SEARCH_PROVIDER_TYPE",
-    "TAVILY_API_KEY",
-    "OLLAMA_BASE_URL",
-    "LOCAL_OPENAI_BASE_URL",
-    "LOCAL_OPENAI_API_KEY",
-    "PROVIDER_PERPLEXITY_ENABLED",
-    "PROVIDER_ANTHROPIC_ENABLED",
-    "PROVIDER_OPENAI_ENABLED",
-    "PROVIDER_GOOGLE_ENABLED",
-    "PROVIDER_XAI_ENABLED",
-    "PROVIDER_OLLAMA_ENABLED",
-    "PROVIDER_LOCAL_OPENAI_ENABLED",
-    "GEMINI_BRIDGE_URL",
-    "GEMINI_BRIDGE_TOKEN",
-    "INTEGRATION_GOOGLE_DRIVE_ENABLED",
-    "INTEGRATION_GITHUB_ENABLED",
-    "INTEGRATION_SEARCH_ENABLED",
-    "INTEGRATION_GEMINI_BRIDGE_ENABLED",
-  ];
+  const keys = [...ADMIN_SETTING_KEYS];
 
   const results = await Promise.all(keys.map(key => getSetting(key)));
   

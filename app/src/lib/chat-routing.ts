@@ -83,14 +83,14 @@ function normalize(text: string): string {
 export function shouldUseRag(userText: string): boolean {
   const normalized = normalize(userText);
   if (!normalized) return false;
-  return RAG_SIGNALS.some((signal) => normalized.includes(signal));
+  return RAG_SIGNALS.some((signal) => new RegExp("\\b" + signal.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\b").test(normalized));
 }
 
 export function shouldUseMemory(userText: string): boolean {
   const normalized = normalize(userText);
   if (!normalized) return false;
 
-  if (MEMORY_SIGNALS.some((signal) => normalized.includes(signal))) {
+  if (MEMORY_SIGNALS.some((signal) => new RegExp("\\b" + signal.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\b").test(normalized))) {
     return true;
   }
 
@@ -100,7 +100,7 @@ export function shouldUseMemory(userText: string): boolean {
 export function shouldUseWebSearch(userText: string): boolean {
   const normalized = normalize(userText);
   if (!normalized) return false;
-  return WEB_SIGNALS.some((signal) => normalized.includes(signal));
+  return WEB_SIGNALS.some((signal) => new RegExp("\\b" + signal.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\b").test(normalized));
 }
 
 export function getChatRoutingDecision(input: ChatRoutingInput): ChatRoutingDecision {

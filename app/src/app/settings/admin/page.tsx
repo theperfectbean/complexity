@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { useSession } from "next-auth/react";
 import { LoadingSkeleton } from "@/components/shared/LoadingSkeleton";
-import { Check, Info, ShieldCheck, Zap, RefreshCw, Plus, Trash2, GripVertical, Settings2, Users, Activity, BarChart3, ScrollText } from "lucide-react";
+import { Check, Info, ShieldCheck, Zap, RefreshCw, Plus, Trash2, GripVertical, Settings2, Users, Activity, BarChart3, ScrollText, SlidersHorizontal } from "lucide-react";
 import { Reorder } from "motion/react";
 import { MODELS } from "@/lib/models";
 import { UserManagement } from "@/components/admin/UserManagement";
@@ -171,7 +171,7 @@ export default function AdminSettingsPage() {
   const { data: session, status } = useSession();
   const [details, setDetails] = useState<Record<string, SettingInfo>>({});
   const [formData, setFormData] = useState<Record<string, string>>({});
-  const [activeTab, setActiveTab] = useState<"providers" | "models" | "users" | "health" | "analytics" | "audit-logs">("providers");
+  const [activeTab, setActiveTab] = useState<"providers" | "models" | "internals" | "users" | "health" | "analytics" | "audit-logs">("providers");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -228,6 +228,11 @@ export default function AdminSettingsPage() {
 
         if (data.details["CUSTOM_MODEL_LIST"]?.source === "db") {
           initialForm["CUSTOM_MODEL_LIST"] = data.details["CUSTOM_MODEL_LIST"].value || "";
+        }
+
+        // Initialize title generation toggle
+        if (!initialForm["CHAT_ENABLE_TITLE_GENERATION"]) {
+          initialForm["CHAT_ENABLE_TITLE_GENERATION"] = data.details["CHAT_ENABLE_TITLE_GENERATION"]?.value || "false";
         }
 
         setFormData(initialForm);
@@ -384,6 +389,15 @@ export default function AdminSettingsPage() {
         >
           <Settings2 className="h-4 w-4" />
           Manage Models
+        </button>
+        <button
+          onClick={() => setActiveTab("internals")}
+          className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all ${
+            activeTab === "internals" ? "bg-background shadow-sm" : "text-muted-foreground hover:bg-background/50"
+          }`}
+        >
+          <SlidersHorizontal className="h-4 w-4" />
+          Internals
         </button>
         <button
           onClick={() => setActiveTab("users")}
@@ -707,6 +721,81 @@ export default function AdminSettingsPage() {
       ) : activeTab === "analytics" ? (
         <div className="mt-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
           <AnalyticsDashboard />
+        </div>
+      ) : activeTab === "internals" ? (
+        <div className="mt-8 space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
+          <section className="rounded-2xl border bg-card p-6 shadow-xs">
+            <h2 className="text-lg font-bold text-foreground mb-1">Internal Model Selection</h2>
+            <p className="text-sm text-muted-foreground mb-6">Choose which models power internal operations. These must be enabled providers.</p>
+            <div className="grid gap-5 sm:grid-cols-2">
+              {[
+                { key: "MEMORY_EXTRACTION_MODEL", label: "Memory Extraction Model", description: "Used to extract durable facts from conversations. A fast cheap model is recommended." },
+                { key: "CHAT_TITLING_MODEL", label: "Thread Titling Model", description: "Used to auto-generate thread titles (requires title generation to be enabled)." },
+                { key: "CHAT_ROLE_INSTRUCTION_MODEL", label: "Role Instruction Model", description: "Used to generate expanded role system prompts from short descriptions." },
+              ].map(({ key, label, description }) => (
+                <div key={key} className="space-y-1.5">
+                  <label className="block text-sm font-semibold text-foreground">{label}</label>
+                  <p className="text-xs text-muted-foreground mb-1">{description}</p>
+                  <input
+                    type="text"
+                    value={formData[key] || details[key]?.value || ""}
+                    onChange={(e) => setFormData(prev => ({ ...prev, [key]: e.target.value }))}
+                    placeholder="e.g. anthropic/claude-haiku-4-5"
+                    className="w-full bg-muted/30 rounded-xl px-3 py-2 text-sm font-mono outline-hidden focus:ring-2 focus:ring-primary/20 border border-transparent focus:border-primary/20"
+                  />
+                  {details[key]?.source === "env" && (
+                    <p className="text-[10px] text-amber-600">Currently set via environment variable. Save to override with DB value.</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <section className="rounded-2xl border bg-card p-6 shadow-xs">
+            <h2 className="text-lg font-bold text-foreground mb-1">Behaviour Toggles</h2>
+            <p className="text-sm text-muted-foreground mb-6">Enable or disable optional features.</p>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between rounded-xl border p-4 bg-muted/10">
+                <div>
+                  <p className="text-sm font-semibold">Auto Thread Titles</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Automatically generate a title for new threads after the first reply.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setFormData(prev => ({ ...prev, CHAT_ENABLE_TITLE_GENERATION: prev.CHAT_ENABLE_TITLE_GENERATION === "true" ? "false" : "true" }))}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${formData.CHAT_ENABLE_TITLE_GENERATION === "true" ? "bg-primary" : "bg-muted-foreground/30"}`}
+                >
+                  <span className={`inline-block h-4 w-4 rounded-full bg-white shadow-sm transform transition-transform ${formData.CHAT_ENABLE_TITLE_GENERATION === "true" ? "translate-x-6" : "translate-x-1"}`} />
+                </button>
+              </div>
+            </div>
+          </section>
+
+          <section className="rounded-2xl border bg-card p-6 shadow-xs">
+            <h2 className="text-lg font-bold text-foreground mb-1">Context & Rate Limits</h2>
+            <p className="text-sm text-muted-foreground mb-6">Per-user daily usage caps and context window size. Changes take effect for new requests.</p>
+            <div className="grid gap-5 sm:grid-cols-2">
+              {[
+                { key: "CHAT_MAX_CONTEXT_MESSAGES", label: "Max Context Messages", description: "Max messages kept in context per request (default: 20)." },
+                { key: "CHAT_DAILY_INPUT_TOKEN_BUDGET", label: "Daily Input Token Budget", description: "Per-user daily input token limit before model downgrade." },
+                { key: "CHAT_DAILY_OUTPUT_TOKEN_BUDGET", label: "Daily Output Token Budget", description: "Per-user daily output token limit before model downgrade." },
+                { key: "CHAT_DAILY_SEARCH_BUDGET", label: "Daily Search Budget", description: "Max web searches per user per day before disabling." },
+                { key: "CHAT_DAILY_FETCH_BUDGET", label: "Daily Fetch Budget", description: "Max URL fetches per user per day before disabling." },
+              ].map(({ key, label, description }) => (
+                <div key={key} className="space-y-1.5">
+                  <label className="block text-sm font-semibold text-foreground">{label}</label>
+                  <p className="text-xs text-muted-foreground mb-1">{description}</p>
+                  <input
+                    type="number"
+                    min="1"
+                    value={formData[key] || details[key]?.value || ""}
+                    onChange={(e) => setFormData(prev => ({ ...prev, [key]: e.target.value }))}
+                    className="w-full bg-muted/30 rounded-xl px-3 py-2 text-sm font-mono outline-hidden focus:ring-2 focus:ring-primary/20 border border-transparent focus:border-primary/20"
+                  />
+                </div>
+              ))}
+            </div>
+          </section>
         </div>
       ) : activeTab === "audit-logs" ? (
         <div className="mt-8 animate-in fade-in slide-in-from-bottom-2 duration-300">

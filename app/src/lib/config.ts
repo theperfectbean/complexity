@@ -11,13 +11,14 @@ export type ModelOption = {
 };
 
 const DEFAULT_MODELS: ModelOption[] = [
-  { id: "anthropic/claude-4-6-sonnet-latest", label: "Claude 4.6 Sonnet", category: "Anthropic", isPreset: false, capability: "high" },
-  { id: "anthropic/claude-4-6-opus-latest", label: "Claude 4.6 Opus", category: "Anthropic", isPreset: false, capability: "high" },
-  { id: "anthropic/claude-4-5-haiku-latest", label: "Claude 4.5 Haiku", category: "Anthropic", isPreset: false, capability: "low" },
-  { id: "openai/gpt-5.4", label: "GPT-5.4", category: "OpenAI", isPreset: false, capability: "high" },
-  { id: "google/gemini-3.1-pro-preview", label: "Gemini 3.1 Pro Preview", category: "Google", isPreset: false, capability: "high" },
-  { id: "google/gemini-3-flash-preview", label: "Gemini 3 Flash Preview", category: "Google", isPreset: false, capability: "medium" },
-  { id: "xai/grok-4.20-beta", label: "Grok 4.20 Beta", category: "xAI", isPreset: false, capability: "high" },
+  { id: "anthropic/claude-sonnet-4-5", label: "Claude Sonnet 4.5", category: "Anthropic", isPreset: false, capability: "high" },
+  { id: "anthropic/claude-opus-4-5", label: "Claude Opus 4.5", category: "Anthropic", isPreset: false, capability: "high" },
+  { id: "anthropic/claude-haiku-4-5", label: "Claude Haiku 4.5", category: "Anthropic", isPreset: false, capability: "low" },
+  { id: "openai/gpt-4o", label: "GPT-4o", category: "OpenAI", isPreset: false, capability: "high" },
+  { id: "openai/gpt-4o-mini", label: "GPT-4o Mini", category: "OpenAI", isPreset: false, capability: "low" },
+  { id: "google/gemini-1.5-pro", label: "Gemini 1.5 Pro", category: "Google", isPreset: false, capability: "high" },
+  { id: "google/gemini-1.5-flash", label: "Gemini 1.5 Flash", category: "Google", isPreset: false, capability: "medium" },
+  { id: "xai/grok-3-beta", label: "Grok 3 Beta", category: "xAI", isPreset: false, capability: "high" },
   { id: "ollama/llama3", label: "Ollama: Llama 3", category: "Local", isPreset: false, capability: "medium" },
   { id: "ollama/mistral", label: "Ollama: Mistral", category: "Local", isPreset: false, capability: "medium" },
   { id: "local-openai/custom-model", label: "Local OpenAI API", category: "Local", isPreset: false, capability: "high" },
@@ -59,35 +60,32 @@ export const runtimeConfig = {
   llm: {
     modelAliases: {
       anthropic: {
-        "claude-haiku-4-5": "claude-4-5-haiku-latest",
-        "claude-4-6-sonnet-latest": "claude-4-6-sonnet-latest",
-        "claude-sonnet-4-6": "claude-4-6-sonnet-latest",
-        "claude-4-5-haiku-latest": "claude-4-5-haiku-latest",
-        "claude-opus-4-6": "claude-4-6-opus-latest",
-        "claude-4-6-opus-latest": "claude-4-6-opus-latest",
+        // Legacy ID aliases → canonical IDs
+        "claude-haiku-4-5": "claude-haiku-4-5",
+        "claude-sonnet-4-5": "claude-sonnet-4-5",
+        "claude-opus-4-5": "claude-opus-4-5",
+        "claude-4-5-haiku-latest": "claude-haiku-4-5",
+        "claude-4-6-sonnet-latest": "claude-sonnet-4-5",
+        "claude-sonnet-4-6": "claude-sonnet-4-5",
+        "claude-4-6-opus-latest": "claude-opus-4-5",
+        "claude-opus-4-6": "claude-opus-4-5",
       },
       openai: {
-        "gpt-5.4": "gpt-5.4",
+        "gpt-4o": "gpt-4o",
+        "gpt-4o-mini": "gpt-4o-mini",
       },
       google: {
-        "gemini-3.1-pro-preview": "gemini-3.1-pro-preview",
-        "gemini-3-flash-preview": "gemini-3-flash-preview",
+        "gemini-1.5-pro": "gemini-1.5-pro",
+        "gemini-1.5-flash": "gemini-1.5-flash",
+        "gemini-1.5-pro-latest": "gemini-1.5-pro",
+        "gemini-1.5-flash-latest": "gemini-1.5-flash",
       },
       xai: {
-        "grok-4.20-beta": "grok-4.20-beta",
+        "grok-3-beta": "grok-3-beta",
       },
     } as Record<string, Record<string, string>>,
     ollamaBaseUrl: env.OLLAMA_BASE_URL ?? "http://localhost:11434/api",
     localOpenAiApiKeyFallback: env.LOCAL_OPENAI_API_KEY_FALLBACK ?? "none",
-  },
-  perplexity: {
-    apiBaseUrl: env.PERPLEXITY_API_BASE_URL ?? "https://api.perplexity.ai/v1/responses",
-    streamTimeoutMs: env.PERPLEXITY_STREAM_TIMEOUT_MS ?? 1000 * 60 * 5,
-    webTools: (env.PERPLEXITY_WEB_TOOLS || "web_search,fetch_url")
-      .split(",")
-      .map((tool) => tool.trim())
-      .filter(Boolean)
-      .map((tool) => ({ type: tool })),
   },
   searchAgent: {
     provider: env.SEARCH_PROVIDER_TYPE ?? "perplexity",
@@ -109,7 +107,7 @@ export const runtimeConfig = {
     embedderPath: env.RAG_EMBEDDER_PATH ?? "/embed",
     rerankerPath: "/rerank",
     similarityLimit: env.RAG_SIMILARITY_LIMIT ?? 5,
-    similarityTopK: env.RAG_SIMILARITY_TOP_K ?? 4,
+    similarityTopK: env.RAG_SIMILARITY_TOP_K, // default 8 in env.ts
     hybridSearch: (env.RAG_HYBRID_SEARCH ?? "true") === "true",
     hybridCandidates: env.RAG_HYBRID_CANDIDATES ?? 20,
     rerankEnabled: (env.RAG_RERANK_ENABLED ?? "false") === "true",
@@ -122,7 +120,7 @@ export const runtimeConfig = {
     maxMemories: env.MEMORY_MAX_MEMORIES ?? 100,
     topK: env.MEMORY_TOP_K ?? 10,
     minExchanges: env.MEMORY_EXTRACTION_MIN_EXCHANGES ?? 3,
-    extractionEveryN: env.MEMORY_EXTRACTION_EVERY_N_EXCHANGES ?? 6,
+    extractionEveryN: env.MEMORY_EXTRACTION_EVERY_N_EXCHANGES, // default 4 in env.ts
     promptHeader: env.MEMORY_PROMPT_HEADER ?? "## About the user (from past conversations)",
     promptFooter: env.MEMORY_PROMPT_FOOTER ?? "Use these memories to personalize your responses. Do not explicitly mention that you have memories unless asked.",
     extractionInstructions: env.MEMORY_EXTRACTION_INSTRUCTIONS ?? "You are a memory extraction expert. Given the current conversation and existing user memories, identify NEW facts, preferences, or context about the user and IDENTIFY outdated or contradicted ones. Focus on durable information: personal details, professional context, specific tool preferences, recurring needs, or explicitly stated goals. DO NOT extract trivial conversational filler. Return a clean JSON object with two keys: 'added' (list of new strings) and 'deleted_ids' (list of existing IDs to remove). If no changes are needed, return empty lists: { \"added\": [], \"deleted_ids\": [] }.",
@@ -145,6 +143,7 @@ export const runtimeConfig = {
     dailyOutputTokenBudget: env.CHAT_DAILY_OUTPUT_TOKEN_BUDGET ?? 250_000,
     dailySearchBudget: env.CHAT_DAILY_SEARCH_BUDGET ?? 50,
     dailyFetchBudget: env.CHAT_DAILY_FETCH_BUDGET ?? 100,
+    maxContextMessages: env.CHAT_MAX_CONTEXT_MESSAGES ?? 20,
   },
   uploads: {
     maxRoleFileSizeBytes: env.ROLE_UPLOAD_MAX_FILE_SIZE ?? 50 * 1024 * 1024,

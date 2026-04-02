@@ -398,7 +398,12 @@ export async function runGeneration(options: GenerationOptions): Promise<Generat
       } satisfies CoreMessage;
     }));
 
-    const searchApiKey = options.keys["SEARCH_API_KEY"] || options.keys["TAVILY_API_KEY"] || env.SEARCH_API_KEY || env.TAVILY_API_KEY;
+    const searchIntegrationEnabled = (options.keys["INTEGRATION_SEARCH_ENABLED"] ?? "true") !== "false";
+    const searchApiKey = searchIntegrationEnabled
+      ? (options.keys["SEARCH_API_KEY"] || options.keys["TAVILY_API_KEY"] || env.SEARCH_API_KEY || env.TAVILY_API_KEY)
+      : null;
+
+    const citations: Citation[] = [];
 
     const result = streamText({
       model,
@@ -451,8 +456,6 @@ export async function runGeneration(options: GenerationOptions): Promise<Generat
         }
       }
     });
-
-    const citations: Citation[] = [];
 
     log.info({ modelId: options.modelId, webSearch: options.webSearch }, "Starting direct provider stream");
 

@@ -85,6 +85,11 @@ export async function assertSafeWebhookUrl(rawUrl: string) {
 
   if (parsed.username || parsed.password) {
     throw new Error("Webhook URL must not include embedded credentials");
+
+  // Block dangerous internal service ports
+  const BLOCKED_PORTS = new Set([22, 25, 110, 143, 3306, 5432, 6379, 6380, 27017, 11211, 9200]);
+  const reqPort = parsed.port ? parseInt(parsed.port, 10) : (parsed.protocol === "https:" ? 443 : 80);
+  if (BLOCKED_PORTS.has(reqPort)) throw new Error("Webhook URL targets a blocked port");
   }
 
   const hostname = parsed.hostname.toLowerCase();
@@ -145,8 +150,8 @@ export async function triggerWebhook(
     if (hook.events.includes(eventType)) {
       await queue.add(`webhook-${hook.id}`, {
         webhookId: hook.id,
-        url: hook.url,
-        secret: hook.secret,
+
+
         eventType,
         eventId,
         payload,
@@ -166,9 +171,11 @@ export async function triggerWebhook(
 /**
  * Signs a payload with a secret using HMAC SHA-256.
  */
-export function signWebhookPayload(payload: string, secret: string) {
-  return crypto
+export function signWebhookPayload(payload: string, secret: string, timestamp?: number): { signature: string; timestamp: number } {
+  const ts = timestamp ?? Date.now();
+  const signature = crypto
     .createHmac("sha256", secret)
-    .update(payload)
+    .update(ts + "." + payload)
     .digest("hex");
+  return { signature, timestamp: ts };
 }

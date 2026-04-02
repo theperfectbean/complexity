@@ -17,8 +17,8 @@ export const createWebSearchTool = (apiKey: string) => tool({
   parameters: z.object({
     query: z.string().describe("The search query to look up."),
   }),
-  // @ts-expect-error - AI SDK version mismatch on tool execute parameters
-  execute: async ({ query }) => {
+  // @ts-expect-error AI SDK v6 execute parameter type overload mismatch (runtime behavior is correct)
+  execute: async ({ query }: { query: string }) => {
     if (!apiKey) {
       throw new Error("Search API key is not configured.");
     }

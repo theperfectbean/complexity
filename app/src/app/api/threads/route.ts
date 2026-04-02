@@ -10,6 +10,7 @@ import { resolveRequestedModel } from "@/lib/available-models";
 import { generateThreadTitle } from "@/lib/llm";
 import { getApiKeys } from "@/lib/settings";
 import { runtimeConfig } from "@/lib/config";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 const createSchema = z.object({
   title: z.string().min(1).max(200).optional(),
@@ -65,6 +66,12 @@ export async function POST(request: Request) {
 
   if (!user) {
     return NextResponse.json({ error: "User not found" }, { status: 404 });
+  }
+
+  // Rate limiting for thread creation
+  const rlAllowed = await checkRateLimit({ key: user.id, limit: 30, windowSeconds: 61 });
+  if (!rlAllowed) {
+    return NextResponse.json({ error: "Rate limit exceeded." }, { status: 429 });
   }
 
   const payload = await request.json();

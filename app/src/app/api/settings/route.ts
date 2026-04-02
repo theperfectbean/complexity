@@ -4,42 +4,11 @@ import { z } from "zod";
 
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
-import { setSetting, getDetailedSettings } from "@/lib/settings";
+import { setSetting, getDetailedSettings, ADMIN_SETTING_KEYS } from "@/lib/settings";
 import { requireUser, requireAdmin } from "@/lib/auth-server";
 import { logAuditEvent } from "@/lib/audit";
 
-const ALLOWED_KEYS = [
-  "ANTHROPIC_API_KEY",
-  "OPENAI_API_KEY",
-  "GOOGLE_GENERATIVE_AI_API_KEY",
-  "XAI_API_KEY",
-  "PERPLEXITY_API_KEY",
-  "SEARCH_API_KEY",
-  "SEARCH_PROVIDER_TYPE",
-  "TAVILY_API_KEY",
-  "OLLAMA_BASE_URL",
-  "LOCAL_OPENAI_BASE_URL",
-  "LOCAL_OPENAI_API_KEY",
-  "PROVIDER_PERPLEXITY_ENABLED",
-  "PROVIDER_ANTHROPIC_ENABLED",
-  "PROVIDER_OPENAI_ENABLED",
-  "PROVIDER_GOOGLE_ENABLED",
-  "PROVIDER_XAI_ENABLED",
-  "PROVIDER_OLLAMA_ENABLED",
-  "PROVIDER_LOCAL_OPENAI_ENABLED",
-  "CUSTOM_MODEL_LIST",
-  "GOOGLE_CLIENT_ID",
-  "GOOGLE_CLIENT_SECRET",
-  "GOOGLE_API_KEY",
-  "GITHUB_CLIENT_ID",
-  "GITHUB_CLIENT_SECRET",
-  "GEMINI_BRIDGE_URL",
-  "GEMINI_BRIDGE_TOKEN",
-  "INTEGRATION_GOOGLE_DRIVE_ENABLED",
-  "INTEGRATION_GITHUB_ENABLED",
-  "INTEGRATION_SEARCH_ENABLED",
-  "INTEGRATION_GEMINI_BRIDGE_ENABLED",
-];
+const ALLOWED_KEYS: readonly string[] = ADMIN_SETTING_KEYS;
 
 const patchSchema = z.object({
   memoryEnabled: z.boolean(),
@@ -55,7 +24,7 @@ export async function GET() {
   };
 
   if (user.isAdmin) {
-    result.details = await getDetailedSettings(ALLOWED_KEYS);
+    result.details = await getDetailedSettings([...ALLOWED_KEYS]);
   }
 
   return NextResponse.json(result);

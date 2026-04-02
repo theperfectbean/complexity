@@ -2,8 +2,8 @@ import { Worker, Job } from "bullmq";
 import { env } from "./env";
 import { logger } from "./logger";
 import { db } from "./db";
-import { chunks, documents, webhookDeliveries } from "./db/schema";
 import { eq } from "drizzle-orm";
+import { chunks, documents, webhookDeliveries, webhooks } from "./db/schema";
 import { createId } from "./db/cuid";
 import { extractTextFromFile, type DocumentFileLike } from "./documents";
 import { chunkText, getEmbeddings } from "./rag";
@@ -172,7 +172,10 @@ export function startWebhookWorker() {
   const worker = new Worker(
     "webhooks",
     async (job: Job) => {
-      const { webhookId, url, secret, eventType, eventId, payload } = job.data;
+      const { webhookId, eventType, eventId, payload } = job.data;
+      const [hook] = await db.select({ url: webhooks.url, secret: webhooks.secret }).from(webhooks).where(eq(webhooks.id, webhookId)).limit(1);
+      if (!hook) throw new Error("Webhook not found or deleted: " + webhookId);
+      const { url, secret } = hook;
       const log = logger.child({ webhookId, eventId, eventType });
       const startTime = Date.now();
 
@@ -186,7 +189,8 @@ export function startWebhookWorker() {
       });
 
       await assertSafeWebhookUrl(url);
-      const signature = signWebhookPayload(body, decryptWebhookSecret(secret));
+      const ts = Date.now();
+      const { signature, timestamp: sigTimestamp } = signWebhookPayload(body, decryptWebhookSecret(secret), ts);
 
       try {
         const response = await fetch(url, {
@@ -195,6 +199,7 @@ export function startWebhookWorker() {
           headers: {
             "Content-Type": "application/json",
             "X-Complexity-Signature": signature,
+            "X-Complexity-Timestamp": sigTimestamp.toString(),
             "X-Complexity-Event": eventType,
           },
           body,

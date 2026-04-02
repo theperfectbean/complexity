@@ -27,6 +27,8 @@ const ZERO_RATE_CARD: RateCard = {
   fetchUsd: 0,
 };
 
+// NOTE: These are rough estimates only. Rates change frequently.
+// Update as models and pricing evolve.
 function getRateCard(modelId?: string | null): RateCard {
   const normalized = (modelId || "").toLowerCase();
 
@@ -41,22 +43,28 @@ function getRateCard(modelId?: string | null): RateCard {
     return ZERO_RATE_CARD;
   }
 
+  // Fast/cheap tier: Haiku, Flash, Mini
   if (
     normalized.includes("haiku") ||
-    normalized.includes("gemini-3-flash")
+    normalized.includes("flash") ||
+    normalized.includes("gpt-4o-mini") ||
+    normalized.includes("gemini-2.0-flash") ||
+    normalized.includes("gemini-1.5-flash")
   ) {
     return {
-      inputPerMillionUsd: 1,
-      outputPerMillionUsd: 5,
+      inputPerMillionUsd: 0.15,
+      outputPerMillionUsd: 0.60,
       searchUsd: 0.005,
       fetchUsd: 0.001,
     };
   }
 
+  // Mid tier: Sonnet, GPT-4o, Gemini 1.5 Pro, Grok
   if (
     normalized.includes("sonnet") ||
-    normalized.includes("gemini-3.1-pro") ||
-    normalized.includes("gpt-5.4")
+    normalized.includes("gpt-4o") ||
+    normalized.includes("gemini-1.5-pro") ||
+    normalized.includes("grok-3")
   ) {
     return {
       inputPerMillionUsd: 3,
@@ -66,6 +74,7 @@ function getRateCard(modelId?: string | null): RateCard {
     };
   }
 
+  // High tier: Opus, o1/o3/o4 reasoning models
   if (
     normalized.includes("opus") ||
     normalized.includes("o1") ||

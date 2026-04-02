@@ -89,6 +89,7 @@ const envSchema = z.object({
   CHAT_DAILY_OUTPUT_TOKEN_BUDGET: z.coerce.number().int().positive().default(250_000),
   CHAT_DAILY_SEARCH_BUDGET: z.coerce.number().int().positive().default(50),
   CHAT_DAILY_FETCH_BUDGET: z.coerce.number().int().positive().default(100),
+  CHAT_MAX_CONTEXT_MESSAGES: z.coerce.number().int().positive().default(20),
   RAG_QUERY_CACHE_TTL_SECONDS: z.coerce.number().int().positive().default(60 * 10),
   ROLE_UPLOAD_MAX_FILE_SIZE: z.coerce.number().int().positive().default(50 * 1024 * 1024),
   ROLE_UPLOAD_MAX_EXTRACTED_CHARS: z.coerce.number().int().positive().default(250_000),
