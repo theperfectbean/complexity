@@ -152,9 +152,13 @@ export default function ThreadPage() {
   }, [threadId, searchParams]);
 
   const webSearchParam = searchParams.get("web");
-  const webSearchDefault = webSearchParam === null
-    ? runtimeConfig.chat.defaultWebSearch
-    : webSearchParam !== "false";
+  const webSearchDefault = (() => {
+    if (webSearchParam !== null) return webSearchParam !== "false";
+    try {
+      if (typeof window !== "undefined" && localStorage.getItem(`webSearch:${threadId}`) === "true") return true;
+    } catch {}
+    return runtimeConfig.chat.defaultWebSearch;
+  })();
 
   return (
     <main className="relative mx-auto flex h-full min-h-screen w-full max-w-3xl flex-col px-6 pt-16 pb-48">

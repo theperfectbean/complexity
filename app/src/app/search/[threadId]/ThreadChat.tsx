@@ -132,6 +132,25 @@ export function ThreadChat({
   const [pinned, setPinned] = useState(initialPinned);
   const [tags, setTags] = useState(initialTags);
   const [webSearchEnabled, setWebSearchEnabled] = useState(initialWebSearch);
+
+  const handleWebSearchChange = useCallback((enabled: boolean) => {
+    setWebSearchEnabled(enabled);
+    try {
+      if (enabled) {
+        localStorage.setItem(`webSearch:${threadId}`, 'true');
+      } else {
+        localStorage.removeItem(`webSearch:${threadId}`);
+      }
+    } catch {}
+    const params = new URLSearchParams(window.location.search);
+    if (enabled) {
+      params.set('web', 'true');
+    } else {
+      params.delete('web');
+    }
+    const newUrl = params.toString() ? `/search/${threadId}?${params.toString()}` : `/search/${threadId}`;
+    router.replace(newUrl, { scroll: false });
+  }, [threadId, router]);
   const [branches, setBranches] = useState<Array<{ id: string; title: string; branchPointMessageId: string | null }>>([]);
   const [hasMore, setHasMore] = useState(initialHasMore);
   const [nextCursor, setNextCursor] = useState(initialNextCursor);
@@ -596,7 +615,7 @@ export function ThreadChat({
               model={model}
               onModelChange={setModel}
               webSearchEnabled={webSearchEnabled}
-              onWebSearchChange={setWebSearchEnabled}
+              onWebSearchChange={handleWebSearchChange}
               attachments={attachments}
               onRemoveAttachment={(index) => {
                 setAttachments((prev) => prev.filter((_, i) => i !== index));
