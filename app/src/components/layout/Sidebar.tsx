@@ -1,15 +1,15 @@
 "use client";
 
 import { motion } from "motion/react";
-import { 
-  BookOpen, 
-  Brain, 
-  ChevronLeft, 
-  ChevronRight, 
-  Home, 
-  Users, 
-  LogOut, 
-  Plus, 
+import {
+  BookOpen,
+  Brain,
+  ChevronLeft,
+  ChevronRight,
+  Home,
+  Users,
+  LogOut,
+  Plus,
   Trash2,
   ChevronsUpDown,
   Keyboard,
@@ -20,10 +20,12 @@ import {
   Pin,
   Webhook,
   Settings,
+  Search,
+  X,
 } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 
 import { KeyboardShortcutsDialog } from "@/components/layout/KeyboardShortcutsDialog";
@@ -43,6 +45,13 @@ type Role = {
   id: string;
   name: string;
   pinned: boolean;
+};
+
+type SearchResult = {
+  id: string;
+  title: string;
+  updatedAt: string;
+  snippet?: string;
 };
 
 type SidebarProps = {
@@ -71,6 +80,41 @@ export function Sidebar({ collapsed = false, onToggle, onNavigate }: SidebarProp
   const [pinnedRoles, setPinnedRoles] = useState<Role[]>([]);
   const [deletingThreadId, setDeletingThreadId] = useState<string | null>(null);
 
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+
+    if (searchQuery.length < 2) {
+      setSearchResults([]);
+      setIsSearching(false);
+      return;
+    }
+
+    setIsSearching(true);
+    searchTimerRef.current = setTimeout(() => {
+      fetch(`/api/search?q=${encodeURIComponent(searchQuery)}`)
+        .then(r => (r.ok ? r.json() : { results: [] }))
+        .then((data: { results: SearchResult[] }) => {
+          setSearchResults(data.results ?? []);
+        })
+        .catch(() => setSearchResults([]))
+        .finally(() => setIsSearching(false));
+    }, 300);
+
+    return () => {
+      if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    };
+  }, [searchQuery]);
+
+  const clearSearch = () => {
+    setSearchQuery("");
+    setSearchResults([]);
+  };
+
   useEffect(() => {
     if (!session?.user) {
       return;
@@ -80,40 +124,31 @@ export function Sidebar({ collapsed = false, onToggle, onNavigate }: SidebarProp
 
     const fetchThreads = () => {
       fetch("/api/threads")
-        .then((response) => (response.ok ? response.json() : Promise.reject(new Error("Failed to load threads"))))
+        .then(response => (response.ok ? response.json() : Promise.reject(new Error("Failed to load threads"))))
         .then((payload: { threads: Thread[] }) => {
-          if (!active) {
-            return;
-          }
+          if (!active) return;
           setThreads(payload.threads.slice(0, 24));
         })
         .catch(() => {
-          if (active) {
-            setThreads([]);
-          }
+          if (active) setThreads([]);
         });
     };
 
     const fetchRoles = () => {
       fetch("/api/roles")
-        .then((response) => (response.ok ? response.json() : Promise.reject(new Error("Failed to load roles"))))
+        .then(response => (response.ok ? response.json() : Promise.reject(new Error("Failed to load roles"))))
         .then((payload: { roles: Role[] }) => {
-          if (!active) {
-            return;
-          }
-          setPinnedRoles(payload.roles.filter((r) => r.pinned));
+          if (!active) return;
+          setPinnedRoles(payload.roles.filter(r => r.pinned));
         })
         .catch(() => {
-          if (active) {
-            setPinnedRoles([]);
-          }
+          if (active) setPinnedRoles([]);
         });
     };
 
     fetchThreads();
     fetchRoles();
 
-    // Listen for updates to refresh the list
     const handleUpdate = () => {
       fetchThreads();
       fetchRoles();
@@ -133,21 +168,15 @@ export function Sidebar({ collapsed = false, onToggle, onNavigate }: SidebarProp
     { href: session?.user?.isAdmin ? "/settings/admin" : "/settings/profile", label: "Settings", icon: Settings },
   ];
 
-  const pinnedThreads = threads.filter((t) => t.pinned);
-  const recentThreads = threads.filter((t) => !t.pinned);
+  const pinnedThreads = threads.filter(t => t.pinned);
+  const recentThreads = threads.filter(t => !t.pinned);
 
   async function handleDeleteThread(threadId: string) {
     setDeletingThreadId(threadId);
     try {
-      const response = await fetch(`/api/threads/${threadId}`, {
-        method: "DELETE",
-      });
-
-      if (!response.ok) {
-        return;
-      }
-
-      setThreads((current) => current.filter((thread) => thread.id !== threadId));
+      const response = await fetch(`/api/threads/${threadId}`, { method: "DELETE" });
+      if (!response.ok) return;
+      setThreads(current => current.filter(thread => thread.id !== threadId));
       window.dispatchEvent(new CustomEvent("thread-list-updated"));
     } finally {
       setDeletingThreadId(null);
@@ -155,6 +184,7 @@ export function Sidebar({ collapsed = false, onToggle, onNavigate }: SidebarProp
   }
 
   const userInitials = getInitials(session?.user?.name, session?.user?.email);
+  const showSearchResults = searchQuery.length >= 2;
 
   return (
     <motion.aside className="flex h-full w-full flex-col bg-sidebar" initial={false} animate={{ width: "100%" }}>
@@ -194,9 +224,68 @@ export function Sidebar({ collapsed = false, onToggle, onNavigate }: SidebarProp
         </Link>
       </div>
 
+      {!collapsed && (
+        <div className="border-b border-sidebar-border px-3 py-2 shrink-0">
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground/50" />
+            <input
+              type="text"
+              placeholder="Search threads..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === "Escape") clearSearch();
+              }}
+              className="w-full rounded-lg border border-sidebar-border bg-background/50 py-1.5 pl-8 pr-7 text-sm placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-primary/40"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={clearSearch}
+                className="absolute right-2 top-1/2 -translate-y-1/2 rounded text-muted-foreground/50 hover:text-muted-foreground"
+                aria-label="Clear search"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+
+          {showSearchResults && (
+            <div className="mt-1.5">
+              {isSearching && (
+                <p className="px-1 py-1 text-xs text-muted-foreground/60">Searching...</p>
+              )}
+              {!isSearching && searchResults.length === 0 && (
+                <p className="px-1 py-1 text-xs text-muted-foreground/60">No results found</p>
+              )}
+              {!isSearching && searchResults.length > 0 && (
+                <div className="rounded-lg border border-sidebar-border bg-popover/95 shadow-sm overflow-hidden">
+                  {searchResults.map(result => (
+                    <Link
+                      key={result.id}
+                      href={`/search/${result.id}`}
+                      onClick={() => {
+                        clearSearch();
+                        onNavigate?.();
+                      }}
+                      className="flex flex-col border-b border-sidebar-border/40 px-3 py-2 last:border-0 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                    >
+                      <span className="truncate text-sm font-medium text-foreground">{result.title}</span>
+                      {result.snippet && (
+                        <span className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">{result.snippet}</span>
+                      )}
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="min-h-0 flex-1 flex flex-col overflow-hidden">
         <nav className="space-y-1 px-2 py-3 text-sm shrink-0">
-          {navItems.map((item) => {
+          {navItems.map(item => {
             const Icon = item.icon;
             return (
               <Link
@@ -216,9 +305,7 @@ export function Sidebar({ collapsed = false, onToggle, onNavigate }: SidebarProp
           })}
           {collapsed && (
             <Link
-              className={cn(
-                "flex items-center justify-center rounded-lg px-3 py-2 text-sidebar-foreground transition-colors hover:bg-black/5 dark:hover:bg-white/5",
-              )}
+              className="flex items-center justify-center rounded-lg px-3 py-2 text-sidebar-foreground transition-colors hover:bg-black/5 dark:hover:bg-white/5"
               href="/recent"
               onClick={onNavigate}
               title="Recent"
@@ -226,17 +313,18 @@ export function Sidebar({ collapsed = false, onToggle, onNavigate }: SidebarProp
               <BookOpen className="h-4 w-4 shrink-0" />
             </Link>
           )}
-          {collapsed && pinnedRoles.map((role) => (
-            <Link
-              key={role.id}
-              className="flex items-center justify-center rounded-lg px-3 py-2 text-sidebar-foreground transition-colors hover:bg-black/5 dark:hover:bg-white/5"
-              href={`/roles/${role.id}`}
-              onClick={onNavigate}
-              title={role.name}
-            >
-              <Users className="h-4 w-4 shrink-0 text-primary" />
-            </Link>
-          ))}
+          {collapsed &&
+            pinnedRoles.map(role => (
+              <Link
+                key={role.id}
+                className="flex items-center justify-center rounded-lg px-3 py-2 text-sidebar-foreground transition-colors hover:bg-black/5 dark:hover:bg-white/5"
+                href={`/roles/${role.id}`}
+                onClick={onNavigate}
+                title={role.name}
+              >
+                <Users className="h-4 w-4 shrink-0 text-primary" />
+              </Link>
+            ))}
         </nav>
 
         {!collapsed && (
@@ -245,7 +333,7 @@ export function Sidebar({ collapsed = false, onToggle, onNavigate }: SidebarProp
               <div className="rounded-lg border border-sidebar-border/80 bg-card/70 p-2">
                 <p className="mb-2 px-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Pinned Roles</p>
                 <div className="space-y-1">
-                  {pinnedRoles.map((role) => (
+                  {pinnedRoles.map(role => (
                     <Link
                       key={role.id}
                       className="flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-black/5 dark:hover:bg-white/5"
@@ -268,14 +356,9 @@ export function Sidebar({ collapsed = false, onToggle, onNavigate }: SidebarProp
                   <Pin className="h-3.5 w-3.5 text-primary/70 fill-primary/10" />
                 </div>
                 <div className="space-y-1">
-                  {pinnedThreads.map((thread) => (
+                  {pinnedThreads.map(thread => (
                     <div key={thread.id} className="group flex flex-col gap-0.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 px-2 py-1.5">
-                      <Link
-                        className="block min-w-0 flex-1 truncate font-medium"
-                        href={`/search/${thread.id}`}
-                        title={thread.title}
-                        onClick={onNavigate}
-                      >
+                      <Link className="block min-w-0 flex-1 truncate font-medium" href={`/search/${thread.id}`} title={thread.title} onClick={onNavigate}>
                         {thread.title}
                       </Link>
                       {thread.tags.length > 0 && (
@@ -294,25 +377,16 @@ export function Sidebar({ collapsed = false, onToggle, onNavigate }: SidebarProp
             )}
 
             <div className="rounded-lg border border-sidebar-border/80 bg-card/70 p-2">
-              <Link 
-                href="/recent" 
-                onClick={onNavigate}
-                className="mb-2 flex items-center justify-between px-2 py-1 transition-colors hover:text-primary group"
-              >
+              <Link href="/recent" onClick={onNavigate} className="mb-2 flex items-center justify-between px-2 py-1 transition-colors hover:text-primary group">
                 <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground group-hover:text-primary">Recent</span>
                 <BookOpen className="h-3.5 w-3.5 text-muted-foreground/50 group-hover:text-primary" />
               </Link>
               <div className="space-y-1">
                 {recentThreads.length === 0 ? <p className="px-2 py-1 text-xs text-muted-foreground">No recent threads</p> : null}
-                {recentThreads.map((thread) => (
+                {recentThreads.map(thread => (
                   <div key={thread.id} className="group flex flex-col gap-0.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 px-2 py-1.5">
                     <div className="flex items-center justify-between gap-1 w-full">
-                      <Link
-                        className="block min-w-0 flex-1 truncate"
-                        href={`/search/${thread.id}`}
-                        title={thread.title}
-                        onClick={onNavigate}
-                      >
+                      <Link className="block min-w-0 flex-1 truncate" href={`/search/${thread.id}`} title={thread.title} onClick={onNavigate}>
                         {thread.title}
                       </Link>
                       <button
@@ -350,7 +424,7 @@ export function Sidebar({ collapsed = false, onToggle, onNavigate }: SidebarProp
               aria-label="Account menu"
               className={cn(
                 "flex items-center gap-3 rounded-xl p-2 text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5 focus:outline-none",
-                collapsed ? "w-10 h-10 justify-center px-0" : "w-full"
+                collapsed ? "w-10 h-10 justify-center px-0" : "w-full",
               )}
             >
               <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[11px] font-bold text-primary">
@@ -374,11 +448,9 @@ export function Sidebar({ collapsed = false, onToggle, onNavigate }: SidebarProp
               align="end"
               sideOffset={12}
             >
-              <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
-                {session?.user?.email}
-              </div>
+              <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">{session?.user?.email}</div>
               <DropdownMenu.Separator className="my-1 h-px bg-sidebar-border" />
-              
+
               <div className="px-1 py-1">
                 <div className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm">
                   <Moon className="h-4 w-4 text-muted-foreground" />
@@ -388,18 +460,20 @@ export function Sidebar({ collapsed = false, onToggle, onNavigate }: SidebarProp
                 </div>
               </div>
 
-              <KeyboardShortcutsDialog trigger={
-                <DropdownMenu.Item 
-                  className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm outline-none hover:bg-black/5 dark:hover:bg-white/5 focus:bg-black/5 dark:focus:bg-white/5"
-                  onSelect={(e) => e.preventDefault()}
-                >
-                  <Keyboard className="h-4 w-4 text-muted-foreground" />
-                  Shortcuts
-                </DropdownMenu.Item>
-              } />
+              <KeyboardShortcutsDialog
+                trigger={
+                  <DropdownMenu.Item
+                    className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm outline-none hover:bg-black/5 dark:hover:bg-white/5 focus:bg-black/5 dark:focus:bg-white/5"
+                    onSelect={e => e.preventDefault()}
+                  >
+                    <Keyboard className="h-4 w-4 text-muted-foreground" />
+                    Shortcuts
+                  </DropdownMenu.Item>
+                }
+              />
 
               <DropdownMenu.Item asChild>
-                <Link 
+                <Link
                   href="/settings/profile"
                   className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm outline-none hover:bg-black/5 dark:hover:bg-white/5 focus:bg-black/5 dark:focus:bg-white/5"
                   onClick={onNavigate}
@@ -410,7 +484,7 @@ export function Sidebar({ collapsed = false, onToggle, onNavigate }: SidebarProp
               </DropdownMenu.Item>
 
               <DropdownMenu.Item asChild>
-                <Link 
+                <Link
                   href="/settings/memory"
                   className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm outline-none hover:bg-black/5 dark:hover:bg-white/5 focus:bg-black/5 dark:focus:bg-white/5"
                   onClick={onNavigate}
@@ -421,7 +495,7 @@ export function Sidebar({ collapsed = false, onToggle, onNavigate }: SidebarProp
               </DropdownMenu.Item>
 
               <DropdownMenu.Item asChild>
-                <Link 
+                <Link
                   href="/settings/webhooks"
                   className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm outline-none hover:bg-black/5 dark:hover:bg-white/5 focus:bg-black/5 dark:focus:bg-white/5"
                   onClick={onNavigate}
@@ -432,7 +506,7 @@ export function Sidebar({ collapsed = false, onToggle, onNavigate }: SidebarProp
               </DropdownMenu.Item>
 
               <DropdownMenu.Item asChild>
-                <Link 
+                <Link
                   href="/docs/api"
                   className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm outline-none hover:bg-black/5 dark:hover:bg-white/5 focus:bg-black/5 dark:focus:bg-white/5"
                   onClick={onNavigate}
@@ -444,7 +518,7 @@ export function Sidebar({ collapsed = false, onToggle, onNavigate }: SidebarProp
 
               {session?.user?.isAdmin && (
                 <DropdownMenu.Item asChild>
-                  <Link 
+                  <Link
                     href="/settings/admin"
                     className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm outline-none hover:bg-black/5 dark:hover:bg-white/5 focus:bg-black/5 dark:focus:bg-white/5 font-semibold text-primary"
                     onClick={onNavigate}
@@ -456,7 +530,7 @@ export function Sidebar({ collapsed = false, onToggle, onNavigate }: SidebarProp
               )}
 
               <DropdownMenu.Separator className="my-1 h-px bg-sidebar-border" />
-              
+
               <DropdownMenu.Item
                 className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm text-destructive outline-none hover:bg-destructive/10 focus:bg-destructive/10"
                 onSelect={() => signOut({ callbackUrl: "/login" })}
