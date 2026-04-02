@@ -10,7 +10,7 @@ import { runtimeConfig } from "./config";
 import { env } from "./env";
 import { extractAssistantText, extractCitationsFromResponse, type Citation } from "./extraction-utils";
 import { isPresetModel, normalizeLegacyModelId, normalizePerplexityModelId } from "./models";
-import { createWebSearchTool } from "./tools/search";
+import { createWebSearchTool, createFetchUrlTool } from "./tools/search";
 import { getLogger } from "./logger";
 import { getDetailedSettings } from "./settings";
 import { getConfiguredModels, MODEL_SETTINGS_KEYS } from "./model-registry";
@@ -358,7 +358,7 @@ export async function runGeneration(options: GenerationOptions): Promise<Generat
       model,
       system: options.system,
       messages: coreMessages as never,
-      tools: options.webSearch && searchApiKey ? { webSearch: createWebSearchTool(searchApiKey) } : undefined,
+      tools: options.webSearch && searchApiKey ? { webSearch: createWebSearchTool(searchApiKey), fetchUrl: createFetchUrlTool() } : undefined,
       // @ts-expect-error - maxSteps is not recognized in this version of streamText
       maxSteps: options.webSearch ? 5 : 1,
       onStepFinish: (step) => {
@@ -425,7 +425,7 @@ export async function runGeneration(options: GenerationOptions): Promise<Generat
           type: "data-call-start",
           data: { 
             callId: chunk.toolCallId, 
-            toolName: chunk.toolName === "webSearch" ? "Web Search" : chunk.toolName, 
+            toolName: chunk.toolName === "webSearch" ? "Web Search" : chunk.toolName === "fetchUrl" ? "Reading" : chunk.toolName, 
             input: "args" in chunk ? (chunk as { args: unknown }).args : ("input" in chunk ? (chunk as { input: unknown }).input : {})
           },
         } as UIMessageChunk);
