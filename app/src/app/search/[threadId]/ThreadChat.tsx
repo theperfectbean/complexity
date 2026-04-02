@@ -133,6 +133,18 @@ export function ThreadChat({
   const [tags, setTags] = useState(initialTags);
   const [webSearchEnabled, setWebSearchEnabled] = useState(initialWebSearch);
 
+  // Restore web search preference from localStorage after client-side mount.
+  // localStorage is unavailable during SSR so useState initializes from the prop (default: false).
+  // This effect runs after hydration and corrects the state if the user previously saved a preference.
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(`webSearch:${threadId}`);
+      if (saved !== null) {
+        setWebSearchEnabled(saved === 'true');
+      }
+    } catch {}
+  }, [threadId]);
+
   const handleWebSearchChange = useCallback((enabled: boolean) => {
     setWebSearchEnabled(enabled);
     try {
