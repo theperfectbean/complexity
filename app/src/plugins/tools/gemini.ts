@@ -21,17 +21,36 @@ export function registerGeminiCommand() {
         return;
       }
 
-      const threadId = context.threadId;
-      if (!threadId) {
-        toast.error("Cannot run Gemini CLI outside of a thread.");
-        context.insertText("");
-        return;
-      }
+      let threadId = context.threadId;
 
       context.insertText("");
       const loadingToastId = toast.loading("Running Gemini CLI...");
 
       try {
+        // If not inside a thread yet, create one first
+        if (!threadId) {
+          const title = "Gemini: " + prompt.substring(0, 60) + (prompt.length > 60 ? "..." : "");
+          const threadRes = await fetch("/api/threads", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ title }),
+          });
+          if (!threadRes.ok) {
+            toast.dismiss(loadingToastId);
+            toast.error("Could not create thread for Gemini CLI response");
+            return;
+          }
+          const { thread } = (await threadRes.json()) as { thread: { id: string } };
+          threadId = thread.id;
+
+          // Save the user prompt as context in the new thread
+          await fetch("/api/threads/" + threadId + "/messages", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ role: "user", content: prompt }),
+          });
+        }
+
         const res = await fetch("/api/tools/gemini", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -46,7 +65,11 @@ export function registerGeminiCommand() {
           return;
         }
 
-        toast.success("Gemini CLI responded - see the thread");
+        toast.success("Gemini CLI responded");
+        // Navigate to the new thread if we just created one
+        if (!context.threadId) {
+          window.location.href = "/search/" + threadId;
+        }
       } catch {
         toast.dismiss(loadingToastId);
         toast.error("Could not reach the Gemini CLI bridge");
