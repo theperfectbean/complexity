@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { commandRegistry, SlashCommand } from "@/plugins/commandRegistry";
 import { cn } from "@/lib/utils";
 
@@ -11,20 +11,18 @@ interface CommandMenuProps {
 }
 
 export function CommandMenu({ query, onSelect, onClose }: CommandMenuProps) {
-  const [commands, setCommands] = useState<SlashCommand[]>([]);
+  const commands = useMemo(() => commandRegistry.matchCommands(query), [query]);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const menuRef = useRef<HTMLDivElement>(null);
   const onCloseRef = useRef(onClose);
   useEffect(() => { onCloseRef.current = onClose; });
 
   useEffect(() => {
-    const matched = commandRegistry.matchCommands(query);
-    setCommands(matched);
     setSelectedIndex(0);
-    if (matched.length === 0 && query.length > 0) {
+    if (commands.length === 0 && query.length > 0) {
       onCloseRef.current();
     }
-  }, [query]);
+  }, [commands, query]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -55,7 +53,7 @@ export function CommandMenu({ query, onSelect, onClose }: CommandMenuProps) {
     <div
       ref={menuRef}
       className="absolute z-50 min-w-[240px] overflow-hidden rounded-xl border bg-popover text-popover-foreground shadow-xl"
-      style={{ bottom: "100%", left: 0, marginBottom: "8px" }} // Positioned above input relative to parent
+      style={{ bottom: "100%", left: 0, marginBottom: "8px" }}
     >
       <div className="p-1">
         {commands.map((cmd, index) => (

@@ -1,4 +1,4 @@
-import { Worker, Job, Queue } from bullmq;
+import { Worker, Job, Queue } from "bullmq";
 import { env } from "./env";
 import { logger } from "./logger";
 import { db } from "./db";
