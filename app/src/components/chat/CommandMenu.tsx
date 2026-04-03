@@ -15,7 +15,7 @@ export function CommandMenu({ query, onSelect, onClose }: CommandMenuProps) {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const menuRef = useRef<HTMLDivElement>(null);
   const onCloseRef = useRef(onClose);
-  onCloseRef.current = onClose;
+  useEffect(() => { onCloseRef.current = onClose; });
 
   useEffect(() => {
     const matched = commandRegistry.matchCommands(query);

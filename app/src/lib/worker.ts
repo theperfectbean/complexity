@@ -1,4 +1,4 @@
-import { Worker, Job } from "bullmq";
+import { Worker, Job, Queue } from bullmq;
 import { env } from "./env";
 import { logger } from "./logger";
 import { db } from "./db";
@@ -266,7 +266,7 @@ export function startAuditLogCleanupWorker() {
   const RETENTION_DAYS = parseInt(process.env.AUDIT_LOG_RETENTION_DAYS || "90", 10);
 
   // Schedule the cleanup job to run every 24h
-  const queue = new (require("bullmq").Queue)("audit-cleanup", { connection });
+  const queue = new Queue("audit-cleanup", { connection });
   queue.add(
     "cleanup",
     { retentionDays: RETENTION_DAYS },
