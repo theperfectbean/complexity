@@ -15,6 +15,7 @@ import { SearchModelOption } from "@/lib/models";
 import { FileAttachments, FileAttachmentsHandle } from "./parts/FileAttachments";
 import { CommandMenu } from "@/components/chat/CommandMenu";
 import { useSlashCommands } from "@/lib/hooks/useSlashCommands";
+import { commandRegistry } from "@/plugins/commandRegistry";
 import { registerGeminiCommand } from "@/plugins/tools/gemini";
 
 // Register slash commands at module level (idempotent)
@@ -228,7 +229,8 @@ export function SearchBar({
           value={value}
           onChange={handleTextChange}
           onKeyDown={(event) => {
-            if (showCommandMenu && (event.key === "ArrowUp" || event.key === "ArrowDown" || event.key === "Enter" || event.key === "Tab")) {
+            const hasActiveCommand = showCommandMenu || (value.startsWith("/") && commandRegistry.matchCommands(value.substring(1)).length > 0);
+            if (hasActiveCommand && (event.key === "ArrowUp" || event.key === "ArrowDown" || event.key === "Enter" || event.key === "Tab")) {
               if (event.key === "Enter" || event.key === "Tab") {
                 event.preventDefault();
               }

@@ -2,6 +2,7 @@ import { SendHorizontal } from "lucide-react";
 import TextareaAutosize from "react-textarea-autosize";
 import { CommandMenu } from "./CommandMenu";
 import { useSlashCommands } from "@/lib/hooks/useSlashCommands";
+import { commandRegistry } from "@/plugins/commandRegistry";
 import { registerGeminiCommand } from "@/plugins/tools/gemini";
 
 // Register slash commands at module level (idempotent)
@@ -43,8 +44,9 @@ export function FollowUpInput({
           value={value}
           onChange={handleTextChange}
           onKeyDown={(event) => {
+            const hasActiveCommand = showCommandMenu || (value.startsWith("/") && commandRegistry.matchCommands(value.substring(1)).length > 0);
             if (
-              showCommandMenu &&
+              hasActiveCommand &&
               (event.key === "ArrowUp" ||
                 event.key === "ArrowDown" ||
                 event.key === "Enter" ||
