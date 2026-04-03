@@ -13,10 +13,16 @@ export function registerGeminiCommand() {
     label: "Ask Gemini CLI",
     description: "Send a prompt to the local Gemini CLI agent",
     action: async (context) => {
-      const raw = context.inputValue;
-      const prompt = raw.replace(/^\/gemini\s*/i, "").trim();
+      const raw = context.inputValue.trim();
+
+      // Extract the prompt — only if the input actually starts with /gemini.
+      // If the user selected from the menu with just "/" or "/gem", raw won't
+      // match the pattern and prompt will be empty, triggering autocomplete.
+      const match = raw.match(/^\/gemini\s+([\s\S]+)$/i);
+      const prompt = match ? match[1].trim() : "";
 
       if (!prompt) {
+        // Autocomplete the trigger and wait for the user to type their prompt
         context.insertText("/gemini ");
         return;
       }
