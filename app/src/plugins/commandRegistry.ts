@@ -30,6 +30,7 @@ class CommandRegistry {
     return this.commands.filter(
       (c) =>
         c.trigger.toLowerCase().includes(lowerQuery) ||
+        lowerQuery.startsWith(c.trigger.toLowerCase()) ||
         c.label.toLowerCase().includes(lowerQuery)
     );
   }
