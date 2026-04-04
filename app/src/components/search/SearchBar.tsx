@@ -16,10 +16,9 @@ import { FileAttachments, FileAttachmentsHandle } from "./parts/FileAttachments"
 import { CommandMenu } from "@/components/chat/CommandMenu";
 import { useSlashCommands } from "@/lib/hooks/useSlashCommands";
 import { commandRegistry } from "@/plugins/commandRegistry";
-import { registerGeminiCommand } from "@/plugins/tools/gemini";
+import { useSession } from "next-auth/react";
 
-// Register slash commands at module level (idempotent)
-registerGeminiCommand();
+import { registerSysadminCommand } from "@/plugins/tools/sysadmin-command";
 
 type SearchBarProps = {
   value: string;
@@ -70,6 +69,11 @@ export function SearchBar({
   roleId,
   threadId,
 }: SearchBarProps) {
+  const { data: session } = useSession();
+  if (session?.user?.isAdmin) {
+    registerSysadminCommand();
+  }
+
   const fileAttachmentsRef = useRef<FileAttachmentsHandle>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [internalAttachments, setInternalAttachments] = useState<File[]>(externalAttachments);
@@ -164,7 +168,7 @@ export function SearchBar({
     handleDrop(event.nativeEvent as DragEvent);
   };
 
-  const { showCommandMenu, commandQuery, handleTextChange, handleCommandSelect, closeMenu } =
+  const { showCommandMenu, commandQuery, handleTextChange, handleCommandSelect, closeMenu, matchedCommands, allCommands } =
     useSlashCommands(onChange, { threadId });
 
   // F5: Restore draft from sessionStorage on mount
@@ -208,6 +212,7 @@ export function SearchBar({
       {showCommandMenu && (
         <CommandMenu
           query={commandQuery}
+          commands={matchedCommands}
           onSelect={handleCommandSelect}
           onClose={closeMenu}
         />
@@ -229,15 +234,25 @@ export function SearchBar({
           value={value}
           onChange={handleTextChange}
           onKeyDown={(event) => {
-            const hasActiveCommand = showCommandMenu || (value.startsWith("/") && commandRegistry.matchCommands(value.substring(1)).length > 0);
-            if (hasActiveCommand && (event.key === "ArrowUp" || event.key === "ArrowDown" || event.key === "Enter" || event.key === "Tab")) {
-              if (event.key === "Enter" || event.key === "Tab") {
-                event.preventDefault();
-              }
+            // Block navigation keys while the command picker menu is open
+            if (showCommandMenu && (event.key === "ArrowUp" || event.key === "ArrowDown" || event.key === "Enter" || event.key === "Tab")) {
+              if (event.key === "Enter" || event.key === "Tab") event.preventDefault();
               return;
             }
 
             if (event.key === "Enter" && !event.shiftKey) {
+              // Execute a fully-formed slash command: /{trigger} {prompt text}
+              if (value.startsWith("/")) {
+                const matched = allCommands.find((cmd) => {
+                  const prefix = `/${cmd.trigger} `;
+                  return value.toLowerCase().startsWith(prefix.toLowerCase()) && value.length > prefix.length;
+                });
+                if (matched) {
+                  event.preventDefault();
+                  handleCommandSelect(matched);
+                  return;
+                }
+              }
               event.preventDefault();
               event.currentTarget.form?.requestSubmit();
             }

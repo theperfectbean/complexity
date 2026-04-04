@@ -536,6 +536,17 @@ export function Sidebar({ collapsed = false, onToggle, onNavigate }: SidebarProp
 
               <DropdownMenu.Item asChild>
                 <Link
+                  href="/settings/prompts"
+                  className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm outline-none hover:bg-black/5 dark:hover:bg-white/5 focus:bg-black/5 dark:focus:bg-white/5"
+                  onClick={onNavigate}
+                >
+                  <BookOpen className="h-4 w-4 text-muted-foreground" />
+                  Prompt Library
+                </Link>
+              </DropdownMenu.Item>
+
+              <DropdownMenu.Item asChild>
+                <Link
                   href="/docs/api"
                   className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm outline-none hover:bg-black/5 dark:hover:bg-white/5 focus:bg-black/5 dark:focus:bg-white/5"
                   onClick={onNavigate}

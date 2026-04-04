@@ -214,7 +214,10 @@ export const messages = pgTable(
     attachments: jsonb("attachments"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (table) => [index("messages_thread_created_idx").on(table.threadId, table.createdAt)],
+  (table) => [
+    index("messages_thread_created_idx").on(table.threadId, table.createdAt),
+    index("messages_content_fts_idx").using("gin", sql`to_tsvector('english', ${table.content})`),
+  ],
 );
 
 export const memories = pgTable(
@@ -292,6 +295,7 @@ export const usersRelations = relations(users, ({ many }) => ({
   roleAccess: many(roleAccess),
   auditLogs: many(auditLogs),
   webhooks: many(webhooks),
+  prompts: many(prompts),
 }));
 
 export const threadsRelations = relations(threads, ({ one, many }) => ({
@@ -397,3 +401,27 @@ export const webhookDeliveriesRelations = relations(webhookDeliveries, ({ one })
     references: [webhooks.id],
   }),
 }));
+
+export const prompts = pgTable(
+  "prompts",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    title: varchar("title", { length: 100 }).notNull(),
+    content: text("content").notNull(),
+    isSystemPrompt: boolean("is_system_prompt").notNull().default(false),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("prompts_user_idx").on(table.userId)],
+);
+
+
+export const promptsRelations = relations(prompts, ({ one }) => ({
+  user: one(users, {
+    fields: [prompts.userId],
+    references: [users.id],
+  }),
+}));
+

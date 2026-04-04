@@ -127,6 +127,20 @@
       "when": 1774503598913,
       "tag": "0017_fat_steve_rogers",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1774728000000,
+      "tag": "0018_messages_fts_idx",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1774900000000,
+      "tag": "0021_prompt_library",
+      "breakpoints": true
     }
   ]
 }

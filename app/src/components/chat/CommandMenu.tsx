@@ -6,12 +6,12 @@ import { cn } from "@/lib/utils";
 
 interface CommandMenuProps {
   query: string;
+  commands: SlashCommand[];
   onSelect: (command: SlashCommand) => void;
   onClose: () => void;
 }
 
-export function CommandMenu({ query, onSelect, onClose }: CommandMenuProps) {
-  const commands = useMemo(() => commandRegistry.matchCommands(query), [query]);
+export function CommandMenu({ query, commands, onSelect, onClose }: CommandMenuProps) {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const menuRef = useRef<HTMLDivElement>(null);
   const onCloseRef = useRef(onClose);
