@@ -11,6 +11,7 @@ import { env } from "./env";
 import { extractAssistantText, extractCitationsFromResponse, type Citation } from "./extraction-utils";
 import { isPresetModel, normalizeLegacyModelId, normalizePerplexityModelId } from "./models";
 import { createWebSearchTool, createFetchUrlTool } from "./tools/search";
+import { createImageGenerationTool } from "./tools/image";
 import { getLogger } from "./logger";
 import { getDetailedSettings } from "./settings";
 import { getConfiguredModels, MODEL_SETTINGS_KEYS } from "./model-registry";
@@ -358,9 +359,21 @@ export async function runGeneration(options: GenerationOptions): Promise<Generat
       model,
       system: options.system,
       messages: coreMessages as never,
-      tools: options.webSearch && searchApiKey ? { webSearch: createWebSearchTool(searchApiKey), fetchUrl: createFetchUrlTool() } : undefined,
+      tools: (() => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const tools: Record<string, any> = {};
+        if (options.webSearch && searchApiKey) {
+          tools.webSearch = createWebSearchTool(searchApiKey);
+          tools.fetchUrl = createFetchUrlTool();
+        }
+        const openaiKey = options.keys["OPENAI_API_KEY"];
+        if (openaiKey) {
+          tools.generateImage = createImageGenerationTool(openaiKey, options.requestId);
+        }
+        return Object.keys(tools).length > 0 ? tools : undefined;
+      })(),
       // @ts-expect-error - maxSteps is not recognized in this version of streamText
-      maxSteps: options.webSearch ? 5 : 1,
+      maxSteps: 5,
       onStepFinish: (step) => {
         if (step.toolCalls.length > 0) {
           log.info({ toolCalls: step.toolCalls.length }, "Tool calls completed");
@@ -425,7 +438,7 @@ export async function runGeneration(options: GenerationOptions): Promise<Generat
           type: "data-call-start",
           data: { 
             callId: chunk.toolCallId, 
-            toolName: chunk.toolName === "webSearch" ? "Web Search" : chunk.toolName === "fetchUrl" ? "Reading" : chunk.toolName, 
+            toolName: chunk.toolName === "webSearch" ? "Web Search" : chunk.toolName === "fetchUrl" ? "Reading" : chunk.toolName === "generateImage" ? "Generating Image" : chunk.toolName, 
             input: "args" in chunk ? (chunk as { args: unknown }).args : ("input" in chunk ? (chunk as { input: unknown }).input : {})
           },
         } as UIMessageChunk);
