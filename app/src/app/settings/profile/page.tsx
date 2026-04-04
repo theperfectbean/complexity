@@ -1,8 +1,9 @@
 "use client";
+import Link from 'next/link';
 
 import { useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
-import { Copy, KeyRound, Plus, Save, Trash2, User } from "lucide-react";
+import { Copy, KeyRound, Plus, Save, Trash2, User, Import } from "lucide-react";
 import { toast } from "sonner";
 
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
@@ -35,6 +36,25 @@ function AvatarInitials({ name, email }: { name: string | null; email: string })
   return (
     <div className="flex h-20 w-20 items-center justify-center rounded-full bg-primary text-2xl font-bold text-primary-foreground">
       {initials}
+
+      {/* Data Management */}
+      <section className="mt-8 rounded-xl border bg-card p-6">
+        <h2 className="mb-3 flex items-center gap-2 text-base font-semibold">
+          <Import className="h-4 w-4 text-muted-foreground" />
+          Data Management
+        </h2>
+        <p className="mb-4 text-sm text-muted-foreground">
+          Import your conversation history from ChatGPT or other platforms.
+        </p>
+        <Link 
+          href="/settings/import"
+          className="inline-flex items-center justify-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium hover:bg-muted transition-colors"
+        >
+          <Import className="h-4 w-4" />
+          Import Conversations
+        </Link>
+      </section>
+
     </div>
   );
 }
@@ -376,6 +396,24 @@ export default function ProfilePage() {
             ))
           )}
         </div>
+      </section>
+
+      {/* Data Management */}
+      <section className="mt-8 rounded-xl border bg-card p-6">
+        <h2 className="mb-3 flex items-center gap-2 text-base font-semibold">
+          <Import className="h-4 w-4 text-muted-foreground" />
+          Data Management
+        </h2>
+        <p className="mb-4 text-sm text-muted-foreground">
+          Import your conversation history from ChatGPT or other platforms.
+        </p>
+        <Link 
+          href="/settings/import"
+          className="inline-flex items-center justify-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium hover:bg-muted transition-colors"
+        >
+          <Import className="h-4 w-4" />
+          Import Conversations
+        </Link>
       </section>
     </div>
   );
