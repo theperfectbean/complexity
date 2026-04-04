@@ -18,6 +18,7 @@ import {
   User,
   FileCode2,
   Pin,
+  Tag,
   Webhook,
   Settings,
   Search,
@@ -168,8 +169,8 @@ export function Sidebar({ collapsed = false, onToggle, onNavigate }: SidebarProp
     { href: session?.user?.isAdmin ? "/settings/admin" : "/settings/profile", label: "Settings", icon: Settings },
   ];
 
-  const pinnedThreads = threads.filter(t => t.pinned);
-  const recentThreads = threads.filter(t => !t.pinned);
+  const pinnedThreads = threads.filter(t => t.pinned && (!selectedTag || t.tags.includes(selectedTag)));
+  const recentThreads = threads.filter(t => !t.pinned && (!selectedTag || t.tags.includes(selectedTag)));
 
   async function handleDeleteThread(threadId: string) {
     setDeletingThreadId(threadId);
@@ -185,6 +186,10 @@ export function Sidebar({ collapsed = false, onToggle, onNavigate }: SidebarProp
 
   const userInitials = getInitials(session?.user?.name, session?.user?.email);
   const showSearchResults = searchQuery.length >= 2;
+
+  // Tag filtering
+  const [selectedTag, setSelectedTag] = useState<string | null>(null);
+  const allTags = Array.from(new Set(threads.flatMap(t => t.tags))).sort();
 
   return (
     <motion.aside className="flex h-full w-full flex-col bg-sidebar" initial={false} animate={{ width: "100%" }}>
@@ -329,7 +334,31 @@ export function Sidebar({ collapsed = false, onToggle, onNavigate }: SidebarProp
 
         {!collapsed && (
           <section className="flex-1 space-y-4 overflow-y-auto px-2 pb-4 text-sm scrollbar-thin">
-            {pinnedRoles.length > 0 && (
+            {allTags.length > 0 && (
+            <div className="flex items-center gap-1.5 px-1 pb-1 overflow-x-auto scrollbar-none flex-nowrap">
+              <Tag className="h-3 w-3 shrink-0 text-muted-foreground" />
+              {selectedTag && (
+                <button
+                  onClick={() => setSelectedTag(null)}
+                  className="flex-shrink-0 inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-primary text-primary-foreground font-medium"
+                >
+                  {selectedTag}
+                  <X className="h-2.5 w-2.5" />
+                </button>
+              )}
+              {allTags.filter(t => t !== selectedTag).map(tag => (
+                <button
+                  key={tag}
+                  onClick={() => setSelectedTag(tag)}
+                  className="flex-shrink-0 inline-flex text-[10px] px-1.5 py-0.5 rounded bg-muted hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors whitespace-nowrap"
+                >
+                  {tag}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {pinnedRoles.length > 0 && (
               <div className="rounded-lg border border-sidebar-border/80 bg-card/70 p-2">
                 <p className="mb-2 px-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Pinned Roles</p>
                 <div className="space-y-1">
