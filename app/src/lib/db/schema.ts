@@ -184,6 +184,7 @@ export const threads = pgTable(
       .references(() => users.id, { onDelete: "cascade" }),
     roleId: text("role_id").references(() => roles.id, { onDelete: "set null" }),
     model: varchar("model", { length: 50 }).notNull().default("anthropic/claude-4-6-sonnet-latest"),
+    compareModels: jsonb("compare_models").$type<string[]>(),
     parentThreadId: text("parent_thread_id"),
     branchPointMessageId: text("branch_point_message_id"),
     systemPrompt: text("system_prompt"),

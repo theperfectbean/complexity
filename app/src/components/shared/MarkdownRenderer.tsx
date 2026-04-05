@@ -7,6 +7,7 @@ import ArtifactRenderer from "./ArtifactRenderer";
 import PythonExecutor from "./PythonExecutor";
 import { Copy, Check } from "lucide-react";
 import { cn, copyToClipboard } from "@/lib/utils";
+import { MermaidRenderer } from "./MermaidRenderer";
 
 import { LoadingSkeleton } from "./LoadingSkeleton";
 
@@ -109,6 +110,10 @@ const components: Components = {
 
     if (language === "python") {
       return <PythonExecutor code={content} />;
+    }
+
+    if (language === "mermaid") {
+      return <MermaidRenderer code={content} />;
     }
 
     if (language === "html" || language === "artifact") {

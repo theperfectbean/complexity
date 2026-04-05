@@ -1,14 +1,21 @@
-import { and, desc, eq, ilike } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
-import { messages, threads, users } from "@/lib/db/schema";
+
+export type MessageSearchResult = {
+  message_id: string;
+  thread_id: string;
+  role: string;
+  snippet: string;
+  thread_title: string;
+  updated_at: string;
+};
 
 export async function GET(request: Request) {
   const session = await auth();
-  const userEmail = session?.user?.email;
-  if (!userEmail) {
+  if (!session?.user?.email) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -19,64 +26,35 @@ export async function GET(request: Request) {
     return NextResponse.json({ results: [] });
   }
 
-  const user = await db.query.users.findFirst({
-    where: (table, { eq }) => eq(table.email, userEmail),
-  });
+  // Look up the user id once
+  const userRows = await db.execute<{ id: string }>(
+    sql`SELECT id FROM users WHERE email = ${session.user.email} LIMIT 1`,
+  );
+  const userId = (userRows as unknown as { id: string }[])[0]?.id;
+  if (!userId) return NextResponse.json({ results: [] });
 
-  if (!user) {
-    return NextResponse.json({ error: "User not found" }, { status: 404 });
-  }
+  // Full-text search across messages joined to their threads.
+  // ts_headline returns an HTML-safe snippet with the matched terms wrapped in <mark>.
+  const results = await db.execute<MessageSearchResult>(sql`
+    SELECT
+      m.id            AS message_id,
+      m.thread_id,
+      m.role,
+      ts_headline(
+        'english',
+        m.content,
+        plainto_tsquery('english', ${q}),
+        'MaxWords=20, MinWords=10, ShortWord=3, StartSel=<mark>, StopSel=</mark>, HighlightAll=false'
+      )               AS snippet,
+      t.title         AS thread_title,
+      t.updated_at
+    FROM   messages m
+    JOIN   threads  t ON m.thread_id = t.id
+    WHERE  t.user_id = ${userId}
+      AND  to_tsvector('english', m.content) @@ plainto_tsquery('english', ${q})
+    ORDER  BY t.updated_at DESC
+    LIMIT  25
+  `);
 
-  const pattern = `%${q}%`;
-
-  // Title matches
-  const titleRows = await db
-    .select({ id: threads.id, title: threads.title, updatedAt: threads.updatedAt })
-    .from(threads)
-    .where(and(eq(threads.userId, user.id), ilike(threads.title, pattern)))
-    .orderBy(desc(threads.updatedAt))
-    .limit(10);
-
-  // Message content matches (30 rows, deduplicated in JS to get up to 10 unique threads)
-  const msgRows = await db
-    .select({
-      id: threads.id,
-      title: threads.title,
-      updatedAt: threads.updatedAt,
-      content: messages.content,
-    })
-    .from(messages)
-    .innerJoin(threads, eq(messages.threadId, threads.id))
-    .where(and(eq(threads.userId, user.id), ilike(messages.content, pattern)))
-    .orderBy(desc(threads.updatedAt))
-    .limit(30);
-
-  type Result = { id: string; title: string; updatedAt: Date; snippet?: string };
-  const seen = new Set<string>();
-  const results: Result[] = [];
-
-  for (const t of titleRows) {
-    if (!seen.has(t.id)) {
-      seen.add(t.id);
-      results.push({ id: t.id, title: t.title, updatedAt: t.updatedAt });
-    }
-  }
-
-  for (const m of msgRows) {
-    if (!seen.has(m.id)) {
-      seen.add(m.id);
-      const lower = m.content.toLowerCase();
-      const idx = lower.indexOf(q.toLowerCase());
-      const start = Math.max(0, idx - 40);
-      const end = Math.min(m.content.length, idx + q.length + 60);
-      const snippet =
-        (start > 0 ? "\u2026" : "") +
-        m.content.slice(start, end).replace(/\n/g, " ") +
-        (end < m.content.length ? "\u2026" : "");
-      results.push({ id: m.id, title: m.title, updatedAt: m.updatedAt, snippet });
-    }
-    if (results.length >= 10) break;
-  }
-
-  return NextResponse.json({ results: results.slice(0, 10) });
+  return NextResponse.json({ results: results as unknown as MessageSearchResult[] });
 }

@@ -69,7 +69,10 @@ export const proxy = auth(async (req) => {
     nextUrl.pathname === "/forgot-password" ||
     nextUrl.pathname === "/reset-password";
 
-  const isPublic = isApiAuth || isApiHealth || isApiWebhook || isApiChat || isPublicAsset || isAuthPage || nextUrl.pathname === "/";
+  const isApiTools = nextUrl.pathname.startsWith("/api/tools");
+  const isApiSearch = nextUrl.pathname.startsWith("/api/search");
+
+  const isPublic = isApiAuth || isApiHealth || isApiWebhook || isApiChat || isApiTools || isApiSearch || isPublicAsset || isAuthPage || nextUrl.pathname === "/";
 
   let response: NextResponse;
 

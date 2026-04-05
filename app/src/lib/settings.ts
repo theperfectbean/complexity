@@ -18,7 +18,6 @@ const SENSITIVE_KEYS = [
   "GITHUB_CLIENT_ID",
   "GITHUB_CLIENT_SECRET",
   "TAVILY_API_KEY",
-  "GEMINI_BRIDGE_TOKEN",
 ];
 
 export async function getSetting(key: string): Promise<string | null> {
@@ -126,13 +125,10 @@ export const ADMIN_SETTING_KEYS = [
   "GOOGLE_API_KEY",
   "GITHUB_CLIENT_ID",
   "GITHUB_CLIENT_SECRET",
-  "GEMINI_BRIDGE_URL",
-  "GEMINI_BRIDGE_TOKEN",
   // Integration toggles
   "INTEGRATION_GOOGLE_DRIVE_ENABLED",
   "INTEGRATION_GITHUB_ENABLED",
   "INTEGRATION_SEARCH_ENABLED",
-  "INTEGRATION_GEMINI_BRIDGE_ENABLED",
   // Internal operations: model selection
   "MEMORY_EXTRACTION_MODEL",
   "CHAT_TITLING_MODEL",

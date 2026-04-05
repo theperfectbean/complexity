@@ -9,6 +9,7 @@ import { ChatMessageItem } from "@/components/chat/MessageList";
 
 interface ThreadSettingsDialogProps {
   threadId: string;
+  threadTitle: string;
   initialSystemPrompt: string | null;
   initialPinned: boolean;
   initialTags: string[];
@@ -16,7 +17,7 @@ interface ThreadSettingsDialogProps {
   onUpdate: (data: { systemPrompt?: string | null; pinned?: boolean; tags?: string[] }) => void;
 }
 
-export function ThreadSettingsDialog({ threadId, initialSystemPrompt, initialPinned, initialTags, messages, onUpdate }: ThreadSettingsDialogProps) {
+export function ThreadSettingsDialog({ threadId, threadTitle, initialSystemPrompt, initialPinned, initialTags, messages, onUpdate }: ThreadSettingsDialogProps) {
   const [open, setOpen] = useState(false);
   const [prompt, setPrompt] = useState(initialSystemPrompt || "");
   const [pinned, setPinned] = useState(initialPinned);
@@ -27,6 +28,44 @@ export function ThreadSettingsDialog({ threadId, initialSystemPrompt, initialPin
   const totalTokens = useMemo(() => {
     return messages.reduce((acc, msg) => acc + countTokens(msg.content), 0);
   }, [messages]);
+
+  function exportAsMarkdown() {
+    const lines: string[] = [`# ${threadTitle}`, ""];
+    for (const msg of messages) {
+      const label = msg.role === "user" ? "**You**" : "**Assistant**";
+      lines.push(label, "", msg.content, "");
+    }
+    const blob = new Blob([lines.join("\n")], { type: "text/markdown;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${threadTitle.replace(/[/\\:*?"<>|]/g, "-").slice(0, 80)}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success("Exported as Markdown");
+  }
+
+  function exportAsJson() {
+    const payload = {
+      id: threadId,
+      title: threadTitle,
+      exportedAt: new Date().toISOString(),
+      messages: messages.map((m) => ({
+        id: m.id,
+        role: m.role,
+        content: m.content,
+        ...(m.citations?.length ? { citations: m.citations } : {}),
+      })),
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${threadTitle.replace(/[/\\:*?"<>|]/g, "-").slice(0, 80)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success("Exported as JSON");
+  }
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -186,55 +225,6 @@ export function ThreadSettingsDialog({ threadId, initialSystemPrompt, initialPin
 
             <div className="pt-2">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium">Export Conversation</span>
-                <Download className="h-3.5 w-3.5 text-muted-foreground" />
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => {
-                    const lines = messages.map((m) =>
-                      `## ${m.role === "user" ? "You" : "Assistant"}\n\n${m.content}`
-                    );
-                    const md = lines.join("\n\n---\n\n");
-                    const blob = new Blob([md], { type: "text/markdown" });
-                    const a = document.createElement("a");
-                    a.href = URL.createObjectURL(blob);
-                    a.download = `thread-${threadId}.md`;
-                    a.click();
-                    URL.revokeObjectURL(a.href);
-                  }}
-                  className="flex-1 rounded-lg border border-border py-2 text-xs font-medium hover:bg-muted transition-colors"
-                >
-                  Export Markdown
-                </button>
-                <button
-                  onClick={() => {
-                    const data = {
-                      threadId,
-                      exportedAt: new Date().toISOString(),
-                      messages: messages.map((m) => ({
-                        id: m.id,
-                        role: m.role,
-                        content: m.content,
-                        citations: m.citations,
-                      })),
-                    };
-                    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-                    const a = document.createElement("a");
-                    a.href = URL.createObjectURL(blob);
-                    a.download = `thread-${threadId}.json`;
-                    a.click();
-                    URL.revokeObjectURL(a.href);
-                  }}
-                  className="flex-1 rounded-lg border border-border py-2 text-xs font-medium hover:bg-muted transition-colors"
-                >
-                  Export JSON
-                </button>
-              </div>
-            </div>
-
-            <div className="pt-2">
-              <div className="flex items-center justify-between mb-2">
                 <span className="text-sm font-medium">Conversation Usage</span>
                 <div className="flex items-center gap-1 text-xs text-muted-foreground">
                   <Cpu className="h-3 w-3" />
@@ -262,20 +252,40 @@ export function ThreadSettingsDialog({ threadId, initialSystemPrompt, initialPin
               </div>
             </div>
 
-            <div className="flex justify-end gap-3 mt-6">
-              <Dialog.Close asChild>
-                <button className="px-4 py-2 text-sm font-medium rounded-lg hover:bg-muted transition-colors">
-                  Cancel
+            <div className="flex items-center justify-between gap-3 mt-6">
+              <div className="flex gap-2">
+                <button
+                  onClick={exportAsMarkdown}
+                  className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg border hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+                  title="Export as Markdown"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  .md
                 </button>
-              </Dialog.Close>
-              <button
-                onClick={handleSave}
-                disabled={isSaving}
-                className="flex items-center gap-2 bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground rounded-lg hover:bg-primary/90 transition-all disabled:opacity-50"
-              >
-                {isSaving && <Loader2 className="h-3 w-3 animate-spin" />}
-                Save Changes
-              </button>
+                <button
+                  onClick={exportAsJson}
+                  className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg border hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+                  title="Export as JSON"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  .json
+                </button>
+              </div>
+              <div className="flex gap-3">
+                <Dialog.Close asChild>
+                  <button className="px-4 py-2 text-sm font-medium rounded-lg hover:bg-muted transition-colors">
+                    Cancel
+                  </button>
+                </Dialog.Close>
+                <button
+                  onClick={handleSave}
+                  disabled={isSaving}
+                  className="flex items-center gap-2 bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground rounded-lg hover:bg-primary/90 transition-all disabled:opacity-50"
+                >
+                  {isSaving && <Loader2 className="h-3 w-3 animate-spin" />}
+                  Save Changes
+                </button>
+              </div>
             </div>
           </div>
         </Dialog.Content>

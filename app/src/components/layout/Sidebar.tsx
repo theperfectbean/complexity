@@ -23,6 +23,7 @@ import {
   Settings,
   Search,
   X,
+  SplitSquareVertical,
 } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
 import Link from "next/link";
@@ -166,8 +167,13 @@ export function Sidebar({ collapsed = false, onToggle, onNavigate }: SidebarProp
   const navItems = [
     { href: "/", label: "Home", icon: Home },
     { href: "/roles", label: "Roles", icon: Users },
+    { href: "/compare", label: "Compare", icon: SplitSquareVertical },
     { href: session?.user?.isAdmin ? "/settings/admin" : "/settings/profile", label: "Settings", icon: Settings },
   ];
+
+  // Tag filtering
+  const [selectedTag, setSelectedTag] = useState<string | null>(null);
+  const allTags = Array.from(new Set(threads.flatMap(t => t.tags))).sort();
 
   const pinnedThreads = threads.filter(t => t.pinned && (!selectedTag || t.tags.includes(selectedTag)));
   const recentThreads = threads.filter(t => !t.pinned && (!selectedTag || t.tags.includes(selectedTag)));
@@ -186,10 +192,6 @@ export function Sidebar({ collapsed = false, onToggle, onNavigate }: SidebarProp
 
   const userInitials = getInitials(session?.user?.name, session?.user?.email);
   const showSearchResults = searchQuery.length >= 2;
-
-  // Tag filtering
-  const [selectedTag, setSelectedTag] = useState<string | null>(null);
-  const allTags = Array.from(new Set(threads.flatMap(t => t.tags))).sort();
 
   return (
     <motion.aside className="flex h-full w-full flex-col bg-sidebar" initial={false} animate={{ width: "100%" }}>

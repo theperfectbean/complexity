@@ -16,6 +16,7 @@ const createSchema = z.object({
   title: z.string().min(1).max(200).optional(),
   initialMessage: z.string().optional(),
   model: z.string().min(1).max(100).optional(),
+  compareModels: z.array(z.string().max(100)).max(2).optional().nullable(),
   roleId: z.string().optional(),
 });
 
@@ -108,6 +109,7 @@ export async function POST(request: Request) {
     id,
     title,
     model: safeModel,
+    compareModels: parsed.data.compareModels,
     userId: user.id,
     roleId: parsed.data.roleId,
   });
