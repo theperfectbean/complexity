@@ -5,7 +5,6 @@ import { useSlashCommands } from "@/lib/hooks/useSlashCommands";
 import { commandRegistry } from "@/plugins/commandRegistry";
 import { useSession } from "next-auth/react";
 
-import { registerSysadminCommand } from "@/plugins/tools/sysadmin-command";
 
 type FollowUpInputProps = {
   value: string;
@@ -26,7 +25,6 @@ export function FollowUpInput({
 }: FollowUpInputProps) {
   const { data: session } = useSession();
   if (session?.user?.isAdmin) {
-    registerSysadminCommand();
   }
 
   const { showCommandMenu, commandQuery, handleTextChange, handleCommandSelect, closeMenu, matchedCommands, allCommands } =

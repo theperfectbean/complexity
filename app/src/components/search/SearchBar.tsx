@@ -18,7 +18,6 @@ import { useSlashCommands } from "@/lib/hooks/useSlashCommands";
 import { commandRegistry } from "@/plugins/commandRegistry";
 import { useSession } from "next-auth/react";
 
-import { registerSysadminCommand } from "@/plugins/tools/sysadmin-command";
 
 type SearchBarProps = {
   value: string;
@@ -71,7 +70,6 @@ export function SearchBar({
 }: SearchBarProps) {
   const { data: session } = useSession();
   if (session?.user?.isAdmin) {
-    registerSysadminCommand();
   }
 
   const fileAttachmentsRef = useRef<FileAttachmentsHandle>(null);
