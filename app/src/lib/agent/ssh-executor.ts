@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 
-const SSH_KEY = '/root/.ssh/id_gemini_agent';
+const SSH_KEY = process.env.SSH_KEY_PATH ?? '/home/complexity/.ssh/id_gemini_agent';
 const SSH_OPTS = [
   '-i', SSH_KEY,
   '-o', 'BatchMode=yes',
