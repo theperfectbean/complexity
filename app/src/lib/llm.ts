@@ -4,17 +4,18 @@ import OpenAI from "openai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createXai } from "@ai-sdk/xai";
 import { createOllama } from "ai-sdk-ollama";
-import { LanguageModel, streamText, UIMessageChunk, UIMessage, generateText } from "ai";
+import { LanguageModel, streamText, UIMessageChunk, UIMessage, generateText, stepCountIs } from "ai";
 import { runPerplexityAgent } from "./search-agent";
 import { runtimeConfig } from "./config";
 import { env } from "./env";
-import { extractAssistantText, extractCitationsFromResponse, type Citation } from "./extraction-utils";
+import { extractCitationsFromResponse, type Citation } from "./extraction-utils";
 import { isPresetModel, normalizeLegacyModelId, normalizePerplexityModelId } from "./models";
 import { createWebSearchTool, createFetchUrlTool } from "./tools/search";
 import { createImageGenerationTool } from "./tools/image";
 import { getLogger } from "./logger";
 import { getDetailedSettings } from "./settings";
 import { getConfiguredModels, MODEL_SETTINGS_KEYS } from "./model-registry";
+import type { AgentStreamEvent, ReasoningSource, ToolResultEnvelope, ResourceWidgetHint } from "./agent/protocol";
 
 export type ProviderType = "perplexity" | "anthropic" | "openai" | "google" | "xai" | "ollama" | "local-openai";
 
@@ -87,15 +88,6 @@ export interface GenerationResult {
     fetchCount?: number;
   };
 }
-
-type CoreMessageContent =
-  | { type: "text"; text: string }
-  | { type: "image"; image: Buffer };
-
-type CoreMessage = {
-  role: "user" | "assistant" | "system";
-  content: CoreMessageContent[];
-};
 
 const PROVIDER_PREFIX_MAP: Record<string, ProviderType> = {
   "perplexity/": "perplexity",
@@ -178,18 +170,216 @@ function mapToPerplexityModel(modelName: string): string {
   return normalizePerplexityModelId(resolved);
 }
 
-function summarizeChunk(chunk: unknown): Record<string, unknown> {
-  if (!chunk || typeof chunk !== "object") {
-    return {};
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function readString(value: unknown): string | null {
+  return typeof value === "string" ? value : null;
+}
+
+export interface NormalizedLlmEventHandlers {
+  onReasoningDelta?: (text: string, source: ReasoningSource) => void | Promise<void>;
+  onTextDelta?: (text: string) => void | Promise<void>;
+  onToolCall?: (toolCall: { callId: string; name: string; input: unknown }) => void | Promise<void>;
+  onToolResult?: (toolResult: { callId: string; name: string; result: ToolResultEnvelope }) => void | Promise<void>;
+  onFinish?: (finish: {
+    finishReason?: string;
+    usage?: {
+      promptTokens?: number;
+      completionTokens?: number;
+      totalTokens?: number;
+    };
+  }) => void | Promise<void>;
+  onError?: (error: unknown) => void | Promise<void>;
+  onStepFinish?: (step: any) => void | Promise<void>;
+}
+
+export function extractAnthropicThinking(part: unknown): string | null {
+  if (!isRecord(part)) return null;
+
+  if (part.type === "reasoning" && typeof part.text === "string") return part.text;
+  if (part.type === "thinking" && typeof part.text === "string") return part.text;
+  if (part.type === "thinking_delta" && typeof part.delta === "string") return part.delta;
+  if (typeof part.thinking === "string") return part.thinking;
+
+  return null;
+}
+
+export function extractGeminiThought(part: unknown): string | null {
+  if (!isRecord(part)) return null;
+
+  if (part.type === "thought-delta" && typeof part.delta === "string") return part.delta;
+  if (part.type === "thought" && typeof part.text === "string") return part.text;
+  if (typeof part.thought === "string") return part.thought;
+
+  return null;
+}
+
+export function extractOpenAIReasoning(part: unknown): string | null {
+  if (!isRecord(part)) return null;
+
+  if (part.type === "reasoning-delta" && typeof part.delta === "string") return part.delta;
+  if (part.type === "reasoning" && typeof part.text === "string") return part.text;
+
+  return null;
+}
+
+function detectReasoningSource(model: unknown, chunk?: unknown): ReasoningSource {
+  if (extractAnthropicThinking(chunk)) return "anthropic";
+  if (extractGeminiThought(chunk)) return "google";
+  if (extractOpenAIReasoning(chunk)) return "openai";
+
+  if (isRecord(model) && typeof model.provider === "string") {
+    if (model.provider.includes("anthropic")) return "anthropic";
+    if (model.provider.includes("google")) return "google";
+    if (model.provider.includes("openai")) return "openai";
   }
 
-  const record = chunk as Record<string, unknown>;
+  return "unknown";
+}
+
+function inferWidgetHint(toolName: string): ResourceWidgetHint {
+  if (toolName === "listHosts") return { type: "host_list" };
+  if (toolName === "sshExec") return { type: "command_result" };
+  if (toolName.toLowerCase().includes("list") || toolName.toLowerCase().includes("search")) {
+    return { type: "table" };
+  }
+  return { type: "key_value" };
+}
+
+function normalizeToolResult(toolName: string, result: unknown): ToolResultEnvelope {
+  if (isRecord(result) && typeof result.ok === "boolean" && typeof result.summary === "string" && "widgetHint" in result) {
+    return result as unknown as ToolResultEnvelope;
+  }
+
   return {
-    type: typeof record.type === "string" ? record.type : undefined,
-    toolName: typeof record.toolName === "string" ? record.toolName : undefined,
-    hasText: typeof record.text === "string" ? record.text.length > 0 : undefined,
-    hasError: "error" in record,
+    ok: true,
+    widgetHint: inferWidgetHint(toolName),
+    summary: `${toolName} completed`,
+    data: result,
   };
+}
+
+export async function streamAgentResponse(args: {
+  model: LanguageModel;
+  system: string;
+  messages: Array<{ role: "system" | "user" | "assistant" | "tool"; content: unknown }>;
+  tools?: Record<string, unknown>;
+  maxSteps?: number;
+  handlers: NormalizedLlmEventHandlers;
+  abortSignal?: AbortSignal;
+}) {
+  let finishReason: string | undefined;
+  let finishUsage:
+    | {
+        promptTokens?: number;
+        completionTokens?: number;
+        totalTokens?: number;
+      }
+    | undefined;
+
+  const result = streamText({
+    model: args.model,
+    system: args.system,
+    messages: args.messages as never,
+    tools: args.tools as never,
+    abortSignal: args.abortSignal,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    stopWhen: stepCountIs(args.maxSteps ?? 20) as any,
+    onStepFinish: async (step) => { await args.handlers.onStepFinish?.(step); },
+    onFinish: (finish) => {
+      finishReason = "finishReason" in finish ? (finish as Record<string, unknown>).finishReason as string | undefined : undefined;
+      finishUsage = {
+        // @ts-expect-error AI SDK version mismatch on usage properties
+        promptTokens: finish.usage?.promptTokens ?? finish.usage?.prompt_tokens,
+        // @ts-expect-error AI SDK version mismatch on usage properties
+        completionTokens: finish.usage?.completionTokens ?? finish.usage?.completion_tokens,
+        // @ts-expect-error AI SDK version mismatch on usage properties
+        totalTokens: finish.usage?.totalTokens ?? finish.usage?.total_tokens,
+      };
+    },
+    onError: (error) => {
+      void args.handlers.onError?.(error);
+    },
+  });
+
+  for await (const chunk of result.fullStream) {
+    const anthropicThinking = extractAnthropicThinking(chunk);
+    if (anthropicThinking) {
+      await args.handlers.onReasoningDelta?.(anthropicThinking, "anthropic");
+      continue;
+    }
+
+    const geminiThought = extractGeminiThought(chunk);
+    if (geminiThought) {
+      await args.handlers.onReasoningDelta?.(geminiThought, "google");
+      continue;
+    }
+
+    const openAiReasoning = extractOpenAIReasoning(chunk);
+    if (openAiReasoning) {
+      await args.handlers.onReasoningDelta?.(openAiReasoning, detectReasoningSource(args.model, chunk));
+      continue;
+    }
+
+    if (isRecord(chunk) && chunk.type === "text-delta" && typeof chunk.text === "string") {
+      await args.handlers.onTextDelta?.(chunk.text);
+      continue;
+    }
+
+    if (isRecord(chunk) && chunk.type === "tool-call") {
+      const toolCallChunk = chunk as Record<string, unknown>;
+      const callId = readString(toolCallChunk.toolCallId) ?? readString(toolCallChunk.id) ?? crypto.randomUUID();
+      const name = readString(toolCallChunk.toolName);
+      if (!name) continue;
+      await args.handlers.onToolCall?.({
+        callId,
+        name,
+        input: toolCallChunk.input ?? ("args" in chunk ? toolCallChunk.args : {}),
+      });
+      continue;
+    }
+
+    if (isRecord(chunk) && chunk.type === "tool-result") {
+      const toolResultChunk = chunk as Record<string, unknown>;
+      const callId = readString(toolResultChunk.toolCallId) ?? readString(toolResultChunk.id) ?? crypto.randomUUID();
+      const name = readString(toolResultChunk.toolName) ?? "tool";
+      const normalized = normalizeToolResult(name, toolResultChunk.result ?? ("output" in chunk ? toolResultChunk.output : undefined));
+      await args.handlers.onToolResult?.({
+        callId,
+        name,
+        result: normalized,
+      });
+      continue;
+    }
+
+    if (isRecord(chunk) && chunk.type === "tool-error") {
+      const errChunk = chunk as Record<string, unknown>;
+      const callId = readString(errChunk.toolCallId) ?? crypto.randomUUID();
+      const name = readString(errChunk.toolName) ?? "tool";
+      const err = errChunk.error;
+      const msg = err instanceof Error ? err.message : String(err ?? "Tool execution failed");
+      await args.handlers.onToolResult?.({
+        callId,
+        name,
+        result: { ok: false, widgetHint: { type: "command_result" }, summary: msg, data: { error: msg } } as never,
+      });
+      continue;
+    }
+
+    if (isRecord(chunk) && chunk.type === "error") {
+      await args.handlers.onError?.(chunk.error);
+      continue;
+    }
+  }
+
+  await args.handlers.onFinish?.({
+    finishReason,
+    usage: finishUsage,
+  });
+
+  return result;
 }
 
 export async function getLanguageModel(modelId: string, keys: Record<string, string | null>): Promise<LanguageModel> {
@@ -332,10 +522,7 @@ export async function runGeneration(options: GenerationOptions): Promise<Generat
   let assistantText = "";
   let hasSentConnected = false;
   let usage: GenerationResult["usage"] = undefined;
-  const chunkTypeCounts: Record<string, number> = {};
-  let streamChunkCount = 0;
   let finishReason: unknown;
-  let finishText = "";
 
   try {
     const model = await getLanguageModel(options.modelId, options.keys);
@@ -355,9 +542,23 @@ export async function runGeneration(options: GenerationOptions): Promise<Generat
 
     const citations: Citation[] = [];
 
-    const result = streamText({
+    let activitySeq = 0;
+    const emitActivity = (event: object) => {
+      options.writer.write({
+        type: "data-json",
+        data: {
+          ...event,
+          runId: options.requestId,
+          sessionId: options.requestId,
+          seq: ++activitySeq,
+          timestamp: new Date().toISOString(),
+        },
+      } as UIMessageChunk);
+    };
+
+    await streamAgentResponse({
       model,
-      system: options.system,
+      system: options.system || "",
       messages: coreMessages as never,
       tools: (() => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -372,122 +573,101 @@ export async function runGeneration(options: GenerationOptions): Promise<Generat
         }
         return Object.keys(tools).length > 0 ? tools : undefined;
       })(),
-      // @ts-expect-error - maxSteps is not recognized in this version of streamText
       maxSteps: 5,
-      onStepFinish: (step) => {
-        if (step.toolCalls.length > 0) {
-          log.info({ toolCalls: step.toolCalls.length }, "Tool calls completed");
-        }
-      },
-      onFinish: (finish) => {
-        usage = {
-          // @ts-expect-error - AI SDK version mismatch on usage properties
-          promptTokens: finish.usage.promptTokens ?? finish.usage.prompt_tokens,
-          // @ts-expect-error - AI SDK version mismatch on usage properties
-          completionTokens: finish.usage.completionTokens ?? finish.usage.completion_tokens,
-        };
-        finishReason = "finishReason" in finish ? (finish as Record<string, unknown>).finishReason : undefined;
-        finishText = extractAssistantText(finish);
-
-        // Extract citations from tool results if any
-        if (options.webSearch) {
-          const toolResults = finish.steps.flatMap(s => s.toolResults);
-          
-          toolResults.forEach((result) => {
-            const toolResult = result as {
-              toolName?: string;
-              result?: {
-                results?: Array<{
-                  url?: string;
-                  title?: string;
-                  snippet?: string;
-                }>;
-              };
-            };
-
-            if (toolResult.toolName === "webSearch" && toolResult.result?.results) {
-              toolResult.result.results.forEach((r) => {
-                citations.push({
-                  url: r.url,
-                  title: r.title,
-                  snippet: r.snippet
-                });
-              });
-            }
+      handlers: {
+        onReasoningDelta: async (reasoningText, source) => {
+          if (!hasSentConnected) {
+            options.writer.write({ type: "data-json", data: { type: "connected" } } as UIMessageChunk);
+            hasSentConnected = true;
+          }
+          emitActivity({
+            type: "reasoning",
+            reasoning: {
+              id: `${options.requestId}:reasoning`,
+              source,
+              phase: "delta",
+              text: reasoningText,
+            },
           });
-        }
-      }
+        },
+        onTextDelta: async (delta) => {
+          if (!hasSentConnected) {
+            options.writer.write({ type: "data-json", data: { type: "connected" } } as UIMessageChunk);
+            hasSentConnected = true;
+          }
+          assistantText += delta;
+          options.writer.write({ type: "text-delta", delta, id: options.textId } as UIMessageChunk);
+        },
+        onToolCall: async ({ callId, name, input }) => {
+          log.info({ toolName: name }, "Model requested tool call");
+          const displayName = name === "webSearch" ? "Web Search" : name === "fetchUrl" ? "Reading" : name === "generateImage" ? "Generating Image" : name;
+          options.writer.write({
+            type: "data-call-start",
+            data: { callId, toolName: displayName, input },
+          } as UIMessageChunk);
+          emitActivity({
+            type: "tool_executing",
+            tool: {
+              callId,
+              name,
+              input,
+              widgetHint: inferWidgetHint(name),
+            },
+          });
+        },
+        onToolResult: async ({ callId, name, result }) => {
+          log.info({ toolName: name }, "Tool call completed");
+          options.writer.write({
+            type: "data-call-result",
+            data: { callId, result: result.data },
+          } as UIMessageChunk);
+
+          if (name === "webSearch") {
+            const results = isRecord(result.data) && Array.isArray(result.data.results) ? result.data.results : [];
+            results.forEach((entry) => {
+              if (isRecord(entry)) {
+                citations.push({
+                  url: typeof entry.url === "string" ? entry.url : undefined,
+                  title: typeof entry.title === "string" ? entry.title : undefined,
+                  snippet: typeof entry.snippet === "string" ? entry.snippet : undefined,
+                });
+              }
+            });
+          }
+
+          emitActivity({
+            type: "tool_result",
+            tool: { callId, name },
+            result,
+          });
+        },
+        onFinish: async ({ finishReason: normalizedFinishReason, usage: normalizedUsage }) => {
+          usage = {
+            promptTokens: normalizedUsage?.promptTokens,
+            completionTokens: normalizedUsage?.completionTokens,
+          };
+          finishReason = normalizedFinishReason;
+        },
+        onError: async (error) => {
+          log.error({ err: error }, "Stream encountered an error chunk");
+          throw error;
+        },
+      },
     });
 
     log.info({ modelId: options.modelId, webSearch: options.webSearch }, "Starting direct provider stream");
 
-    for await (const chunk of result.fullStream) {
-      streamChunkCount += 1;
-      chunkTypeCounts[chunk.type] = (chunkTypeCounts[chunk.type] ?? 0) + 1;
-
-      if (chunk.type === "text-delta") {
-        if (!hasSentConnected) {
-          options.writer.write({ type: "data-json", data: { type: "connected" } } as UIMessageChunk);
-          hasSentConnected = true;
-        }
-        assistantText += chunk.text;
-        options.writer.write({ type: "text-delta", delta: chunk.text, id: options.textId } as UIMessageChunk);
-      } else if (chunk.type === "tool-call") {
-        log.info({ toolName: chunk.toolName }, "Model requested tool call");
-        options.writer.write({
-          type: "data-call-start",
-          data: { 
-            callId: chunk.toolCallId, 
-            toolName: chunk.toolName === "webSearch" ? "Web Search" : chunk.toolName === "fetchUrl" ? "Reading" : chunk.toolName === "generateImage" ? "Generating Image" : chunk.toolName, 
-            input: "args" in chunk ? (chunk as { args: unknown }).args : ("input" in chunk ? (chunk as { input: unknown }).input : {})
-          },
-        } as UIMessageChunk);
-      } else if (chunk.type === "tool-result") {
-        log.info({ toolName: chunk.toolName }, "Tool call completed");
-        options.writer.write({
-          type: "data-call-result",
-          data: { 
-            callId: chunk.toolCallId, 
-            result: "result" in chunk ? (chunk as { result: unknown }).result : ("output" in chunk ? (chunk as { output: unknown }).output : {})
-          },
-        } as UIMessageChunk);
-      } else if (chunk.type === "error") {
-        log.error({ err: chunk.error }, "Stream encountered an error chunk");
-        throw chunk.error;
-      } else {
-        log.debug({ chunk: summarizeChunk(chunk) }, "Received non-text stream chunk");
-      }
-    }
-
     if (!assistantText.trim()) {
-      const recoveredText = finishText.trim();
-      if (recoveredText) {
-        assistantText = recoveredText;
-        if (!hasSentConnected) {
-          options.writer.write({ type: "data-json", data: { type: "connected" } } as UIMessageChunk);
-          hasSentConnected = true;
-        }
-        options.writer.write({ type: "text-delta", delta: assistantText, id: options.textId } as UIMessageChunk);
-        log.warn({
-          streamChunkCount,
-          chunkTypeCounts,
-          finishReason,
-          assistantTextLength: assistantText.length,
-        }, "Recovered assistant text from stream finish payload after empty delta stream");
-      } else {
-        log.error({
-          modelId: options.modelId,
-          provider,
-          streamChunkCount,
-          chunkTypeCounts,
-          finishReason,
-          usage,
-        }, "Direct provider stream completed without assistant text");
-        throw new Error("Provider stream completed without text output");
-      }
+      log.error({
+        modelId: options.modelId,
+        provider,
+        finishReason,
+        usage,
+      }, "Direct provider stream completed without assistant text");
+      throw new Error("Provider stream completed without text output");
     }
 
-    log.info({ assistantTextLength: assistantText.length, streamChunkCount, chunkTypeCounts }, "Direct provider stream complete");
+    log.info({ assistantTextLength: assistantText.length }, "Direct provider stream complete");
 
     return {
       text: assistantText,
