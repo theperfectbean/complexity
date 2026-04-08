@@ -1,99 +1,76 @@
-# App (Next.js)
+# Complexity App (Next.js)
 
-This folder contains the Next.js app and API routes for Complexity.
+Self-hosted agentic AI chat application and cluster sysadmin console.
 
-## Implemented architecture
+## Architecture & Stack
 
-- Next.js 16 App Router (`src/app`)
-- Auth.js v5 credentials auth with Drizzle adapter
-- PostgreSQL + pgvector via Drizzle ORM
-- Search Provider Agent API integration via generic abstraction
-- Streaming chat responses bridged into AI SDK UI message stream format (`useChat` compatible)
-- Optional local RAG context injection by `spaceId`
+- **Framework**: Next.js 16 (Standalone output)
+- **Auth**: Auth.js v5 (NextAuth) with Credentials provider and Drizzle adapter
+- **Database**: PostgreSQL 17 + pgvector via Drizzle ORM
+- **Cache/Events**: Redis (for settings cache and agent event streaming)
+- **AI Integration**: Vercel AI SDK v6
+- **Local Models**: Ollama integration via `ai-sdk-ollama`
+- **Infrastructure**: Native systemd services (no Docker in production)
 
-## Implemented model support
+## Key Features
 
-Shared model registry is in `src/lib/models.ts`.
+### 1. Cluster Agent Console
+A dedicated interface (`/console`) for cluster management using agentic local LLMs.
+- **Human-in-the-loop**: All cluster-impacting actions require a `draft_mission_plan` approval.
+- **SSH Execution**: Agent can execute bounded commands (`df`, `uptime`, `systemctl`, etc.) across the Proxmox cluster nodes and containers.
+- **Streaming UI**: Real-time terminal-style output from SSH tools and reasoning tokens from the model.
 
-Presets:
-- `fast-search`
-- `pro-search`
-- `deep-research`
-- `advanced-deep-research`
+### 2. Local LLM Integration (Ollama)
+Deep integration with Ollama running on optimized cluster nodes (e.g., `pve01` with iGPU passthrough).
+- **Supported Models**: Llama 3.2, Phi-3 Mini, and Gemma 4 (e2b/e4b).
+- **Auto-Discovery**: Dynamically fetches available models from the Ollama API.
+- **Security**: Security policy enforces local-only models for infrastructure missions.
 
-Direct models:
-- `anthropic/claude-4-6-sonnet-latest` (default)
-- `perplexity/sonar`
-- `anthropic/claude-4-6-opus-latest`
-- `anthropic/claude-4-5-haiku-latest`
-- `openai/gpt-5.4`
-- `google/gemini-3.1-pro-preview`
-- `google/gemini-3-flash-preview`
-- `xai/grok-4.20-beta`
+### 3. Search & RAG
+- **Search Provider Abstraction**: Unified interface for Perplexity, Tavily, and Brave Search.
+- **Memory**: Context-aware memory extraction and retrieval for personalized assistance.
+- **RAG**: Optional local RAG context injection by `spaceId`.
 
-For direct models, the chat route enables Search Provider Agent API tools:
-- `web_search`
-- `fetch_url`
+## Implemented Model Support
 
-## Key files
+Models are managed via a shared registry in `src/lib/models.ts` and configurable via the `CUSTOM_MODEL_LIST` database setting.
 
-- `src/app/api/chat/route.ts`: Search Provider Agent API streaming bridge + persistence
-- `src/lib/agent-client.ts`: server-side agent client factory
-- `src/lib/models.ts`: shared curated model list and helpers
-- `src/lib/rag.ts`: retrieval logic for local space-scoped context
-- `src/app/page.tsx`: home model selector + thread creation
-- `src/app/search/[threadId]/page.tsx`: chat UI + model selector
+### Current Cluster Presets:
+- **Local**: Ollama (Llama 3.2, Phi-3, Gemma 4)
+- **Cloud**: Claude 4.6 Sonnet/Opus, Gemini 2.5 Flash, Grok 3
 
-## Database migrations
+## Key Files & Directories
 
-- `src/lib/db/migrations/0000_initial.sql`
-- `src/lib/db/migrations/0001_agent_api_models.sql` (thread model default changed to `pro-search`)
+- `src/app/(console)`: Route group for the Agent Console.
+- `src/lib/agent`: Core agent logic, protocol, and tool definitions.
+- `src/lib/providers`: LLM provider implementations (Anthropic, Google, Ollama, etc.).
+- `src/lib/db/schema.ts`: Drizzle database schema definitions.
+- `e2e/`: Playwright end-to-end tests for critical flows (auth, agent, disk checks).
 
-## Local development
-
-From this folder:
+## Development
 
 ```bash
 npm install
-npm run build
-npm run dev
+npm run dev    # Starts on http://localhost:3000
 npm run lint
-npm test
+npm test       # Vitest unit/integration
+npm run test:e2e # Playwright tests
 ```
 
-## Test suite
+## Deployment (Ops-Center Cluster)
 
-Configured with Vitest + React Testing Library.
-
-Current coverage includes:
-
-- Helper logic (`src/lib/models.test.ts`)
-- Shared chat/search components (`src/components/**/*.test.tsx`)
-- API route integration-style tests for chat and document upload
-
-Commands:
+Deployment is handled via SSH to node `CT 105`:
 
 ```bash
-npm test
-npm run test:watch
-npm run test:coverage
-npm test && npm run lint
+# Build
+NODE_OPTIONS="--max-old-space-size=3072" npm run build
+
+# Restart Service
+systemctl restart complexity-app
 ```
-
-See full project docs:
-
-- `../docs/ARCHITECTURE.md`
-- `../docs/API_REFERENCE.md`
-- `../docs/TESTING.md`
-- `../docs/RUNBOOK.md`
-
-If running via Docker Compose, the app is published by the root compose file at:
-
-- `http://localhost:3002`
 
 ## Notes
 
-- `trustHost: true` is enabled in auth config for local host/port mapped Docker runs.
-- Chat route requires authenticated session; unauthenticated calls return `401`.
-- `package.json` includes an `overrides.esbuild` pin to mitigate an `npm audit` advisory pulled in via `drizzle-kit` → `@esbuild-kit/*`.
-- Remove this override only after `drizzle-kit` drops the vulnerable transitive chain and `npm audit` remains clean without it.
+- **SSH Access**: The app requires an SSH key at `/home/complexity/.ssh/id_gemini_agent` for cluster management tools.
+- **Environment**: Ensure `OLLAMA_BASE_URL` is set to the internal container IP (e.g., `http://192.168.0.114:11434`).
+- **Permissions**: The app runs as the `complexity` user (UID 1000).
