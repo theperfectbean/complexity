@@ -11,7 +11,10 @@ import { logAuditEvent } from "@/lib/audit";
 const ALLOWED_KEYS: readonly string[] = ADMIN_SETTING_KEYS;
 
 const patchSchema = z.object({
-  memoryEnabled: z.boolean(),
+  memoryEnabled: z.boolean().optional(),
+  defaultModel: z.string().optional(),
+  defaultSshUser: z.string().optional(),
+  autoApproveReadOnly: z.boolean().optional(),
 });
 
 export async function GET() {
@@ -21,6 +24,9 @@ export async function GET() {
 
   const result: Record<string, unknown> = {
     memoryEnabled: user.memoryEnabled,
+    defaultModel: user.defaultModel,
+    defaultSshUser: user.defaultSshUser,
+    autoApproveReadOnly: user.autoApproveReadOnly,
   };
 
   if (user.isAdmin) {
@@ -63,9 +69,14 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
   }
 
+  const updates: Partial<typeof users.$inferInsert> = {
+    ...parsed.data,
+    updatedAt: new Date(),
+  };
+
   await db
     .update(users)
-    .set({ memoryEnabled: parsed.data.memoryEnabled, updatedAt: new Date() })
+    .set(updates)
     .where(eq(users.id, user.id));
 
   return NextResponse.json({ ok: true });

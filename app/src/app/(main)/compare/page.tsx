@@ -86,7 +86,8 @@ export default function ComparePage() {
             placeholder="Enter a prompt to compare models..."
             submitLabel={loading ? "Comparing..." : "Run Comparison"}
             disabled={loading}
-            autoFilter={false}
+            autoFilter={true}
+            hideModelSelector={true}
           />
         </form>
       </div>

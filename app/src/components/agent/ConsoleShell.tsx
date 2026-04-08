@@ -12,7 +12,7 @@ import { CommandPalette } from "../console/CommandPalette";
 import { SettingsPanel } from "../console/SettingsPanel";
 import { DocsPanel } from "../console/DocsPanel";
 import { HelpDialog } from "../console/HelpDialog";
-import { getDefaultModel } from "@/lib/models";
+import { getDefaultModel, getLocalDefaultModel } from "@/lib/models";
 import { 
   type AgentStreamEvent, 
   type MissionPlannerViewState,
@@ -28,7 +28,7 @@ const INITIAL_PLANNER_STATE: MissionPlannerViewState = {
 
 export function ConsoleShell() {
   const { data: session } = useSession();
-  const [model, setModel] = useState(getDefaultModel());
+  const [model, setModel] = useState(getLocalDefaultModel());
   const [inputValue, setInputValue] = useState("");
   const [activeRunId, setActiveRunId] = useState<string | null>(null);
   const [events, setEvents] = useState<AgentStreamEvent[]>([]);
@@ -146,7 +146,7 @@ export function ConsoleShell() {
         });
 
         if (!res.ok) {
-          const data = await res.json();
+          const text = await res.text(); let data; try { data = JSON.parse(text); } catch (e) { throw new Error(`Invalid JSON response: ${text.slice(0, 100)}`); }
           throw new Error(data.message || "Failed to reply");
         }
         
@@ -168,11 +168,11 @@ export function ConsoleShell() {
         });
 
         if (!res.ok) {
-          const data = await res.json();
+          const text = await res.text(); let data; try { data = JSON.parse(text); } catch (e) { throw new Error(`Invalid JSON response: ${text.slice(0, 100)}`); }
           throw new Error(data.message || "Failed to start mission");
         }
 
-        const data = await res.json();
+        const text = await res.text(); let data; try { data = JSON.parse(text); } catch (e) { throw new Error(`Invalid JSON response: ${text.slice(0, 100)}`); }
         setActiveRunId(data.runId);
         startStream(data.runId);
       }
@@ -199,7 +199,7 @@ export function ConsoleShell() {
       });
 
       if (!res.ok) {
-        const data = await res.json();
+        const text = await res.text(); let data; try { data = JSON.parse(text); } catch (e) { throw new Error(`Invalid JSON response: ${text.slice(0, 100)}`); }
         throw new Error(data.message || "Failed to submit approval");
       }
     } catch (err) {

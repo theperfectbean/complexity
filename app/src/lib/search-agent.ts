@@ -1,7 +1,8 @@
 import { UIMessageChunk, UIMessage } from "ai";
 import { encode } from "gpt-tokenizer";
 import { extractTextFromMessage, collectFileParts } from "./chat-utils";
-import { isPresetModel, normalizeLegacyModelId, normalizePerplexityModelId } from "./models";
+import { isPresetModel, normalizeLegacyModelId } from "./models";
+import { normalizeSearchModelId } from "./search/backends/perplexity";
 import { safeParseJsonLine } from "./sse";
 import { asRecord, extractAssistantText } from "./extraction-utils";
 import { runtimeConfig } from "./config";
@@ -63,7 +64,7 @@ function extractCompletedResponseText(response: unknown): string {
   return extractAssistantText(responseRecord);
 }
 
-export async function runPerplexityAgent(options: SearchAgentOptions): Promise<SearchAgentResult> {
+export async function runSearchAgent(options: SearchAgentOptions): Promise<SearchAgentResult> {
   const { modelId: rawModelId, messages, instructions, webSearch, apiKey, writer, textId, requestId } = options;
   const log = getLogger(requestId);
   const toAgentModelId = (modelId: string): string => {
@@ -74,14 +75,14 @@ export async function runPerplexityAgent(options: SearchAgentOptions): Promise<S
     }
 
     if (normalized.startsWith("perplexity/")) {
-      return normalizePerplexityModelId(normalized);
+      return normalizeSearchModelId(normalized);
     }
 
     if (normalized === "sonar") {
       return "perplexity/sonar";
     }
 
-    return normalizePerplexityModelId(normalized);
+    return normalizeSearchModelId(normalized);
   };
 
   const normalizedModelId = Array.isArray(rawModelId)
@@ -334,7 +335,7 @@ export async function runPerplexityAgent(options: SearchAgentOptions): Promise<S
 
           if (eventRecord.type === "response.failed") {
             const message = eventRecord.error?.message || "";
-            log.error({ eventRecord }, "Perplexity Agent API reported failure");
+            log.error({ eventRecord }, "Search Provider Agent API reported failure");
             if (!hasWrittenTextDelta) {
               streamingFailed = true;
               return;

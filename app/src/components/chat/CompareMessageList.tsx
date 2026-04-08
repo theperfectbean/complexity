@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { ChatMessageItem, ChatBranch } from "./MessageList";
 import { MessageItem } from "./MessageItem";
-import { cn, cleanMarkdownForCopy, copyToClipboard } from "@/lib/utils";
+import { cn, copyToClipboard } from "@/lib/utils";
 import { AnimatePresence, motion } from "motion/react";
 import { ArrowDown } from "lucide-react";
 
@@ -50,7 +50,7 @@ export function CompareMessageList({
   }, [messages, isStreaming, scrollToBottom]);
 
   async function copyMessage(messageId: string, content: string) {
-    const cleaned = cleanMarkdownForCopy(content);
+    const cleaned = content;
     const success = await copyToClipboard(cleaned);
     if (success) {
       setCopiedId(messageId);

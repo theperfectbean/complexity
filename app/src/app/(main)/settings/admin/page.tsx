@@ -50,64 +50,26 @@ type ModelHealthEntry = {
   targetId: string;
 };
 
-const PROVIDERS: ProviderConfig[] = [
-  {
-    id: "perplexity",
-    name: "Perplexity",
-    keyName: "PERPLEXITY_API_KEY",
-    toggleName: "PROVIDER_PERPLEXITY_ENABLED",
-    placeholder: "pplx-...",
-    description: "Optional managed search provider for Sonar and explicitly selected wrapped models.",
-  },
-  {
-    id: "anthropic",
-    name: "Anthropic",
-    keyName: "ANTHROPIC_API_KEY",
-    toggleName: "PROVIDER_ANTHROPIC_ENABLED",
-    placeholder: "sk-ant-...",
-    description: "Enables Claude models (e.g., Sonnet, Opus, Haiku).",
-  },
-  {
-    id: "openai",
-    name: "OpenAI",
-    keyName: "OPENAI_API_KEY",
-    toggleName: "PROVIDER_OPENAI_ENABLED",
-    placeholder: "sk-...",
-    description: "Enables GPT models (e.g., GPT-4o).",
-  },
-  {
-    id: "google",
-    name: "Google Gemini",
-    keyName: "GOOGLE_GENERATIVE_AI_API_KEY",
-    toggleName: "PROVIDER_GOOGLE_ENABLED",
-    placeholder: "AIza...",
-    description: "Enables Gemini models (e.g., Pro, Flash).",
-  },
-  {
-    id: "xai",
-    name: "xAI",
-    keyName: "XAI_API_KEY",
-    toggleName: "PROVIDER_XAI_ENABLED",
-    placeholder: "xai-...",
-    description: "Enables Grok models.",
-  },
-  {
-    id: "ollama",
-    name: "Ollama (Local)",
-    keyName: "OLLAMA_BASE_URL",
-    toggleName: "PROVIDER_OLLAMA_ENABLED",
-    placeholder: "http://localhost:11434/api",
-    description: "Enables locally running models via Ollama.",
-  },
-  {
-    id: "local-openai",
-    name: "Local OpenAI API",
-    keyName: "LOCAL_OPENAI_BASE_URL",
-    toggleName: "PROVIDER_LOCAL_OPENAI_ENABLED",
-    placeholder: "http://localhost:1234/v1",
-    description: "Enables custom OpenAI-compatible endpoints (e.g., LM Studio, vLLM).",
-  },
-];
+import { listProviders } from "@/lib/providers/registry";
+
+const PROVIDER_DESCRIPTIONS: Record<string, { placeholder: string; description: string }> = {
+  perplexity: { placeholder: "pplx-...", description: "Optional managed search provider for Sonar and explicitly selected wrapped models." },
+  anthropic: { placeholder: "sk-ant-...", description: "Enables Claude models (e.g., Sonnet, Opus, Haiku)." },
+  openai: { placeholder: "sk-...", description: "Enables GPT models (e.g., GPT-4o)." },
+  google: { placeholder: "AIza...", description: "Enables Gemini models (e.g., Pro, Flash)." },
+  xai: { placeholder: "xai-...", description: "Enables Grok models." },
+  ollama: { placeholder: "http://localhost:11434/api", description: "Enables locally running models via Ollama." },
+  "local-openai": { placeholder: "http://localhost:1234/v1", description: "Enables custom OpenAI-compatible endpoints (e.g., LM Studio, vLLM)." },
+};
+
+const PROVIDERS: ProviderConfig[] = listProviders().map((p) => ({
+  id: p.id,
+  name: p.displayName,
+  keyName: p.settingsKey,
+  toggleName: p.toggleKey,
+  placeholder: PROVIDER_DESCRIPTIONS[p.id]?.placeholder || "...",
+  description: PROVIDER_DESCRIPTIONS[p.id]?.description || "AI Provider",
+}));
 
 type IntegrationConfig = {
   id: string;
@@ -435,7 +397,7 @@ export default function AdminSettingsPage() {
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">
                     <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/5 text-primary">
-                      {provider.id === "perplexity" ? <Zap className="h-5 w-5" /> : <ShieldCheck className="h-5 w-5" />}
+                      {provider.id === "perplexity" || provider.id === "search" ? <Zap className="h-5 w-5" /> : <ShieldCheck className="h-5 w-5" />}
                     </div>
                     <div>
                       <h2 className="text-lg font-bold">{provider.name}</h2>

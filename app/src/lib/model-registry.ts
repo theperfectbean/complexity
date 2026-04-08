@@ -1,15 +1,12 @@
 import { ModelOption, runtimeConfig } from "./config";
 import type { SettingInfo } from "./settings";
 import { normalizeLegacyModelId } from "./models";
+import { listProviders, getProvider } from "./providers/registry";
+import { isSearchPreset, getBackendForPreset } from "./search/registry";
 
-export type ModelProviderId =
-  | "perplexity"
-  | "anthropic"
-  | "openai"
-  | "google"
-  | "xai"
-  | "ollama"
-  | "local-openai";
+export type ModelProviderId = string;
+
+export const KNOWN_PROVIDER_IDS = listProviders().map((p) => p.id);
 
 export const MODEL_SETTINGS_KEYS = [
   "ANTHROPIC_API_KEY",
@@ -34,49 +31,14 @@ export const MODEL_SETTINGS_KEYS = [
 
 type ModelLike = Pick<ModelOption, "id" | "label" | "category" | "isPreset" | "providerId" | "providerModelId" | "capability">;
 
-const PROVIDER_PREFIXES: Array<{ prefix: string; provider: ModelProviderId }> = [
-  { prefix: "perplexity/", provider: "perplexity" },
-  { prefix: "anthropic/", provider: "anthropic" },
-  { prefix: "openai/", provider: "openai" },
-  { prefix: "google/", provider: "google" },
-  { prefix: "xai/", provider: "xai" },
-  { prefix: "ollama/", provider: "ollama" },
-  { prefix: "local-openai/", provider: "local-openai" },
-];
+function getProviderPrefixes() {
+  return listProviders().flatMap((p) => p.prefixes.map((prefix) => ({ prefix, provider: p.id })));
+}
 
-const PROVIDER_SETTINGS: Record<
-  ModelProviderId,
-  { key: string; toggle?: string }
-> = {
-  perplexity: {
-    key: "PERPLEXITY_API_KEY",
-    toggle: "PROVIDER_PERPLEXITY_ENABLED",
-  },
-  anthropic: {
-    key: "ANTHROPIC_API_KEY",
-    toggle: "PROVIDER_ANTHROPIC_ENABLED",
-  },
-  openai: {
-    key: "OPENAI_API_KEY",
-    toggle: "PROVIDER_OPENAI_ENABLED",
-  },
-  google: {
-    key: "GOOGLE_GENERATIVE_AI_API_KEY",
-    toggle: "PROVIDER_GOOGLE_ENABLED",
-  },
-  xai: {
-    key: "XAI_API_KEY",
-    toggle: "PROVIDER_XAI_ENABLED",
-  },
-  ollama: {
-    key: "OLLAMA_BASE_URL",
-    toggle: "PROVIDER_OLLAMA_ENABLED",
-  },
-  "local-openai": {
-    key: "LOCAL_OPENAI_BASE_URL",
-    toggle: "PROVIDER_LOCAL_OPENAI_ENABLED",
-  },
-};
+function getProviderSettings(providerId: string) {
+  const p = getProvider(providerId);
+  return p ? { key: p.settingsKey, toggle: p.toggleKey } : undefined;
+}
 
 const OPEN_MODEL_PREFIXES = [
   "llama",
@@ -141,13 +103,24 @@ export function getConfiguredModels(
 
 export function getModelProvider(model: Pick<ModelLike, "id" | "isPreset" | "providerId">): ModelProviderId {
   if (model.isPreset) {
-    if (model.providerId) return model.providerId as ModelProviderId;
-    return (runtimeConfig.searchAgent.provider === "perplexity" ? "perplexity" : "anthropic") as ModelProviderId;
+    if (model.providerId) return model.providerId;
+    return runtimeConfig.searchAgent.provider;
+  }
+  
+  if (isSearchPreset(model.id)) {
+    return getBackendForPreset(model.id)?.id ?? runtimeConfig.searchAgent.provider;
   }
 
-  for (const entry of PROVIDER_PREFIXES) {
+  for (const entry of getProviderPrefixes()) {
     if (model.id.startsWith(entry.prefix)) {
       return entry.provider;
+    }
+  }
+
+  // Check bare models
+  for (const provider of listProviders()) {
+    if (provider.bareModels?.includes(model.id)) {
+      return provider.id;
     }
   }
 
@@ -174,7 +147,9 @@ export function isProviderEnabled(
   provider: ModelProviderId,
   settings: Record<string, SettingInfo>,
 ): boolean {
-  const providerSettings = PROVIDER_SETTINGS[provider];
+  const providerSettings = getProviderSettings(provider);
+  if (!providerSettings) return false;
+
   const apiSetting = settings[providerSettings.key];
   const hasKey = hasSettingValue(apiSetting);
   if (!hasKey) {

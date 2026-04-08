@@ -78,10 +78,9 @@ export function MissionInput({
         
         <div className="flex items-center justify-between px-3 pb-2 pt-1">
           <div className="flex items-center gap-2">
-            <ModelSelector 
+            <ModelSelector excludeCategories={["Anthropic", "OpenAI", "Google", "xAI", "Search"]} 
               model={model}
               onModelChange={onModelChange}
-              excludeCategories={["Perplexity", "Presets"]}
             />
           </div>
           

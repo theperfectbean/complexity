@@ -1,5 +1,6 @@
 import { getDetailedSettings } from "./settings";
 import { getDefaultModel, normalizeLegacyModelId } from "./models";
+import { searchBackendRegistry } from "./search/registry";
 import { filterModelsByConfiguration, getConfiguredModels, MODEL_SETTINGS_KEYS } from "./model-registry";
 import { getModelHealthSnapshot, type ModelHealthEntry, type ModelHealthStatus } from "./model-health";
 import type { ModelOption } from "./config";
@@ -81,7 +82,10 @@ export async function resolveRequestedModel(
       ? normalizedRequestedModel.split("/").slice(-2).join("/")
       : normalizedRequestedModel;
     const fuzzyMatches = models.filter((model) => model.id.endsWith(baseRequested));
-    const fuzzyMatch = fuzzyMatches.find((model) => !model.id.startsWith("perplexity/")) ?? fuzzyMatches[0];
+    const backendPrefixes = [...searchBackendRegistry.keys()].map((id) => id + "/");
+    const fuzzyMatch = fuzzyMatches.find(
+      (model) => !backendPrefixes.some((prefix) => model.id.startsWith(prefix))
+    ) ?? fuzzyMatches[0];
     if (fuzzyMatch && (!options?.preferNonPreset || !fuzzyMatch.isPreset)) {
       return fuzzyMatch.id;
     }

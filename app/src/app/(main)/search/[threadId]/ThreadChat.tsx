@@ -12,7 +12,6 @@ import { ImageGallery } from "@/components/chat/ImageGallery";
 import { ThreadSettingsDialog } from "./ThreadSettingsDialog";
 import { ThreadSearchBar } from "./ThreadSearchBar";
 import { normalizeUIMessage, getAttachmentsFromSession, clearAttachmentsFromSession } from "@/lib/utils";
-
 export type ThreadPayload = {
   thread: {
     id: string;
@@ -282,6 +281,8 @@ export function ThreadChat({
     return [...initialHistory, ...newSdkMessages];
   }, [initialHistory, messages]);
 
+
+
   const [searchQuery, setSearchQuery] = useState("");
   const [currentSearchIndex, setCurrentSearchIndex] = useState(0);
 
@@ -455,7 +456,7 @@ export function ThreadChat({
     };
 
     void processAndSendInitialQuery();
-  }, [initialQuery, initialHistory.length, model, roleId, router, sendMessage, threadId, attachments, setAttachments, messages.length, isLoading]);
+  }, [initialQuery, initialHistory, initialHistory.length, model, roleId, router, sendMessage, threadId, attachments, setAttachments, messages.length, isLoading]);
 
   useEffect(() => {
     if (error) {
@@ -554,8 +555,9 @@ export function ThreadChat({
         </div>
       </div>
 
-      <div className="flex-1 space-y-12">
-        <MessageList
+      <div className="flex-1 w-full max-w-4xl mx-auto">
+        <div className="space-y-12">
+          <MessageList
           messages={mergedMessages}
           branches={branches}
           onBranchChange={handleBranchChange}
@@ -614,7 +616,9 @@ export function ThreadChat({
             void regenerate({ messageId: lastMessage.id });
           }}
           onEditMessage={status !== "streaming" ? handleEditMessage : undefined}
-        />
+          />
+        </div>
+
       </div>
 
       <div className="fixed inset-x-0 bottom-0 z-20 bg-gradient-to-t from-background via-background/95 to-transparent pb-6 pt-10 md:left-[278px]">

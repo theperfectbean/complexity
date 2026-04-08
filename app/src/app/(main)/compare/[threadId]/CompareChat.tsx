@@ -93,7 +93,8 @@ export function CompareChat({
               placeholder="Ask a follow-up comparison..."
               submitLabel={isLoading ? "Comparing..." : "Compare"}
               disabled={isLoading}
-              autoFilter={false}
+              autoFilter={true}
+              hideModelSelector={true}
             />
           </form>
         </div>

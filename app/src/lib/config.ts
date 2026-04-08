@@ -19,8 +19,12 @@ const DEFAULT_MODELS: ModelOption[] = [
   { id: "google/gemini-1.5-pro", label: "Gemini 1.5 Pro", category: "Google", isPreset: false, capability: "high" },
   { id: "google/gemini-1.5-flash", label: "Gemini 1.5 Flash", category: "Google", isPreset: false, capability: "medium" },
   { id: "xai/grok-3-beta", label: "Grok 3 Beta", category: "xAI", isPreset: false, capability: "high" },
+  { id: "ollama/llama3.2", label: "Ollama: Llama 3.2", category: "Local", isPreset: false, capability: "medium" },
   { id: "ollama/llama3", label: "Ollama: Llama 3", category: "Local", isPreset: false, capability: "medium" },
   { id: "ollama/mistral", label: "Ollama: Mistral", category: "Local", isPreset: false, capability: "medium" },
+  { id: "ollama/phi3:mini", label: "Ollama: Phi-3 Mini", category: "Local", isPreset: false, capability: "medium" },
+  { id: "ollama/gemma4:e2b", label: "Ollama: Gemma 4 e2b", category: "Local", isPreset: false, capability: "medium" },
+  { id: "ollama/gemma4:e4b", label: "Ollama: Gemma 4 e4b", category: "Local", isPreset: false, capability: "medium" },
   { id: "local-openai/custom-model", label: "Local OpenAI API", category: "Local", isPreset: false, capability: "high" },
 ];
 
@@ -61,14 +65,14 @@ export const runtimeConfig = {
     modelAliases: {
       anthropic: {
         // Legacy ID aliases → canonical IDs
-        "claude-haiku-4-5": "claude-haiku-4-5",
-        "claude-sonnet-4-5": "claude-sonnet-4-5",
-        "claude-opus-4-5": "claude-opus-4-5",
-        "claude-4-5-haiku-latest": "claude-haiku-4-5",
-        "claude-4-6-sonnet-latest": "claude-sonnet-4-5",
-        "claude-sonnet-4-6": "claude-sonnet-4-5",
-        "claude-4-6-opus-latest": "claude-opus-4-5",
-        "claude-opus-4-6": "claude-opus-4-5",
+        "claude-haiku-4-5": "claude-haiku-4-5-20251001",
+        "claude-sonnet-4-5": "claude-sonnet-4-5-20250929",
+        "claude-opus-4-5": "claude-opus-4-5-20251101",
+        "claude-4-5-haiku-latest": "claude-haiku-4-5-20251001",
+        "claude-4-6-sonnet-latest": "claude-sonnet-4-6",
+        "claude-sonnet-4-6": "claude-sonnet-4-6",
+        "claude-4-6-opus-latest": "claude-opus-4-6",
+        "claude-opus-4-6": "claude-opus-4-6",
       },
       openai: {
         "gpt-4o": "gpt-4o",
@@ -90,9 +94,9 @@ export const runtimeConfig = {
   searchAgent: {
     provider: env.SEARCH_PROVIDER_TYPE ?? "perplexity",
     apiKey: env.SEARCH_API_KEY || env.PERPLEXITY_API_KEY,
-    apiBaseUrl: env.PERPLEXITY_API_BASE_URL ?? "https://api.perplexity.ai/v1/responses",
-    streamTimeoutMs: env.PERPLEXITY_STREAM_TIMEOUT_MS ?? 1000 * 60 * 5,
-    webTools: (env.PERPLEXITY_WEB_TOOLS || "web_search,fetch_url")
+    apiBaseUrl: env.SEARCH_API_BASE_URL || env.PERPLEXITY_API_BASE_URL,
+    streamTimeoutMs: env.SEARCH_STREAM_TIMEOUT_MS || env.PERPLEXITY_STREAM_TIMEOUT_MS,
+    webTools: (env.SEARCH_WEB_TOOLS || env.PERPLEXITY_WEB_TOOLS)
       .split(",")
       .map((tool) => tool.trim())
       .filter(Boolean)

@@ -1,7 +1,8 @@
 import { createUIMessageStream, createUIMessageStreamResponse, UIMessageChunk } from "ai";
 import { getLogger } from "./logger";
-import { saveExtractedMemories } from "./memory";
+import { saveExtractedMemories, getMemoryPrompt } from "./memory";
 import { runGeneration, generateImage } from "./llm";
+import crypto from "node:crypto";
 import { getApiKeys } from "./settings";
 import { triggerWebhook } from "./webhooks";
 import { db } from "./db";
@@ -65,6 +66,27 @@ export class ChatService {
 
     const persistUserMessage = this.history.saveUserMessage(this.session, userText, isRegenerate);
 
+    // Initial routing decision
+    const initialRouting = this.session.routing ?? getChatRoutingDecision({
+      userText,
+      roleId: thread.roleId,
+      memoryEnabled: thread.memoryEnabled,
+      webSearchRequested: !!webSearch,
+      webSearchExplicit: this.session.webSearchExplicit,
+    });
+    this.session.routing = initialRouting;
+
+    // Early memory fetch for cache key
+    let preFetchedMemories: { prompt: string; count: number } | undefined = undefined;
+    let memoryHash: string | undefined = undefined;
+
+    if (thread.memoryEnabled && initialRouting.useMemory) {
+      preFetchedMemories = await getMemoryPrompt(thread.userId, userText, thread.roleId);
+      if (preFetchedMemories.count > 0) {
+        memoryHash = crypto.createHash("sha256").update(preFetchedMemories.prompt).digest("hex").slice(0, 12);
+      }
+    }
+
     // /image <prompt> shortcut — generate an image instead of text
     if (userText.trimStart().startsWith("/image ")) {
       const imagePrompt = userText.trimStart().slice("/image ".length).trim();
@@ -89,7 +111,7 @@ export class ChatService {
 
     // Cache logic
     const { roleInstructions } = thread;
-    const cacheKey = this.history.generateCacheKey(this.session, roleInstructions, !!thread.memoryEnabled, userText);
+    const cacheKey = this.history.generateCacheKey(this.session, roleInstructions, !!thread.memoryEnabled, userText, memoryHash);
 
     const cached = await this.history.getCache(this.session, cacheKey);
     if (cached) {
@@ -149,7 +171,7 @@ export class ChatService {
               writer.write({ type: "start", messageId: responseMessageId });
               writer.write({ type: "text-start", id: textId });
 
-              const initialRouting = this.session.routing ?? getChatRoutingDecision({
+              const currentRouting = this.session.routing ?? getChatRoutingDecision({
                 userText,
                 roleId: thread.roleId,
                 memoryEnabled: thread.memoryEnabled,
@@ -157,19 +179,18 @@ export class ChatService {
                 webSearchExplicit: this.session.webSearchExplicit,
               });
               
-              const budgeted = applyBudgetGuardrails(modelId, initialRouting, budgetState);
-              const { instructions, ragCitations, memoriesFound } = await this.assembler.assemble(this.session, thread, userText, writer);
+              const budgeted = applyBudgetGuardrails(modelId, currentRouting, budgetState);
+              const { instructions, ragCitations, memoriesFound } = await this.assembler.assemble(
+                this.session, 
+                thread, 
+                userText, 
+                writer, 
+                preFetchedMemories
+              );
 
               if (index === 0 && budgeted.notices.length > 0) {
                 writer.write({ type: "data-json", data: { kind: "budget-applied", notices: budgeted.notices } } as UIMessageChunk);
               }
-
-              // Proxy writer that also appends text-deltas to the Redis buffer (only for first model for now to avoid complexity in resume)
-              const bufferingWriter: { write: (chunk: UIMessageChunk) => void } = {
-                write(chunk: UIMessageChunk) {
-                  writer.write(chunk);
-                },
-              };
 
               let result;
               try {
@@ -181,7 +202,7 @@ export class ChatService {
                   requestId,
                   textId,
                   webSearch: budgeted.routing.allowWebSearch,
-                  writer: bufferingWriter,
+                  writer: writer,
                 });
               } catch (genError) {
                 const message = genError instanceof Error ? genError.message : "Generation failed";

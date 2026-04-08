@@ -17,6 +17,8 @@ export type AuthenticatedUser = {
   defaultModel: string | null;
   streamingStyle: string | null;
   streamingSpeed: number | null;
+  defaultSshUser: string | null;
+  autoApproveReadOnly: boolean | null;
 };
 
 /**
@@ -43,6 +45,12 @@ export async function requireUser(): Promise<{ user: AuthenticatedUser } | NextR
       defaultModel: users.defaultModel,
       streamingStyle: users.streamingStyle,
       streamingSpeed: users.streamingSpeed,
+      defaultSshUser: users.defaultSshUser,
+      autoApproveReadOnly: users.autoApproveReadOnly,
+      
+      
+      
+      
     })
     .from(users)
     .where(eq(users.email, email))
@@ -104,6 +112,12 @@ export async function requireUserOrApiToken(request: Request): Promise<{ user: A
         defaultModel: users.defaultModel,
       streamingStyle: users.streamingStyle,
       streamingSpeed: users.streamingSpeed,
+      defaultSshUser: users.defaultSshUser,
+      autoApproveReadOnly: users.autoApproveReadOnly,
+      
+      
+      
+      
       })
       .from(apiTokens)
       .innerJoin(users, eq(users.id, apiTokens.userId))

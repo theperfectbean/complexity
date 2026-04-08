@@ -86,15 +86,33 @@ export function shouldUseRag(userText: string): boolean {
   return RAG_SIGNALS.some((signal) => new RegExp("\\b" + signal.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\b").test(normalized));
 }
 
+const SHORT_MEMORY_SIGNALS = [
+  "again",
+  "as before",
+  "previous",
+  "yesterday",
+  "last time",
+  "earlier",
+];
+
 export function shouldUseMemory(userText: string): boolean {
   const normalized = normalize(userText);
   if (!normalized) return false;
 
+  // Check explicit signals
   if (MEMORY_SIGNALS.some((signal) => new RegExp("\\b" + signal.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\b").test(normalized))) {
     return true;
   }
 
-  return /\b(i|my|me)\b/.test(normalized) && normalized.split(/\s+/).length >= 16;
+  // Check short context-dependent signals
+  if (SHORT_MEMORY_SIGNALS.some((signal) => new RegExp("\\b" + signal.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\b").test(normalized))) {
+    return true;
+  }
+
+  // Heuristic for substantive personal messages (exclude questions)
+  const isQuestion = normalized.endsWith("?") || normalized.startsWith("who") || normalized.startsWith("what") || normalized.startsWith("how") || normalized.startsWith("why") || normalized.startsWith("when");
+  
+  return !isQuestion && /\b(i|my|me)\b/.test(normalized) && normalized.split(/\s+/).length >= 25;
 }
 
 export function shouldUseWebSearch(userText: string): boolean {

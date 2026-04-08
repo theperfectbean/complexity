@@ -71,11 +71,11 @@ describe("/api/admin/fetch-provider-models", () => {
     expect(data.health.models).toEqual({});
   });
 
-  it("returns 401 when user is not admin", async () => {
+  it("returns 403 when user is not admin", async () => {
     vi.mocked(auth).mockResolvedValue({ user: { email: "user@example.com", isAdmin: false } } as never);
     dbLimitMock.mockResolvedValue([{ isAdmin: false }]);
 
     const response = await GET();
-    expect(response.status).toBe(401);
+    expect(response.status).toBe(403);
   });
 });

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import { AgentService, PauseForApprovalError, type AgentRunState } from "@/lib/agent/AgentService";
+import { AgentService, type AgentRunState } from "@/lib/agent/AgentService";
 
 function createState(): AgentRunState {
   return {
@@ -48,11 +48,9 @@ describe("AgentService", () => {
       },
     });
 
-    const sdkTools = (service as unknown as { buildSdkTools: (state: AgentRunState, actorId: string) => Record<string, { execute: (input: unknown) => Promise<unknown> }> }).buildSdkTools(state, "user-1");
+    const sdkTools = (service as unknown as { buildSdkTools: (state: AgentRunState, actorId: string) => Record<string, { execute: (input: unknown, options: { toolCallId: string }) => Promise<unknown> }> }).buildSdkTools(state, "user-1");
 
-    await expect(sdkTools.listHosts.execute({ clusterId: "cluster-a" })).rejects.toThrow(
-      "Tool listHosts blocked until mission plan approval",
-    );
+    expect(sdkTools.listHosts).toBeUndefined();
     expect(emitted).toHaveLength(0);
     expect(saved).toHaveLength(0);
   });
@@ -81,8 +79,7 @@ describe("AgentService", () => {
 
     const sdkTools = (service as unknown as { buildSdkTools: (state: AgentRunState, actorId: string) => Record<string, { execute: (input: unknown) => Promise<unknown> }> }).buildSdkTools(state, "user-1");
 
-    await expect(
-      sdkTools.draft_mission_plan.execute({
+    const result = await sdkTools.draft_mission_plan.execute({
         goal: "Inspect cluster health",
         assumptions: ["Hosts are reachable"],
         risks: ["Read-only checks only"],
@@ -95,9 +92,9 @@ describe("AgentService", () => {
           },
         ],
         successCriteria: ["All hosts accounted for"],
-      }),
-    ).rejects.toBeInstanceOf(PauseForApprovalError);
+      }, { toolCallId: "test-call-id" });
 
+    expect(result).toEqual({ ok: true, status: "awaiting_approval", message: "Mission plan proposed. Awaiting human approval before executing any commands." });
     expect(state.approvalState).toBe("pending");
     expect(emitted.map((event) => event.type)).toEqual([
       "plan_proposed",

@@ -23,10 +23,6 @@ export function FollowUpInput({
   submitLabel,
   threadId,
 }: FollowUpInputProps) {
-  const { data: session } = useSession();
-  if (session?.user?.isAdmin) {
-  }
-
   const { showCommandMenu, commandQuery, handleTextChange, handleCommandSelect, closeMenu, matchedCommands, allCommands } =
     useSlashCommands(onChange, { threadId });
 

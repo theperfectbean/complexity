@@ -72,7 +72,6 @@ function shouldExtractMemoriesFromTurn(userMessage: string, assistantMessage: st
     "for future reference",
     "always",
     "never",
-    "use ",
     "don't use ",
   ];
 
@@ -247,15 +246,7 @@ export async function saveExtractedMemories(params: {
           runtimeConfig.memory.dedupThreshold,
         );
 
-        // Also include any candidates that had no embedding (couldn't embed → insert anyway)
-        const noEmbedding = candidates
-          .filter((_, i) => !embeddings[i] || embeddings[i].length === 0)
-          .map((content) => ({ content, embedding: null as number[] | null }));
-
-        const insertList = [
-          ...dedupedByEmbedding,
-          ...noEmbedding,
-        ];
+        const insertList = dedupedByEmbedding;
 
         if (insertList.length > 0) {
           await MemoryStore.insertMemories(userId, threadId, insertList, roleId);

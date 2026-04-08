@@ -7,7 +7,7 @@ This folder contains the Next.js app and API routes for Complexity.
 - Next.js 16 App Router (`src/app`)
 - Auth.js v5 credentials auth with Drizzle adapter
 - PostgreSQL + pgvector via Drizzle ORM
-- Perplexity Agent API integration via `@perplexity-ai/perplexity_ai`
+- Search Provider Agent API integration via generic abstraction
 - Streaming chat responses bridged into AI SDK UI message stream format (`useChat` compatible)
 - Optional local RAG context injection by `spaceId`
 
@@ -31,13 +31,13 @@ Direct models:
 - `google/gemini-3-flash-preview`
 - `xai/grok-4.20-beta`
 
-For direct models, the chat route enables Agent API tools:
+For direct models, the chat route enables Search Provider Agent API tools:
 - `web_search`
 - `fetch_url`
 
 ## Key files
 
-- `src/app/api/chat/route.ts`: Agent API streaming bridge + persistence
+- `src/app/api/chat/route.ts`: Search Provider Agent API streaming bridge + persistence
 - `src/lib/agent-client.ts`: server-side agent client factory
 - `src/lib/models.ts`: shared curated model list and helpers
 - `src/lib/rag.ts`: retrieval logic for local space-scoped context

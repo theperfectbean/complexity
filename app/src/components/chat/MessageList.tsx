@@ -8,7 +8,7 @@ import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { SourceCarousel } from "@/components/chat/SourceCarousel";
 import { MarkdownRenderer } from "@/components/shared/MarkdownRenderer";
 import { ThinkingBlock, extractThinkingBlock } from "@/components/shared/ThinkingBlock";
-import { cn, copyToClipboard, cleanMarkdownForCopy, formatDisplayLabel } from "@/lib/utils";
+import { cn, copyToClipboard, formatDisplayLabel } from "@/lib/utils";
 import { MODELS, SearchModelOption } from "@/lib/models";
 
 export type ChatCitation = {
@@ -664,7 +664,7 @@ export function MessageList({
   }, [messages, isStreaming, scrollToBottom]);
 
   async function copyMessage(messageId: string, content: string) {
-    const cleaned = cleanMarkdownForCopy(content);
+    const cleaned = content;
     const success = await copyToClipboard(cleaned);
     if (success) {
       setCopiedId(messageId);

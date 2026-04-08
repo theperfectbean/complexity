@@ -3,7 +3,7 @@ import { registerUser } from "./helpers/auth";
 
 const TEST_PROMPT = "What is the capital of Japan? Answer in one word.";
 
-test("Claude Haiku 4.5 routes through a valid Perplexity model", async ({ page }) => {
+test("Claude Haiku 4.5 routes through a valid Search model", async ({ page }) => {
   await registerUser(page, { emailPrefix: "model-routing-regression", name: "Model Routing Regression" });
 
   await page.getByRole("button", { name: "Select model" }).click();

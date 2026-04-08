@@ -6,8 +6,6 @@ export const MODELS = runtimeConfig.models;
 
 export type ModelId = string;
 
-export const MODEL_IDS = MODELS.map((model) => model.id);
-
 const LEGACY_MODEL_ALIASES: Record<string, string> = {
   "anthropic/claude-haiku-4-5": "anthropic/claude-4-5-haiku-latest",
   "claude-haiku-4-5": "claude-4-5-haiku-latest",
@@ -15,15 +13,6 @@ const LEGACY_MODEL_ALIASES: Record<string, string> = {
   "claude-sonnet-4-6": "claude-4-6-sonnet-latest",
   "anthropic/claude-opus-4-6": "anthropic/claude-4-6-opus-latest",
   "claude-opus-4-6": "claude-4-6-opus-latest",
-};
-
-const PERPLEXITY_MODEL_ALIASES: Record<string, string> = {
-  "anthropic/claude-4-5-haiku-latest": "anthropic/claude-haiku-4-5",
-  "claude-4-5-haiku-latest": "anthropic/claude-haiku-4-5",
-  "anthropic/claude-4-6-sonnet-latest": "anthropic/claude-sonnet-4-6",
-  "claude-4-6-sonnet-latest": "anthropic/claude-sonnet-4-6",
-  "anthropic/claude-4-6-opus-latest": "anthropic/claude-opus-4-6",
-  "claude-4-6-opus-latest": "anthropic/claude-opus-4-6",
 };
 
 export function normalizeLegacyModelId(modelId: string): string {
@@ -41,33 +30,8 @@ export function normalizeLegacyModelId(modelId: string): string {
   return modelId;
 }
 
-export function normalizePerplexityModelId(modelId: string): string {
-  const normalized = normalizeLegacyModelId(modelId);
-  if (normalized === "sonar" || normalized === "perplexity/sonar") {
-    return "perplexity/sonar";
-  }
-
-  const unwrapped = normalized.startsWith("perplexity/")
-    ? normalized.slice("perplexity/".length)
-    : normalized;
-
-  if (unwrapped === "sonar") {
-    return "perplexity/sonar";
-  }
-
-  if (PERPLEXITY_MODEL_ALIASES[unwrapped]) {
-    return PERPLEXITY_MODEL_ALIASES[unwrapped];
-  }
-
-  for (const [appId, perplexityId] of Object.entries(PERPLEXITY_MODEL_ALIASES)) {
-    const wrappedAppSuffix = `/${appId}`;
-    if (unwrapped.endsWith(wrappedAppSuffix)) {
-      return `${unwrapped.slice(0, -appId.length)}${perplexityId}`;
-    }
-  }
-
-  return unwrapped;
-}
+// Normalize all IDs in the registry so lookup via isValidModelId is consistent
+export const MODEL_IDS = MODELS.map((model) => normalizeLegacyModelId(model.id));
 
 export function isValidModelId(model: string): model is ModelId {
   return MODEL_IDS.includes(normalizeLegacyModelId(model));
@@ -89,7 +53,7 @@ export function getDefaultModel(): ModelId {
     models.find((model) => !model.isPreset && model.capability === "medium") ??
     models.find((model) => !model.isPreset);
 
-  return preferred?.id || models[0]?.id || "anthropic/claude-4-5-haiku-latest";
+  return normalizeLegacyModelId(preferred?.id || models[0]?.id || "anthropic/claude-4-5-haiku-latest");
 }
 
 export function getBudgetFallbackModel(): ModelId {
@@ -102,4 +66,13 @@ export function getBudgetFallbackModel(): ModelId {
     MODELS.find((model) => !model.isPreset && model.capability === "medium");
 
   return (localModel?.id || cheapRemoteModel?.id || getDefaultModel()) as ModelId;
+}
+
+export function getLocalDefaultModel(): ModelId {
+  const localModel =
+    MODELS.find((model) => model.id.startsWith('ollama/') && model.id.includes('llama3.2')) ??
+    MODELS.find((model) => model.id.startsWith('ollama/')) ??
+    MODELS.find((model) => model.id.startsWith('local-openai/'));
+
+  return (localModel?.id || getDefaultModel()) as ModelId;
 }

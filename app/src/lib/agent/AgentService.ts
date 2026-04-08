@@ -115,7 +115,7 @@ export class AgentService {
 
     await this.emit(state, { type: "run_status", status: "running" });
 
-    await this.continueAgentLoop(state, {
+    void this.continueAgentLoop(state, {
       model: input.model,
       system: input.system,
       actorId: input.actorId,
@@ -175,7 +175,7 @@ export class AgentService {
 
     await this.emit(state, { type: "run_status", status: "running" });
 
-    await this.continueAgentLoop(state, {
+    void this.continueAgentLoop(state, {
       model,
       system: system ?? state.system ?? "",
       actorId: actorId ?? state.actorId ?? "",
@@ -209,7 +209,7 @@ export class AgentService {
 
     await this.emit(state, { type: "run_status", status: "running" });
 
-    await this.continueAgentLoop(state, {
+    void this.continueAgentLoop(state, {
       model,
       system: state.system ?? "",
       actorId: input.actorId ?? state.actorId ?? "",
@@ -252,7 +252,7 @@ export class AgentService {
           await this.emit(state, {
             type: "assistant_message",
             message: {
-              id: `${state.runId}:msg:${state.seq}`,
+              id: `${state.runId}:msg:current`,
               role: "assistant",
               text,
             },
@@ -308,7 +308,7 @@ export class AgentService {
             type: "error",
             error: {
               code: "MODEL_STREAM_ERROR",
-              message: error instanceof Error ? error.message : String(error),
+              message: error instanceof Error ? error.message : (typeof error === "object" && error !== null && "message" in error ? String((error as any).message) : JSON.stringify(error)),
               retryable: false,
               details: error,
             },

@@ -8,7 +8,7 @@ import { MODELS } from "../models";
 import { type Citation } from "../extraction-utils";
 import type { ChatSession, ThreadInfo } from "./types";
 import type { UIMessageChunk } from "ai";
-import { shouldUseRag } from "../chat-routing";
+import { shouldUseRag, shouldUseMemory } from "../chat-routing";
 
 export class ContextAssembler {
   private log;
@@ -54,7 +54,13 @@ ${content}`;
     return `cache:rag:${roleId}:${Buffer.from(normalized).toString("base64")}`;
   }
 
-  async assemble(session: ChatSession, thread: ThreadInfo, userText: string, writer: { write: (chunk: UIMessageChunk) => void }): Promise<{ instructions: string; ragCitations: Citation[]; memoriesFound: number }> {
+  async assemble(
+    session: ChatSession, 
+    thread: ThreadInfo, 
+    userText: string, 
+    writer: { write: (chunk: UIMessageChunk) => void },
+    preFetchedMemories?: { prompt: string; count: number }
+  ): Promise<{ instructions: string; ragCitations: Citation[]; memoriesFound: number }> {
     const { roleId, memoryEnabled, userId } = thread;
     const { roleInstructions } = thread;
 
@@ -116,11 +122,18 @@ ${content}`;
     let memoryPrompt = "";
     let memoriesFound = 0;
     
-    if (memoryEnabled && (session.routing?.useMemory ?? true)) {
+    if (memoryEnabled && (session.routing?.useMemory ?? shouldUseMemory(userText))) {
       writer.write({ type: "data-call-start", data: { callId: "memory-search", toolName: "Recall", input: { query: userText } } } as UIMessageChunk);
-      const memResult = await getMemoryPrompt(userId, userText, roleId);
-      memoryPrompt = memResult.prompt;
-      memoriesFound = memResult.count;
+      
+      if (preFetchedMemories) {
+        memoryPrompt = preFetchedMemories.prompt;
+        memoriesFound = preFetchedMemories.count;
+      } else {
+        const memResult = await getMemoryPrompt(userId, userText, roleId);
+        memoryPrompt = memResult.prompt;
+        memoriesFound = memResult.count;
+      }
+      
       writer.write({ type: "data-call-result", data: { callId: "memory-search", result: memoriesFound > 0 ? `Recalled ${memoriesFound} relevant memories.` : "No relevant memories found." } } as UIMessageChunk);
     } else if (memoryEnabled) {
       this.log.info("Skipping memory retrieval for prompt without personalization signals");

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { CompareChat } from "./CompareChat";
 import { ChatMessageItem } from "@/components/chat/MessageList";
-import { normalizeCitations } from "@/app/search/[threadId]/ThreadChat";
+import { normalizeCitations } from "@/app/(main)/search/[threadId]/ThreadChat";
 
 export default function CompareThreadPage() {
   const params = useParams();

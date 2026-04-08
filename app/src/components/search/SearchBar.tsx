@@ -5,7 +5,7 @@ import { motion } from "motion/react";
 import { useRef, useState, useEffect, useCallback } from "react";
 import TextareaAutosize from "react-textarea-autosize";
 
-import { getDefaultModel, isPresetModel } from "@/lib/models";
+import { getDefaultModel } from "@/lib/models";
 import { runtimeConfig } from "@/lib/config";
 import { cn } from "@/lib/utils";
 
@@ -15,8 +15,7 @@ import { SearchModelOption } from "@/lib/models";
 import { FileAttachments, FileAttachmentsHandle } from "./parts/FileAttachments";
 import { CommandMenu } from "@/components/chat/CommandMenu";
 import { useSlashCommands } from "@/lib/hooks/useSlashCommands";
-import { commandRegistry } from "@/plugins/commandRegistry";
-import { useSession } from "next-auth/react";
+import { resolveSearchBackend } from "@/lib/search/registry";
 
 
 type SearchBarProps = {
@@ -37,6 +36,7 @@ type SearchBarProps = {
   webSearchEnabled?: boolean;
   onWebSearchChange?: (enabled: boolean) => void;
   autoFilter?: boolean;
+  hideModelSelector?: boolean;
   "data-testid"?: string;
   id?: string;
   roleId?: string;
@@ -63,15 +63,12 @@ export function SearchBar({
   webSearchEnabled = runtimeConfig.chat.defaultWebSearch,
   onWebSearchChange,
   autoFilter = true,
+  hideModelSelector = false,
   "data-testid": dataTestId,
   id,
   roleId,
   threadId,
 }: SearchBarProps) {
-  const { data: session } = useSession();
-  if (session?.user?.isAdmin) {
-  }
-
   const fileAttachmentsRef = useRef<FileAttachmentsHandle>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [internalAttachments, setInternalAttachments] = useState<File[]>(externalAttachments);
@@ -265,14 +262,17 @@ export function SearchBar({
 
       <div className="mt-1 flex items-center justify-between gap-2 px-1 pb-1">
         <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide">
-          <ModelSelector
-            model={model}
-            onModelChange={onModelChange}
-            modelOptions={modelOptions}
-            autoFilter={autoFilter}
-          />
-
-          <div className="h-4 w-px bg-border/40 mx-0.5" />
+          {!hideModelSelector && (
+            <>
+              <ModelSelector
+                model={model}
+                onModelChange={onModelChange}
+                modelOptions={modelOptions}
+                autoFilter={autoFilter}
+              />
+              <div className="h-4 w-px bg-border/40 mx-0.5" />
+            </>
+          )}
 
           <button
             type="button"
@@ -285,9 +285,9 @@ export function SearchBar({
             aria-label="Toggle web search"
             title={webSearchEnabled
               ? (() => {
-                  const usesPerplexity = runtimeConfig.searchAgent.provider !== "tavily" &&
-                    (model?.startsWith("perplexity/") || isPresetModel(model));
-                  return `Web search active (via ${usesPerplexity ? "Perplexity" : "Tavily"})`;
+                  const provider = runtimeConfig.searchAgent.provider;
+                  const providerName = resolveSearchBackend(provider)?.displayName ?? "Search Agent";
+                  return `Web search active (via ${providerName})`;
                 })()
               : "Enable web search"}
             onClick={() => onWebSearchChange?.(!webSearchEnabled)}

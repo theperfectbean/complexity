@@ -83,6 +83,13 @@ export async function POST(request: Request) {
   }
 
   const { service, runStore, eventStore } = await buildService();
+  // Enforce local-only models for Console agent
+  if (parsed.data.action === "start" || parsed.data.action === "reply") {
+    const modelId = parsed.data.modelId;
+    if (!modelId.startsWith("ollama/") && !modelId.startsWith("local-openai/")) {
+      return ApiResponse.error("Security Policy Violation: Only local models (Ollama/Local OpenAI) are allowed for infrastructure missions.", 403);
+    }
+  }
 
   const abortController = new AbortController();
   const redis = getRedisClient();

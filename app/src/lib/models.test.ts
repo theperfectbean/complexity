@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { MODELS, getDefaultModel, isPresetModel, isValidModelId, normalizeLegacyModelId, normalizePerplexityModelId } from "@/lib/models";
+import { MODELS, getDefaultModel, isPresetModel, isValidModelId, normalizeLegacyModelId } from "@/lib/models";
 
 describe("models helpers", () => {
   it("returns a valid default model", () => {
@@ -31,11 +31,5 @@ describe("models helpers", () => {
     expect(normalizeLegacyModelId("anthropic/claude-haiku-4-5")).toBe("anthropic/claude-4-5-haiku-latest");
     expect(normalizeLegacyModelId("perplexity/anthropic/claude-haiku-4-5")).toBe("perplexity/anthropic/claude-4-5-haiku-latest");
     expect(normalizeLegacyModelId("claude-sonnet-4-6")).toBe("claude-4-6-sonnet-latest");
-  });
-
-  it("normalizes Perplexity model ids to supported API names", () => {
-    expect(normalizePerplexityModelId("anthropic/claude-4-5-haiku-latest")).toBe("anthropic/claude-haiku-4-5");
-    expect(normalizePerplexityModelId("perplexity/anthropic/claude-4-5-haiku-latest")).toBe("anthropic/claude-haiku-4-5");
-    expect(normalizePerplexityModelId("perplexity/sonar")).toBe("perplexity/sonar");
   });
 });

@@ -1,8 +1,8 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { runPerplexityAgent } from "./search-agent";
+import { runSearchAgent } from "./search-agent";
 
 describe("search-agent.ts", () => {
-  describe("runPerplexityAgent", () => {
+  describe("runSearchAgent", () => {
     beforeEach(() => {
       vi.unstubAllGlobals();
     });
@@ -40,7 +40,7 @@ describe("search-agent.ts", () => {
         { id: "1", role: "user" as const, content: "hello", parts: [{ type: "text" as const, text: "hello" }] },
       ];
 
-      const result = await runPerplexityAgent({
+      const result = await runSearchAgent({
         modelId: "pro-search",
         messages,
         instructions: "System",
@@ -92,7 +92,7 @@ describe("search-agent.ts", () => {
         { id: "1", role: "user" as const, content: "hello", parts: [{ type: "text" as const, text: "hello" }] },
       ];
 
-      const result = await runPerplexityAgent({
+      const result = await runSearchAgent({
         modelId: "pro-search",
         messages,
         instructions: "System",
@@ -105,7 +105,7 @@ describe("search-agent.ts", () => {
       expect(result.text).toBe("Nested fallback response");
     });
 
-    it("normalizes legacy model ids before sending the Perplexity request", async () => {
+    it("normalizes legacy model ids before sending the Search Provider request", async () => {
       const fetchMock = vi.fn()
         .mockResolvedValueOnce({
           ok: true,
@@ -129,7 +129,7 @@ describe("search-agent.ts", () => {
 
       global.fetch = fetchMock as unknown as typeof fetch;
 
-      await runPerplexityAgent({
+      await runSearchAgent({
         modelId: "anthropic/claude-haiku-4-5",
         messages: [
           { id: "1", role: "user" as const, content: "hello", parts: [{ type: "text" as const, text: "hello" }] },
@@ -148,7 +148,7 @@ describe("search-agent.ts", () => {
       });
     });
 
-    it("normalizes wrapped legacy model ids before sending the Perplexity request", async () => {
+    it("normalizes wrapped legacy model ids before sending the Search Provider request", async () => {
       const fetchMock = vi.fn()
         .mockResolvedValueOnce({
           ok: true,
@@ -172,7 +172,7 @@ describe("search-agent.ts", () => {
 
       global.fetch = fetchMock as unknown as typeof fetch;
 
-      await runPerplexityAgent({
+      await runSearchAgent({
         modelId: "perplexity/anthropic/claude-haiku-4-5",
         messages: [
           { id: "1", role: "user" as const, content: "hello", parts: [{ type: "text" as const, text: "hello" }] },

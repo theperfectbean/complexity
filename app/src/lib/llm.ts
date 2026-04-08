@@ -1,46 +1,32 @@
-import { createAnthropic } from "@ai-sdk/anthropic";
-import { createOpenAI } from "@ai-sdk/openai";
 import OpenAI from "openai";
-import { createGoogleGenerativeAI } from "@ai-sdk/google";
-import { createXai } from "@ai-sdk/xai";
-import { createOllama } from "ai-sdk-ollama";
 import { LanguageModel, streamText, UIMessageChunk, UIMessage, generateText, stepCountIs } from "ai";
-import { runPerplexityAgent } from "./search-agent";
 import { runtimeConfig } from "./config";
 import { env } from "./env";
 import { extractCitationsFromResponse, type Citation } from "./extraction-utils";
-import { isPresetModel, normalizeLegacyModelId, normalizePerplexityModelId } from "./models";
+import { isPresetModel, normalizeLegacyModelId } from "./models";
 import { createWebSearchTool, createFetchUrlTool } from "./tools/search";
 import { createImageGenerationTool } from "./tools/image";
 import { getLogger } from "./logger";
 import { getDetailedSettings } from "./settings";
 import { getConfiguredModels, MODEL_SETTINGS_KEYS } from "./model-registry";
-import type { AgentStreamEvent, ReasoningSource, ToolResultEnvelope, ResourceWidgetHint } from "./agent/protocol";
+import type { ReasoningSource, ToolResultEnvelope, ResourceWidgetHint } from "./agent/protocol";
 
-export type ProviderType = "perplexity" | "anthropic" | "openai" | "google" | "xai" | "ollama" | "local-openai";
+import { getProvider, resolveProviderFromModelId } from "./providers/registry";
+import { isSearchPreset, getBackendForPreset, resolveSearchBackend } from "./search/registry";
 
-const PERPLEXITY_PRESET_MODELS = ["fast-search", "pro-search", "deep-research", "advanced-deep-research"] as const;
-const OPEN_MODEL_PREFIXES = [
-  "llama",
-  "qwen",
-  "deepseek",
-  "mistral",
-  "mixtral",
-  "gemma",
-  "phi",
-  "command-r",
-  "dolphin",
-  "nous",
-  "yi-",
-];
+export type ProviderType = string;
 
-function isPerplexityPresetModel(modelId: string): boolean {
-  return PERPLEXITY_PRESET_MODELS.includes(modelId as typeof PERPLEXITY_PRESET_MODELS[number]);
-}
-
-function looksLikeOpenModel(modelId: string): boolean {
-  const normalized = modelId.toLowerCase();
-  return OPEN_MODEL_PREFIXES.some((prefix) => normalized.startsWith(prefix));
+/**
+ * Strips known provider prefixes from a model ID string.
+ */
+export function stripProviderPrefix(modelId: string): string {
+  const knownPrefixes = ["anthropic/", "openai/", "google/", "groq/", "mistral/", "perplexity/", "ollama/", "local-openai/"];
+  for (const p of knownPrefixes) {
+    if (modelId.startsWith(p)) {
+      return modelId.slice(p.length);
+    }
+  }
+  return modelId;
 }
 
 /**
@@ -58,7 +44,7 @@ async function resolveDynamicModel(modelId: string): Promise<{ provider: Provide
   // 2. If the model has a specific providerModelId mapped in the DB, use it
   if (modelDef?.providerModelId) {
     const { provider } = getProviderAndModel(normalizedModelId); // Still use prefix to determine provider
-    return { provider, model: normalizeLegacyModelId(modelDef.providerModelId) };
+    return { provider, model: stripProviderPrefix(normalizeLegacyModelId(modelDef.providerModelId)) };
   }
 
   // 3. Fallback to existing static resolution if no dynamic mapping exists
@@ -89,85 +75,35 @@ export interface GenerationResult {
   };
 }
 
-const PROVIDER_PREFIX_MAP: Record<string, ProviderType> = {
-  "perplexity/": "perplexity",
-  "anthropic/": "anthropic",
-  "openai/": "openai",
-  "google/": "google",
-  "xai/": "xai",
-  "ollama/": "ollama",
-  "local-openai/": "local-openai",
-};
-
 export function getProviderAndModel(modelId: string): { provider: ProviderType; model: string } {
-  const normalizedModelId = normalizeLegacyModelId(modelId);
+  const normalized = normalizeLegacyModelId(modelId);
 
-  // 1. Check for explicit prefix
-  for (const [prefix, provider] of Object.entries(PROVIDER_PREFIX_MAP)) {
-    if (normalizedModelId.startsWith(prefix)) {
-      return { provider, model: normalizedModelId.slice(prefix.length) };
+  // 1. Check registered provider prefixes and bare models
+  const provider = resolveProviderFromModelId(normalized);
+  if (provider) {
+    let modelName = stripProviderPrefix(normalized);
+
+    const registeredPrefix = provider.prefixes.find((p) => normalized.startsWith(p));
+    if (registeredPrefix && modelName === normalized) {
+      modelName = normalized.slice(registeredPrefix.length);
+    }
+
+    return { 
+      provider: provider.id, 
+      model: modelName 
+    };
+  }
+
+  // 2. Search presets route to the owning backend's id
+  if (isSearchPreset(normalized)) {
+    const backend = getBackendForPreset(normalized);
+    if (backend) {
+      return { provider: backend.id, model: normalized };
     }
   }
 
-  // 2. Resolve implicit providers
-  if (isPresetModel(normalizedModelId)) {
-    return { provider: "perplexity", model: normalizedModelId };
-  }
-
-  // 3. Handle specific un-prefixed models
-  const knownPerplexityModels = ["sonar"];
-  if (knownPerplexityModels.includes(normalizedModelId)) {
-    return { provider: "perplexity", model: normalizedModelId };
-  }
-
-  // 4. Heuristics for common un-prefixed provider models
-  if (normalizedModelId.startsWith("claude-") || normalizedModelId.startsWith("claude.")) {
-    return { provider: "anthropic", model: normalizedModelId };
-  }
-  if (normalizedModelId.startsWith("gpt-") || normalizedModelId.startsWith("o1") || normalizedModelId.startsWith("o3") || normalizedModelId.startsWith("o4")) {
-    return { provider: "openai", model: normalizedModelId };
-  }
-  if (normalizedModelId.startsWith("gemini-")) {
-    return { provider: "google", model: normalizedModelId };
-  }
-  if (normalizedModelId.startsWith("grok-")) {
-    return { provider: "xai", model: normalizedModelId };
-  }
-  if (looksLikeOpenModel(normalizedModelId)) {
-    return { provider: "local-openai", model: normalizedModelId };
-  }
-
   // Unknown models should default to user-controlled OpenAI-compatible backends.
-  return { provider: "local-openai", model: normalizedModelId };
-}
-
-/**
- * Normalizes explicit Perplexity model IDs for the target API surface.
- * Direct wrapped models like `perplexity/anthropic/...` should remain intact.
- */
-function resolvePerplexityModelName(modelName: string): string {
-  if (modelName.startsWith("perplexity/")) {
-    return modelName.slice("perplexity/".length);
-  }
-  return modelName;
-}
-
-/**
- * Maps internal model IDs to IDs that Perplexity API understands.
- * Native Perplexity chat models require the `perplexity/` prefix in the Agent API,
- * while presets and wrapped third-party models should be passed through unchanged.
- */
-function mapToPerplexityModel(modelName: string): string {
-  const resolved = resolvePerplexityModelName(modelName);
-
-  if (isPerplexityPresetModel(resolved)) {
-    return resolved;
-  }
-  if (resolved === "sonar") {
-    return "perplexity/sonar";
-  }
-
-  return normalizePerplexityModelId(resolved);
+  return { provider: "local-openai", model: normalized };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -192,7 +128,7 @@ export interface NormalizedLlmEventHandlers {
     };
   }) => void | Promise<void>;
   onError?: (error: unknown) => void | Promise<void>;
-  onStepFinish?: (step: any) => void | Promise<void>;
+  onStepFinish?: (step: unknown) => void | Promise<void>;
 }
 
 export function extractAnthropicThinking(part: unknown): string | null {
@@ -383,108 +319,60 @@ export async function streamAgentResponse(args: {
 }
 
 export async function getLanguageModel(modelId: string, keys: Record<string, string | null>): Promise<LanguageModel> {
-  const { provider, model: modelName } = await resolveDynamicModel(modelId);
-
-  const factories: Record<Exclude<ProviderType, "perplexity">, () => LanguageModel> = {
-    anthropic: () => {
-      const key = keys["ANTHROPIC_API_KEY"];
-      if (!key) throw new Error("ANTHROPIC_API_KEY is not configured");
-      const model = (runtimeConfig.llm.modelAliases.anthropic?.[modelName]) || modelName;
-      return createAnthropic({ apiKey: key })(model);
-    },
-    openai: () => {
-      const key = keys["OPENAI_API_KEY"];
-      if (!key) throw new Error("OPENAI_API_KEY is not configured");
-      const model = (runtimeConfig.llm.modelAliases.openai?.[modelName]) || modelName;
-      return createOpenAI({ apiKey: key })(model);
-    },
-    google: () => {
-      const key = keys["GOOGLE_GENERATIVE_AI_API_KEY"];
-      if (!key) throw new Error("GOOGLE_GENERATIVE_AI_API_KEY is not configured");
-      const model = (runtimeConfig.llm.modelAliases.google?.[modelName]) || modelName;
-      return createGoogleGenerativeAI({ apiKey: key })(model);
-    },
-    xai: () => {
-      const key = keys["XAI_API_KEY"];
-      if (!key) throw new Error("XAI_API_KEY is not configured");
-      const model = (runtimeConfig.llm.modelAliases.xai?.[modelName]) || modelName;
-      return createXai({ apiKey: key })(model);
-    },
-    ollama: () => {
-      const baseUrl = keys["OLLAMA_BASE_URL"] || runtimeConfig.llm.ollamaBaseUrl;
-      return createOllama({ baseURL: baseUrl })(modelName);
-    },
-    "local-openai": () => {
-      const baseUrl = keys["LOCAL_OPENAI_BASE_URL"];
-      if (!baseUrl) throw new Error("LOCAL_OPENAI_BASE_URL is not configured");
-      return createOpenAI({ 
-        baseURL: baseUrl,
-        apiKey: keys["LOCAL_OPENAI_API_KEY"] || runtimeConfig.llm.localOpenAiApiKeyFallback
-      })(modelName);
-    },
-  };
-
-  if (provider === "perplexity") {
-    const perplexityKey = keys["PERPLEXITY_API_KEY"];
-    if (!perplexityKey) throw new Error("PERPLEXITY_API_KEY is not configured");
-    
-    const effectiveModel = mapToPerplexityModel(modelName);
-
-    return createOpenAI({
-      apiKey: perplexityKey,
-      baseURL: "https://api.perplexity.ai",
-    }).chat(effectiveModel);
+  const { provider: providerId, model: modelName } = await resolveDynamicModel(modelId);
+  const providerDef = getProvider(providerId);
+  
+  if (!providerDef) {
+    throw new Error(`Provider ${providerId} is not fully implemented or registered.`);
   }
 
-  const factory = factories[provider];
-  if (!factory) {
-    throw new Error(`Provider ${provider} is not yet fully implemented.`);
-  }
-
-  return factory();
+  // Use provider-specific model aliases if defined
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const aliases = (runtimeConfig.llm.modelAliases as any)[providerId] as Record<string, string>;
+  return providerDef.createModel(modelName, keys, aliases);
 }
 
 export async function runGeneration(options: GenerationOptions): Promise<GenerationResult> {
-  const { provider, model: modelName } = await resolveDynamicModel(options.modelId);
+  const { provider: providerId, model: modelName } = await resolveDynamicModel(options.modelId);
   const log = getLogger(options.requestId);
+
+  const searchBackendId = (options.keys["SEARCH_PROVIDER_TYPE"] as string) ?? runtimeConfig.searchAgent.provider;
+  const searchBackend = resolveSearchBackend(searchBackendId);
 
   const isSearchAgentRequest =
     !!options.webSearch ||
-    isPresetModel(options.modelId) ||
-    isPerplexityPresetModel(options.modelId);
+    isSearchPreset(options.modelId) ||
+    isSearchPreset(modelName) ||
+    isPresetModel(options.modelId);
 
-  // Wrapped third-party models (e.g. perplexity/anthropic/claude-*) are only valid on the
-  // Agent API, not the chat completions endpoint. Always route them through the Agent API.
-  const isWrappedPerplexityThirdPartyModel =
-    provider === "perplexity" &&
-    !isPresetModel(options.modelId) &&
-    !isPerplexityPresetModel(options.modelId);
+  const isWrappedBackendModel =
+    !!searchBackend &&
+    providerId === searchBackend.id &&
+    !isSearchPreset(options.modelId) &&
+    !isPresetModel(options.modelId);
 
-  const searchAgentProvider = (options.keys["SEARCH_PROVIDER_TYPE"] as string | null | undefined) || runtimeConfig.searchAgent.provider;
-
-  if ((isSearchAgentRequest || isWrappedPerplexityThirdPartyModel) && (provider === "perplexity" || searchAgentProvider === "perplexity")) {
-    log.info({ modelId: options.modelId, modelName, provider }, "Routing to Perplexity Agent API");
+  if (searchBackend && (isSearchAgentRequest || isWrappedBackendModel)) {
+    log.info({ modelId: options.modelId, modelName, provider: providerId }, "Routing to Search Provider Agent API");
     try {
-      const primaryModel = mapToPerplexityModel(modelName);
-      
-      const isPreset = isPresetModel(options.modelId) || 
-                       isPerplexityPresetModel(options.modelId);
+      const primaryModel = searchBackend.mapModelId?.(modelName) ?? modelName;
+
+      const isPreset = isSearchPreset(options.modelId) || isPresetModel(options.modelId);
 
       const modelId = isPreset ? primaryModel : Array.from(new Set([
         primaryModel,
-        "perplexity/sonar"
+        ...(searchBackend.fallbackModelId ? [searchBackend.fallbackModelId] : []),
       ])).slice(0, 5);
 
-      const result = await runPerplexityAgent({
+      const result = await searchBackend.run({
         modelId,
         messages: options.messages,
         instructions: options.system || "",
         webSearch: !!options.webSearch,
-        apiKey: options.keys["PERPLEXITY_API_KEY"] || options.keys["SEARCH_API_KEY"] || undefined,
+        apiKey: options.keys[searchBackend.apiKeySettingKeys[0]] || options.keys[searchBackend.apiKeySettingKeys[1]] || undefined,
         writer: options.writer,
         textId: options.textId,
         requestId: options.requestId,
-      });
+      }, options.keys);
 
       return {
         text: result.text,
@@ -507,7 +395,7 @@ export async function runGeneration(options: GenerationOptions): Promise<Generat
 
         const fallbackText = text.trim();
         if (!fallbackText) {
-          log.error({ modelId: options.modelId, provider }, "Search Provider fallback completed without text");
+          log.error({ modelId: options.modelId, provider: providerId }, "Search Provider fallback completed without text");
           throw new Error("Search Provider fallback completed without text output");
         }
 
@@ -660,7 +548,7 @@ export async function runGeneration(options: GenerationOptions): Promise<Generat
     if (!assistantText.trim()) {
       log.error({
         modelId: options.modelId,
-        provider,
+        provider: providerId,
         finishReason,
         usage,
       }, "Direct provider stream completed without assistant text");

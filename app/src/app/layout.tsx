@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from "next";
 import { headers } from "next/headers";
-import { AppShell } from "@/components/layout/AppShell";
 import { AppProviders } from "@/lib/auth-client";
 import { GeistSans } from "geist/font/sans";
 import "./globals.css";
@@ -38,7 +37,7 @@ export default async function RootLayout({
     <html lang="en" suppressHydrationWarning className={GeistSans.variable}>
       <body className="bg-background font-sans text-foreground antialiased selection:bg-primary/10 selection:text-primary">
         <AppProviders nonce={nonce}>
-          <AppShell>{children}</AppShell>
+          {children}
         </AppProviders>
       </body>
     </html>

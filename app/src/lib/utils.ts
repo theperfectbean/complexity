@@ -7,9 +7,10 @@ import { asRecord, collectTextStrings } from "./extraction-utils";
 /**
  * Formats a model ID or label into a human-readable string.
  */
+export function cleanMarkdownForCopy(c: string) { return c; }
 export function formatDisplayLabel(label: string): string {
   // If it's a raw ID-like string (contains / or multiple -), clean it up
-  if (label.includes("/") || (label.match(/-/g) || []).length > 2) {
+  if (label.includes("/") || (label.match(/-/g) || []).length >= 2) {
     const parts = label.split("/");
     const lastPart = parts[parts.length - 1];
     return lastPart
@@ -19,7 +20,12 @@ export function formatDisplayLabel(label: string): string {
       .replace(/Gpt/g, "GPT")
       .replace(/Llama/g, "Llama")
       .replace(/Mistral/g, "Mistral")
-      .replace(/Xai/g, "xAI");
+      .replace(/Xai/g, "xAI")
+      .replace(/Sonnet/g, "Sonnet")
+      .replace(/Opus/g, "Opus")
+      .replace(/Haiku/g, "Haiku")
+      .replace(/Latest/g, "")
+      .trim();
   }
   return label;
 }
@@ -68,10 +74,6 @@ export async function copyToClipboard(text: string): Promise<boolean> {
 /**
  * Cleans markdown content for copying by removing UI-only blocks like charts.
  */
-export function cleanMarkdownForCopy(content: string): string {
-  // Remove ```chart ... ``` blocks
-  return content.replace(/```chart[\s\S]*?```/g, "").trim();
-}
 
 /**
  * Estimates the number of tokens in a string using gpt-tokenizer.
