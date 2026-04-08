@@ -16,6 +16,8 @@ export class RedisAgentEventStore {
     const key = keyFor(runId);
     await this.redis.rpush(key, JSON.stringify(event));
     await this.redis.expire(key, EVENT_TTL_SECONDS);
+    // Notify the streaming route that a new event is available
+    await this.redis.publish(`agent:events:new:${runId}`, "1");
   }
 
   async getAll(runId: string): Promise<AgentStreamEvent[]> {

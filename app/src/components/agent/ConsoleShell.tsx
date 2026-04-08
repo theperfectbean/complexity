@@ -31,6 +31,8 @@ export function ConsoleShell() {
   const [model, setModel] = useState(getLocalDefaultModel());
   const [inputValue, setInputValue] = useState("");
   const [activeRunId, setActiveRunId] = useState<string | null>(null);
+  const [sessionMessages, setSessionMessages] = useState<Array<{ role: string; content: unknown }>>([]);
+  const userMessageRef = useRef<string>("");
   const [events, setEvents] = useState<AgentStreamEvent[]>([]);
   const [plannerState, setPlannerState] = useState<MissionPlannerViewState>(INITIAL_PLANNER_STATE);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -75,7 +77,20 @@ export function ConsoleShell() {
           } else if (event.type === "environment_update") {
             setEnvState((prev) => ({ ...prev, ...event.environment }));
           }
-          if (event.type === "run_status" && (event.status === "completed" || event.status === "cancelled")) {
+          if (event.type === "run_status" && event.status === "completed") {
+            setEvents(prev => {
+              const lastAssistant = [...prev].reverse().find(e => e.type === "assistant_message");
+              const assistantText = lastAssistant?.type === "assistant_message" ? lastAssistant.message.text : "";
+              setSessionMessages(msgs => [
+                ...msgs,
+                { role: "user", content: userMessageRef.current },
+                { role: "assistant", content: assistantText },
+              ]);
+              return prev;
+            });
+            es.close();
+            eventSourceRef.current = null;
+          } else if (event.type === "run_status" && event.status === "cancelled") {
             es.close();
             eventSourceRef.current = null;
           }
@@ -108,6 +123,7 @@ export function ConsoleShell() {
         setActiveRunId(null);
         setPlannerState(INITIAL_PLANNER_STATE);
         setEnvState({});
+        setSessionMessages([]);
         break;
       case 'docs':
         setDocsOpen(true);
@@ -154,6 +170,7 @@ export function ConsoleShell() {
       } else {
         setEvents([]);
         setPlannerState(INITIAL_PLANNER_STATE);
+        userMessageRef.current = userMessage;
         
         const res = await fetch("/api/agent/runs", {
           method: "POST",
@@ -164,6 +181,7 @@ export function ConsoleShell() {
             modelId: model,
             system: CLUSTER_SYSTEM_PROMPT,
             userMessage,
+            messages: sessionMessages,
           }),
         });
 

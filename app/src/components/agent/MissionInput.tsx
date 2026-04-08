@@ -28,14 +28,25 @@ export function MissionInput({
   envPrefix
 }: MissionInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const historyRef = useRef<string[]>([]);
+  const historyIndexRef = useRef<number>(-1);
+  const draftRef = useRef<string>("");
 
   const handleSubmit = (e?: React.FormEvent) => {
     e?.preventDefault();
     const trimmed = value.trim();
     if (trimmed && !disabled) {
-      if (trimmed.startsWith('/') && onSlashCommand) {
+      // Save to history (avoid duplicates at top)
+      if (historyRef.current[0] !== trimmed) {
+        historyRef.current.unshift(trimmed);
+        if (historyRef.current.length > 100) historyRef.current.pop();
+      }
+      historyIndexRef.current = -1;
+      draftRef.current = "";
+
+      if (trimmed.startsWith("/") && onSlashCommand) {
         onSlashCommand(trimmed);
-        onValueChange('');
+        onValueChange("");
       } else {
         onSubmit(trimmed);
       }
@@ -43,6 +54,24 @@ export function MissionInput({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "ArrowUp" && !e.shiftKey) {
+      const hist = historyRef.current;
+      if (hist.length === 0) return;
+      if (historyIndexRef.current === -1) draftRef.current = value;
+      const next = Math.min(historyIndexRef.current + 1, hist.length - 1);
+      historyIndexRef.current = next;
+      e.preventDefault();
+      onValueChange(hist[next]);
+      return;
+    }
+    if (e.key === "ArrowDown" && !e.shiftKey) {
+      if (historyIndexRef.current === -1) return;
+      const next = historyIndexRef.current - 1;
+      historyIndexRef.current = next;
+      e.preventDefault();
+      onValueChange(next === -1 ? draftRef.current : historyRef.current[next]);
+      return;
+    }
     if (e.key === "Enter" && (e.metaKey || e.ctrlKey || !e.shiftKey)) {
       if (!e.shiftKey) e.preventDefault();
       handleSubmit();
@@ -78,7 +107,7 @@ export function MissionInput({
         
         <div className="flex items-center justify-between px-3 pb-2 pt-1">
           <div className="flex items-center gap-2">
-            <ModelSelector excludeCategories={["Anthropic", "OpenAI", "Google", "xAI", "Search"]} 
+            <ModelSelector excludeCategories={["Search"]} 
               model={model}
               onModelChange={onModelChange}
             />

@@ -36,5 +36,11 @@ KEY SERVICE DETAILS:
 - Storage master: pve02 at /mnt/staging (~938GB btrfs), NFS to pve01 + pve03
 - Infrastructure repo: http://git.internal.lan/gary/infrastructure
 
-ALLOWED sshExec COMMANDS: uptime, df, systemctl-status, qm-list, pct-list
+TOOLS AVAILABLE:
+- listHosts: list all cluster hosts and containers
+- sshExec: run a shell command on a remote host (streaming stdout/stderr)
+- writeFile: write or overwrite a file on a remote host
+
+For config edits, prefer writeFile over piping heredocs through sshExec.
+Always read the existing file with sshExec (cat) before writing with writeFile.
 `.trim();

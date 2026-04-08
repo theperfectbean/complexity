@@ -128,3 +128,35 @@ export function createSshExecTool(
     execute,
   };
 }
+
+export interface WriteFileInput {
+  hostId: string;
+  path: string;
+  content: string;
+  mode?: string; // e.g. "0644"
+}
+
+export interface WriteFileData {
+  hostId: string;
+  path: string;
+  bytesWritten: number;
+}
+
+export type WriteFileResult = ToolResultEnvelope<WriteFileData>;
+
+export function createWriteFileTool(
+  execute: AgentToolDefinition<WriteFileInput, WriteFileData>["execute"],
+): AgentToolDefinition<WriteFileInput, WriteFileData> {
+  return {
+    name: "writeFile",
+    description: "Write (or overwrite) a file on a remote host via SSH using a heredoc. Use for config edits and script deployment.",
+    inputSchema: z.object({
+      hostId: z.string().min(1),
+      path: z.string().min(1),
+      content: z.string(),
+      mode: z.string().optional(),
+    }) as unknown as z.ZodType<WriteFileInput>,
+    widgetHint: { type: "diff" },
+    execute,
+  };
+}

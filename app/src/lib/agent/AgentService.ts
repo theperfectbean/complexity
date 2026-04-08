@@ -222,17 +222,27 @@ export class AgentService {
   private toCoreMsgs(msgs: unknown[]): unknown[] {
     return msgs;
   }
+  private trimMessageHistory(
+    messages: AgentRunState["messageHistory"],
+    maxMessages = 40,
+  ): AgentRunState["messageHistory"] {
+    // Always keep the first message (original user request) and the most recent messages.
+    if (messages.length <= maxMessages) return messages;
+    return [messages[0], ...messages.slice(-(maxMessages - 1))];
+  }
+
 
   private async continueAgentLoop(
     state: AgentRunState,
     args: { model: LanguageModel; system: string; actorId: string; abortSignal?: AbortSignal },
   ) {
+
     const sdkTools = this.buildSdkTools(state, args.actorId);
 
     await this.deps.llm.streamAgentResponse({
       model: args.model,
       system: args.system,
-      messages: state.messageHistory as never,
+      messages: this.trimMessageHistory(state.messageHistory) as never,
       tools: sdkTools,
       maxSteps: state.approvalState === "approved" ? 20 : 1,
       abortSignal: args.abortSignal,

@@ -2,10 +2,7 @@ import { NextResponse } from "next/server";
 import { requireUserOrApiToken } from "@/lib/auth-server";
 import { getRedisClient } from "@/lib/redis";
 import { RedisAgentEventStore } from "@/lib/agent/event-store";
-import type { AgentStreamEvent } from "@/lib/agent/protocol";
-
-const POLL_INTERVAL_MS = 300;
-const MAX_IDLE_MS = 5 * 60 * 1000;
+import { type AgentStreamEvent, isAgentStreamEvent } from "@/lib/agent/protocol";
 
 function isTerminalEvent(event: AgentStreamEvent): boolean {
   return (
@@ -31,23 +28,46 @@ export async function GET(request: Request) {
         controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
       };
 
+      // Replay historical events first
       const existing = await eventStore.getAll(runId);
       for (const event of existing) send(event);
-      let cursor = existing.length;
-
       if (existing.some(isTerminalEvent)) { controller.close(); return; }
 
-      let idleMs = 0;
-      while (true) {
-        await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
-        idleMs += POLL_INTERVAL_MS;
+      // Subscribe to new events via Redis pub/sub
+      const redis = getRedisClient();
+      const subscriber = redis?.duplicate();
+      if (!subscriber) { controller.close(); return; }
+
+      const channel = `agent:events:new:${runId}`;
+      let cursor = existing.length;
+
+      const cleanup = () => {
+        subscriber.unsubscribe(channel);
+        subscriber.quit();
+      };
+
+      subscriber.subscribe(channel);
+      subscriber.on("message", async (_ch, _msg) => {
         const next = await eventStore.getFrom(runId, cursor);
         for (const event of next) send(event);
         cursor += next.length;
-        if (next.some(isTerminalEvent)) { controller.close(); return; }
-        if (next.length > 0) { idleMs = 0; }
-        else if (idleMs >= MAX_IDLE_MS) { controller.close(); return; }
-      }
+        if (next.some(isTerminalEvent)) {
+          cleanup();
+          controller.close();
+        }
+      });
+
+      // Idle timeout
+      const idleTimer = setTimeout(() => {
+        cleanup();
+        controller.close();
+      }, 5 * 60 * 1000);
+
+      request.signal.addEventListener("abort", () => {
+        clearTimeout(idleTimer);
+        cleanup();
+        controller.close();
+      });
     },
   });
 
