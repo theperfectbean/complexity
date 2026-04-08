@@ -30,7 +30,7 @@ test.describe("Full Password Reset Flow", () => {
     await page.click('button[type="submit"]');
     await expect(page.locator('text="If an account exists for that email, we have sent password reset instructions."')).toBeVisible();
 
-    // 4. Retrieve reset link from docker logs
+    // 4. Retrieve reset link from systemd logs
     let resetLink: string | null = null;
     const maxRetries = 15;
     for (let i = 0; i < maxRetries; i++) {
@@ -38,8 +38,7 @@ test.describe("Full Password Reset Flow", () => {
             // Wait a bit for the log to be written
             await new Promise(resolve => setTimeout(resolve, 1000));
             
-            // Note: We are in app/ so we need to go up one level to reach docker-compose.yml
-            const logs = execSync("docker compose -f ../docker-compose.yml -f ../docker-compose.dev.yml logs app").toString();
+            const logs = execSync("journalctl -u complexity-app -n 100").toString();
             // Use string for RegExp constructor to avoid escaping issues in this environment
             const pattern = "\\[Password Reset\\] Link for " + email + ": (https?://[^\\s]+)";
             const match = logs.match(new RegExp(pattern));
@@ -56,7 +55,7 @@ test.describe("Full Password Reset Flow", () => {
     }
 
     if (!resetLink) {
-        throw new Error("Could not find reset link in docker logs");
+        throw new Error("Could not find reset link in systemd logs");
     }
 
     // 5. Navigate to reset link

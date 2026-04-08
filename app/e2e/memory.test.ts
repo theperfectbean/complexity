@@ -9,8 +9,8 @@ test.describe("Memory Feature", () => {
     // Explicitly clean up all test users after the test run
     console.log("Cleaning up test users...");
     try {
-      // Use direct docker-compose exec to psql for reliable cleanup in this environment
-      execSync('docker compose exec -e PAGER=cat postgres psql -U complexity -d complexity -c "DELETE FROM users WHERE email LIKE \'%test%\' OR email LIKE \'%example.com%\';"');
+      // Use direct psql for reliable cleanup in this environment
+      execSync('psql -U complexity -d complexity -c "DELETE FROM users WHERE email LIKE \'%test%\' OR email LIKE \'%example.com%\';"');
       console.log("Test users cleaned up successfully.");
     } catch (err) {
       console.error("Failed to clean up test users:", err);

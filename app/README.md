@@ -10,7 +10,7 @@ Self-hosted agentic AI chat application and cluster sysadmin console.
 - **Cache/Events**: Redis (for settings cache and agent event streaming)
 - **AI Integration**: Vercel AI SDK v6
 - **Local Models**: Ollama integration via `ai-sdk-ollama`
-- **Infrastructure**: Native systemd services (no Docker in production)
+- **Infrastructure**: Native systemd services
 
 ## Key Features
 

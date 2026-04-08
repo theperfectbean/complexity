@@ -30,7 +30,7 @@ CONTAINER IPs AND PURPOSES:
 - 192.168.0.111  CT 111: adguard-secondary
 
 KEY SERVICE DETAILS:
-- All services use native systemd (not Docker)
+- All services use native systemd
 - Complexity app: /opt/complexity/app, service: complexity-app.service, port 3000
 - Caddy config: /etc/caddy/Caddyfile on CT 107, reload: systemctl reload caddy
 - Storage master: pve02 at /mnt/staging (~938GB btrfs), NFS to pve01 + pve03

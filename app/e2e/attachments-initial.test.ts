@@ -11,7 +11,7 @@ test.describe("Initial Attachments", () => {
   test.afterAll(async () => {
     console.log("Cleaning up test users...");
     try {
-      execSync('docker compose exec -e PAGER=cat postgres psql -U complexity -d complexity -c "DELETE FROM users WHERE email LIKE \'%test%\' OR email LIKE \'%example.com%\';"');
+      execSync('psql -U complexity -d complexity -c "DELETE FROM users WHERE email LIKE \'%test%\' OR email LIKE \'%example.com%\';"');
       console.log("Test users cleaned up successfully.");
     } catch (err) {
       console.error("Failed to clean up test users:", err);
