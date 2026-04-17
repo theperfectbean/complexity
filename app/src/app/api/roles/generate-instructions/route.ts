@@ -6,7 +6,7 @@ import crypto from "node:crypto";
 
 import { auth } from "../../../../auth";
 import { resolveRequestedModel } from "../../../../lib/available-models";
-import { getLanguageModel } from "../../../../lib/llm";
+import { getLanguageModel, getProviderRequestOptions } from "../../../../lib/llm";
 import { getApiKeys } from "../../../../lib/settings";
 import { runtimeConfig } from "../../../../lib/config";
 import { getRedisClient } from "../../../../lib/redis";
@@ -59,10 +59,12 @@ Focus on:
     }
 
     const langModel = await getLanguageModel(safeModel, keys);
+    const { providerOptions } = await getProviderRequestOptions(safeModel);
     const result = await generateText({
       model: langModel,
       system: systemInstructions,
       messages: [{ role: "user", content: [{ type: "text", text: prompt }] }] as ModelMessage[],
+      providerOptions,
     });
 
     if (redis && result.text) {

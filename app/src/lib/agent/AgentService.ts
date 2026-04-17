@@ -4,7 +4,7 @@ import { tool } from "ai";
 import { getLogger } from "@/lib/logger";
 import { DraftMissionPlanInputSchema, type DraftMissionPlanInput, type AgentStreamEvent } from "@/lib/agent/protocol";
 import { type AgentToolDefinition, type ToolExecutionContext } from "@/lib/agent/tools";
-import { streamAgentResponse } from "@/lib/llm";
+import { getProviderRequestOptions, streamAgentResponse } from "@/lib/llm";
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const log = getLogger("AgentService");
@@ -228,11 +228,13 @@ export class AgentService {
     args: { model: LanguageModel; system: string; actorId: string; abortSignal?: AbortSignal },
   ) {
     const sdkTools = this.buildSdkTools(state, args.actorId);
+    const { providerOptions } = await getProviderRequestOptions(state.modelId);
 
     await this.deps.llm.streamAgentResponse({
       model: args.model,
       system: args.system,
       messages: state.messageHistory as never,
+      providerOptions,
       tools: sdkTools,
       maxSteps: state.approvalState === "approved" ? 20 : 1,
       abortSignal: args.abortSignal,

@@ -1,5 +1,12 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { runGeneration, getProviderAndModel, getLanguageModel, GenerationOptions, generateThreadTitle } from "./llm";
+import {
+  runGeneration,
+  getProviderAndModel,
+  getLanguageModel,
+  GenerationOptions,
+  generateThreadTitle,
+  getProviderRequestOptionsForProvider,
+} from "./llm";
 import * as searchAgent from "./search-agent";
 import { UIMessage, generateText, streamText } from "ai";
 
@@ -155,6 +162,34 @@ describe("llm.ts", () => {
       })).rejects.toThrow("Provider stream completed without text output");
     });
 
+    it("forces OpenAI system prompts to use the system role", async () => {
+      vi.mocked(streamText).mockReturnValue({
+        fullStream: (async function* () {
+          yield { type: "text-delta", text: "hello" };
+        })(),
+      } as unknown as ReturnType<typeof streamText>);
+
+      const result = await runGeneration({
+        modelId: "openai/gpt-5.4",
+        messages: [{ role: "user", content: "hi" } as unknown as UIMessage],
+        writer: { write: vi.fn() } as unknown as GenerationOptions["writer"],
+        textId: "test-id",
+        requestId: "req-id",
+        keys: { "OPENAI_API_KEY": "test" },
+      });
+
+      expect(result.text).toBe("hello");
+      expect(streamText).toHaveBeenCalledWith(
+        expect.objectContaining({
+          providerOptions: {
+            openai: {
+              systemMessageMode: "system",
+            },
+          },
+        }),
+      );
+    });
+
     it("throws when search-provider fallback completes without text output", async () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       vi.mocked(searchAgent.runSearchAgent).mockRejectedValue(new Error("agent stream failed") as any);
@@ -230,6 +265,22 @@ describe("llm.ts", () => {
       const title = await generateThreadTitle(query, "anthropic/claude-3", keys);
       
       expect(title).toBe(query.slice(0, 60) + "...");
+    });
+  });
+
+  describe("getProviderRequestOptionsForProvider", () => {
+    it("forces OpenAI requests to keep system messages as system", () => {
+      expect(getProviderRequestOptionsForProvider("openai")).toEqual({
+        providerOptions: {
+          openai: {
+            systemMessageMode: "system",
+          },
+        },
+      });
+    });
+
+    it("returns no provider overrides for non-OpenAI providers", () => {
+      expect(getProviderRequestOptionsForProvider("anthropic")).toEqual({});
     });
   });
 });

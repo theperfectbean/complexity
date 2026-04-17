@@ -1,6 +1,6 @@
 import { logger } from "@/lib/logger";
 import { generateText } from "ai";
-import { getLanguageModel } from "@/lib/llm";
+import { getLanguageModel, getProviderRequestOptions } from "@/lib/llm";
 import { getApiKeys } from "@/lib/settings";
 import { runtimeConfig } from "../config";
 import { extractJsonObject } from "../extraction-utils";
@@ -136,11 +136,13 @@ export async function extractMemories({
   
   const keys = await getApiKeys();
   const model = await getLanguageModel(runtimeConfig.memory.extractionModel, keys);
+  const { providerOptions } = await getProviderRequestOptions(runtimeConfig.memory.extractionModel);
 
   const { text: raw } = await generateText({
     model,
     system: runtimeConfig.memory.extractionInstructions,
     prompt: `Existing memories:\n${JSON.stringify(existingMemories)}\n\nUser:\n${userMessage}\n\nAssistant:\n${assistantMessage}`,
+    providerOptions,
   });
 
   const parsed = extractJsonObject(raw) ?? {};

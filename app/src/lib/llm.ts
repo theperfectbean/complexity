@@ -75,6 +75,12 @@ export interface GenerationResult {
   };
 }
 
+export type LlmProviderOptions = {
+  openai?: {
+    systemMessageMode: "system";
+  };
+};
+
 export function getProviderAndModel(modelId: string): { provider: ProviderType; model: string } {
   const normalized = normalizeLegacyModelId(modelId);
 
@@ -104,6 +110,25 @@ export function getProviderAndModel(modelId: string): { provider: ProviderType; 
 
   // Unknown models should default to user-controlled OpenAI-compatible backends.
   return { provider: "local-openai", model: normalized };
+}
+
+export function getProviderRequestOptionsForProvider(providerId: ProviderType): { providerOptions?: LlmProviderOptions } {
+  if (providerId !== "openai") {
+    return {};
+  }
+
+  return {
+    providerOptions: {
+      openai: {
+        systemMessageMode: "system",
+      },
+    },
+  };
+}
+
+export async function getProviderRequestOptions(modelId: string): Promise<{ providerOptions?: LlmProviderOptions }> {
+  const { provider } = await resolveDynamicModel(modelId);
+  return getProviderRequestOptionsForProvider(provider);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -203,6 +228,7 @@ export async function streamAgentResponse(args: {
   messages: Array<{ role: "system" | "user" | "assistant" | "tool"; content: unknown }>;
   tools?: Record<string, unknown>;
   maxSteps?: number;
+  providerOptions?: LlmProviderOptions;
   handlers: NormalizedLlmEventHandlers;
   abortSignal?: AbortSignal;
 }) {
@@ -220,6 +246,7 @@ export async function streamAgentResponse(args: {
     system: args.system,
     messages: args.messages as never,
     tools: args.tools as never,
+    providerOptions: args.providerOptions,
     abortSignal: args.abortSignal,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     stopWhen: stepCountIs(args.maxSteps ?? 20) as any,
@@ -389,6 +416,7 @@ export async function runGeneration(options: GenerationOptions): Promise<Generat
       
       try {
         const langModel = await getLanguageModel(options.modelId, options.keys);
+        const { providerOptions } = getProviderRequestOptionsForProvider(providerId);
         const { convertMessagesToCore } = await import("./chat-utils");
         const coreMessages = await convertMessagesToCore(options.messages, log);
 
@@ -396,6 +424,7 @@ export async function runGeneration(options: GenerationOptions): Promise<Generat
           model: langModel,
           system: options.system,
           messages: coreMessages as never,
+          providerOptions,
         });
 
         const fallbackText = text.trim();
@@ -419,6 +448,7 @@ export async function runGeneration(options: GenerationOptions): Promise<Generat
 
   try {
     const model = await getLanguageModel(options.modelId, options.keys);
+    const { providerOptions } = getProviderRequestOptionsForProvider(providerId);
 
     options.writer.write({
       type: "data-call-start",
@@ -453,6 +483,7 @@ export async function runGeneration(options: GenerationOptions): Promise<Generat
       model,
       system: options.system || "",
       messages: coreMessages as never,
+      providerOptions,
       tools: (() => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const tools: Record<string, any> = {};
@@ -611,10 +642,12 @@ export async function generateImage(prompt: string, keys: Record<string, string 
 export async function generateThreadTitle(query: string, modelId: string, keys: Record<string, string | null>): Promise<string> {
   try {
     const model = await getLanguageModel(modelId, keys);
+    const { providerOptions } = await getProviderRequestOptions(modelId);
     const { text } = await generateText({
       model,
       system: "You are a concise assistant that summarizes user queries into a concise, high-quality thread title (3-6 words). Do not use quotes or punctuation. Return ONLY the title.",
       prompt: `Summarize this query: ${query}`,
+      providerOptions,
       abortSignal: AbortSignal.timeout(3000),
     });
     return text.trim().replace(/^["'](.*)["']$/, "$1") || query.slice(0, 60) + (query.length > 60 ? "..." : "");
