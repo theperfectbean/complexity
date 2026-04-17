@@ -133,10 +133,18 @@ export async function runSearchAgent(options: SearchAgentOptions): Promise<Searc
     return true;
   });
 
+  // Embed instructions as an explicit system message in the input array rather than
+  // relying on the separate `instructions` field. When Perplexity routes cross-provider
+  // models (e.g. openai/gpt-5.4) it converts the `instructions` field into a `developer`
+  // role message, which GPT-5.x rejects. An explicit `system` role in `input` is passed
+  // through unchanged to the underlying provider.
+  const inputWithInstructions = instructions
+    ? [{ type: "message", role: "system", content: [{ type: "input_text", text: instructions }] }, ...filteredInput]
+    : filteredInput;
+
   const requestBodyBase = {
     ...modelConfig,
-    input: filteredInput,
-    instructions: instructions,
+    input: inputWithInstructions,
     tools: webSearch ? runtimeConfig.searchAgent.webTools : [],
   };
 
@@ -145,7 +153,7 @@ export async function runSearchAgent(options: SearchAgentOptions): Promise<Searc
     stream: true,
   };
 
-  log.info({ modelConfig, inputCount: filteredInput.length, instructionsLength: instructions.length }, "Sending request to Search Provider Agent API");
+  log.info({ modelConfig, inputCount: inputWithInstructions.length, instructionsLength: instructions.length }, "Sending request to Search Provider Agent API");
   // log.debug({ requestBody }, "Search Provider Agent API request body");
 
   // Calculate prompt tokens
