@@ -358,9 +358,14 @@ export async function runGeneration(options: GenerationOptions): Promise<Generat
 
       const isPreset = isSearchPreset(options.modelId) || isPresetModel(options.modelId);
 
+      // Only include the Perplexity fallback when the primary model is a native Perplexity model.
+      // Cross-provider models (e.g. anthropic/claude-sonnet-4-6) sent via the Perplexity /v1/responses
+      // endpoint must use the single `model` field — mixing them with a bare "sonar" in a `models`
+      // array causes Perplexity to reject the request.
+      const isPrimaryNativeBackendModel = !primaryModel.includes("/") || primaryModel.startsWith(`${searchBackend.id}/`);
       const modelId = isPreset ? primaryModel : Array.from(new Set([
         primaryModel,
-        ...(searchBackend.fallbackModelId ? [searchBackend.fallbackModelId] : []),
+        ...(searchBackend.fallbackModelId && isPrimaryNativeBackendModel ? [searchBackend.fallbackModelId] : []),
       ])).slice(0, 5);
 
       const result = await searchBackend.run({
