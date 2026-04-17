@@ -41,10 +41,13 @@ async function resolveDynamicModel(modelId: string): Promise<{ provider: Provide
   const allModels = getConfiguredModels(settings);
   const modelDef = allModels.find((m) => normalizeLegacyModelId(m.id) === normalizedModelId);
 
-  // 2. If the model has a specific providerModelId mapped in the DB, use it
+  // 2. If the model has a specific providerModelId mapped in the DB, use it.
+  // Keep the full providerModelId WITHOUT stripping the provider prefix (e.g. "openai/gpt-5.4"
+  // not "gpt-5.4") so that the Perplexity search backend receives the correct cross-provider
+  // model ID (e.g. "openai/gpt-5.4" instead of bare "gpt-5.4" which it rejects).
   if (modelDef?.providerModelId) {
     const { provider } = getProviderAndModel(normalizedModelId); // Still use prefix to determine provider
-    return { provider, model: stripProviderPrefix(normalizeLegacyModelId(modelDef.providerModelId)) };
+    return { provider, model: normalizeLegacyModelId(modelDef.providerModelId) };
   }
 
   // 3. Fallback to existing static resolution if no dynamic mapping exists
@@ -113,7 +116,10 @@ export function getProviderAndModel(modelId: string): { provider: ProviderType; 
 }
 
 export function getProviderRequestOptionsForProvider(providerId: ProviderType): { providerOptions?: LlmProviderOptions } {
-  if (providerId !== "openai") {
+  // Apply systemMessageMode: "system" for both openai and perplexity providers.
+  // Perplexity uses @ai-sdk/openai (createOpenAI) internally, which auto-converts
+  // system → developer for GPT-5.x models. The same fix is needed for both.
+  if (providerId !== "openai" && providerId !== "perplexity") {
     return {};
   }
 
