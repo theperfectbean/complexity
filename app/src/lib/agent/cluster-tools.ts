@@ -36,8 +36,8 @@ export const listHosts = createListHostsTool(async (input): Promise<ListHostsRes
         status: 'online',
         cpuUsagePct: 0, // Mock
         memoryUsagePct: 0, // Mock
-        vmCount: h.type === 'vm' ? 1 : 0,
-        tags: h.tags,
+        vmCount: 0,
+        tags: [],
       }))
     }
   };

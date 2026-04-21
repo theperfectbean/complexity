@@ -1,102 +1,71 @@
 @import "tailwindcss";
 
-@theme {
-  --color-border: hsl(var(--border));
-  --color-input: hsl(var(--input));
-  --color-ring: hsl(var(--ring));
-  --color-background: hsl(var(--background));
-  --color-foreground: hsl(var(--foreground));
+/* ── Theme tokens ─────────────────────────────────────────────────────────── */
+:root,
+:root[data-theme="dark"] {
+  --bg-page:         #0f1117;
+  --bg-surface:      #1e2030;
+  --bg-surface-alt:  #0d1117;
+  --bg-input:        #2d3748;
+  --bg-selected:     rgba(124,58,237,0.13);
+  --border:          #2d3748;
+  --text:            #e2e8f0;
+  --text-secondary:  #718096;
+  --text-muted:      #a0aec0;
+  --text-empty:      #4a5568;
+  --accent:          #7c3aed;
+  --accent-light:    #a78bfa;
+  --accent-subtle:   rgba(124,58,237,0.13);
+  --success:         #22c55e;
+  --error:           #ef4444;
+  --warning:         #f59e0b;
+}
 
-  --color-primary: hsl(var(--primary));
-  --color-primary-foreground: hsl(var(--primary-foreground));
+:root[data-theme="dim"] {
+  --bg-page:         #1a1b2e;
+  --bg-surface:      #25283d;
+  --bg-surface-alt:  #13141f;
+  --bg-input:        #3d4166;
+  --bg-selected:     rgba(124,58,237,0.18);
+  --border:          #3d4166;
+  --text:            #c0caf5;
+  --text-secondary:  #6272a4;
+  --text-muted:      #9aa5ce;
+  --text-empty:      #4d5780;
+  --accent:          #7c3aed;
+  --accent-light:    #a78bfa;
+  --accent-subtle:   rgba(124,58,237,0.15);
+  --success:         #50fa7b;
+  --error:           #ff5555;
+  --warning:         #ffb86c;
+}
 
-  --color-secondary: hsl(var(--secondary));
-  --color-secondary-foreground: hsl(var(--secondary-foreground));
-
-  --color-destructive: hsl(var(--destructive));
-  --color-destructive-foreground: hsl(var(--destructive-foreground));
-
-  --color-muted: hsl(var(--muted));
-  --color-muted-foreground: hsl(var(--muted-foreground));
-
-  --color-accent: hsl(var(--accent));
-  --color-accent-foreground: hsl(var(--accent-foreground));
-
-  --color-popover: hsl(var(--popover));
-  --color-popover-foreground: hsl(var(--popover-foreground));
-
-  --color-card: hsl(var(--card));
-  --color-card-foreground: hsl(var(--card-foreground));
-
-  --radius-lg: var(--radius);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-sm: calc(var(--radius) - 4px);
-
-  --animate-accordion-down: accordion-down 0.2s ease-out;
-  --animate-accordion-up: accordion-up 0.2s ease-out;
-
-  @keyframes accordion-down {
-    from { height: 0; }
-    to { height: var(--radix-accordion-content-height); }
-  }
-  @keyframes accordion-up {
-    from { height: var(--radix-accordion-content-height); }
-    to { height: 0; }
-  }
+:root[data-theme="light"] {
+  --bg-page:         #f8fafc;
+  --bg-surface:      #ffffff;
+  --bg-surface-alt:  #f1f5f9;
+  --bg-input:        #e2e8f0;
+  --bg-selected:     rgba(124,58,237,0.08);
+  --border:          #cbd5e1;
+  --text:            #1e293b;
+  --text-secondary:  #64748b;
+  --text-muted:      #94a3b8;
+  --text-empty:      #94a3b8;
+  --accent:          #7c3aed;
+  --accent-light:    #7c3aed;
+  --accent-subtle:   rgba(124,58,237,0.1);
+  --success:         #16a34a;
+  --error:           #dc2626;
+  --warning:         #d97706;
 }
 
 @layer base {
-  :root {
-    --background: 0 0% 100%;
-    --foreground: 224 71.4% 4.1%;
-    --card: 0 0% 100%;
-    --card-foreground: 224 71.4% 4.1%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 224 71.4% 4.1%;
-    --primary: 262.1 83.3% 57.8%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 220 14.3% 95.9%;
-    --secondary-foreground: 220.9 39.3% 11%;
-    --muted: 220 14.3% 95.9%;
-    --muted-foreground: 220 8.9% 46.1%;
-    --accent: 220 14.3% 95.9%;
-    --accent-foreground: 220.9 39.3% 11%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 220 13% 91%;
-    --input: 220 13% 91%;
-    --ring: 262.1 83.3% 57.8%;
-    --radius: 0.5rem;
-  }
-
-  .dark {
-    --background: 224 71.4% 4.1%;
-    --foreground: 210 40% 98%;
-    --card: 224 71.4% 4.1%;
-    --card-foreground: 210 40% 98%;
-    --popover: 224 71.4% 4.1%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 262.1 83.3% 57.8%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 262.1 83.3% 57.8%;
-  }
-}
-
-@layer base {
-  * {
-    @apply border-border;
-  }
+  * { box-sizing: border-box; }
   body {
-    @apply bg-background text-foreground;
+    background: var(--bg-page);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    margin: 0;
   }
+  html, body, #root { height: 100%; }
 }

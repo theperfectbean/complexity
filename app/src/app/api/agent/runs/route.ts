@@ -1,3 +1,12 @@
+/**
+ * @deprecated This route is superseded by /api/agent/v2/runs
+ * It remains intact to avoid breaking the main Complexity app.
+ * Do not add new features here. Use /api/agent/v2/ for all agent console work.
+ * @see /app/src/app/api/agent/v2/runs/route.ts
+ */
+// eslint-disable-next-line no-console
+console.warn("[agent/runs] DEPRECATED: use /api/agent/v2/runs instead");
+
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
