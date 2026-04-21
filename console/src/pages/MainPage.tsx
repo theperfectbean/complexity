@@ -32,7 +32,7 @@ export default function MainPage() {
       </header>
 
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-        <div style={{ width: '35%', borderRight: '1px solid var(--border)', overflowY: 'auto', flexShrink: 0 }}>
+        <div style={{ width: '280px', borderRight: '1px solid var(--border)', overflowY: 'auto', flexShrink: 0 }}>
           <ServiceList selectedService={selectedService} onSelectService={handleSelectService} />
         </div>
         <div style={{ flex: 1, overflow: 'hidden' }}>

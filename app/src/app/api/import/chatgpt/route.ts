@@ -5,12 +5,16 @@ import { createId } from "@/lib/db/cuid";
 import { threads, messages } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 
+interface ChatGPTContentPart {
+  text?: string;
+}
+
 interface ChatGPTMessage {
   author: {
     role: string;
   } | null;
   content: {
-    parts?: any[];
+    parts?: Array<string | ChatGPTContentPart>;
     text?: string;
   } | null;
   create_time: number | null;
@@ -25,6 +29,16 @@ interface ChatGPTConversation {
     parent: string | null;
   }>;
   current_node: string;
+}
+
+type MessageInsert = typeof messages.$inferInsert;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function getErrorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : "Unknown error";
 }
 
 export async function POST(request: Request) {
@@ -42,8 +56,10 @@ export async function POST(request: Request) {
   }
 
   try {
-    const rawData = await request.json();
-    const conversations = Array.isArray(rawData) ? rawData : (rawData.conversations || []);
+    const rawData: unknown = await request.json();
+    const conversations = Array.isArray(rawData)
+      ? rawData
+      : (isRecord(rawData) && Array.isArray(rawData.conversations) ? rawData.conversations : []);
 
     if (!Array.isArray(conversations)) {
       return NextResponse.json({ error: "Invalid JSON format. Expected an array." }, { status: 400 });
@@ -66,7 +82,7 @@ export async function POST(request: Request) {
         head = conv.mapping[head].parent;
       }
 
-      const messageInsertions: any[] = [];
+      const messageInsertions: MessageInsert[] = [];
       for (const nodeId of path) {
         const node = conv.mapping[nodeId];
         if (!node?.message) continue;
@@ -118,14 +134,14 @@ export async function POST(request: Request) {
       messagesCreatedCount += messageInsertions.length;
     }
 
-    return NextResponse.json({ 
+    return NextResponse.json({
       success: true, 
       threadsCreated: threadsCreatedCount, 
       messagesCreated: messagesCreatedCount 
     });
 
-  } catch (err: any) {
+  } catch (err) {
     console.error("ChatGPT Import Error:", err);
-    return NextResponse.json({ error: "Failed to process import: " + err.message }, { status: 500 });
+    return NextResponse.json({ error: "Failed to process import: " + getErrorMessage(err) }, { status: 500 });
   }
 }

@@ -1,10 +1,26 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams, useSearchParams } from "next/navigation";
+import { useParams } from "next/navigation";
 import { CompareChat } from "./CompareChat";
 import { ChatMessageItem } from "@/components/chat/MessageList";
 import { normalizeCitations } from "@/app/(main)/search/[threadId]/ThreadChat";
+
+interface ThreadMessageResponse {
+  id: string;
+  role: string;
+  content: string;
+  model?: string | null;
+  citations?: unknown;
+  thinking?: ChatMessageItem["thinking"];
+}
+
+interface ThreadResponsePayload {
+  thread: {
+    compareModels?: string[] | null;
+  };
+  messages: ThreadMessageResponse[];
+}
 
 export default function CompareThreadPage() {
   const params = useParams();
@@ -20,15 +36,15 @@ export default function CompareThreadPage() {
       try {
         const res = await fetch(`/api/threads/${threadId}`);
         if (!res.ok) throw new Error("Thread not found");
-        const payload = await res.json();
+        const payload = await res.json() as ThreadResponsePayload;
         
         setThreadData({
           compareModels: payload.thread.compareModels || [],
-          history: payload.messages.map((m: any) => ({
+          history: payload.messages.map((m) => ({
             id: m.id,
             role: m.role,
             content: m.content,
-            model: m.model,
+            model: m.model ?? undefined,
             citations: normalizeCitations(m.citations),
             thinking: m.thinking,
           })),

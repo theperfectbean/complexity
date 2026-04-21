@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useRef } from "react";
-import { commandRegistry, SlashCommand } from "@/plugins/commandRegistry";
+import { SlashCommand } from "@/plugins/commandRegistry";
 import { cn } from "@/lib/utils";
 
 interface CommandMenuProps {
@@ -16,9 +16,12 @@ export function CommandMenu({ query, commands, onSelect, onClose }: CommandMenuP
   const menuRef = useRef<HTMLDivElement>(null);
   const onCloseRef = useRef(onClose);
   useEffect(() => { onCloseRef.current = onClose; });
+  const activeIndex = useMemo(
+    () => Math.min(selectedIndex, Math.max(commands.length - 1, 0)),
+    [commands.length, selectedIndex],
+  );
 
   useEffect(() => {
-    setSelectedIndex(0);
     if (commands.length === 0 && query.length > 0) {
       onCloseRef.current();
     }
@@ -36,7 +39,10 @@ export function CommandMenu({ query, commands, onSelect, onClose }: CommandMenuP
         setSelectedIndex((i) => (i - 1 + commands.length) % commands.length);
       } else if (e.key === "Enter" || e.key === "Tab") {
         e.preventDefault();
-        onSelect(commands[selectedIndex]);
+        const selected = commands[activeIndex];
+        if (selected) {
+          onSelect(selected);
+        }
       } else if (e.key === "Escape") {
         e.preventDefault();
         onCloseRef.current();
@@ -45,7 +51,7 @@ export function CommandMenu({ query, commands, onSelect, onClose }: CommandMenuP
 
     window.addEventListener("keydown", handleKeyDown, true);
     return () => window.removeEventListener("keydown", handleKeyDown, true);
-  }, [commands, selectedIndex, onSelect]);
+  }, [activeIndex, commands, onSelect]);
 
   if (commands.length === 0) return null;
 
@@ -62,9 +68,9 @@ export function CommandMenu({ query, commands, onSelect, onClose }: CommandMenuP
             onClick={() => onSelect(cmd)}
             className={cn(
               "flex cursor-pointer items-center justify-between rounded-lg px-3 py-2 text-sm",
-              index === selectedIndex ? "bg-primary text-primary-foreground" : "hover:bg-muted"
-            )}
-          >
+               index === activeIndex ? "bg-primary text-primary-foreground" : "hover:bg-muted"
+             )}
+           >
             <div className="flex flex-col">
               <span className="font-semibold">/{cmd.trigger}</span>
               <span className="text-xs opacity-80">{cmd.label} - {cmd.description}</span>

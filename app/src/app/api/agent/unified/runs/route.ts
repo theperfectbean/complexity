@@ -401,8 +401,19 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           }
 
           try {
+            emit({
+              type: 'tool_start',
+              tool: `cmd:${parsedCommand.action}`,
+              params: { resource: parsedCommand.resource, options: parsedCommand.options },
+              tier: parsedCommand.tier === 'tier3' ? 3 : parsedCommand.tier === 'tier2' ? 2 : parsedCommand.tier === 'tier1' ? 1 : 0,
+            });
             const cmdResult = await cmdRegistry.executeCommand(parsedCommand, userId, true);
             if (!cmdResult.success) {
+              emit({
+                type: 'tool_error',
+                tool: `cmd:${parsedCommand.action}`,
+                error: cmdResult.error ?? 'Command failed.',
+              });
               emit({ type: 'error', message: cmdResult.error ?? 'Command failed.' });
               runState.toolCallHistory.push({
                 tool: `cmd:${parsedCommand.action}`,
@@ -412,6 +423,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
               await finish('error');
               return;
             }
+            emit({
+              type: 'tool_result',
+              tool: `cmd:${parsedCommand.action}`,
+              result: cmdResult.output,
+              tier: parsedCommand.tier === 'tier3' ? 3 : parsedCommand.tier === 'tier2' ? 2 : parsedCommand.tier === 'tier1' ? 1 : 0,
+            });
             emit({
               type: 'text',
               content: typeof cmdResult.output === 'string'
@@ -426,6 +443,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
             });
           } catch (err) {
             const errMsg = err instanceof Error ? err.message : String(err);
+            emit({
+              type: 'tool_error',
+              tool: `cmd:${parsedCommand.action}`,
+              error: errMsg,
+            });
             emit({ type: 'error', message: errMsg });
             runState.toolCallHistory.push({
               tool: `cmd:${parsedCommand.action}`,

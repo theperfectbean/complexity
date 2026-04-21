@@ -13,8 +13,10 @@ vi.mock('@/auth', () => ({
 
 import { auth } from '@/auth';
 
+const maybeIt = process.env.RUN_OLLAMA_E2E === '1' ? it : it.skip;
+
 describe('Ollama E2E', () => {
-  it('direct provider probe (phi3:mini)', async () => {
+  maybeIt('direct provider probe (phi3:mini)', async () => {
     const ollama = createOllama({ baseURL: 'http://192.168.0.114:11434' });
     const { text } = await generateText({
       model: ollama('phi3:mini'),
@@ -27,13 +29,13 @@ describe('Ollama E2E', () => {
   const models = ["ollama/llama3.2"]
 
   for (const modelId of models) {
-    it(`generates a response via /api/chat using ${modelId}`, async () => {
+      maybeIt(`generates a response via /api/chat using ${modelId}`, async () => {
       const [user] = await db.select().from(users).limit(1);
       if (!user) throw new Error('No user found');
 
       vi.mocked(auth).mockResolvedValue({
         user: { email: user.email },
-      } as any);
+      } as Awaited<ReturnType<typeof auth>>);
 
       const threadId = createId();
       await db.insert(threads).values({

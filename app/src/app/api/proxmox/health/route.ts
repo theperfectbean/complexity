@@ -2,6 +2,15 @@ import { NextResponse } from 'next/server';
 import { execSsh } from '@/lib/agent/ssh-executor';
 import { requireUser } from '@/lib/auth-server';
 
+interface ProxmoxNode {
+  node?: string;
+  status?: string;
+  uptime?: number;
+  cpu?: number;
+  mem?: number;
+  maxmem?: number;
+}
+
 export async function GET() {
   const authResult = await requireUser();
   if (authResult instanceof NextResponse) return authResult;
@@ -14,10 +23,10 @@ export async function GET() {
       return NextResponse.json({ error: 'Failed to fetch Proxmox metrics', details: result.stderr }, { status: 500 });
     }
 
-    const nodes = JSON.parse(result.stdout);
+    const nodes = JSON.parse(result.stdout) as ProxmoxNode[];
     
     // Process nodes to match the expected schema
-    const processedNodes = nodes.map((node: any) => ({
+    const processedNodes = nodes.map((node) => ({
       name: node.node,
       status: node.status === 'online' ? 'online' : 'offline',
       uptime: node.uptime || 0,

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { X, Loader2, Book } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion } from 'motion/react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
@@ -13,24 +13,30 @@ export function DocsPanel({
   isOpen: boolean; 
   onClose: () => void;
 }) {
-  const [content, setContent] = useState('');
-  const [loading, setLoading] = useState(true);
+  const [content, setContent] = useState<string | null>(null);
 
   useEffect(() => {
-    if (isOpen) {
-      setLoading(true);
-      fetch('/api/docs')
-        .then(res => res.json())
-        .then(data => {
-          if (data.content) setContent(data.content);
-          setLoading(false);
-        })
-        .catch(err => {
-          console.error(err);
-          setLoading(false);
-        });
-    }
-  }, [isOpen]);
+    if (!isOpen || content !== null) return;
+    let cancelled = false;
+    fetch('/api/docs')
+      .then(res => res.json())
+      .then((data: { content?: string }) => {
+        if (!cancelled) {
+          setContent(data.content ?? '');
+        }
+      })
+      .catch(err => {
+        console.error(err);
+        if (!cancelled) {
+          setContent('');
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [content, isOpen]);
+
+  const loading = content === null;
 
   if (!isOpen) return null;
 

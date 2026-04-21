@@ -37,7 +37,7 @@ async function main() {
     ],
     webSearch: false,
     webSearchExplicit: false,
-    redis: null as any,
+    redis: null,
     routing: { useMemory: false, useSearch: false, allowWebSearch: false, notices: [] },
   });
 

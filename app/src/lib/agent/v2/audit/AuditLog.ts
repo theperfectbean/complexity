@@ -1,5 +1,6 @@
 import path from 'path';
 import fs from 'fs';
+import { createRequire } from 'module';
 
 // Lazy-load better-sqlite3 to avoid import errors if package missing
 interface AuditDb {
@@ -11,11 +12,11 @@ interface AuditDb {
 }
 
 let db: AuditDb | null = null;
+const requireFromHere = createRequire(import.meta.url);
 
 function getDb(): AuditDb {
   if (db) return db;
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const Database = require('better-sqlite3') as new (filename: string) => AuditDb;
+  const Database = requireFromHere('better-sqlite3') as new (filename: string) => AuditDb;
   const dbPath = process.env.AUDIT_DB_PATH ?? '/opt/complexity/data/audit.db';
   fs.mkdirSync(path.dirname(dbPath), { recursive: true });
   db = new Database(dbPath);

@@ -22,7 +22,7 @@ export const SEARCH_MODEL_ALIASES: Record<string, string> = {
 export function normalizeSearchModelId(modelId: string): string {
   const normalized = normalizeLegacyModelId(modelId);
   if (normalized === "sonar" || normalized === "perplexity/sonar") {
-    return "sonar";
+    return "perplexity/sonar";
   }
 
   const unwrapped = normalized.startsWith("perplexity/")
@@ -30,7 +30,7 @@ export function normalizeSearchModelId(modelId: string): string {
     : normalized;
 
   if (unwrapped === "sonar") {
-    return "sonar";
+    return "perplexity/sonar";
   }
 
   if (SEARCH_MODEL_ALIASES[unwrapped]) {

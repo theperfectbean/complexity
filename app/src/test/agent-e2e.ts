@@ -7,13 +7,14 @@ import { CLUSTER_SYSTEM_PROMPT } from '@/lib/agent/cluster-context';
 import { clusterTools } from '@/lib/agent/cluster-tools';
 import { createId } from '@/lib/db/cuid';
 import { getApiKeys } from '@/lib/settings';
+import type { AgentStreamEvent } from '@/lib/agent/protocol';
 
 async function main() {
   const redis = getRedisClient();
   const runStore = new RedisAgentRunStore(redis);
   
   // Create a promise that resolves when the run is completed or waiting
-  let resolveDone: (val: string) => void;
+  let resolveDone!: (val: string) => void;
   const donePromise = new Promise<string>(resolve => { resolveDone = resolve; });
 
   const service = new AgentService({
@@ -22,11 +23,11 @@ async function main() {
     runStore,
     eventBus: {
       async emit(event) {
-        console.log(`[EVENT ${event.type}]`, event.type === 'assistant_message' ? (event as any).message.text : event.type === 'text-delta' ? (event as any).delta : JSON.stringify(event));
-        if (event.type === 'run_status' && (event as any).status === 'completed') {
+        console.log(`[EVENT ${event.type}]`, formatEventForLog(event));
+        if (event.type === 'run_status' && event.status === 'completed') {
             resolveDone('completed');
         }
-        if (event.type === 'run_status' && (event as any).status === 'waiting_for_approval') {
+        if (event.type === 'run_status' && event.status === 'waiting_for_approval') {
             resolveDone('waiting_for_approval');
         }
         if (event.type === 'error') {
@@ -85,6 +86,13 @@ async function main() {
   }
 
   process.exit(0);
+}
+
+function formatEventForLog(event: AgentStreamEvent): string {
+  if (event.type === 'assistant_message') {
+    return event.message.text;
+  }
+  return JSON.stringify(event);
 }
 
 main().catch(err => {

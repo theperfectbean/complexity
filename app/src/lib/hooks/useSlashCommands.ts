@@ -1,8 +1,23 @@
 import { useState, useCallback, useRef, useEffect } from "react";
-import { commandRegistry, SlashCommand } from "@/plugins/commandRegistry";
+import { commandRegistry, type CommandContext, SlashCommand } from "@/plugins/commandRegistry";
 
 export interface SlashCommandContext {
   threadId?: string;
+}
+
+interface PromptRecord {
+  id: string;
+  title: string;
+  content: string;
+  isSystemPrompt?: boolean;
+}
+
+function isPromptRecord(value: unknown): value is PromptRecord {
+  return typeof value === "object"
+    && value !== null
+    && typeof (value as { id?: unknown }).id === "string"
+    && typeof (value as { title?: unknown }).title === "string"
+    && typeof (value as { content?: unknown }).content === "string";
 }
 
 export function useSlashCommands(
@@ -19,14 +34,20 @@ export function useSlashCommands(
   useEffect(() => {
     fetch("/api/prompts")
       .then(r => r.ok ? r.json() : { prompts: [] })
-      .then(data => {
-        if (!data.prompts) return;
-        const cmds: SlashCommand[] = data.prompts.map((p: any) => ({
+      .then((data: unknown) => {
+        const promptValues = typeof data === "object"
+          && data !== null
+          && "prompts" in data
+          && Array.isArray((data as { prompts?: unknown[] }).prompts)
+          ? (data as { prompts: unknown[] }).prompts.filter(isPromptRecord)
+          : [];
+        if (promptValues.length === 0) return;
+        const cmds: SlashCommand[] = promptValues.map((p) => ({
           id: `prompt-${p.id}`,
           trigger: `prompt:${p.title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
           label: `Prompt: ${p.title}`,
           description: p.content.slice(0, 100),
-          action: (ctx: any) => {
+          action: (ctx: CommandContext) => {
              const inputValue = ctx.inputValue.trim();
              // Strip the trigger word from the input
              const prefix = `/${`prompt:${p.title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`} `;

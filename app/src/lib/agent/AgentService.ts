@@ -30,7 +30,7 @@ export interface AgentRunState {
   runId: string;
   sessionId: string;
   approvalState: "not_requested" | "pending" | "approved" | "rejected";
-  messageHistory: Array<{ role: string; content: any; toolName?: string; toolCallId?: string }>;
+  messageHistory: Array<{ role: string; content: unknown; toolName?: string; toolCallId?: string }>;
   agentId: string;
   userMessage: string;
   modelId: string;
@@ -38,7 +38,7 @@ export interface AgentRunState {
   actorId?: string;
   seq: number;
   autoApproveReadOnly?: boolean;
-  proposedPlan?: any;
+  proposedPlan?: DraftMissionPlanInput;
   pendingPlanToolCallId?: string;
   pendingQuestionToolCallId?: string;
 }
@@ -55,6 +55,29 @@ interface ApproveMissionPlanRequest {
   approved: boolean;
   reviewerId: string;
   comment?: string;
+}
+
+type AgentEventInput = { type: AgentStreamEvent["type"] } & Record<string, unknown>;
+
+function isAssistantMessage(value: unknown): value is { role: "assistant"; content: unknown } {
+  return typeof value === "object"
+    && value !== null
+    && "role" in value
+    && (value as { role?: unknown }).role === "assistant";
+}
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error === "object" && error !== null && "message" in error) {
+    return String((error as { message?: unknown }).message);
+  }
+  return JSON.stringify(error);
+}
+
+function getCommandFromInput(input: unknown): string | null {
+  if (typeof input !== "object" || input === null || !("command" in input)) return null;
+  const command = (input as { command?: unknown }).command;
+  return typeof command === "string" ? command : null;
 }
 
 function isCommandReadOnly(command: string): boolean {
@@ -281,18 +304,24 @@ export class AgentService {
         },
         onStepFinish: async (step) => {
           // AI SDK v6: step.messages does not exist; use step.response.messages
-          const responseMessages: unknown[] = (step as any).response?.messages ?? [];
+          const responseMessages: unknown[] = typeof step === "object"
+            && step !== null
+            && "response" in step
+            && typeof (step as { response?: unknown }).response === "object"
+            && (step as { response?: { messages?: unknown[] } }).response?.messages
+            ? (step as { response: { messages: unknown[] } }).response.messages
+            : [];
           if (state.approvalState === "pending") {
             // Only save the assistant tool-call message; the actual tool result will be
             // injected by approveMissionPlan with the human's approval decision.
-            const assistantMessages = this.toCoreMsgs(responseMessages.filter((m: any) => m.role === "assistant"));
+            const assistantMessages = this.toCoreMsgs(responseMessages.filter(isAssistantMessage));
             state.messageHistory = [
               ...(state.messageHistory ?? []),
               ...assistantMessages,
             ] as never;
           } else if (state.pendingQuestionToolCallId) {
             // Only save the assistant tool-call message; replyToQuestion injects the actual answer.
-            const assistantMsgs = this.toCoreMsgs(responseMessages.filter((m) => (m as any).role === "assistant"));
+            const assistantMsgs = this.toCoreMsgs(responseMessages.filter(isAssistantMessage));
             state.messageHistory = [
               ...(state.messageHistory ?? []),
               ...assistantMsgs,
@@ -310,9 +339,9 @@ export class AgentService {
             type: "error",
             error: {
               code: "MODEL_STREAM_ERROR",
-              message: error instanceof Error ? error.message : (typeof error === "object" && error !== null && "message" in error ? String((error as any).message) : JSON.stringify(error)),
-              retryable: false,
-              details: error,
+               message: getErrorMessage(error),
+               retryable: false,
+               details: error,
             },
           });
         },
@@ -329,9 +358,8 @@ export class AgentService {
     state: AgentRunState,
     actorId: string,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  ): Record<string, any> {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const tools: Record<string, any> = {};
+  ): Record<string, unknown> {
+    const tools: Record<string, unknown> = {};
 
     // ask_user tool
     tools.ask_user = makeTool({
@@ -413,10 +441,8 @@ export class AgentService {
           const toolCallId = options.toolCallId ?? "";
           const abortSignal = options.abortSignal;
 
-          const isReadOnly = typeof input === "object" && input !== null &&
-            "command" in input && typeof (input as any).command === "string"
-            ? isCommandReadOnly((input as any).command)
-            : false;
+          const command = getCommandFromInput(input);
+          const isReadOnly = command ? isCommandReadOnly(command) : false;
 
           if (state.approvalState !== "approved" && !(state.autoApproveReadOnly && isReadOnly)) {
             throw new Error(`Tool ${capturedName} blocked until mission plan approval`);
@@ -457,7 +483,7 @@ export class AgentService {
   private async emit(
     state: AgentRunState,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    event: any,
+    event: AgentEventInput,
   ): Promise<void> {
     state.seq++;
     await this.deps.eventBus.emit({

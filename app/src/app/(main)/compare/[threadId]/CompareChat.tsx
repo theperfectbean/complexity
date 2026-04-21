@@ -31,7 +31,7 @@ export function CompareChat({
   const { messages, sendMessage, status, error } = useChat({
     messages: initialHistory.map((msg) => ({
       id: msg.id,
-      role: msg.role as any,
+      role: msg.role === "assistant" || msg.role === "system" ? msg.role : "user",
       content: msg.content,
       parts: [{ type: "text", text: msg.content }],
     })),

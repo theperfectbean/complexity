@@ -637,10 +637,12 @@ function EventBlock({ event, onApproval }: { event: AgentRunEvent; onApproval: (
 function InspectorPanel({ thread, turn }: { thread?: Thread; turn?: ConversationTurn }) {
   const timeline = turn ? buildTimeline(turn.events) : [];
   const toolResults = turn ? turn.events.filter((event) => event.type === 'tool_result' || event.type === 'tool_error') : [];
-  const verification = summarizeVerification(turn);
+  const snapshot = summarizeRunSnapshot(turn);
+  const latestAssistantMessage = turn ? getLatestAssistantMessage(turn.events) : '';
+  const suggestedCommands = buildSuggestedCommands(turn);
 
   return (
-    <aside style={{ width: '320px', borderLeft: '1px solid var(--border)', background: 'var(--bg-surface)', overflowY: 'auto', flexShrink: 0 }}>
+    <aside style={{ width: '280px', borderLeft: '1px solid var(--border)', background: 'var(--bg-surface)', overflowY: 'auto', flexShrink: 0 }}>
       <div style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
         <section>
           <p style={{ margin: '0 0 0.5rem', fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-secondary)' }}>
@@ -652,6 +654,8 @@ function InspectorPanel({ thread, turn }: { thread?: Thread; turn?: Conversation
               <MetricRow label="Turns" value={String(thread.turns.length)} />
               <MetricRow label="Run" value={turn?.runId ?? 'Pending'} monospace />
               <MetricRow label="Status" value={turn?.status ?? 'idle'} />
+              <MetricRow label="Last tool" value={snapshot.lastTool} monospace />
+              <MetricRow label="Last result" value={snapshot.lastOutcome} />
             </div>
           ) : (
             <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Select or start a thread to inspect the live run timeline.</p>
@@ -660,13 +664,39 @@ function InspectorPanel({ thread, turn }: { thread?: Thread; turn?: Conversation
 
         <section>
           <p style={{ margin: '0 0 0.5rem', fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-secondary)' }}>
-            Verification state
+            Actionable state
           </p>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '0.5rem' }}>
-            <StatusTile label="Completed tools" value={String(verification.completed)} tone="success" />
-            <StatusTile label="Failures" value={String(verification.failed)} tone={verification.failed > 0 ? 'error' : 'neutral'} />
-            <StatusTile label="Awaiting approval" value={verification.awaitingApproval ? 'Yes' : 'No'} tone={verification.awaitingApproval ? 'warning' : 'neutral'} />
-            <StatusTile label="Assistant replies" value={String(verification.messages)} tone="neutral" />
+            <StatusTile label="Pending approval" value={snapshot.awaitingApproval ? 'Yes' : 'No'} tone={snapshot.awaitingApproval ? 'warning' : 'neutral'} />
+            <StatusTile label="Errors" value={String(snapshot.failed)} tone={snapshot.failed > 0 ? 'error' : 'neutral'} />
+            <StatusTile label="Tool runs" value={String(snapshot.completed)} tone="success" />
+            <StatusTile label="Replies" value={String(snapshot.messages)} tone="neutral" />
+          </div>
+        </section>
+
+        <section>
+          <p style={{ margin: '0 0 0.5rem', fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-secondary)' }}>
+            Latest reply
+          </p>
+          {latestAssistantMessage ? (
+            <div style={{ borderRadius: '0.75rem', border: '1px solid var(--border)', background: 'var(--bg-page)', padding: '0.85rem', fontSize: '0.78rem', color: 'var(--text-secondary)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+              {latestAssistantMessage}
+            </div>
+          ) : (
+            <EmptyCard text="The latest assistant reply will appear here so you do not have to scan the chat log." />
+          )}
+        </section>
+
+        <section>
+          <p style={{ margin: '0 0 0.5rem', fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-secondary)' }}>
+            Suggested commands
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+            {suggestedCommands.map((command) => (
+              <code key={command} style={{ borderRadius: '0.6rem', border: '1px solid var(--border)', background: 'var(--bg-page)', padding: '0.6rem 0.7rem', fontSize: '0.72rem', color: 'var(--accent-light)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                {command}
+              </code>
+            ))}
           </div>
         </section>
 
@@ -796,6 +826,81 @@ function summarizeVerification(turn?: ConversationTurn) {
   }
 
   return { completed, failed, awaitingApproval, messages };
+}
+
+function summarizeRunSnapshot(turn?: ConversationTurn) {
+  const verification = summarizeVerification(turn);
+  if (!turn) {
+    return {
+      ...verification,
+      lastTool: 'None',
+      lastOutcome: 'No actions yet',
+    };
+  }
+
+  let lastTool = 'None';
+  let lastOutcome = 'No actions yet';
+
+  for (let index = turn.events.length - 1; index >= 0; index -= 1) {
+    const event = turn.events[index];
+    const payload = event as Record<string, unknown>;
+    if (event.type === 'tool_result') {
+      lastTool = String(payload.tool ?? 'tool');
+      lastOutcome = summarizeResult(payload.result);
+      break;
+    }
+    if (event.type === 'tool_error') {
+      lastTool = String(payload.tool ?? 'tool');
+      lastOutcome = String(payload.error ?? 'Unknown error');
+      break;
+    }
+    if (event.type === 'command_parsed') {
+      const command = payload.command as Record<string, unknown> | undefined;
+      lastTool = `/${String(command?.action ?? 'command')}`;
+      lastOutcome = `Target: ${String(command?.resource ?? 'n/a')}`;
+      break;
+    }
+  }
+
+  return {
+    ...verification,
+    lastTool,
+    lastOutcome,
+  };
+}
+
+function getLatestAssistantMessage(events: AgentRunEvent[]): string {
+  for (let index = events.length - 1; index >= 0; index -= 1) {
+    const event = events[index] as Record<string, unknown>;
+    if (events[index]?.type === 'text' && typeof event.content === 'string' && event.content.trim()) {
+      return event.content;
+    }
+    if (events[index]?.type === 'assistant_message') {
+      const message = event.message as Record<string, unknown> | undefined;
+      if (typeof message?.text === 'string' && message.text.trim()) {
+        return message.text;
+      }
+    }
+  }
+  return '';
+}
+
+function buildSuggestedCommands(turn?: ConversationTurn): string[] {
+  const defaults = [
+    '/list services',
+    '/status plex',
+    '/logs plex --lines=100',
+    '/check disk --path=/mnt/media',
+    '/inspect proxy /etc/caddy/Caddyfile',
+  ];
+  const latestPrompt = turn?.userMessage.toLowerCase() ?? '';
+  if (latestPrompt.includes('plex')) {
+    return ['/status plex', '/logs plex --lines=100', '/restart plex', '/check disk --path=/mnt/media'];
+  }
+  if (latestPrompt.includes('proxy') || latestPrompt.includes('caddy')) {
+    return ['/inspect proxy /etc/caddy/Caddyfile', '/logs proxy --lines=100', '/list services'];
+  }
+  return defaults;
 }
 
 function buildTimeline(events: AgentRunEvent[]) {

@@ -241,7 +241,7 @@ describe("llm.ts", () => {
 
       expect(searchAgent.runSearchAgent).toHaveBeenCalledWith(
         expect.objectContaining({
-          modelId: expect.arrayContaining(["anthropic/claude-haiku-4-5", "perplexity/sonar"]),
+          modelId: ["anthropic/claude-haiku-4-5"],
         }),
       );
     });

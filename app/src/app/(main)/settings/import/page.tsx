@@ -12,6 +12,8 @@ export default function ImportPage() {
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
+  const getErrorMessage = (err: unknown) => err instanceof Error ? err.message : "Failed to import conversations";
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       setFile(e.target.files[0]);
@@ -32,7 +34,7 @@ export default function ImportPage() {
       let jsonData;
       try {
         jsonData = JSON.parse(text);
-      } catch (e) {
+      } catch {
         throw new Error("Invalid JSON file. Please ensure you uploaded a valid ChatGPT export.");
       }
 
@@ -53,8 +55,8 @@ export default function ImportPage() {
         messagesCreated: data.messagesCreated,
       });
       setFile(null);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      setError(getErrorMessage(err));
     } finally {
       setImporting(false);
     }
