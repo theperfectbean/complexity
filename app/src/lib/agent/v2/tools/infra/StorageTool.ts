@@ -1,5 +1,9 @@
 import { sshExec } from '../base/SshTool';
 
+function shellQuote(value: string): string {
+  return `'${value.replace(/'/g, `'\\''`)}'`;
+}
+
 export async function disk_usage(): Promise<object> {
   const [nas, media, ai] = await Promise.all([
     sshExec('nas',   'df -h / /data /mnt/disk3 2>/dev/null || df -h /'),
@@ -11,6 +15,25 @@ export async function disk_usage(): Promise<object> {
     media: media.stdout,
     ai:    ai.stdout,
   };
+}
+
+export async function disk_usage_path(params: { path: string }): Promise<object> {
+  const path = params.path;
+  const [nas, media, ai] = await Promise.all([
+    sshExec('nas', `df -h ${shellQuote(path)} 2>/dev/null || true`),
+    sshExec('media', `df -h ${shellQuote(path)} 2>/dev/null || true`),
+    sshExec('ai', `df -h ${shellQuote(path)} 2>/dev/null || true`),
+  ]);
+
+  const results = Object.fromEntries(
+    Object.entries({
+      nas: nas.stdout.trim(),
+      media: media.stdout.trim(),
+      ai: ai.stdout.trim(),
+    }).filter(([, output]) => output.length > 0),
+  );
+
+  return { path, results };
 }
 
 export async function find_large_files(params: { path: string; top?: number }): Promise<object> {

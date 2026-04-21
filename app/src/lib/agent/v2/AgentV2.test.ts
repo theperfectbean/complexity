@@ -67,11 +67,32 @@ describe('ToolRegistry', () => {
     await expect(executeTool('nonexistent_tool', {})).rejects.toThrow();
   });
 
+  it('executeTool validates required parameters', async () => {
+    const { executeTool } = await import('./ToolRegistry');
+    await expect(executeTool('incus_status', {})).rejects.toThrow('Missing required parameter "container"');
+  });
+
+  it('executeTool rejects unknown parameters', async () => {
+    const { executeTool } = await import('./ToolRegistry');
+    await expect(executeTool('incus_list', { unexpected: true })).rejects.toThrow('Unknown parameter "unexpected"');
+  });
+
+  it('executeTool validates enum parameters', async () => {
+    const { executeTool } = await import('./ToolRegistry');
+    await expect(executeTool('qbit_pause', { action: 'stop' })).rejects.toThrow('Invalid parameter "action"');
+  });
+
   it('getToolEntry returns metadata for known tools', async () => {
     const { getToolEntry } = await import('./ToolRegistry');
     const entry = getToolEntry('sonarr_status');
     expect(entry).toBeDefined();
     expect(entry?.tier).toBe(0);
+  });
+
+  it('registers git diff preview and guarded commit tools', async () => {
+    const { getToolEntry } = await import('./ToolRegistry');
+    expect(getToolEntry('git_diff_preview')?.tier).toBe(0);
+    expect(getToolEntry('git_commit')?.tier).toBe(3);
   });
 });
 

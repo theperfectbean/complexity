@@ -1,9 +1,23 @@
 import { sshExec, SSH_HOSTS } from '../base/SshTool';
+import { FLEET_CONTAINERS } from '@/lib/topology';
 
 const KNOWN_NODES = ['nas', 'media', 'ai'] as const;
 type Node = typeof KNOWN_NODES[number];
 
+const KNOWN_CONTAINERS = new Set(FLEET_CONTAINERS.map((container) => container.name));
+
+function shellQuote(value: string): string {
+  return `'${value.replace(/'/g, `'\\''`)}'`;
+}
+
+function assertValidContainer(name: string): void {
+  if (!/^[a-z0-9][a-z0-9-]*$/.test(name) || !KNOWN_CONTAINERS.has(name)) {
+    throw new Error(`Unknown or invalid container: ${name}`);
+  }
+}
+
 function nodeForContainer(name: string): Node {
+  assertValidContainer(name);
   const NAS_CONTAINERS = ['dns', 'proxy', 'forgejo'];
   const MEDIA_CONTAINERS = ['arrstack', 'ingestion-stack', 'audio-stack', 'plex'];
   if (NAS_CONTAINERS.includes(name)) return 'nas';
@@ -30,7 +44,7 @@ export async function incus_list(): Promise<object> {
 
 export async function incus_status(params: { container: string }): Promise<object> {
   const node = nodeForContainer(params.container);
-  const r = await sshExec(node, `incus list ${params.container} --format csv -c n,s,4,M,P 2>&1`);
+  const r = await sshExec(node, `incus list ${shellQuote(params.container)} --format csv -c n,s,4,M,P 2>&1`);
   if (r.exitCode !== 0) return { node, error: r.stderr };
   const [name, status, ip, memory, pid] = r.stdout.trim().split(',');
   return { node, name: name?.trim(), status: status?.trim(), ip: ip?.trim() || '-', memory: memory?.trim(), pid: pid?.trim() };
@@ -38,47 +52,47 @@ export async function incus_status(params: { container: string }): Promise<objec
 
 export async function incus_restart(params: { container: string }): Promise<object> {
   const node = nodeForContainer(params.container);
-  const r = await sshExec(node, `incus restart ${params.container} 2>&1`);
+  const r = await sshExec(node, `incus restart ${shellQuote(params.container)} 2>&1`);
   return { node, container: params.container, output: r.stdout, exitCode: r.exitCode };
 }
 
 export async function incus_start(params: { container: string }): Promise<object> {
   const node = nodeForContainer(params.container);
-  const r = await sshExec(node, `incus start ${params.container} 2>&1`);
+  const r = await sshExec(node, `incus start ${shellQuote(params.container)} 2>&1`);
   return { node, container: params.container, output: r.stdout, exitCode: r.exitCode };
 }
 
 export async function incus_stop(params: { container: string }): Promise<object> {
   const node = nodeForContainer(params.container);
-  const r = await sshExec(node, `incus stop ${params.container} 2>&1`);
+  const r = await sshExec(node, `incus stop ${shellQuote(params.container)} 2>&1`);
   return { node, container: params.container, output: r.stdout, exitCode: r.exitCode };
 }
 
 export async function incus_delete(params: { container: string; force?: boolean }): Promise<object> {
   const node = nodeForContainer(params.container);
   const flag = params.force ? ' --force' : '';
-  const r = await sshExec(node, `incus delete${flag} ${params.container} 2>&1`);
+  const r = await sshExec(node, `incus delete${flag} ${shellQuote(params.container)} 2>&1`);
   return { node, container: params.container, output: r.stdout, exitCode: r.exitCode };
 }
 
 export async function incus_exec(params: { container: string; command: string }): Promise<object> {
   const node = nodeForContainer(params.container);
-  const r = await sshExec(node, `incus exec ${params.container} -- bash -c ${JSON.stringify(params.command)} 2>&1`);
+  const r = await sshExec(node, `incus exec ${shellQuote(params.container)} -- bash -c ${JSON.stringify(params.command)} 2>&1`);
   return { node, container: params.container, stdout: r.stdout, exitCode: r.exitCode };
 }
 
 export async function incus_logs(params: { container: string; lines?: number }): Promise<object> {
   const node = nodeForContainer(params.container);
   const n = params.lines ?? 100;
-  const r = await sshExec(node, `incus exec ${params.container} -- journalctl -n ${n} --no-pager 2>&1`, { maxLines: n + 5 });
+  const r = await sshExec(node, `incus exec ${shellQuote(params.container)} -- journalctl -n ${n} --no-pager 2>&1`, { maxLines: n + 5 });
   return { node, container: params.container, logs: r.stdout, exitCode: r.exitCode };
 }
 
 export async function incus_set_limit(params: { container: string; cpu?: string; memory?: string }): Promise<object> {
   const node = nodeForContainer(params.container);
   const cmds: string[] = [];
-  if (params.cpu)    cmds.push(`incus config set ${params.container} limits.cpu ${params.cpu}`);
-  if (params.memory) cmds.push(`incus config set ${params.container} limits.memory ${params.memory}`);
+  if (params.cpu)    cmds.push(`incus config set ${shellQuote(params.container)} limits.cpu ${shellQuote(params.cpu)}`);
+  if (params.memory) cmds.push(`incus config set ${shellQuote(params.container)} limits.memory ${shellQuote(params.memory)}`);
   const r = await sshExec(node, cmds.join(' && '));
   return { node, container: params.container, output: r.stdout, exitCode: r.exitCode };
 }

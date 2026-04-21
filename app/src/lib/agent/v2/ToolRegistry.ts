@@ -22,6 +22,63 @@ export interface RegistryEntry {
   parametersSchema?: Record<string, unknown>;
 }
 
+interface SchemaProperty {
+  type?: string;
+  enum?: unknown[];
+}
+
+function validateSchemaProperty(name: string, value: unknown, schema: SchemaProperty): void {
+  if (value === undefined) return;
+  if (schema.enum && !schema.enum.includes(value)) {
+    throw new Error(`Invalid parameter "${name}": expected one of ${schema.enum.join(', ')}`);
+  }
+
+  switch (schema.type) {
+    case undefined:
+      return;
+    case 'string':
+    case 'number':
+    case 'boolean':
+      if (typeof value !== schema.type) {
+        throw new Error(`Invalid parameter "${name}": expected ${schema.type}`);
+      }
+      return;
+    case 'object':
+      if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+        throw new Error(`Invalid parameter "${name}": expected object`);
+      }
+      return;
+    default:
+      return;
+  }
+}
+
+function validateParams(name: string, params: Record<string, unknown>, schema?: Record<string, unknown>): void {
+  if (!schema) return;
+
+  const schemaType = schema.type;
+  if (schemaType && schemaType !== 'object') {
+    throw new Error(`Invalid schema for ${name}: root schema must be object`);
+  }
+
+  const properties = (schema.properties ?? {}) as Record<string, SchemaProperty>;
+  const required = new Set(Array.isArray(schema.required) ? schema.required.filter((key): key is string => typeof key === 'string') : []);
+
+  for (const field of required) {
+    if (params[field] === undefined) {
+      throw new Error(`Missing required parameter "${field}" for ${name}`);
+    }
+  }
+
+  for (const key of Object.keys(params)) {
+    const propertySchema = properties[key];
+    if (!propertySchema) {
+      throw new Error(`Unknown parameter "${key}" for ${name}`);
+    }
+    validateSchemaProperty(key, params[key], propertySchema);
+  }
+}
+
 const REGISTRY: Record<string, RegistryEntry> = {
   incus_list:     { fn: () => incus.incus_list(), description: 'List all containers across all nodes with their status and IPs', tier: 0,
     parametersSchema: { type: 'object', properties: {} } },
@@ -44,6 +101,8 @@ const REGISTRY: Record<string, RegistryEntry> = {
 
   disk_usage:           { fn: () => storage.disk_usage(), description: 'Show disk usage across all nodes', tier: 0,
     parametersSchema: { type: 'object', properties: {} } },
+  disk_usage_path:      { fn: (p) => storage.disk_usage_path(p as { path: string }), description: 'Show disk usage for a specific path across matching nodes', tier: 0,
+    parametersSchema: { type: 'object', properties: { path: { type: 'string', description: 'Path to inspect, e.g. /data or /mnt/media' } }, required: ['path'] } },
   find_large_files:     { fn: (p) => storage.find_large_files(p as { path: string; top?: number }), description: 'Find largest files at a path', tier: 0,
     parametersSchema: { type: 'object', properties: { path: { type: 'string', description: 'Path to search e.g. /data or /mnt/disk3' }, top: { type: 'number', description: 'Number of results (default 20)' } }, required: ['path'] } },
   storage_pool_status:  { fn: () => storage.storage_pool_status(), description: 'Show Incus storage pool usage', tier: 0,
@@ -132,7 +191,9 @@ const REGISTRY: Record<string, RegistryEntry> = {
     parametersSchema: { type: 'object', properties: { query: { type: 'string' }, repo: { type: 'string', description: 'Limit to specific repo name' } }, required: ['query'] } },
   git_read_file: { fn: (p) => git.git_read_file(p as { repo: string; path: string; ref?: string }), description: 'Read a file from a Forgejo repo', tier: 0,
     parametersSchema: { type: 'object', properties: { repo: { type: 'string', description: 'Repo name e.g. infrastructure' }, path: { type: 'string' }, ref: { type: 'string', description: 'Branch or commit (default: main)' } }, required: ['repo', 'path'] } },
-  git_commit:    { fn: (p) => git.git_commit(p as { repo: string; path: string; content: string; message: string }), description: 'Commit and push a file to Forgejo', tier: 1,
+  git_diff_preview: { fn: (p) => git.git_diff_preview(p as { repo: string; path: string; content: string; ref?: string }), description: 'Preview a unified diff before changing a Forgejo file', tier: 0,
+    parametersSchema: { type: 'object', properties: { repo: { type: 'string' }, path: { type: 'string' }, content: { type: 'string' }, ref: { type: 'string', description: 'Branch or commit (default: main)' } }, required: ['repo', 'path', 'content'] } },
+  git_commit:    { fn: (p) => git.git_commit(p as { repo: string; path: string; content: string; message: string }), description: 'Commit and push a reviewed file change to Forgejo', tier: 3,
     parametersSchema: { type: 'object', properties: { repo: { type: 'string' }, path: { type: 'string' }, content: { type: 'string' }, message: { type: 'string' } }, required: ['repo', 'path', 'content', 'message'] } },
 };
 
@@ -166,11 +227,13 @@ export async function executeTool(
   name: string,
   params: Record<string, unknown>,
   user = 'agent',
+  confirmed = false,
 ): Promise<{ result: unknown; tier: number; decision: ReturnType<typeof evaluateToolRisk> }> {
   const entry = REGISTRY[name];
   if (!entry) throw new Error(`Unknown tool: ${name}`);
+  validateParams(name, params, entry.parametersSchema);
   const decision = evaluateToolRisk(name);
-  if (!decision.allow) {
+  if (!decision.allow && !confirmed) {
     throw new Error(`Tool ${name} requires confirmation (tier ${decision.tier})`);
   }
   const result = await entry.fn(params);

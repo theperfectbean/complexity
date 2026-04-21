@@ -5,8 +5,13 @@
  * Enforces tier-based approval and audit logging.
  */
 
-import { ToolRegistry } from '../ToolRegistry';
+import { executeTool, getToolEntry } from '../ToolRegistry';
 import { RiskPolicy, ToolTier } from '../policy/RiskPolicy';
+import { FLEET_CONTAINERS, FLEET_NODES } from '@/lib/topology';
+
+function shellQuote(value: string): string {
+  return `'${value.replace(/'/g, `'\\''`)}'`;
+}
 
 export interface ParsedCommand {
   action: string; // list, status, start, restart, delete, inspect, edit, etc.
@@ -34,17 +39,37 @@ export interface CommandResult {
  * @example
  * /restart arrstack  →  { action: 'restart', resource: 'arrstack', tier: 1, ... }
  * /delete plex --force  →  { action: 'delete', resource: 'plex', options: { force: true }, tier: 3, ... }
+ * /inspect proxy /etc/caddy/Caddyfile  →  { action: 'inspect', resource: 'proxy', options: { path: '/etc/caddy/Caddyfile' }, ... }
  */
 export function parseSlashCommand(input: string): ParsedCommand | null {
-  const match = input.match(/^\/(\w+)(?:\s+(\S+))?(.*)$/);
+  const match = input.match(/^\/(\w+)(?:\s+(.+?))?(?:\s+--)?\s*((?:--\S+(?:=\S+)?(?:\s+|$))*)$/);
   if (!match) return null;
 
-  const [, action, resource = '', flagsStr = ''] = match;
+  const [, action, resourceAndPath = '', flagsStr = ''] = match;
   const options: Record<string, string | boolean> = {};
 
+  // Split resource and path for multi-arg commands like /inspect proxy /path/to/file
+  let resource = '';
+  const parts = resourceAndPath.trim().split(/\s+/);
+  
+  if (parts.length === 0) {
+    resource = '';
+  } else if (action === 'inspect' && parts.length >= 2) {
+    // Special handling for /inspect container path
+    resource = parts[0];
+    options.path = parts.slice(1).join(' ');
+  } else {
+    resource = parts[0];
+    // Remaining parts might be additional options
+    if (parts.length > 1) {
+      options.remaining = parts.slice(1).join(' ');
+    }
+  }
+
   // Parse flags: --flag=value or --flag
-  const flagMatches = flagsStr.matchAll(/--(\w+)(?:=(\S+))?/g);
-  for (const flagMatch of flagMatches) {
+  const flagPattern = /--(\w+)(?:=(\S+))?/g;
+  let flagMatch;
+  while ((flagMatch = flagPattern.exec(flagsStr)) !== null) {
     const [, key, value] = flagMatch;
     options[key] = value ?? true;
   }
@@ -63,7 +88,7 @@ export function classifyNaturalLanguage(text: string): ParsedCommand | null {
 
   // Status queries
   if (/^(?:what|what's?|show|get|tell me).{0,20}(?:status|health|state)/i.test(text)) {
-    const match = text.match(/(?:of|for)?\s+(\w+)/i);
+    const match = text.match(/(?:status|health|state)(?:\s+of|\s+for)?\s+(?:the\s+)?([\w\-]+)/i);
     if (match) return parseSlashCommand(`/status ${match[1]}`);
   }
 
@@ -74,22 +99,22 @@ export function classifyNaturalLanguage(text: string): ParsedCommand | null {
   }
 
   // Restart/start/stop
-  if (/^restart\s+(\w+)/i.test(text)) {
-    const match = text.match(/^restart\s+(\w+)/i);
+  if (/^restart\s+([\w\-]+)/i.test(text)) {
+    const match = text.match(/^restart\s+([\w\-]+)/i);
     return parseSlashCommand(`/restart ${match![1]}`);
   }
-  if (/^(?:start|begin)\s+(\w+)/i.test(text)) {
-    const match = text.match(/^(?:start|begin)\s+(\w+)/i);
+  if (/^(?:start|begin)\s+([\w\-]+)/i.test(text)) {
+    const match = text.match(/^(?:start|begin)\s+([\w\-]+)/i);
     return parseSlashCommand(`/start ${match![1]}`);
   }
-  if (/^stop\s+(\w+)/i.test(text)) {
-    const match = text.match(/^stop\s+(\w+)/i);
+  if (/^stop\s+([\w\-]+)/i.test(text)) {
+    const match = text.match(/^stop\s+([\w\-]+)/i);
     return parseSlashCommand(`/stop ${match![1]}`);
   }
 
   // Delete queries
-  if (/^(?:delete|remove|destroy)\s+(\w+)/i.test(text)) {
-    const match = text.match(/^(?:delete|remove|destroy)\s+(\w+)/i);
+  if (/^(?:delete|remove|destroy)\s+([\w\-]+)/i.test(text)) {
+    const match = text.match(/^(?:delete|remove|destroy)\s+([\w\-]+)/i);
     const resource = match![1];
     const force = /--force|(?:with\s+)?force/i.test(text) ? ' --force' : '';
     return parseSlashCommand(`/delete ${resource}${force}`);
@@ -102,16 +127,16 @@ export function classifyNaturalLanguage(text: string): ParsedCommand | null {
   }
 
   // Config inspection
-  if (/^(?:show|get|read|display|inspect)\s+(?:the\s+)?(?:config|file|content)\s+(?:of|from|in)?\s*(\S+)?\s+(\S+)?/i.test(text)) {
-    const match = text.match(/(?:in|from)?\s*(\w+)?\s+(\S+)?/);
+  if (/^(?:show|get|read|display|inspect)\s+(?:the\s+)?(?:config|file|content)\s+(?:of|from|in)?\s+([\w\-]+)\s+(.+)/i.test(text)) {
+    const match = text.match(/(?:in|from)?\s+([\w\-]+)\s+(.+)/i);
     if (match && match[1] && match[2]) {
       return parseSlashCommand(`/inspect ${match[1]} ${match[2]}`);
     }
   }
 
   // Logs
-  if (/^(?:show|get|display)\s+(?:the\s+)?logs?(?:\s+(?:of|from))?\s+(\w+)/i.test(text)) {
-    const match = text.match(/(?:of|from)?\s+(\w+)/i);
+  if (/^(?:show|get|display)\s+(?:the\s+)?logs?(?:\s+(?:of|from))?\s+([\w\-]+)/i.test(text)) {
+    const match = text.match(/logs?(?:\s+of|\s+from)?\s+(?:the\s+)?([\w\-]+)/i);
     if (match) {
       const lines = text.match(/(?:last|last\s+)?(\d+)/);
       return parseSlashCommand(`/logs ${match[1]}${lines ? ` --lines=${lines[1]}` : ''}`);
@@ -133,14 +158,6 @@ export function classifyNaturalLanguage(text: string): ParsedCommand | null {
 }
 
 export class CommandRegistry {
-  private toolRegistry: ToolRegistry;
-  private policy: RiskPolicy;
-
-  constructor(toolRegistry: ToolRegistry) {
-    this.toolRegistry = toolRegistry;
-    this.policy = RiskPolicy.getInstance();
-  }
-
   /**
    * Execute a parsed command with approval flow
    */
@@ -171,7 +188,7 @@ export class CommandRegistry {
 
     try {
       // Map action → tool call
-      const result = await this.routeCommand(parsed);
+      const result = await this.routeCommand(parsed, userId, confirmApproval === true);
 
       return {
         success: true,
@@ -202,73 +219,149 @@ export class CommandRegistry {
   /**
    * Route a parsed command to the appropriate tool(s)
    */
-  private async routeCommand(cmd: ParsedCommand): Promise<unknown> {
+  private async routeCommand(
+    cmd: ParsedCommand,
+    userId: string,
+    confirmed = false,
+  ): Promise<string | Record<string, unknown>> {
     const { action, resource, options } = cmd;
 
     // Delegate to tool registry based on action
+    let result: unknown;
     switch (action) {
-      case 'list':
-        return this.toolRegistry.executeTool('list_containers_or_nodes', {
-          type: resource || 'containers',
-          node: options.node as string | undefined,
-        });
+      case 'list': {
+        const listTarget = resource || 'containers';
+        if (listTarget === 'nodes') {
+          result = {
+            nodes: FLEET_NODES.map((node) => ({
+              name: node.name,
+              ip: node.ip,
+              tailscaleIp: node.tailscaleIp,
+              role: node.role,
+              incusVersion: node.incusVersion,
+            })),
+          };
+          break;
+        }
+        if (listTarget === 'services') {
+          result = {
+            services: FLEET_CONTAINERS.map((container) => ({
+              name: container.name,
+              node: container.node,
+              ip: container.ip,
+              purpose: container.purpose,
+              tags: container.tags,
+              services: container.services.map((service) => service.name),
+            })),
+          };
+          break;
+        }
 
-      case 'status':
-        return this.toolRegistry.executeTool('incus_container_info', { container: resource });
+        const toolResult = await executeTool('incus_list', {}, userId, confirmed);
+        const listResult = toolResult.result as Record<string, unknown>;
+        if (typeof options.node === 'string') {
+          result = { [options.node]: listResult[options.node] ?? [] };
+        } else {
+          result = listResult;
+        }
+        break;
+      }
 
-      case 'start':
-        return this.toolRegistry.executeTool('incus_start_container', { container: resource });
+      case 'status': {
+        const toolResult = await executeTool('incus_status', { container: resource }, userId, confirmed);
+        result = toolResult.result;
+        break;
+      }
 
-      case 'stop':
-        return this.toolRegistry.executeTool('incus_stop_container', { container: resource });
+      case 'start': {
+        const toolResult = await executeTool('incus_start', { container: resource }, userId, confirmed);
+        result = toolResult.result;
+        break;
+      }
 
-      case 'restart':
-        return this.toolRegistry.executeTool('incus_restart_container', { container: resource });
+      case 'stop': {
+        const toolResult = await executeTool('incus_stop', { container: resource }, userId, confirmed);
+        result = toolResult.result;
+        break;
+      }
 
-      case 'delete':
-        return this.toolRegistry.executeTool('incus_delete_container', {
+      case 'restart': {
+        const toolResult = await executeTool('incus_restart', { container: resource }, userId, confirmed);
+        result = toolResult.result;
+        break;
+      }
+
+      case 'delete': {
+        const toolResult = await executeTool('incus_delete', {
           container: resource,
           force: options.force === true,
-        });
+        }, userId, confirmed);
+        result = toolResult.result;
+        break;
+      }
 
-      case 'logs':
-        return this.toolRegistry.executeTool('incus_exec_command', {
+      case 'logs': {
+        const toolResult = await executeTool('incus_logs', {
           container: resource,
-          command: `journalctl -n ${options.lines || 100}`,
-        });
+          lines: options.lines ? parseInt(options.lines as string) : 100,
+        }, userId, confirmed);
+        result = toolResult.result;
+        break;
+      }
 
-      case 'inspect':
-        return this.toolRegistry.executeTool('incus_read_file', {
-          container: resource,
-          path: options.path as string,
-        });
-
-      case 'check':
-        if (resource === 'disk') {
-          return this.toolRegistry.executeTool('disk_usage_report', {
-            path: options.path as string | undefined,
-          });
+      case 'inspect': {
+        const path = options.path as string | undefined;
+        if (!path) {
+          throw new Error('Inspect requires a file path');
         }
-        throw new Error(`Unknown check target: ${resource}`);
+        const toolResult = await executeTool('incus_exec', {
+          container: resource,
+          command: `cat -- ${shellQuote(path)}`,
+        }, userId, confirmed);
+        result = toolResult.result;
+        break;
+      }
 
-      case 'ping':
-        return this.toolRegistry.executeTool('health_check_nodes', {});
+      case 'check': {
+        if (resource === 'disk') {
+          const toolResult = typeof options.path === 'string'
+            ? await executeTool('disk_usage_path', { path: options.path }, userId, confirmed)
+            : await executeTool('disk_usage', {}, userId, confirmed);
+          result = toolResult.result;
+        } else {
+          throw new Error(`Unknown check target: ${resource}`);
+        }
+        break;
+      }
 
-      case 'audit':
-        return this.toolRegistry.executeTool('audit_log_query', {
-          limit: parseInt(options.limit as string) || 50,
+      case 'ping': {
+        const toolResult = await executeTool('ansible_ping', {}, userId, confirmed);
+        result = toolResult.result;
+        break;
+      }
+
+      case 'audit': {
+        const toolResult = await executeTool('audit_query', {
+          limit: options.limit ? parseInt(options.limit as string) : 50,
           since: options.since as string | undefined,
-        });
+        }, userId, confirmed);
+        result = toolResult.result;
+        break;
+      }
 
       default:
         throw new Error(`Unknown action: ${action}`);
     }
+
+    // Normalize result to string or Record
+    if (typeof result === 'string') return result;
+    if (typeof result === 'object') return result as Record<string, unknown>;
+    return String(result);
   }
 }
 
 export async function parseAndExecuteCommand(
   input: string,
-  toolRegistry: ToolRegistry,
   userId: string
 ): Promise<{ command: ParsedCommand; result: CommandResult }> {
   // Try slash command first
@@ -302,7 +395,7 @@ export async function parseAndExecuteCommand(
     };
   }
 
-  const registry = new CommandRegistry(toolRegistry);
+  const registry = new CommandRegistry();
   const result = await registry.executeCommand(parsed, userId, false);
 
   return { command: parsed, result };

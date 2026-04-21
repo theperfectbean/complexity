@@ -1,15 +1,18 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Send, Loader2 } from 'lucide-react';
-import { streamAgentRun, type AgentRunEvent } from '../lib/api';
+import { fetchAgentRun, streamAgentRun, type AgentRunEvent } from '../lib/api';
 import { ThreadSidebar } from './ThreadSidebar';
 import { uuid } from '../lib/uuid';
 import { Markdown } from './Markdown';
+import { WidgetRenderer } from './WidgetRenderer';
 
 interface ConversationTurn {
   id: string;
   userMessage: string;
   events: AgentRunEvent[];
   isRunning: boolean;
+  runId?: string;
+  status?: string;
 }
 
 interface Thread {
@@ -61,8 +64,11 @@ export function AgentChat({ initialContext, onContextUsed }: Props) {
   });
   const [input, setInput] = useState('');
   const [isRunning, setIsRunning] = useState(false);
+  const [pendingApprovalIds, setPendingApprovalIds] = useState<Record<string, string | undefined>>({});
   const abortRef = useRef<AbortController | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const recoveringRunsRef = useRef<Set<string>>(new Set());
+  const recoveredRunsRef = useRef<Set<string>>(new Set());
 
   // Sync activeId when threads initialise
   useEffect(() => {
@@ -93,21 +99,64 @@ export function AgentChat({ initialContext, onContextUsed }: Props) {
     setThreads(prev => prev.map(t => t.id === threadId ? updater(t) : t));
   }, []);
 
-  const handleNewThread = useCallback(() => {
-    const t = makeThread();
-    setThreads(prev => [t, ...prev]);
-    setActiveId(t.id);
-  }, []);
+  useEffect(() => {
+    for (const thread of threads) {
+      for (const turn of thread.turns) {
+        if (!turn.runId || !turn.isRunning || recoveringRunsRef.current.has(turn.runId) || recoveredRunsRef.current.has(turn.runId)) continue;
+        recoveringRunsRef.current.add(turn.runId);
+        void fetchAgentRun(turn.runId)
+          .then((run) => {
+            const recoveredApprovalId = run.state.status === 'paused_for_approval'
+              ? [...run.events].reverse().find((event) => event.type === 'destructive_confirm' && typeof (event as Record<string, unknown>).approvalId === 'string')
+              : undefined;
+            if (recoveredApprovalId) {
+              setPendingApprovalIds((prev) => ({
+                ...prev,
+                [thread.id]: (recoveredApprovalId as Record<string, unknown>).approvalId as string,
+              }));
+            }
+            updateThread(thread.id, (currentThread) => ({
+              ...currentThread,
+              turns: currentThread.turns.map((currentTurn) => {
+                if (currentTurn.id !== turn.id) return currentTurn;
+                return {
+                  ...currentTurn,
+                  events: run.events.length > currentTurn.events.length ? run.events : currentTurn.events,
+                  isRunning: run.state.status === 'in_progress' || run.state.status === 'paused_for_approval',
+                  status: run.state.status,
+                };
+              }),
+            }));
+          })
+          .catch(() => undefined)
+          .finally(() => {
+            recoveredRunsRef.current.add(turn.runId!);
+            recoveringRunsRef.current.delete(turn.runId!);
+          });
+      }
+    }
+  }, [threads, updateThread]);
 
-  const activeThread = threads.find(t => t.id === activeId);
+  const submitMessage = useCallback((userMessage: string, extraBody: Record<string, unknown> = {}) => {
+    const explicitThreadId = typeof extraBody.threadId === 'string' ? extraBody.threadId : undefined;
+    const thread = threads.find(t => t.id === (explicitThreadId ?? activeId));
+    if (isRunning || !thread) return;
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!input.trim() || isRunning || !activeThread) return;
+    const normalized = userMessage.trim().toUpperCase();
+    const threadApprovalId = pendingApprovalIds[thread.id];
+    const effectiveExtraBody = (
+      (normalized === 'CONFIRM' || normalized === 'CANCEL') &&
+      threadApprovalId &&
+      extraBody.approvalId === undefined
+    )
+      ? { ...extraBody, approvalId: threadApprovalId, threadId: thread.id }
+      : { ...extraBody, threadId: thread.id };
+
+    if ('approvalId' in effectiveExtraBody && effectiveExtraBody.approvalId) {
+      setPendingApprovalIds(prev => ({ ...prev, [thread.id]: undefined }));
+    }
 
     const turnId = uuid();
-    const userMessage = input.trim();
-    setInput('');
     setIsRunning(true);
 
     const turn: ConversationTurn = {
@@ -117,8 +166,7 @@ export function AgentChat({ initialContext, onContextUsed }: Props) {
       isRunning: true,
     };
 
-    // Update thread title from first message
-    updateThread(activeThread.id, t => ({
+    updateThread(thread.id, t => ({
       ...t,
       title: t.turns.length === 0 ? userMessage.slice(0, 48) : t.title,
       turns: [...t.turns, turn],
@@ -130,40 +178,79 @@ export function AgentChat({ initialContext, onContextUsed }: Props) {
     streamAgentRun(
       userMessage,
       'default',
-      (event) => {
-        updateThread(activeThread.id, t => ({
-          ...t,
-          turns: t.turns.map(tr =>
-            tr.id === turnId ? { ...tr, events: [...tr.events, event] } : tr,
-          ),
-        }));
-      },
-      () => {
-        setIsRunning(false);
-        updateThread(activeThread.id, t => ({
-          ...t,
-          turns: t.turns.map(tr =>
-            tr.id === turnId ? { ...tr, isRunning: false } : tr,
-          ),
-        }));
-      },
+        (event) => {
+          if (event.type === 'destructive_confirm') {
+            const approvalId = (event as Record<string, unknown>).approvalId;
+            if (typeof approvalId === 'string') {
+              setPendingApprovalIds(prev => ({ ...prev, [thread.id]: approvalId }));
+            }
+          }
+          const runId = typeof (event as Record<string, unknown>).runId === 'string'
+            ? (event as Record<string, unknown>).runId as string
+            : undefined;
+          const status = typeof (event as Record<string, unknown>).status === 'string'
+            ? (event as Record<string, unknown>).status as string
+            : undefined;
+          updateThread(thread.id, t => ({
+            ...t,
+            turns: t.turns.map(tr =>
+              tr.id === turnId ? {
+                ...tr,
+                events: [...tr.events, event],
+                runId: runId ?? tr.runId,
+                status: status ?? tr.status,
+              } : tr,
+            ),
+          }));
+        },
+        () => {
+          setIsRunning(false);
+          updateThread(thread.id, t => ({
+            ...t,
+            turns: t.turns.map(tr =>
+              tr.id === turnId ? {
+                ...tr,
+                isRunning: false,
+                status: tr.status === 'running' ? 'completed' : tr.status,
+              } : tr,
+            ),
+          }));
+        },
       (err) => {
         setIsRunning(false);
         const errEvent: AgentRunEvent = {
           type: 'error',
           error: { code: 'stream_error', message: err },
         };
-        updateThread(activeThread.id, t => ({
+        updateThread(thread.id, t => ({
           ...t,
-          turns: t.turns.map(tr =>
-            tr.id === turnId
-              ? { ...tr, isRunning: false, events: [...tr.events, errEvent] }
-              : tr,
-          ),
-        }));
+            turns: t.turns.map(tr =>
+              tr.id === turnId
+                ? { ...tr, isRunning: false, status: 'error', events: [...tr.events, errEvent] }
+                : tr,
+            ),
+          }));
       },
       ab.signal,
+      effectiveExtraBody,
     );
+  }, [activeId, isRunning, pendingApprovalIds, threads, updateThread]);
+
+  const handleNewThread = useCallback(() => {
+    const t = makeThread();
+    setThreads(prev => [t, ...prev]);
+    setActiveId(t.id);
+  }, []);
+
+  const activeThread = threads.find(t => t.id === activeId);
+  const activeTurn = activeThread?.turns.at(-1);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!input.trim()) return;
+    const userMessage = input.trim();
+    setInput('');
+    submitMessage(userMessage);
   };
 
   const handleCancel = () => {
@@ -171,16 +258,27 @@ export function AgentChat({ initialContext, onContextUsed }: Props) {
     setIsRunning(false);
   };
 
+  const handleApproval = useCallback((event: AgentRunEvent, approved: boolean) => {
+    const e = event as Record<string, unknown>;
+    if (typeof e.approvalId !== 'string') {
+      return;
+    }
+    submitMessage(approved ? 'CONFIRM' : 'CANCEL', {
+      approvalId: e.approvalId,
+      ...(typeof e.threadId === 'string' ? { threadId: e.threadId } : {}),
+    });
+  }, [submitMessage]);
+
   return (
-    <div style={{ display: 'flex', height: '100%', background: 'var(--bg-page)' }}>
-      <ThreadSidebar
-        threads={threads.map(t => ({ id: t.id, title: t.title, createdAt: t.createdAt }))}
-        activeId={activeId}
-        onSelect={setActiveId}
+      <div style={{ display: 'flex', height: '100%', background: 'var(--bg-page)' }}>
+        <ThreadSidebar
+          threads={threads.map(t => ({ id: t.id, title: t.title, createdAt: t.createdAt }))}
+          activeId={activeId}
+          onSelect={setActiveId}
         onNew={handleNewThread}
       />
 
-      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
         {/* Messages */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           {(!activeThread || activeThread.turns.length === 0) && (
@@ -193,7 +291,7 @@ export function AgentChat({ initialContext, onContextUsed }: Props) {
           )}
 
           {activeThread?.turns.map(turn => (
-            <TurnBlock key={turn.id} turn={turn} />
+            <TurnBlock key={turn.id} turn={turn} onApproval={handleApproval} />
           ))}
 
           <div ref={bottomRef} />
@@ -240,23 +338,39 @@ export function AgentChat({ initialContext, onContextUsed }: Props) {
           )}
         </form>
       </div>
+
+      <InspectorPanel thread={activeThread} turn={activeTurn} />
     </div>
   );
 }
 
-function TurnBlock({ turn }: { turn: ConversationTurn }) {
+function TurnBlock({ turn, onApproval }: { turn: ConversationTurn; onApproval: (event: AgentRunEvent, approved: boolean) => void }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem' }}>
       {/* User bubble */}
       <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
         <div style={{ maxWidth: '70%', borderRadius: '1rem', borderTopRightRadius: '0.25rem', padding: '0.625rem 1rem', fontSize: '0.85rem', background: 'var(--accent)', color: '#fff' }}>
-          {turn.userMessage}
+          <div>{turn.userMessage}</div>
+          {(turn.runId || turn.status) && (
+            <div style={{ marginTop: '0.35rem', display: 'flex', gap: '0.35rem', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+              {turn.status && (
+                <span style={{ borderRadius: '999px', background: 'rgba(255,255,255,0.18)', padding: '0.08rem 0.45rem', fontSize: '0.65rem' }}>
+                  {turn.status.replace(/_/g, ' ')}
+                </span>
+              )}
+              {turn.runId && (
+                <code style={{ fontSize: '0.65rem', background: 'rgba(15,23,42,0.22)', padding: '0.08rem 0.45rem', borderRadius: '999px' }}>
+                  {turn.runId}
+                </code>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
       {/* Events */}
       {turn.events.map((ev, idx) => (
-        <EventBlock key={idx} event={ev} />
+        <EventBlock key={idx} event={ev} onApproval={onApproval} />
       ))}
 
       {turn.isRunning && (
@@ -269,7 +383,7 @@ function TurnBlock({ turn }: { turn: ConversationTurn }) {
   );
 }
 
-function EventBlock({ event }: { event: AgentRunEvent }) {
+function EventBlock({ event, onApproval }: { event: AgentRunEvent; onApproval: (event: AgentRunEvent, approved: boolean) => void }) {
   const e = event as Record<string, unknown>;
 
   switch (event.type) {
@@ -344,10 +458,10 @@ function EventBlock({ event }: { event: AgentRunEvent }) {
           <p style={{ margin: '0 0 0.5rem', fontSize: '0.85rem', fontWeight: 600, color: 'var(--warning)' }}>⚠ Confirmation Required</p>
           <p style={{ margin: '0 0 0.75rem', fontSize: '0.8rem', color: 'var(--text-muted)' }}>{msg}</p>
           <div style={{ display: 'flex', gap: '0.5rem' }}>
-            <button style={{ borderRadius: '0.5rem', padding: '0.375rem 1rem', fontSize: '0.8rem', fontWeight: 500, border: 'none', cursor: 'pointer', background: '#22c55e', color: '#fff' }}>
+            <button onClick={() => onApproval(event, true)} style={{ borderRadius: '0.5rem', padding: '0.375rem 1rem', fontSize: '0.8rem', fontWeight: 500, border: 'none', cursor: 'pointer', background: '#22c55e', color: '#fff' }}>
               Approve
             </button>
-            <button style={{ borderRadius: '0.5rem', padding: '0.375rem 1rem', fontSize: '0.8rem', fontWeight: 500, border: 'none', cursor: 'pointer', background: '#ef4444', color: '#fff' }}>
+            <button onClick={() => onApproval(event, false)} style={{ borderRadius: '0.5rem', padding: '0.375rem 1rem', fontSize: '0.8rem', fontWeight: 500, border: 'none', cursor: 'pointer', background: '#ef4444', color: '#fff' }}>
               Cancel
             </button>
           </div>
@@ -401,4 +515,254 @@ function EventBlock({ event }: { event: AgentRunEvent }) {
     default:
       return null;
   }
+}
+
+function InspectorPanel({ thread, turn }: { thread?: Thread; turn?: ConversationTurn }) {
+  const timeline = turn ? buildTimeline(turn.events) : [];
+  const toolResults = turn ? turn.events.filter((event) => event.type === 'tool_result' || event.type === 'tool_error') : [];
+  const verification = summarizeVerification(turn);
+
+  return (
+    <aside style={{ width: '320px', borderLeft: '1px solid var(--border)', background: 'var(--bg-surface)', overflowY: 'auto', flexShrink: 0 }}>
+      <div style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <section>
+          <p style={{ margin: '0 0 0.5rem', fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-secondary)' }}>
+            Operator workspace
+          </p>
+          {thread ? (
+            <div style={{ display: 'grid', gap: '0.5rem' }}>
+              <MetricRow label="Thread" value={thread.title} />
+              <MetricRow label="Turns" value={String(thread.turns.length)} />
+              <MetricRow label="Run" value={turn?.runId ?? 'Pending'} monospace />
+              <MetricRow label="Status" value={turn?.status ?? 'idle'} />
+            </div>
+          ) : (
+            <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Select or start a thread to inspect the live run timeline.</p>
+          )}
+        </section>
+
+        <section>
+          <p style={{ margin: '0 0 0.5rem', fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-secondary)' }}>
+            Verification state
+          </p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '0.5rem' }}>
+            <StatusTile label="Completed tools" value={String(verification.completed)} tone="success" />
+            <StatusTile label="Failures" value={String(verification.failed)} tone={verification.failed > 0 ? 'error' : 'neutral'} />
+            <StatusTile label="Awaiting approval" value={verification.awaitingApproval ? 'Yes' : 'No'} tone={verification.awaitingApproval ? 'warning' : 'neutral'} />
+            <StatusTile label="Assistant replies" value={String(verification.messages)} tone="neutral" />
+          </div>
+        </section>
+
+        <section>
+          <p style={{ margin: '0 0 0.5rem', fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-secondary)' }}>
+            Tool pane
+          </p>
+          {toolResults.length > 0 ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              {toolResults.map((event, index) => (
+                <ToolPane key={`${event.type}-${index}`} event={event} />
+              ))}
+            </div>
+          ) : (
+            <EmptyCard text="Tool executions will appear here with structured output as the run progresses." />
+          )}
+        </section>
+
+        <section>
+          <p style={{ margin: '0 0 0.5rem', fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-secondary)' }}>
+            Timeline
+          </p>
+          {timeline.length > 0 ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              {timeline.map((item, index) => (
+                <div key={`${item.label}-${index}`} style={{ borderRadius: '0.75rem', border: '1px solid var(--border)', background: 'var(--bg-page)', padding: '0.75rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
+                    <span style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text)' }}>{item.label}</span>
+                    <span style={{ fontSize: '0.68rem', color: 'var(--text-secondary)' }}>{item.kind}</span>
+                  </div>
+                  {item.detail && (
+                    <p style={{ margin: '0.35rem 0 0', fontSize: '0.74rem', color: 'var(--text-secondary)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                      {item.detail}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <EmptyCard text="The latest run timeline will be summarized here." />
+          )}
+        </section>
+      </div>
+    </aside>
+  );
+}
+
+function MetricRow({ label, value, monospace = false }: { label: string; value: string; monospace?: boolean }) {
+  return (
+    <div style={{ borderRadius: '0.75rem', border: '1px solid var(--border)', background: 'var(--bg-page)', padding: '0.75rem' }}>
+      <p style={{ margin: '0 0 0.25rem', fontSize: '0.68rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)' }}>{label}</p>
+      <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text)', fontFamily: monospace ? 'monospace' : undefined, wordBreak: 'break-word' }}>{value}</p>
+    </div>
+  );
+}
+
+function StatusTile({ label, value, tone }: { label: string; value: string; tone: 'success' | 'error' | 'warning' | 'neutral' }) {
+  const colors: Record<typeof tone, string> = {
+    success: '#22c55e',
+    error: '#ef4444',
+    warning: '#f59e0b',
+    neutral: 'var(--text-secondary)',
+  };
+  return (
+    <div style={{ borderRadius: '0.75rem', border: '1px solid var(--border)', background: 'var(--bg-page)', padding: '0.75rem' }}>
+      <p style={{ margin: '0 0 0.2rem', fontSize: '0.68rem', color: 'var(--text-secondary)' }}>{label}</p>
+      <p style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: colors[tone] }}>{value}</p>
+    </div>
+  );
+}
+
+function EmptyCard({ text }: { text: string }) {
+  return (
+    <div style={{ borderRadius: '0.75rem', border: '1px dashed var(--border)', background: 'var(--bg-page)', padding: '0.9rem', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+      {text}
+    </div>
+  );
+}
+
+function ToolPane({ event }: { event: AgentRunEvent }) {
+  const payload = event as Record<string, unknown>;
+  if (event.type === 'tool_error') {
+    return (
+      <div style={{ borderRadius: '0.75rem', border: '1px solid var(--error)', background: 'var(--bg-page)', padding: '0.85rem' }}>
+        <p style={{ margin: '0 0 0.35rem', fontSize: '0.8rem', fontWeight: 600, color: 'var(--error)' }}>
+          {(payload.tool as string | undefined) ?? 'tool'} failed
+        </p>
+        <p style={{ margin: 0, fontSize: '0.76rem', color: 'var(--text-secondary)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+          {(payload.error as string | undefined) ?? 'Unknown error'}
+        </p>
+      </div>
+    );
+  }
+
+  const toolName = (payload.tool as string | undefined) ?? 'tool';
+  const result = payload.result;
+  const structured = isEnvelope(result) ? result : inferStructuredResult(result);
+  if (structured) {
+    return <WidgetRenderer toolName={toolName} result={structured} />;
+  }
+
+  return (
+    <details style={{ borderRadius: '0.75rem', border: '1px solid var(--border)', background: 'var(--bg-page)', padding: '0.85rem' }} open>
+      <summary style={{ cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text)' }}>{toolName}</summary>
+      <pre style={{ margin: '0.6rem 0 0', fontSize: '0.72rem', whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: 'var(--text-secondary)' }}>
+        {typeof result === 'string' ? result : JSON.stringify(result, null, 2)}
+      </pre>
+    </details>
+  );
+}
+
+function summarizeVerification(turn?: ConversationTurn) {
+  if (!turn) {
+    return { completed: 0, failed: 0, awaitingApproval: false, messages: 0 };
+  }
+
+  let completed = 0;
+  let failed = 0;
+  let messages = 0;
+  let awaitingApproval = turn.status === 'waiting_for_approval';
+  for (const event of turn.events) {
+    if (event.type === 'tool_result') completed += 1;
+    if (event.type === 'tool_error' || event.type === 'error') failed += 1;
+    if (event.type === 'text' || event.type === 'assistant_message') messages += 1;
+    if (event.type === 'destructive_confirm') awaitingApproval = true;
+    if (event.type === 'approval_decision') awaitingApproval = false;
+  }
+
+  return { completed, failed, awaitingApproval, messages };
+}
+
+function buildTimeline(events: AgentRunEvent[]) {
+  return events.flatMap((event) => {
+    const payload = event as Record<string, unknown>;
+    switch (event.type) {
+      case 'run_started':
+        return [{ kind: 'run', label: 'Run started', detail: payload.userMessage as string | undefined }];
+      case 'run_status':
+        return [{ kind: 'status', label: `Status: ${String(payload.status ?? 'unknown').replace(/_/g, ' ')}`, detail: '' }];
+      case 'command_parsed':
+        return [{ kind: 'command', label: 'Command parsed', detail: JSON.stringify(payload.command, null, 2) }];
+      case 'tool_start':
+        return [{ kind: 'tool', label: `Started ${String(payload.tool ?? 'tool')}`, detail: JSON.stringify(payload.params ?? {}, null, 2) }];
+      case 'tool_result':
+        return [{ kind: 'tool', label: `Completed ${String(payload.tool ?? 'tool')}`, detail: summarizeResult(payload.result) }];
+      case 'tool_error':
+        return [{ kind: 'error', label: `Failed ${String(payload.tool ?? 'tool')}`, detail: String(payload.error ?? '') }];
+      case 'destructive_confirm':
+        return [{ kind: 'approval', label: 'Approval requested', detail: String(payload.message ?? '') }];
+      case 'approval_decision':
+        return [{ kind: 'approval', label: `Approval ${payload.approved ? 'granted' : 'rejected'}`, detail: '' }];
+      case 'error':
+        return [{ kind: 'error', label: 'Run error', detail: String(payload.message ?? payload.error ?? '') }];
+      default:
+        return [];
+    }
+  });
+}
+
+function summarizeResult(result: unknown): string {
+  if (typeof result === 'string') return result;
+  if (result == null) return '';
+  try {
+    return JSON.stringify(result, null, 2);
+  } catch {
+    return String(result);
+  }
+}
+
+function isEnvelope(value: unknown): value is Parameters<typeof WidgetRenderer>[0]['result'] {
+  return typeof value === 'object'
+    && value !== null
+    && 'ok' in value
+    && 'widgetHint' in value
+    && 'data' in value;
+}
+
+function inferStructuredResult(value: unknown): Parameters<typeof WidgetRenderer>[0]['result'] | null {
+  if (Array.isArray(value) && value.length > 0 && typeof value[0] === 'object' && value[0] !== null) {
+    return {
+      ok: true,
+      summary: `${value.length} row${value.length === 1 ? '' : 's'}`,
+      data: value,
+      widgetHint: { type: 'table' },
+    };
+  }
+
+  if (value && typeof value === 'object') {
+    const record = value as Record<string, unknown>;
+    if (Array.isArray(record.hosts) || Array.isArray(record.nodes) || Array.isArray(record.items)) {
+      return {
+        ok: true,
+        summary: 'Structured host view',
+        data: value,
+        widgetHint: { type: 'host_list' },
+      };
+    }
+    return {
+      ok: true,
+      summary: 'Structured key/value view',
+      data: value,
+      widgetHint: { type: 'key_value' },
+    };
+  }
+
+  if (typeof value === 'string') {
+    return {
+      ok: true,
+      summary: 'Command output',
+      data: { output: value },
+      widgetHint: { type: 'command_result' },
+    };
+  }
+
+  return null;
 }

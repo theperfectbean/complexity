@@ -2,12 +2,20 @@ import path from 'path';
 import fs from 'fs';
 
 // Lazy-load better-sqlite3 to avoid import errors if package missing
-let db: import('better-sqlite3').Database | null = null;
+interface AuditDb {
+  exec(sql: string): void;
+  prepare(sql: string): {
+    run(...params: unknown[]): unknown;
+    all(...params: unknown[]): unknown[];
+  };
+}
 
-function getDb(): import('better-sqlite3').Database {
+let db: AuditDb | null = null;
+
+function getDb(): AuditDb {
   if (db) return db;
   // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const Database = require('better-sqlite3') as typeof import('better-sqlite3');
+  const Database = require('better-sqlite3') as new (filename: string) => AuditDb;
   const dbPath = process.env.AUDIT_DB_PATH ?? '/opt/complexity/data/audit.db';
   fs.mkdirSync(path.dirname(dbPath), { recursive: true });
   db = new Database(dbPath);

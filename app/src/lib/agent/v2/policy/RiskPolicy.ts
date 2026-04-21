@@ -32,7 +32,7 @@ const TOOL_TIERS: Record<string, RiskTier> = {
   dns_add: 1, dns_delete: 3,
   caddy_list_routes: 0,
   caddy_add_vhost: 2, caddy_remove_vhost: 3, caddy_reload: 1,
-  disk_usage: 0, find_large_files: 0, storage_pool_status: 0,
+  disk_usage: 0, disk_usage_path: 0, find_large_files: 0, storage_pool_status: 0,
   journal_disk_usage: 0, snapraid_status: 0,
   truncate_logs: 1,
   sonarr_status: 0, sonarr_search: 1, sonarr_add: 2,
@@ -48,7 +48,7 @@ const TOOL_TIERS: Record<string, RiskTier> = {
   ansible_ping: 0, ansible_list_playbooks: 0,
   ansible_run_playbook: 3,
   audit_query: 0,
-  git_search: 0, git_read_file: 0, git_commit: 1,
+  git_search: 0, git_read_file: 0, git_diff_preview: 0, git_commit: 3,
 };
 
 export function getToolTier(toolName: string): RiskTier {

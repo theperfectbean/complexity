@@ -1,11 +1,13 @@
 import { ArrowLeft, Server, HardDrive, Cpu, Database } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { FLEET_CONTAINERS, FLEET_NODES } from '../../../app/src/lib/topology';
 
-const NODES = [
-  { name: 'nas',   ip: '192.168.0.202', tailscale: '100.94.25.108',  containers: 3 },
-  { name: 'media', ip: '192.168.0.201', tailscale: '100.126.26.57',  containers: 4 },
-  { name: 'ai',    ip: '192.168.0.204', tailscale: '100.65.14.34',   containers: 2 },
-];
+const NODES = FLEET_NODES.map(node => ({
+  name: node.name,
+  ip: node.ip,
+  tailscale: node.tailscaleIp,
+  containers: FLEET_CONTAINERS.filter(container => container.node === node.name).length,
+}));
 
 const DISKS = [
   { node: 'nas',   device: 'nvme0n1p2', size: '238G', mount: '/',              pct: 2  },

@@ -1,3 +1,5 @@
+import { FLEET_CONTAINERS, type FleetContainer } from '../../../app/src/lib/topology';
+
 const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined) ?? '';
 const API_TOKEN = (import.meta.env.VITE_API_TOKEN as string | undefined) ?? '';
 
@@ -6,6 +8,45 @@ export interface AgentRunEvent {
   [key: string]: unknown;
 }
 
+export interface PersistedAgentRun {
+  ok: true;
+  state: {
+    runId: string;
+    threadId: string;
+    status: string;
+    updatedAt: string;
+  };
+  events: AgentRunEvent[];
+}
+
+const SERVICE_LINK_OVERRIDES: Record<string, ServiceLink[]> = {
+  dns: [{ label: 'Technitium UI', url: 'http://192.168.0.53:5380' }],
+  forgejo: [
+    { label: 'Git', url: 'http://git.internal.lan' },
+    { label: 'Docs', url: 'http://docs.internal.lan' },
+  ],
+  arrstack: [
+    { label: 'Seer', url: 'http://seer.internal.lan' },
+    { label: 'Sonarr', url: 'http://sonarr.internal.lan' },
+    { label: 'Radarr', url: 'http://radarr.internal.lan' },
+    { label: 'Prowlarr', url: 'http://prowlarr.internal.lan' },
+    { label: 'Bazarr', url: 'http://bazarr.internal.lan' },
+    { label: 'Unmanic', url: 'http://unmanic.internal.lan' },
+  ],
+  'ingestion-stack': [
+    { label: 'qBittorrent', url: 'http://torrent.internal.lan' },
+    { label: 'SABnzbd', url: 'http://sab.internal.lan' },
+    { label: 'Stats', url: 'http://stats.internal.lan' },
+  ],
+  'audio-stack': [
+    { label: 'Audiobookshelf', url: 'http://books.internal.lan' },
+    { label: 'Finder', url: 'http://finder.internal.lan' },
+    { label: 'Mouse', url: 'http://mouse.internal.lan' },
+  ],
+  plex: [{ label: 'Plex', url: 'http://plex.internal.lan' }],
+  complexity: [{ label: 'Complexity App', url: 'http://complexity.internal.lan' }],
+};
+
 export function streamAgentRun(
   message: string,
   modelId = 'default',
@@ -13,14 +54,15 @@ export function streamAgentRun(
   onDone: () => void,
   onError: (err: string) => void,
   signal?: AbortSignal,
+  extraBody: Record<string, unknown> = {},
 ): void {
-  fetch(`${API_BASE}/api/agent/v2/runs`, {
+  fetch(`${API_BASE}/api/agent/unified/runs`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       ...(API_TOKEN ? { 'X-Api-Key': API_TOKEN } : {}),
     },
-    body: JSON.stringify({ message, modelId }),
+    body: JSON.stringify({ message, modelId, commandMode: 'auto', ...extraBody }),
     signal,
   }).then(async (res) => {
     if (!res.ok) { onError(`HTTP ${res.status}`); return; }
@@ -39,12 +81,12 @@ export function streamAgentRun(
             const event = JSON.parse(line.slice(6)) as AgentRunEvent;
             onEvent(event);
             if (event.type === "done") { onDone(); return; }
-            if (event.type === "run_status") {
-              const status = event.status as string;
-              if (status === 'completed' || status === 'cancelled' || status === 'failed') {
-                onDone();
-              }
-            }
+             if (event.type === "run_status") {
+               const status = event.status as string;
+               if (status === 'completed' || status === 'cancelled' || status === 'failed' || status === 'error') {
+                 onDone();
+               }
+             }
           } catch { /* ignore parse errors */ }
         }
       }
@@ -53,6 +95,16 @@ export function streamAgentRun(
   }).catch((err: unknown) => {
     if ((err as { name?: string })?.name !== 'AbortError') onError(String(err));
   });
+}
+
+export async function fetchAgentRun(runId: string): Promise<PersistedAgentRun> {
+  const res = await fetch(`${API_BASE}/api/agent/unified/runs?runId=${encodeURIComponent(runId)}`, {
+    headers: API_TOKEN ? { 'X-Api-Key': API_TOKEN } : undefined,
+  });
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status}`);
+  }
+  return res.json() as Promise<PersistedAgentRun>;
 }
 
 export interface ServiceLink {
@@ -70,41 +122,18 @@ export interface ServiceInfo {
   links?: ServiceLink[];
 }
 
-export const SERVICES: ServiceInfo[] = [
-  { name: "dns",             ip: "192.168.0.53",  node: "nas",   purpose: "Technitium DNS",             tags: ["network"],   url: "http://192.168.0.53:5380" },
-  { name: "proxy",           ip: "192.168.0.100", node: "nas",   purpose: "Caddy Reverse Proxy",        tags: ["network"] },
-  { name: "forgejo",         ip: "192.168.0.109", node: "nas",   purpose: "Forgejo Git + Docs",         tags: ["devops"],    url: "http://git.internal.lan",
-    links: [
-      { label: "Git",  url: "http://git.internal.lan" },
-      { label: "Docs", url: "http://docs.internal.lan" },
-    ],
-  },
-  { name: "arrstack",        ip: "192.168.0.103", node: "media", purpose: "Sonarr / Radarr / Prowlarr", tags: ["media"],     url: "http://seer.internal.lan",
-    links: [
-      { label: "Seer",     url: "http://seer.internal.lan" },
-      { label: "Sonarr",   url: "http://sonarr.internal.lan" },
-      { label: "Radarr",   url: "http://radarr.internal.lan" },
-      { label: "Prowlarr", url: "http://prowlarr.internal.lan" },
-      { label: "Bazarr",   url: "http://bazarr.internal.lan" },
-      { label: "Unmanic",  url: "http://unmanic.internal.lan" },
-    ],
-  },
-  { name: "ingestion-stack", ip: "192.168.0.112", node: "media", purpose: "qBittorrent / SABnzbd",      tags: ["downloads"], url: "http://torrent.internal.lan",
-    links: [
-      { label: "qBittorrent", url: "http://torrent.internal.lan" },
-      { label: "SABnzbd",     url: "http://sab.internal.lan" },
-      { label: "Stats",       url: "http://stats.internal.lan" },
-    ],
-  },
-  { name: "audio-stack",     ip: "192.168.0.104", node: "media", purpose: "Audiobookshelf / Readarr",   tags: ["audio"],     url: "http://books.internal.lan",
-    links: [
-      { label: "Audiobookshelf", url: "http://books.internal.lan" },
-      { label: "Finder",         url: "http://finder.internal.lan" },
-      { label: "Mouse",          url: "http://mouse.internal.lan" },
-    ],
-  },
-  { name: "plex",            ip: "192.168.0.60",  node: "media", purpose: "Plex Media Server",          tags: ["media"],     url: "http://plex.internal.lan" },
-  { name: "ollama",          ip: "192.168.0.106", node: "ai",    purpose: "Ollama LLM Inference",       tags: ["ai"],        url: "http://192.168.0.106:11434" },
-  { name: "litellm",         ip: "192.168.0.107", node: "ai",    purpose: "LiteLLM Proxy",              tags: ["ai"],        url: "http://192.168.0.107:4000" },
-  { name: "complexity",      ip: "192.168.0.105", node: "ai",    purpose: "Complexity AI App",          tags: ["app"],       url: "http://complexity.internal.lan" },
-];
+function toServiceInfo(container: FleetContainer): ServiceInfo {
+  const links = SERVICE_LINK_OVERRIDES[container.name];
+
+  return {
+    name: container.name,
+    ip: container.ip,
+    node: container.node,
+    purpose: container.purpose,
+    tags: [...container.tags],
+    url: links?.[0]?.url,
+    links: links && links.length > 0 ? links : undefined,
+  };
+}
+
+export const SERVICES: ServiceInfo[] = FLEET_CONTAINERS.map(toServiceInfo);

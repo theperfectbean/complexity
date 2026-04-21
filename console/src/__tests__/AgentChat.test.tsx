@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, act, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { AgentChat } from '@/components/AgentChat';
 import * as api from '@/lib/api';
@@ -64,7 +64,7 @@ describe('AgentChat initial state', () => {
     localStorage.setItem('fleet_console_threads_v1', JSON.stringify([thread]));
 
     renderChat();
-    expect(screen.getByText('Old thread')).toBeInTheDocument();
+    expect(screen.getAllByText('Old thread').length).toBeGreaterThanOrEqual(1);
   });
 });
 
@@ -107,14 +107,15 @@ describe('AgentChat message submission', () => {
     await userEvent.keyboard('{Enter}');
 
     await waitFor(() => {
-      expect(spy).toHaveBeenCalledWith(
-        'restart qbittorrent',
-        'default',
-        expect.any(Function),
-        expect.any(Function),
-        expect.any(Function),
-        expect.anything(),
-      );
+    expect(spy).toHaveBeenCalledWith(
+      'restart qbittorrent',
+      'default',
+      expect.any(Function),
+      expect.any(Function),
+      expect.any(Function),
+      expect.anything(),
+      expect.objectContaining({ threadId: expect.any(String) }),
+    );
     });
   });
 
@@ -157,10 +158,27 @@ describe('AgentChat event rendering', () => {
     });
   });
 
+  it('shows persisted run metadata from lifecycle events', async () => {
+    mockStream([
+      { type: 'run_started', runId: 'run_meta_1', threadId: 'thread-1' },
+      { type: 'run_status', runId: 'run_meta_1', threadId: 'thread-1', status: 'completed' },
+    ]);
+    renderChat();
+
+    const input = screen.getByPlaceholderText('Ask the fleet agent...');
+    await userEvent.type(input, 'check plex');
+    await userEvent.keyboard('{Enter}');
+
+    await waitFor(() => {
+      expect(screen.getAllByText('run_meta_1').length).toBeGreaterThanOrEqual(1);
+      expect(screen.getAllByText('completed').length).toBeGreaterThanOrEqual(1);
+    });
+  });
+
   it('renders tool_start events as "Running tool…" indicator', async () => {
     // tool_start is rendered while isRunning — we need to check before onDone fires
     const streamSpy = vi.spyOn(api, 'streamAgentRun').mockImplementation(
-      (_msg, _model, onEvent, onDone) => {
+      (_msg, _model, onEvent, _onDone) => {
         queueMicrotask(() => {
           onEvent({ type: 'tool_start', tool: 'plex_status', params: {} });
           // Don't call onDone yet
@@ -174,7 +192,7 @@ describe('AgentChat event rendering', () => {
     await userEvent.keyboard('{Enter}');
 
     await waitFor(() => {
-      expect(screen.getByText(/plex_status/)).toBeInTheDocument();
+      expect(screen.getAllByText(/plex_status/).length).toBeGreaterThanOrEqual(1);
     });
 
     streamSpy.mockRestore();
@@ -190,7 +208,7 @@ describe('AgentChat event rendering', () => {
     await userEvent.keyboard('{Enter}');
 
     await waitFor(() => {
-      expect(screen.getByText('service_restart')).toBeInTheDocument();
+      expect(screen.getAllByText('service_restart').length).toBeGreaterThanOrEqual(1);
     });
   });
 
@@ -202,13 +220,15 @@ describe('AgentChat event rendering', () => {
     await userEvent.keyboard('{Enter}');
 
     await waitFor(() => {
-      expect(screen.getByText(/Connection refused/)).toBeInTheDocument();
+      expect(screen.getAllByText(/Connection refused/).length).toBeGreaterThanOrEqual(1);
     });
   });
 
   it('renders destructive_confirm events with approve/cancel buttons', async () => {
     mockStream([{
       type: 'destructive_confirm',
+      approvalId: 'approval-1',
+      threadId: 'thread-approve',
       tool: 'incus_stop',
       params: { container: 'plex' },
       message: 'Reply CONFIRM to proceed or CANCEL to abort.',
@@ -224,6 +244,100 @@ describe('AgentChat event rendering', () => {
     });
   });
 
+  it('uses the approval event thread when clicking Approve', async () => {
+    let initialThreadId: string | undefined;
+    const streamSpy = vi.spyOn(api, 'streamAgentRun').mockImplementation(
+      (message, _model, onEvent, onDone, _onError, _signal, extraBody) => {
+        queueMicrotask(() => {
+          if (message === 'stop plex') {
+            initialThreadId = (extraBody as { threadId?: string } | undefined)?.threadId;
+            onEvent({
+              type: 'destructive_confirm',
+              approvalId: 'approval-click-confirm',
+              threadId: initialThreadId,
+              tool: 'incus_stop',
+              params: { container: 'plex' },
+              message: 'Reply CONFIRM to proceed or CANCEL to abort.',
+            });
+          }
+          onDone();
+        });
+      },
+    );
+
+    renderChat();
+
+    await userEvent.type(screen.getByPlaceholderText('Ask the fleet agent...'), 'stop plex');
+    await userEvent.keyboard('{Enter}');
+
+    await waitFor(() => {
+      expect(screen.getByText('Approve')).toBeInTheDocument();
+    });
+
+    await userEvent.click(screen.getByText('Approve'));
+
+    await waitFor(() => {
+      expect(streamSpy).toHaveBeenLastCalledWith(
+        'CONFIRM',
+        'default',
+        expect.any(Function),
+        expect.any(Function),
+        expect.any(Function),
+        expect.anything(),
+        expect.objectContaining({
+          approvalId: 'approval-click-confirm',
+          threadId: initialThreadId,
+        }),
+      );
+    });
+  });
+
+  it('reuses the server approval id when the user types CONFIRM', async () => {
+    const streamSpy = vi.spyOn(api, 'streamAgentRun').mockImplementation(
+      (message, _model, onEvent, onDone) => {
+        queueMicrotask(() => {
+          if (message === 'stop plex') {
+            onEvent({
+              type: 'destructive_confirm',
+              approvalId: 'approval-typed-confirm',
+              tool: 'incus_stop',
+              params: { container: 'plex' },
+              message: 'Reply CONFIRM to proceed or CANCEL to abort.',
+            });
+          }
+          onDone();
+        });
+      },
+    );
+
+    renderChat();
+
+    await userEvent.type(screen.getByPlaceholderText('Ask the fleet agent...'), 'stop plex');
+    await userEvent.keyboard('{Enter}');
+
+    await waitFor(() => {
+      expect(screen.getByText('Approve')).toBeInTheDocument();
+    });
+
+    await userEvent.type(screen.getByPlaceholderText('Ask the fleet agent...'), 'CONFIRM');
+    await userEvent.keyboard('{Enter}');
+
+    await waitFor(() => {
+      expect(streamSpy).toHaveBeenLastCalledWith(
+        'CONFIRM',
+        'default',
+        expect.any(Function),
+        expect.any(Function),
+        expect.any(Function),
+        expect.anything(),
+        expect.objectContaining({
+          approvalId: 'approval-typed-confirm',
+          threadId: expect.any(String),
+        }),
+      );
+    });
+  });
+
   it('renders error events with error message', async () => {
     mockStream([{ type: 'error', message: 'LLM timeout: upstream took too long' }]);
     renderChat();
@@ -232,7 +346,7 @@ describe('AgentChat event rendering', () => {
     await userEvent.keyboard('{Enter}');
 
     await waitFor(() => {
-      expect(screen.getByText(/LLM timeout/)).toBeInTheDocument();
+      expect(screen.getAllByText(/LLM timeout/).length).toBeGreaterThanOrEqual(1);
     });
   });
 

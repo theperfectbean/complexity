@@ -1,6 +1,6 @@
 /**
  * Unified Agent Orchestration Route (Phase 1: Converged backend)
- * 
+ *
  * Merges:
  * - v2 local-LLM tool loop (proven stable)
  * - Legacy AgentService run-state and approval semantics (richer state)
@@ -10,9 +10,12 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireUserOrApiToken } from '@/lib/auth-server';
+import { getRedisClient } from '@/lib/redis';
 import { buildAgentContext } from '@/lib/agent/v2/context/AgentContextPipeline';
-import { ToolRegistry, executeTool, getToolEntry } from '@/lib/agent/v2/ToolRegistry';
+import { executeTool } from '@/lib/agent/v2/ToolRegistry';
 import { evaluateToolRisk } from '@/lib/agent/v2/policy/RiskPolicy';
+import { createCommandApproval, createToolApproval, consumeApproval } from '@/lib/agent/v2/approval/ApprovalStore';
+import { RedisUnifiedEventStore, RedisUnifiedRunStore } from '@/lib/agent/v2/unified/RunPersistence';
 import {
   CommandRegistry,
   parseSlashCommand,
@@ -32,9 +35,6 @@ const SMART_KEYWORDS = /\b(design|architecture|compare|debug|plan|analyse|analyz
 
 type ToolCall = { id: string; function: { name: string; arguments: string } };
 
-/**
- * Unified run state combining old AgentService semantics with new v2 tool loop
- */
 interface UnifiedRunState {
   runId: string;
   threadId: string;
@@ -42,36 +42,36 @@ interface UnifiedRunState {
   createdAt: string;
   updatedAt: string;
   status: 'in_progress' | 'paused_for_approval' | 'completed' | 'error' | 'cancelled';
-  
-  // v2 loop state
   messages: object[];
   toolCallHistory: Array<{ tool: string; params: Record<string, unknown>; result?: unknown; error?: string }>;
   round: number;
-  
-  // Approval/question state
-  pendingConfirm?: { tool: string; params: Record<string, unknown> };
+  pendingApprovalId?: string;
   pendingQuestion?: { text: string; expectedType?: string };
-  
-  // Command routing
   lastCommand?: ParsedCommand;
   commandMode: 'natural' | 'slash' | 'auto';
 }
 
-/**
- * Event contract for /console UI (unified across all modes)
- */
-type ConsoleEvent = 
+type ConsoleEvent =
+  | { type: 'run_started'; userMessage: string; commandMode: string }
+  | { type: 'run_status'; status: 'running' | 'waiting_for_approval' | 'completed' | 'cancelled' | 'error' }
   | { type: 'context'; domain: string; model: string; commandMode: string }
   | { type: 'command_parsed'; command: ParsedCommand; tier: string }
   | { type: 'text'; content: string; role?: 'assistant' | 'system' }
   | { type: 'tool_start'; tool: string; params: Record<string, unknown>; tier: number }
   | { type: 'tool_result'; tool: string; result: unknown; tier: number }
   | { type: 'tool_error'; tool: string; error: string }
-  | { type: 'destructive_confirm'; tool: string; params: Record<string, unknown>; message: string }
+  | { type: 'destructive_confirm'; approvalId: string; command?: ParsedCommand; tool?: string; params?: Record<string, unknown>; message: string }
   | { type: 'question'; text: string; expectedType?: string }
   | { type: 'approval_decision'; approved: boolean }
   | { type: 'error'; message: string }
   | { type: 'done' };
+
+type PersistedConsoleEvent = ConsoleEvent & {
+  runId: string;
+  threadId: string;
+  seq: number;
+  timestamp: string;
+};
 
 function selectModel(message: string): string {
   return SMART_KEYWORDS.test(message) || message.length > 600 ? MODEL_SMART : MODEL_DEFAULT;
@@ -138,11 +138,12 @@ function extractAssistantResponse(content: string): string {
   return content;
 }
 
-async function llmCall(messages: object[], tools: object[], model: string): Promise<Response> {
+async function llmCall(messages: object[], tools: object[], model: string, signal?: AbortSignal): Promise<Response> {
   const body: Record<string, unknown> = { model, messages, stream: false, think: false };
   if (tools.length > 0) body.tools = tools;
   return fetch(`${LOCAL_OPENAI_BASE}/chat/completions`, {
     method: 'POST',
+    signal,
     headers: {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${LOCAL_OPENAI_KEY}`,
@@ -151,83 +152,225 @@ async function llmCall(messages: object[], tools: object[], model: string): Prom
   });
 }
 
+function toConsoleStatus(status: UnifiedRunState['status']): Extract<ConsoleEvent, { type: 'run_status' }>['status'] {
+  switch (status) {
+    case 'in_progress':
+      return 'running';
+    case 'paused_for_approval':
+      return 'waiting_for_approval';
+    case 'completed':
+      return 'completed';
+    case 'cancelled':
+      return 'cancelled';
+    case 'error':
+    default:
+      return 'error';
+  }
+}
+
+function makeRunState(
+  userId: string,
+  threadId: string,
+  commandMode: 'auto' | 'slash' | 'natural',
+  stateSnapshot?: Partial<UnifiedRunState>,
+): UnifiedRunState {
+  return {
+    runId: stateSnapshot?.runId ?? `run_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
+    threadId,
+    userId,
+    createdAt: stateSnapshot?.createdAt ?? new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    status: 'in_progress',
+    messages: stateSnapshot?.messages ?? [],
+    toolCallHistory: stateSnapshot?.toolCallHistory ?? [],
+    round: stateSnapshot?.round ?? 0,
+    pendingApprovalId: stateSnapshot?.pendingApprovalId,
+    pendingQuestion: stateSnapshot?.pendingQuestion,
+    lastCommand: stateSnapshot?.lastCommand,
+    commandMode: (stateSnapshot?.commandMode ?? commandMode) as UnifiedRunState['commandMode'],
+  };
+}
+
 export async function POST(req: NextRequest): Promise<NextResponse> {
   const authResult = await requireUserOrApiToken(req);
   if (authResult instanceof NextResponse) return authResult;
+  const userId = authResult.user.id;
 
   const {
     message,
     threadId,
     stateSnapshot,
-    pendingConfirm,
+    approvalId,
     commandMode = 'auto',
   } = await req.json() as {
     message: string;
     threadId?: string;
     stateSnapshot?: Partial<UnifiedRunState>;
-    pendingConfirm?: { tool: string; params: Record<string, unknown> };
+    approvalId?: string;
     commandMode?: 'auto' | 'slash' | 'natural';
   };
+
+  const redis = getRedisClient();
+  const runStore = new RedisUnifiedRunStore<UnifiedRunState>(redis);
+  const eventStore = new RedisUnifiedEventStore<PersistedConsoleEvent>(redis);
+  const effectiveThreadId = threadId ?? stateSnapshot?.threadId ?? `thread_${Date.now()}`;
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
     async start(controller) {
-      function emit(event: ConsoleEvent) {
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
-      }
+      const runState = makeRunState(userId, effectiveThreadId, commandMode, stateSnapshot);
+      let seq = 0;
+      let closed = false;
+      const pendingWrites: Array<Promise<unknown>> = [];
+
+      const queuePersist = (promise: Promise<unknown>) => {
+        pendingWrites.push(promise);
+      };
+
+      const flushPersistence = async () => {
+        if (pendingWrites.length === 0) return;
+        const writes = pendingWrites.splice(0, pendingWrites.length);
+        await Promise.allSettled(writes);
+      };
+
+      const persistRunState = () => {
+        runState.updatedAt = new Date().toISOString();
+        queuePersist(runStore.save(runState));
+      };
+
+      const emit = (event: ConsoleEvent) => {
+        const persistedEvent: PersistedConsoleEvent = {
+          ...event,
+          runId: runState.runId,
+          threadId: runState.threadId,
+          seq: ++seq,
+          timestamp: new Date().toISOString(),
+        };
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify(persistedEvent)}\n\n`));
+        queuePersist(eventStore.append(runState.runId, persistedEvent));
+      };
+
+      const finish = async (status: UnifiedRunState['status']) => {
+        if (closed) return;
+        runState.status = status;
+        if (status !== 'paused_for_approval') {
+          runState.pendingApprovalId = undefined;
+        }
+        persistRunState();
+        emit({ type: 'run_status', status: toConsoleStatus(status) });
+        emit({ type: 'done' });
+        await flushPersistence();
+        closed = true;
+        controller.close();
+      };
+
+      const handleAbort = () => {
+        if (closed) return;
+        runState.status = 'cancelled';
+        persistRunState();
+        void flushPersistence();
+      };
+      req.signal.addEventListener('abort', handleAbort);
 
       try {
-        // Initialize run state
-        const runState: UnifiedRunState = {
-          runId: `run_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
-          threadId: threadId || `thread_${Date.now()}`,
-          userId: 'default_user', // TODO: extract from authResult
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          status: 'in_progress',
-          messages: stateSnapshot?.messages ?? [],
-          toolCallHistory: stateSnapshot?.toolCallHistory ?? [],
-          round: stateSnapshot?.round ?? 0,
-          commandMode: commandMode as 'natural' | 'slash' | 'auto',
-        };
+        persistRunState();
+        emit({ type: 'run_started', userMessage: message, commandMode: runState.commandMode });
+        emit({ type: 'run_status', status: 'running' });
 
-        // Handle pending destructive confirmation
-        if (pendingConfirm) {
+        if (approvalId) {
+          const approval = await consumeApproval(approvalId, userId, runState.threadId);
+          if (!approval) {
+            emit({ type: 'error', message: 'Approval request is invalid or has expired.' });
+            await finish('error');
+            return;
+          }
+
           const userConfirmed = message.trim().toUpperCase() === 'CONFIRM';
           if (!userConfirmed) {
             emit({ type: 'text', content: 'Action cancelled.' });
             emit({ type: 'approval_decision', approved: false });
-            emit({ type: 'done' });
-            controller.close();
+            await finish('cancelled');
             return;
           }
+          emit({ type: 'approval_decision', approved: true });
 
-          emit({ type: 'tool_start', tool: pendingConfirm.tool, params: pendingConfirm.params, tier: 3 });
-          try {
-            const { result } = await executeTool(pendingConfirm.tool, pendingConfirm.params);
-            emit({ type: 'tool_result', tool: pendingConfirm.tool, result, tier: 3 });
-            emit({ type: 'approval_decision', approved: true });
-            emit({ type: 'text', content: `Done. Executed \`${pendingConfirm.tool}\`.` });
-            runState.toolCallHistory.push({
-              tool: pendingConfirm.tool,
-              params: pendingConfirm.params,
-              result,
-            });
-          } catch (err) {
-            const errMsg = err instanceof Error ? err.message : String(err);
-            emit({ type: 'tool_error', tool: pendingConfirm.tool, error: errMsg });
-            runState.toolCallHistory.push({
-              tool: pendingConfirm.tool,
-              params: pendingConfirm.params,
-              error: errMsg,
-            });
+          if (approval.kind === 'command') {
+            emit({ type: 'text', content: `Executing: ${approval.command.action} ${approval.command.resource}...` });
+            try {
+              const cmdRegistry = new CommandRegistry();
+              const cmdResult = await cmdRegistry.executeCommand(approval.command, userId, true);
+              if (!cmdResult.success) {
+                emit({ type: 'error', message: cmdResult.error ?? 'Command failed.' });
+                runState.toolCallHistory.push({
+                  tool: `cmd:${approval.command.action}`,
+                  params: { resource: approval.command.resource, options: approval.command.options },
+                  error: cmdResult.error ?? 'Command failed.',
+                });
+                await finish('error');
+                return;
+              }
+              emit({
+                type: 'text',
+                content: typeof cmdResult.output === 'string'
+                  ? cmdResult.output
+                  : JSON.stringify(cmdResult.output, null, 2),
+                role: 'assistant',
+              });
+              runState.toolCallHistory.push({
+                tool: `cmd:${approval.command.action}`,
+                params: { resource: approval.command.resource, options: approval.command.options },
+                result: cmdResult.output,
+              });
+            } catch (err) {
+              const errMsg = err instanceof Error ? err.message : String(err);
+              emit({ type: 'error', message: errMsg });
+              runState.toolCallHistory.push({
+                tool: `cmd:${approval.command.action}`,
+                params: { resource: approval.command.resource, options: approval.command.options },
+                error: errMsg,
+              });
+              await finish('error');
+              return;
+            }
+          } else {
+            emit({ type: 'tool_start', tool: approval.tool.name, params: approval.tool.params, tier: 3 });
+            try {
+              const { result } = await executeTool(approval.tool.name, approval.tool.params, userId, true);
+              emit({
+                type: 'tool_result',
+                tool: approval.tool.name,
+                result,
+                tier: 3,
+              });
+              runState.toolCallHistory.push({
+                tool: approval.tool.name,
+                params: approval.tool.params,
+                result,
+              });
+              emit({
+                type: 'text',
+                content: typeof result === 'string' ? result : JSON.stringify(result, null, 2),
+                role: 'assistant',
+              });
+            } catch (err) {
+              const errMsg = err instanceof Error ? err.message : String(err);
+              emit({ type: 'tool_error', tool: approval.tool.name, error: errMsg });
+              runState.toolCallHistory.push({
+                tool: approval.tool.name,
+                params: approval.tool.params,
+                error: errMsg,
+              });
+              emit({ type: 'error', message: errMsg });
+              await finish('error');
+              return;
+            }
           }
-          emit({ type: 'done' });
-          controller.close();
+
+          persistRunState();
+          await finish('completed');
           return;
         }
 
-        // Try to parse as command first
         let parsedCommand: ParsedCommand | null = null;
         if (commandMode === 'slash' || commandMode === 'auto') {
           parsedCommand = parseSlashCommand(message);
@@ -236,32 +379,39 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           parsedCommand = classifyNaturalLanguage(message);
         }
 
-        // If we got a command, execute via CommandRegistry
         if (parsedCommand) {
           emit({ type: 'command_parsed', command: parsedCommand, tier: parsedCommand.tier });
           runState.lastCommand = parsedCommand;
 
-          const toolRegistry = new ToolRegistry();
-          const cmdRegistry = new CommandRegistry(toolRegistry);
-
-          // Check if approval is needed
+          const cmdRegistry = new CommandRegistry();
           if (parsedCommand.requiresApproval) {
+            const pendingId = await createCommandApproval(parsedCommand, userId, runState.threadId);
+            runState.pendingApprovalId = pendingId;
+            persistRunState();
             const confirmMsg = `Destructive action: \`${parsedCommand.action}\` on \`${parsedCommand.resource}\`. This cannot be undone. Reply \`CONFIRM\` to proceed or \`CANCEL\` to abort.`;
             emit({
               type: 'destructive_confirm',
-              tool: `cmd:${parsedCommand.action}`,
-              params: { resource: parsedCommand.resource, options: parsedCommand.options },
+              approvalId: pendingId,
+              command: parsedCommand,
               message: confirmMsg,
             });
             emit({ type: 'text', content: confirmMsg });
-            emit({ type: 'done' });
-            controller.close();
+            await finish('paused_for_approval');
             return;
           }
 
-          // Execute the command
           try {
-            const cmdResult = await cmdRegistry.executeCommand(parsedCommand, runState.userId, true);
+            const cmdResult = await cmdRegistry.executeCommand(parsedCommand, userId, true);
+            if (!cmdResult.success) {
+              emit({ type: 'error', message: cmdResult.error ?? 'Command failed.' });
+              runState.toolCallHistory.push({
+                tool: `cmd:${parsedCommand.action}`,
+                params: { resource: parsedCommand.resource, options: parsedCommand.options },
+                error: cmdResult.error ?? 'Command failed.',
+              });
+              await finish('error');
+              return;
+            }
             emit({
               type: 'text',
               content: typeof cmdResult.output === 'string'
@@ -282,34 +432,44 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
               params: { resource: parsedCommand.resource, options: parsedCommand.options },
               error: errMsg,
             });
+            await finish('error');
+            return;
           }
-          emit({ type: 'done' });
-          controller.close();
+
+          persistRunState();
+          await finish('completed');
           return;
         }
 
-        // Fall back to agentic loop (natural language without command parsing)
         const ctx = buildAgentContext(message, stateSnapshot);
         const model = selectModel(message);
         emit({ type: 'context', domain: ctx.domain, model, commandMode });
 
         const messages: object[] = runState.messages.length > 0
-          ? runState.messages
+          ? [...runState.messages]
           : [{ role: 'system', content: ctx.systemPrompt }];
 
         messages.push({ role: 'user', content: message });
 
         const calledTools = new Set<string>();
         let forceSynthesis = false;
+        let encounteredError = false;
+
         for (let round = runState.round; round < 10; round++) {
           runState.round = round;
           const roundTools = forceSynthesis ? [] : ctx.tools;
           forceSynthesis = false;
 
-          const llmRes = await llmCall(messages, roundTools, model);
+          if (req.signal.aborted) {
+            await finish('cancelled');
+            return;
+          }
+
+          const llmRes = await llmCall(messages, roundTools, model, req.signal);
           if (!llmRes.ok) {
             const errText = await llmRes.text();
             emit({ type: 'error', message: `LLM error ${llmRes.status}: ${errText.slice(0, 200)}` });
+            encounteredError = true;
             break;
           }
 
@@ -359,29 +519,32 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
             calledTools.add(callKey);
 
             const decision = evaluateToolRisk(toolName);
+            const tierNum = decision.tier;
 
             if (decision.requiresConfirm) {
+              const pendingId = await createToolApproval(toolName, params, userId, runState.threadId);
+              runState.pendingApprovalId = pendingId;
+              runState.messages = messages;
+              persistRunState();
               const confirmMsg = `I need to execute \`${toolName}\` with params: \`${JSON.stringify(params)}\`. This is a **destructive** action (tier 3). Reply \`CONFIRM\` to proceed or \`CANCEL\` to abort.`;
               emit({
                 type: 'destructive_confirm',
+                approvalId: pendingId,
                 tool: toolName,
                 params,
                 message: confirmMsg,
               });
               emit({ type: 'text', content: confirmMsg });
-              emit({ type: 'done' });
-              controller.close();
+              await finish('paused_for_approval');
               return;
             }
 
-            emit({ type: 'tool_start', tool: toolName, params, tier: decision.tier });
-            if (decision.emitNotification) {
-              emit({ type: 'text', content: `Executing ${toolName}...` });
-            }
+            emit({ type: 'tool_start', tool: toolName, params, tier: tierNum });
+            emit({ type: 'text', content: `Executing ${toolName}...` });
 
             try {
-              const { result } = await executeTool(toolName, params);
-              emit({ type: 'tool_result', tool: toolName, result, tier: decision.tier });
+              const { result } = await executeTool(toolName, params, userId, false);
+              emit({ type: 'tool_result', tool: toolName, result, tier: tierNum });
               toolResults.push({ tool_call_id: tc.id, role: 'tool', content: JSON.stringify(result) });
               runState.toolCallHistory.push({ tool: toolName, params, result });
               allUnknown = false;
@@ -394,20 +557,31 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           }
 
           messages.push(...toolResults);
+          runState.messages = messages;
+          persistRunState();
           if (anyDuplicate) break;
           if (allUnknown && toolResults.length > 0) break;
           if (toolResults.length > 0) forceSynthesis = true;
         }
 
         runState.messages = messages;
-        runState.status = 'completed';
-        runState.updatedAt = new Date().toISOString();
-        emit({ type: 'done' });
+        persistRunState();
+        await finish(encounteredError ? 'error' : 'completed');
       } catch (err) {
+        if (req.signal.aborted || (err instanceof Error && err.name === 'AbortError')) {
+          await finish('cancelled');
+          return;
+        }
         const msg = err instanceof Error ? err.message : String(err);
         emit({ type: 'error', message: msg });
+        await finish('error');
       } finally {
-        controller.close();
+        req.signal.removeEventListener('abort', handleAbort);
+        if (!closed) {
+          await flushPersistence();
+          closed = true;
+          controller.close();
+        }
       }
     },
   });
@@ -419,4 +593,32 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       'Connection': 'keep-alive',
     },
   });
+}
+
+export async function GET(req: NextRequest): Promise<NextResponse> {
+  const authResult = await requireUserOrApiToken(req);
+  if (authResult instanceof NextResponse) return authResult;
+  const userId = authResult.user.id;
+  const { searchParams } = new URL(req.url);
+  const runId = searchParams.get('runId');
+  const threadId = searchParams.get('threadId');
+
+  if (!runId && !threadId) {
+    return NextResponse.json({ error: 'runId or threadId is required' }, { status: 400 });
+  }
+
+  const redis = getRedisClient();
+  const runStore = new RedisUnifiedRunStore<UnifiedRunState>(redis);
+  const eventStore = new RedisUnifiedEventStore<PersistedConsoleEvent>(redis);
+  const state = runId ? await runStore.load(runId) : await runStore.loadLatestByThread(threadId!);
+
+  if (!state) {
+    return NextResponse.json({ error: 'Run not found' }, { status: 404 });
+  }
+  if (state.userId !== userId) {
+    return NextResponse.json({ error: 'Run not found' }, { status: 404 });
+  }
+
+  const events = await eventStore.getAll(state.runId);
+  return NextResponse.json({ ok: true, state, events });
 }

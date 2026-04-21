@@ -13,10 +13,9 @@ const NODE_COLORS: Record<string, string> = {
   ai:    '#7c3aed',
 };
 
-const NODES = ['nas', 'media', 'ai'];
-
 export function ServiceList({ selectedService, onSelectService }: Props) {
-  const grouped = NODES.map(node => ({
+  const nodes = Array.from(new Set(SERVICES.map(svc => svc.node)));
+  const grouped = nodes.map(node => ({
     node,
     services: SERVICES.filter(s => s.node === node),
     color: NODE_COLORS[node] ?? '#718096',

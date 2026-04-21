@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { streamAgentRun, SERVICES } from '@/lib/api';
+import { fetchAgentRun, streamAgentRun, SERVICES } from '@/lib/api';
 
 // ---------- streamAgentRun tests ----------
 
@@ -32,7 +32,7 @@ afterEach(() => {
 });
 
 describe('streamAgentRun()', () => {
-  it('calls /api/agent/v2/runs with POST and correct headers', async () => {
+  it('calls /api/agent/unified/runs with POST and correct headers', async () => {
     const stream = makeSseStream([
       'data: {"type":"context","domain":"general","model":"default"}\n\n',
       'data: {"type":"text","content":"All good."}\n\n',
@@ -48,12 +48,13 @@ describe('streamAgentRun()', () => {
 
     expect(fetchMock).toHaveBeenCalledOnce();
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toContain('/api/agent/v2/runs');
+    expect(url).toContain('/api/agent/unified/runs');
     expect(init.method).toBe('POST');
     expect((init.headers as Record<string, string>)['Content-Type']).toBe('application/json');
-    const body = JSON.parse(init.body as string) as { message: string; modelId: string };
+    const body = JSON.parse(init.body as string) as { message: string; modelId: string; commandMode: string };
     expect(body.message).toBe('check plex status');
     expect(body.modelId).toBe('default');
+    expect(body.commandMode).toBe('auto');
   });
 
   it('emits parsed events in order', async () => {
@@ -201,6 +202,26 @@ describe('streamAgentRun()', () => {
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(init.signal).toBe(ac.signal);
   });
+
+  it('fetches persisted unified runs by runId', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({
+        ok: true,
+        state: { runId: 'run-1', threadId: 'thread-1', status: 'completed', updatedAt: '2026-01-01T00:00:00.000Z' },
+        events: [{ type: 'run_started', runId: 'run-1' }],
+      }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const payload = await fetchAgentRun('run-1');
+    expect(payload.state.runId).toBe('run-1');
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining('/api/agent/unified/runs?runId=run-1'),
+      expect.anything(),
+    );
+  });
 });
 
 // ---------- SERVICES registry tests ----------
@@ -260,6 +281,13 @@ describe('SERVICES registry', () => {
     const labels = (forgejo?.links ?? []).map(l => l.label);
     expect(labels).toContain('Git');
     expect(labels).toContain('Docs');
+  });
+
+  it('does not expose the proxy admin endpoint as a service link', () => {
+    const proxy = SERVICES.find(s => s.name === 'proxy');
+    expect(proxy).toBeDefined();
+    expect(proxy?.url).toBeUndefined();
+    expect(proxy?.links).toBeUndefined();
   });
 
   it('no two services share the same IP', () => {

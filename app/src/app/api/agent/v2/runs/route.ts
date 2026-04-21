@@ -3,6 +3,7 @@ import { requireUserOrApiToken } from '@/lib/auth-server';
 import { buildAgentContext } from '@/lib/agent/v2/context/AgentContextPipeline';
 import { executeTool, getToolEntry } from '@/lib/agent/v2/ToolRegistry';
 import { evaluateToolRisk } from '@/lib/agent/v2/policy/RiskPolicy';
+import { createToolApproval, consumeApproval } from '@/lib/agent/v2/approval/ApprovalStore';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -117,13 +118,15 @@ async function llmCall(messages: object[], tools: object[], model: string): Prom
 export async function POST(req: NextRequest): Promise<NextResponse> {
   const authResult = await requireUserOrApiToken(req);
   if (authResult instanceof NextResponse) return authResult;
+  const userId = authResult.user.id;
 
-  const { message, threadId, stateSnapshot, pendingConfirm } = await req.json() as {
+  const { message, threadId, stateSnapshot, approvalId } = await req.json() as {
     message: string;
     threadId?: string;
     stateSnapshot?: object;
-    pendingConfirm?: { tool: string; params: Record<string, unknown> };
+    approvalId?: string;
   };
+  const effectiveThreadId = threadId ?? `thread_${Date.now()}`;
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
@@ -134,17 +137,25 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
       try {
         // Handle pending destructive confirmation
-        if (pendingConfirm) {
-          const userConfirmed = message.trim().toUpperCase() === 'CONFIRM';
-          if (!userConfirmed) {
-            emit({ type: 'text', content: 'Action cancelled.' });
+        if (approvalId) {
+          const approval = await consumeApproval(approvalId, userId, effectiveThreadId);
+          if (!approval || approval.kind !== 'tool') {
+            emit({ type: 'error', message: 'Approval request is invalid or has expired.' });
+            emit({ type: 'done' });
             controller.close();
             return;
           }
-          emit({ type: 'tool_start', tool: pendingConfirm.tool, params: pendingConfirm.params });
-          const { result } = await executeTool(pendingConfirm.tool, pendingConfirm.params);
-          emit({ type: 'tool_result', tool: pendingConfirm.tool, result });
-          emit({ type: 'text', content: `Done. Executed \`${pendingConfirm.tool}\`.` });
+          const userConfirmed = message.trim().toUpperCase() === 'CONFIRM';
+          if (!userConfirmed) {
+            emit({ type: 'text', content: 'Action cancelled.' });
+            emit({ type: 'done' });
+            controller.close();
+            return;
+          }
+          emit({ type: 'tool_start', tool: approval.tool.name, params: approval.tool.params });
+          const { result } = await executeTool(approval.tool.name, approval.tool.params, userId, true);
+          emit({ type: 'tool_result', tool: approval.tool.name, result });
+          emit({ type: 'text', content: `Done. Executed \`${approval.tool.name}\`.` });
           emit({ type: 'done' });
           controller.close();
           return;
@@ -226,8 +237,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
             const decision = evaluateToolRisk(toolName);
 
             if (decision.requiresConfirm) {
+              const approvalId = await createToolApproval(toolName, params, userId, effectiveThreadId);
               const confirmMsg = `I need to execute \`${toolName}\` with params: \`${JSON.stringify(params)}\`. This is a **destructive** action (tier 3). Reply \`CONFIRM\` to proceed or \`CANCEL\` to abort.`;
-              emit({ type: 'destructive_confirm', tool: toolName, params, message: confirmMsg });
+              emit({ type: 'destructive_confirm', tool: toolName, params, approvalId, threadId: effectiveThreadId, message: confirmMsg });
               emit({ type: 'text', content: confirmMsg });
               emit({ type: 'done' });
               controller.close();
@@ -240,7 +252,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
             }
 
             try {
-              const { result } = await executeTool(toolName, params);
+              const { result } = await executeTool(toolName, params, userId, false);
               emit({ type: 'tool_result', tool: toolName, result, tier: decision.tier });
               toolResults.push({ tool_call_id: tc.id, role: 'tool', content: JSON.stringify(result) });
               allUnknown = false;
