@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { Send, Loader2 } from 'lucide-react';
 import { fetchAgentRun, streamAgentRun, type AgentRunEvent } from '../lib/api';
 import { ThreadSidebar } from './ThreadSidebar';
@@ -53,6 +53,26 @@ interface Props {
   onContextUsed: () => void;
 }
 
+interface SlashCommandOption {
+  command: string;
+  summary: string;
+  example: string;
+}
+
+const SLASH_COMMANDS: SlashCommandOption[] = [
+  { command: '/list', summary: 'List nodes, services, or containers', example: '/list services' },
+  { command: '/status', summary: 'Show the current status of a container', example: '/status plex' },
+  { command: '/start', summary: 'Start a container', example: '/start plex' },
+  { command: '/stop', summary: 'Stop a container (approval required)', example: '/stop plex' },
+  { command: '/restart', summary: 'Restart a container', example: '/restart arrstack' },
+  { command: '/delete', summary: 'Delete a container (approval required)', example: '/delete plex --force' },
+  { command: '/logs', summary: 'Show recent container logs', example: '/logs plex --lines=100' },
+  { command: '/inspect', summary: 'Read a file from a container', example: '/inspect proxy /etc/caddy/Caddyfile' },
+  { command: '/check', summary: 'Run an infrastructure check', example: '/check disk --path=/data' },
+  { command: '/ping', summary: 'Ping the fleet', example: '/ping' },
+  { command: '/audit', summary: 'Show recent operator actions', example: '/audit --limit=20' },
+];
+
 export function AgentChat({ initialContext, onContextUsed }: Props) {
   const [threads, setThreads] = useState<Thread[]>(() => {
     const ts = loadThreads();
@@ -65,8 +85,10 @@ export function AgentChat({ initialContext, onContextUsed }: Props) {
   const [input, setInput] = useState('');
   const [isRunning, setIsRunning] = useState(false);
   const [pendingApprovalIds, setPendingApprovalIds] = useState<Record<string, string | undefined>>({});
+  const [selectedCommandIndex, setSelectedCommandIndex] = useState(0);
   const abortRef = useRef<AbortController | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const recoveringRunsRef = useRef<Set<string>>(new Set());
   const recoveredRunsRef = useRef<Set<string>>(new Set());
 
@@ -244,6 +266,23 @@ export function AgentChat({ initialContext, onContextUsed }: Props) {
 
   const activeThread = threads.find(t => t.id === activeId);
   const activeTurn = activeThread?.turns.at(-1);
+  const slashQuery = input.startsWith('/') ? input.slice(1).trim() : '';
+  const showCommandPalette = input.startsWith('/') && !slashQuery.includes(' ');
+  const filteredCommands = useMemo(() => {
+    if (!showCommandPalette) return [];
+    if (!slashQuery) return SLASH_COMMANDS;
+    return SLASH_COMMANDS.filter((option) => option.command.slice(1).startsWith(slashQuery.toLowerCase()));
+  }, [showCommandPalette, slashQuery]);
+
+  useEffect(() => {
+    setSelectedCommandIndex(0);
+  }, [input]);
+
+  const applySlashCommand = useCallback((option: SlashCommandOption) => {
+    setInput(`${option.example} `);
+    setSelectedCommandIndex(0);
+    queueMicrotask(() => inputRef.current?.focus());
+  }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -257,6 +296,33 @@ export function AgentChat({ initialContext, onContextUsed }: Props) {
     abortRef.current?.abort();
     setIsRunning(false);
   };
+
+  const handleInputKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!showCommandPalette || filteredCommands.length === 0) return;
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setSelectedCommandIndex((prev) => (prev + 1) % filteredCommands.length);
+      return;
+    }
+
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setSelectedCommandIndex((prev) => (prev - 1 + filteredCommands.length) % filteredCommands.length);
+      return;
+    }
+
+    if (e.key === 'Tab' || e.key === 'Enter') {
+      e.preventDefault();
+      applySlashCommand(filteredCommands[selectedCommandIndex] ?? filteredCommands[0]!);
+      return;
+    }
+
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      setInput('');
+    }
+  }, [applySlashCommand, filteredCommands, selectedCommandIndex, showCommandPalette]);
 
   const handleApproval = useCallback((event: AgentRunEvent, approved: boolean) => {
     const e = event as Record<string, unknown>;
@@ -300,12 +366,62 @@ export function AgentChat({ initialContext, onContextUsed }: Props) {
         {/* Input bar */}
         <form
           onSubmit={handleSubmit}
-          style={{ padding: '0.75rem 1rem', borderTop: '1px solid var(--border)', display: 'flex', gap: '0.5rem' }}
+          style={{ padding: '0.75rem 1rem', borderTop: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}
         >
+          {showCommandPalette && filteredCommands.length > 0 && (
+            <div
+              role="listbox"
+              aria-label="Slash commands"
+              style={{
+                borderRadius: '0.9rem',
+                border: '1px solid var(--border)',
+                background: 'var(--bg-surface)',
+                overflow: 'hidden',
+                boxShadow: '0 10px 30px rgba(15,23,42,0.18)',
+              }}
+            >
+              {filteredCommands.map((option, index) => {
+                const isSelected = index === selectedCommandIndex;
+                return (
+                  <button
+                    key={option.command}
+                    type="button"
+                    onClick={() => applySlashCommand(option)}
+                    style={{
+                      width: '100%',
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      justifyContent: 'space-between',
+                      gap: '1rem',
+                      padding: '0.8rem 1rem',
+                      border: 'none',
+                      borderTop: index === 0 ? 'none' : '1px solid var(--border)',
+                      background: isSelected ? 'var(--bg-page)' : 'transparent',
+                      color: 'var(--text)',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                    }}
+                  >
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                      <span style={{ fontSize: '0.82rem', fontWeight: 700, fontFamily: 'monospace' }}>{option.command}</span>
+                      <span style={{ fontSize: '0.76rem', color: 'var(--text-secondary)' }}>{option.summary}</span>
+                    </div>
+                    <code style={{ fontSize: '0.72rem', color: 'var(--accent-light)', whiteSpace: 'nowrap' }}>
+                      {option.example}
+                    </code>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
           <input
+            ref={inputRef}
             type="text"
             value={input}
             onChange={e => setInput(e.target.value)}
+            onKeyDown={handleInputKeyDown}
             placeholder="Ask the fleet agent..."
             disabled={isRunning}
             style={{
@@ -336,6 +452,7 @@ export function AgentChat({ initialContext, onContextUsed }: Props) {
               <Send size={16} />
             </button>
           )}
+          </div>
         </form>
       </div>
 

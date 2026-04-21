@@ -71,6 +71,27 @@ describe('AgentChat initial state', () => {
 // ---------- Submitting a message ----------
 
 describe('AgentChat message submission', () => {
+  it('shows slash command suggestions when the user types slash', async () => {
+    renderChat();
+
+    const input = screen.getByPlaceholderText('Ask the fleet agent...');
+    await userEvent.type(input, '/');
+
+    expect(screen.getByRole('listbox', { name: 'Slash commands' })).toBeInTheDocument();
+    expect(screen.getByText('/list')).toBeInTheDocument();
+    expect(screen.getByText('/inspect')).toBeInTheDocument();
+  });
+
+  it('lets the user pick a slash command with keyboard', async () => {
+    renderChat();
+
+    const input = screen.getByPlaceholderText('Ask the fleet agent...');
+    await userEvent.type(input, '/');
+    await userEvent.keyboard('{ArrowDown}{Enter}');
+
+    expect(input).toHaveValue('/status plex ');
+  });
+
   it('shows user message as a bubble after submit', async () => {
     mockStream([]);
     renderChat();
