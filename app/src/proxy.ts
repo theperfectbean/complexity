@@ -20,6 +20,9 @@ export const config = {
 export const proxy = auth(async (req) => {
   const { nextUrl, auth: session, method, headers } = req;
   const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
+  const hasApiToken =
+    headers.get("x-api-key")?.trim() ||
+    headers.get("authorization")?.toLowerCase().startsWith("bearer ");
 
   // 1. CSRF Protection: Verify Origin/Referer for state-mutating methods
   if (["POST", "PUT", "PATCH", "DELETE"].includes(method)) {
@@ -72,7 +75,17 @@ export const proxy = auth(async (req) => {
   const isApiTools = nextUrl.pathname.startsWith("/api/tools");
   const isApiSearch = nextUrl.pathname.startsWith("/api/search");
 
-  const isPublic = isApiAuth || isApiHealth || isApiWebhook || isApiChat || isApiTools || isApiSearch || isPublicAsset || isAuthPage || nextUrl.pathname === "/";
+  const isPublic =
+    isApiAuth ||
+    isApiHealth ||
+    isApiWebhook ||
+    isApiChat ||
+    isApiTools ||
+    isApiSearch ||
+    isPublicAsset ||
+    isAuthPage ||
+    nextUrl.pathname === "/" ||
+    Boolean(hasApiToken);
 
   let response: NextResponse;
 
