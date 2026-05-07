@@ -15,7 +15,7 @@ test.describe("Streaming Response Browser Validation", () => {
     await searchInput.fill(TEST_PROMPT);
     await searchInput.press("Enter");
 
-    await expect(page).toHaveURL(/\/search\//, { timeout: 15000 });
+    await expect(page).toHaveURL(/\/chat\//, { timeout: 15000 });
 
     const article = page.locator("article").last();
     // Wait for the article to be visible

@@ -53,7 +53,7 @@ test.describe("UI Performance and Polish Audit", () => {
     await searchInput.fill("Write a very short poem about performance.");
     await searchInput.press("Enter");
 
-    await expect(page).toHaveURL(/\/search\//, { timeout: 15000 });
+    await expect(page).toHaveURL(/\/chat\//, { timeout: 15000 });
 
     // Assert that the "Thinking..." indicator is visible during the submitted/streaming phase
     await expect(page.getByText("Thinking...", { exact: true })).toBeVisible({ timeout: 5000 });
@@ -134,7 +134,7 @@ test.describe("UI Performance and Polish Audit", () => {
     await searchInput.fill("What is the secret launch code for project Orion?");
     await searchInput.press("Enter");
 
-    await expect(page).toHaveURL(/\/search\//, { timeout: 15000 });
+    await expect(page).toHaveURL(/\/chat\//, { timeout: 15000 });
 
     const article = page.locator("article").last();
     await expect(article).toBeVisible({ timeout: 45000 });

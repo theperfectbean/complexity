@@ -224,10 +224,10 @@ export function Sidebar({ collapsed = false, onToggle, onNavigate }: SidebarProp
             "inline-flex w-full items-center justify-center rounded-lg border border-primary/20 bg-primary/10 px-3 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/20",
             collapsed && "h-10 w-10 rounded-full px-0",
           )}
-          title={collapsed ? "New search" : undefined}
+          title={collapsed ? "New chat" : undefined}
         >
           <Plus className="h-4 w-4" />
-          {!collapsed && <span className="ml-2">New search</span>}
+          {!collapsed && <span className="ml-2">New chat</span>}
         </Link>
       </div>
 

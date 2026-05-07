@@ -15,7 +15,7 @@ test.describe("Markdown Table Rendering", () => {
     await searchInput.fill(TEST_PROMPT);
     await searchInput.press("Enter");
 
-    await expect(page).toHaveURL(/\/search\//, { timeout: 15000 });
+    await expect(page).toHaveURL(/\/chat\//, { timeout: 15000 });
 
     // Wait for the response to finish
     const article = page.locator("article").last();

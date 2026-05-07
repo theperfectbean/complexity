@@ -34,7 +34,7 @@ test.describe("SearchBar Attachment Button", () => {
     await page.getByPlaceholder("Ask anything...").press("Enter");
     
     // Wait for the URL to stabilize (no more query params)
-    await expect(page).toHaveURL(/\/search\/[a-zA-Z0-9_-]+$/, { timeout: 15000 });
+    await expect(page).toHaveURL(/\/chat\/[a-zA-Z0-9_-]+$/, { timeout: 15000 });
 
     // Wait for initial response
     await expect(page.getByRole("button", { name: "Copy message" })).toBeVisible({ timeout: 30000 });
@@ -80,7 +80,7 @@ test.describe("SearchBar Attachment Button", () => {
     await page.getByPlaceholder("Ask anything...").press("Enter");
     
     // Wait for the URL to stabilize
-    await expect(page).toHaveURL(/\/search\/[a-zA-Z0-9_-]+$/, { timeout: 15000 });
+    await expect(page).toHaveURL(/\/chat\/[a-zA-Z0-9_-]+$/, { timeout: 15000 });
 
     // 2. Wait for initial response
     await expect(page.getByRole("button", { name: "Copy message" })).toBeVisible({ timeout: 30000 });
@@ -118,7 +118,7 @@ test.describe("SearchBar Attachment Button", () => {
     await page.getByPlaceholder("Ask anything...").press("Enter");
     
     // Wait for the URL to stabilize
-    await expect(page).toHaveURL(/\/search\/[a-zA-Z0-9_-]+$/, { timeout: 15000 });
+    await expect(page).toHaveURL(/\/chat\/[a-zA-Z0-9_-]+$/, { timeout: 15000 });
 
     // 2. Wait for initial response
     await expect(page.getByRole("button", { name: "Copy message" })).toBeVisible({ timeout: 30000 });

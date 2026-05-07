@@ -45,7 +45,7 @@ test.describe("Model Prompt & Response Browser Validation", () => {
 
       // 3. Verify "Thinking..." state appears (from our previous work)
       // Wait for redirect to search page
-      await expect(page).toHaveURL(/\/search\//, { timeout: 15000 });
+      await expect(page).toHaveURL(/\/chat\//, { timeout: 15000 });
 
       // 4. Wait for the final response
       const article = page.locator("article").last();

@@ -46,7 +46,7 @@ test.describe("Initial Attachments", () => {
     await page.keyboard.press("Enter");
 
     // 5. Verify we redirected to search page and NO "re-attach" message appeared
-    await expect(page).toHaveURL(/\/search\//, { timeout: 15000 });
+    await expect(page).toHaveURL(/\/chat\//, { timeout: 15000 });
     const toastMessage = page.getByText(/Please re-attach/i);
     await expect(toastMessage).not.toBeVisible();
 
@@ -103,7 +103,7 @@ test.describe("Initial Attachments", () => {
     await page.keyboard.press("Enter");
 
     // 6. Verify we redirected and image is visible
-    await expect(page).toHaveURL(/\/search\//, { timeout: 15000 });
+    await expect(page).toHaveURL(/\/chat\//, { timeout: 15000 });
     await expect(page.getByText("Describe this image in the role context.").first()).toBeVisible({ timeout: 30000 });
     
     const attachedImage = page.locator('img[src^="data:image/"]').first();

@@ -91,7 +91,7 @@ test.describe("Role summarise-uploaded-files diagnostic", () => {
     await submitBtn.click();
 
     // ── 4. Wait for navigation to the chat/search page ──────────────────────
-    await expect(page).toHaveURL(/\/search\//, { timeout: 60_000 });
+    await expect(page).toHaveURL(/\/chat\//, { timeout: 60_000 });
     timings.navigatedToChat = Date.now();
     console.log(`[timing] Submit → chat navigation: ${timings.navigatedToChat - timings.submitStart}ms`);
 

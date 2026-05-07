@@ -20,7 +20,7 @@ test.describe("Message Editing UI", () => {
     await searchInput.press("Enter");
 
     // Wait for the URL to change to the search/thread page
-    await expect(page).toHaveURL(new RegExp("/search/"), { timeout: 15000 });
+    await expect(page).toHaveURL(new RegExp("/chat/"), { timeout: 15000 });
 
     // Wait for the message to appear in the list
     const userMessage = page.locator('article').first();
@@ -63,9 +63,10 @@ test.describe("Message Editing UI", () => {
     await searchInput2.fill("Hi");
     await searchInput2.press("Enter");
     
-    await expect(page).toHaveURL(new RegExp("/search/"), { timeout: 15000 });
+    await expect(page).toHaveURL(new RegExp("/chat/"), { timeout: 15000 });
     
-    const shortMessage = page.locator('article').last();
+    const shortMessage = page.locator('[data-testid="message-user"]').last();
+    await expect(shortMessage).toBeVisible({ timeout: 10000 });
     await shortMessage.hover();
     await shortMessage.getByTitle("Edit message").click();
     

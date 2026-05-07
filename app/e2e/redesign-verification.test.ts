@@ -15,7 +15,7 @@ test.describe("Redesign E2E Verification", () => {
     await searchInput.press("Enter");
 
     // 3. Wait for search redirect
-    await expect(page).toHaveURL(/\/search\//, { timeout: 15000 });
+    await expect(page).toHaveURL(/\/chat\//, { timeout: 15000 });
 
     // 4. Verify Grounding Context artifact appears
     const groundingButton = page.getByRole("button", { name: /Grounding Context|Thinking/ });

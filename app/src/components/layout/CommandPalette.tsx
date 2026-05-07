@@ -134,7 +134,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
             className="flex cursor-pointer items-center gap-2 rounded-md px-3 py-2 text-sm outline-none data-[selected=true]:bg-accent"
           >
             <CommandIcon className="h-4 w-4" />
-            New search
+            New chat
           </Command.Item>
         </Command.Group>
 

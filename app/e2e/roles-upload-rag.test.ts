@@ -35,7 +35,7 @@ test.describe("Role document upload + chat", () => {
     await page.getByPlaceholder("Ask anything...").fill("What is the secret word?");
     await page.getByRole("button", { name: "Start", exact: true }).click();
 
-    await expect(page).toHaveURL(/\/search\//, { timeout: 15000 });
+    await expect(page).toHaveURL(/\/chat\//, { timeout: 15000 });
     await expect(page.getByRole("button", { name: "Copy message" })).toBeVisible({ timeout: 30000 });
   });
 

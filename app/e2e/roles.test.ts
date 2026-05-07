@@ -26,6 +26,6 @@ test.describe("Roles flow", () => {
     await promptInput.fill(firstPrompt);
     await page.getByRole("button", { name: "Start" }).click();
 
-    await expect(page).toHaveURL(/\/search\//, { timeout: 15000 });
+    await expect(page).toHaveURL(/\/chat\//, { timeout: 15000 });
   });
 });

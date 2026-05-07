@@ -15,7 +15,7 @@ test("Claude Haiku 4.5 routes through a valid Perplexity model", async ({ page }
   await searchInput.fill(TEST_PROMPT);
   await searchInput.press("Enter");
 
-  await expect(page).toHaveURL(/\/search\//, { timeout: 15000 });
+  await expect(page).toHaveURL(/\/chat\//, { timeout: 15000 });
 
   const article = page.locator("article").last();
   await expect(article).toBeVisible({ timeout: 45000 });
