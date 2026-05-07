@@ -608,32 +608,48 @@ export function MessageList({
   isStreaming, 
   onDownload 
 }: MessageListProps) {
+  const FOLLOW_THRESHOLD_PX = 160;
   const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [showScrollButton, setShowScrollButton] = useState(false);
+  const [isFollowingLatest, setIsFollowingLatest] = useState(true);
   const bottomRef = useRef<HTMLDivElement>(null);
   const hasAutoScrolledRef = useRef(false);
   const lastScrollTimeRef = useRef(0);
 
   const previousMessagesLengthRef = useRef(messages.length);
 
+  const isNearBottom = useCallback(
+    () =>
+      window.innerHeight + window.scrollY >=
+      document.documentElement.scrollHeight - FOLLOW_THRESHOLD_PX,
+    [FOLLOW_THRESHOLD_PX]
+  );
+
   const scrollToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {
     // Throttle scroll events to at most 30fps (33ms) to prevent jitter
     const now = Date.now();
     if (now - lastScrollTimeRef.current < 33) return;
     lastScrollTimeRef.current = now;
-    
+
+    if (bottomRef.current) {
+      bottomRef.current.scrollIntoView({ behavior, block: "end" });
+      return;
+    }
+
     window.scrollTo({ top: document.documentElement.scrollHeight, behavior });
   }, []);
 
   const handleScroll = useCallback(() => {
-    // Check if we are near the bottom to hide/show the "scroll to bottom" button
-    const isAtBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 300;
-    setShowScrollButton(!isAtBottom && (isStreaming ?? false));
-  }, [isStreaming]);
+    const nearBottom = isNearBottom();
+    setIsFollowingLatest(nearBottom);
+  }, [isNearBottom]);
 
   useEffect(() => {
-    window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    window.addEventListener("resize", handleScroll);
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      window.removeEventListener("resize", handleScroll);
+    };
   }, [handleScroll]);
 
   // Auto-scroll to bottom
@@ -645,23 +661,26 @@ export function MessageList({
 
     const isNewMessage = messages.length > previousMessagesLengthRef.current;
     previousMessagesLengthRef.current = messages.length;
+    const latestMessage = messages[messages.length - 1];
+    const isNewUserMessage = isNewMessage && latestMessage?.role === "user";
 
     // Initial scroll when messages arrive
     if (!hasAutoScrolledRef.current) {
       hasAutoScrolledRef.current = true;
-      requestAnimationFrame(() => scrollToBottom("instant" as ScrollBehavior));
+      requestAnimationFrame(() => scrollToBottom("auto"));
       return;
     }
 
-    // Smart auto-scroll: only scroll if the user was already near the bottom
-    // or if it's a new message (forcing focus on the new input).
-    const isNearBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 300;
-
-    if (isNewMessage || isNearBottom) {
-      // Use "instant" (auto) instead of smooth during active streaming to prevent animation jitter
-      requestAnimationFrame(() => scrollToBottom("instant" as ScrollBehavior));
+    if (isNewUserMessage) {
+      requestAnimationFrame(() => scrollToBottom("auto"));
+      return;
     }
-  }, [messages, isStreaming, scrollToBottom]);
+
+    if (isFollowingLatest) {
+      // Use "auto" instead of smooth during active streaming to prevent jitter.
+      requestAnimationFrame(() => scrollToBottom("auto"));
+    }
+  }, [messages, isStreaming, isFollowingLatest, scrollToBottom]);
 
   async function copyMessage(messageId: string, content: string) {
     const cleaned = content;
@@ -677,6 +696,8 @@ export function MessageList({
   if (messages.length === 0) {
     return <p className="text-sm text-muted-foreground">{emptyLabel}</p>;
   }
+
+  const showScrollButton = !isFollowingLatest && messages.length > 0;
 
   return (
     <div className="relative space-y-6 pb-4 overflow-anchor-none">
@@ -703,7 +724,11 @@ export function MessageList({
             initial={{ opacity: 0, y: 10, scale: 0.9 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 10, scale: 0.9 }}
-            onClick={() => scrollToBottom("smooth")}
+            onClick={() => {
+              setIsFollowingLatest(true);
+              scrollToBottom("smooth");
+            }}
+            aria-label="Jump to latest messages"
             className="fixed bottom-32 left-1/2 z-50 flex h-10 w-10 -translate-x-1/2 items-center justify-center rounded-full border bg-background shadow-lg transition-transform active:scale-95 md:bottom-36"
           >
             <ArrowDown className="h-4 w-4 text-foreground" />
