@@ -1,0 +1,1 @@
+ALTER TABLE "spaces" ADD COLUMN "pinned" boolean DEFAULT false NOT NULL;

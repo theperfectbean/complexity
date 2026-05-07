@@ -1,0 +1,10 @@
+fastapi==0.115.12
+uvicorn[standard]==0.34.0
+sentence-transformers==3.4.1
+torch==2.6.0
+faster-whisper==1.1.1
+numpy>=1.26,<3
+python-multipart
+pytesseract
+pdf2image
+Pillow

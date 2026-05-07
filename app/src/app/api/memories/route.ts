@@ -1,0 +1,103 @@
+import { and, desc, eq } from "drizzle-orm";
+import { NextResponse } from "next/server";
+import { z } from "zod";
+
+import { auth } from "@/auth";
+import { db } from "@/lib/db";
+import { memories, users } from "@/lib/db/schema";
+import { invalidateMemoryCache } from "@/lib/memory";
+import { getEmbeddings } from "@/lib/rag";
+import { runtimeConfig } from "@/lib/config";
+
+const createSchema = z.object({
+  content: z.string().min(1).max(1000),
+});
+
+export async function GET(request: Request) {
+  const session = await auth();
+  const userEmail = session?.user?.email;
+  if (!userEmail) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const [user] = await db.select().from(users).where(eq(users.email, userEmail)).limit(1);
+  if (!user) {
+    return NextResponse.json({ error: "User not found" }, { status: 404 });
+  }
+
+  const { searchParams } = new URL(request.url);
+  const roleId = searchParams.get("roleId");
+
+  const query = db
+    .select()
+    .from(memories)
+    .where(
+      and(
+        eq(memories.userId, user.id),
+        roleId ? eq(memories.roleId, roleId) : undefined
+      )
+    )
+    .orderBy(desc(memories.createdAt));
+
+  const rows = await query;
+
+  return NextResponse.json({ memories: rows });
+}
+
+export async function POST(request: Request) {
+  const session = await auth();
+  const userEmail = session?.user?.email;
+  if (!userEmail) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const [user] = await db.select().from(users).where(eq(users.email, userEmail)).limit(1);
+  if (!user) {
+    return NextResponse.json({ error: "User not found" }, { status: 404 });
+  }
+
+  const parsed = createSchema.safeParse(await request.json());
+  if (!parsed.success) {
+    return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
+  }
+
+  const existing = await db
+    .select({ id: memories.id })
+    .from(memories)
+    .where(eq(memories.userId, user.id))
+    .limit(runtimeConfig.memory.maxMemories);
+
+  if (existing.length >= runtimeConfig.memory.maxMemories) {
+    return NextResponse.json({ error: "Memory limit reached" }, { status: 400 });
+  }
+
+  let embedding: number[];
+  try {
+    const [fetchedEmbedding] = await getEmbeddings([parsed.data.content.trim()]);
+    if (!fetchedEmbedding) {
+       return NextResponse.json({ error: "Failed to generate embedding" }, { status: 500 });
+    }
+    embedding = fetchedEmbedding;
+  } catch (error) {
+    console.error("[Memory] Failed to generate embedding:", error);
+    return NextResponse.json({ error: "Failed to generate embedding" }, { status: 500 });
+  }
+
+  const now = new Date();
+  const id = crypto.randomUUID();
+  await db.insert(memories).values({
+    id,
+    userId: user.id,
+    content: parsed.data.content.trim(),
+    embedding,
+    source: "manual",
+    threadId: undefined, // manual memories don't have a threadId
+    createdAt: now,
+    updatedAt: now,
+  });
+
+  await invalidateMemoryCache(user.id);
+
+  const [memory] = await db.select().from(memories).where(eq(memories.id, id)).limit(1);
+  return NextResponse.json({ memory }, { status: 201 });
+}

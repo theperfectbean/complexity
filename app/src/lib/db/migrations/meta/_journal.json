@@ -1,0 +1,139 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 0,
+      "tag": "0000_initial",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 0,
+      "tag": "0001_agent_api_models",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1773184872006,
+      "tag": "0002_tranquil_major_mapleleaf",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1773289411926,
+      "tag": "0003_material_rockslide",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1773291077847,
+      "tag": "0004_numerous_havok",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1773362213653,
+      "tag": "0005_rare_moira_mactaggert",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1773369000000,
+      "tag": "0006_default_thread_model",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1773477468398,
+      "tag": "0007_friendly_red_ghost",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1773704233856,
+      "tag": "0008_long_tempest",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1773894432600,
+      "tag": "0009_broken_lady_mastermind",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1773895880870,
+      "tag": "0010_daffy_squadron_sinister",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1773990000000,
+      "tag": "0011_chunks_fts_gin_index",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1773991000000,
+      "tag": "0012_tokens_totp_branching",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1774138364440,
+      "tag": "0013_role_memory_isolation_v2",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1774245578465,
+      "tag": "0014_fast_shinko_yamashiro",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1774310400000,
+      "tag": "0015_password_changed_at",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1774416673092,
+      "tag": "0016_known_william_stryker",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1774503598913,
+      "tag": "0017_fat_steve_rogers",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1778112761506,
+      "tag": "0018_past_killraven",
+      "breakpoints": true
+    }
+  ]
+}

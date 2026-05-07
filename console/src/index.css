@@ -1,0 +1,71 @@
+@import "tailwindcss";
+
+/* ── Theme tokens ─────────────────────────────────────────────────────────── */
+:root,
+:root[data-theme="dark"] {
+  --bg-page:         #0f1117;
+  --bg-surface:      #1e2030;
+  --bg-surface-alt:  #0d1117;
+  --bg-input:        #2d3748;
+  --bg-selected:     rgba(124,58,237,0.13);
+  --border:          #2d3748;
+  --text:            #e2e8f0;
+  --text-secondary:  #718096;
+  --text-muted:      #a0aec0;
+  --text-empty:      #4a5568;
+  --accent:          #7c3aed;
+  --accent-light:    #a78bfa;
+  --accent-subtle:   rgba(124,58,237,0.13);
+  --success:         #22c55e;
+  --error:           #ef4444;
+  --warning:         #f59e0b;
+}
+
+:root[data-theme="dim"] {
+  --bg-page:         #1a1b2e;
+  --bg-surface:      #25283d;
+  --bg-surface-alt:  #13141f;
+  --bg-input:        #3d4166;
+  --bg-selected:     rgba(124,58,237,0.18);
+  --border:          #3d4166;
+  --text:            #c0caf5;
+  --text-secondary:  #6272a4;
+  --text-muted:      #9aa5ce;
+  --text-empty:      #4d5780;
+  --accent:          #7c3aed;
+  --accent-light:    #a78bfa;
+  --accent-subtle:   rgba(124,58,237,0.15);
+  --success:         #50fa7b;
+  --error:           #ff5555;
+  --warning:         #ffb86c;
+}
+
+:root[data-theme="light"] {
+  --bg-page:         #f8fafc;
+  --bg-surface:      #ffffff;
+  --bg-surface-alt:  #f1f5f9;
+  --bg-input:        #e2e8f0;
+  --bg-selected:     rgba(124,58,237,0.08);
+  --border:          #cbd5e1;
+  --text:            #1e293b;
+  --text-secondary:  #64748b;
+  --text-muted:      #94a3b8;
+  --text-empty:      #94a3b8;
+  --accent:          #7c3aed;
+  --accent-light:    #7c3aed;
+  --accent-subtle:   rgba(124,58,237,0.1);
+  --success:         #16a34a;
+  --error:           #dc2626;
+  --warning:         #d97706;
+}
+
+@layer base {
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg-page);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    margin: 0;
+  }
+  html, body, #root { height: 100%; }
+}
