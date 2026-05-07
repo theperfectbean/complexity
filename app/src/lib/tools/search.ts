@@ -82,7 +82,7 @@ export const createWebSearchTool = (apiKey: string) => tool({
     query: z.string().describe("The search query to look up."),
   }),
 
-  // @ts-expect-error AI SDK execute signature overload - typed at runtime, suppressed at compile time
+  // @ts-expect-error AI SDK v6 NeverOptional<never> makes execute typed as undefined when no outputSchema; cast is unavoidable
   execute: async ({ query }: { query: string }) => {
     if (!apiKey) {
       throw new Error("Search API key is not configured.");
@@ -138,7 +138,7 @@ export const createFetchUrlTool = () => tool({
     url: z.string().describe("The URL to fetch and read."),
   }),
 
-  // @ts-expect-error AI SDK execute signature overload - typed at runtime, suppressed at compile time
+  // @ts-expect-error AI SDK v6 NeverOptional<never> makes execute typed as undefined when no outputSchema; cast is unavoidable
   execute: async ({ url }: { url: string }) => {
     const safety = isSafeUrl(url);
     if (!safety.safe) {

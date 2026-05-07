@@ -258,14 +258,11 @@ export async function streamAgentResponse(args: {
     stopWhen: stepCountIs(args.maxSteps ?? 20) as any,
     onStepFinish: async (step) => { await args.handlers.onStepFinish?.(step); },
     onFinish: (finish) => {
-      finishReason = "finishReason" in finish ? (finish as Record<string, unknown>).finishReason as string | undefined : undefined;
+      finishReason = finish.finishReason;
       finishUsage = {
-        // @ts-expect-error AI SDK version mismatch on usage properties
-        promptTokens: finish.usage?.promptTokens ?? finish.usage?.prompt_tokens,
-        // @ts-expect-error AI SDK version mismatch on usage properties
-        completionTokens: finish.usage?.completionTokens ?? finish.usage?.completion_tokens,
-        // @ts-expect-error AI SDK version mismatch on usage properties
-        totalTokens: finish.usage?.totalTokens ?? finish.usage?.total_tokens,
+        promptTokens: finish.usage?.inputTokens,
+        completionTokens: finish.usage?.outputTokens,
+        totalTokens: (finish.usage?.inputTokens ?? 0) + (finish.usage?.outputTokens ?? 0),
       };
     },
     onError: (error) => {

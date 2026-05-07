@@ -256,7 +256,7 @@ const MessageItem = memo(function MessageItem({
       <article 
         data-testid={`message-${message.role}`}
         className={isUser ? "flex flex-col items-end py-2" : "group relative flex flex-col gap-0 pt-2 pb-10"}
-        style={{ overflowAnchor: "auto" }}
+        style={{ overflowAnchor: "auto", contentVisibility: "auto", containIntrinsicSize: "0 300px" }}
       >
       {isUser ? (
         <div className={cn(

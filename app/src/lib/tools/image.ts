@@ -25,7 +25,7 @@ export const createImageGenerationTool = (apiKey: string, requestId?: string) =>
         .describe("Image dimensions. Use 1792x1024 for wide/landscape, 1024x1792 for tall/portrait."),
     }),
 
-    // @ts-expect-error AI SDK execute signature overload
+    // @ts-expect-error AI SDK v6 NeverOptional<never> makes execute typed as undefined when no outputSchema; cast is unavoidable
     execute: async ({ prompt, size }: { prompt: string; size?: "1024x1024" | "1792x1024" | "1024x1792" }) => {
       const log = getLogger(requestId);
       try {
