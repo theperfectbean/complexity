@@ -1,3 +1,4 @@
+import { logger } from "@/lib/logger";
 import { generateText, ModelMessage } from "ai";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -5,7 +6,7 @@ import crypto from "node:crypto";
 
 import { auth } from "../../../../auth";
 import { resolveRequestedModel } from "../../../../lib/available-models";
-import { getLanguageModel } from "../../../../lib/llm";
+import { getLanguageModel, getProviderRequestOptions } from "../../../../lib/llm";
 import { getApiKeys } from "../../../../lib/settings";
 import { runtimeConfig } from "../../../../lib/config";
 import { getRedisClient } from "../../../../lib/redis";
@@ -33,7 +34,7 @@ export async function POST(request: Request) {
   const redis = getRedisClient();
   const cacheKey = `cache:role-instructions:${safeModel}:${crypto.createHash("sha256").update(prompt).digest("hex")}`;
 
-  console.log(`[generate-instructions] Requested: ${requestedModel}, Resolved: ${safeModel}`);
+  logger.debug({}, `[generate-instructions] Requested: ${requestedModel}, Resolved: ${safeModel}`);
 
   const systemInstructions = `You are an expert at creating system prompts and AI personas. 
 Based on the user's specification, generate a detailed, clear, and effective set of custom instructions (system prompt) for an AI role. 
@@ -58,10 +59,12 @@ Focus on:
     }
 
     const langModel = await getLanguageModel(safeModel, keys);
+    const { providerOptions } = await getProviderRequestOptions(safeModel);
     const result = await generateText({
       model: langModel,
       system: systemInstructions,
       messages: [{ role: "user", content: [{ type: "text", text: prompt }] }] as ModelMessage[],
+      providerOptions,
     });
 
     if (redis && result.text) {
@@ -73,7 +76,7 @@ Focus on:
       headers: { "Content-Type": "text/plain; charset=utf-8" },
     });
   } catch (error) {
-    console.error("[generate-instructions] Error:", error);
+    logger.error({ err: error }, "[generate-instructions] Error:");
     return NextResponse.json({ error: "Failed to generate instructions" }, { status: 500 });
   }
 }

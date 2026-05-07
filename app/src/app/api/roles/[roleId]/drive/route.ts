@@ -47,6 +47,9 @@ export async function POST(
     if (!Array.isArray(files) || files.length === 0) {
       return ApiResponse.badRequest("No files provided");
     }
+    if (files.length > 20) {
+      return ApiResponse.badRequest("Maximum 20 files per request");
+    }
 
     const queuedDocs = [];
 

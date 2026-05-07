@@ -4,36 +4,17 @@ import { z } from "zod";
 
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
-import { setSetting, getDetailedSettings } from "@/lib/settings";
+import { setSetting, getDetailedSettings, ADMIN_SETTING_KEYS } from "@/lib/settings";
 import { requireUser, requireAdmin } from "@/lib/auth-server";
 import { logAuditEvent } from "@/lib/audit";
 
-const ALLOWED_KEYS = [
-  "ANTHROPIC_API_KEY",
-  "OPENAI_API_KEY",
-  "GOOGLE_GENERATIVE_AI_API_KEY",
-  "XAI_API_KEY",
-  "PERPLEXITY_API_KEY",
-  "OLLAMA_BASE_URL",
-  "LOCAL_OPENAI_BASE_URL",
-  "LOCAL_OPENAI_API_KEY",
-  "PROVIDER_PERPLEXITY_ENABLED",
-  "PROVIDER_ANTHROPIC_ENABLED",
-  "PROVIDER_OPENAI_ENABLED",
-  "PROVIDER_GOOGLE_ENABLED",
-  "PROVIDER_XAI_ENABLED",
-  "PROVIDER_OLLAMA_ENABLED",
-  "PROVIDER_LOCAL_OPENAI_ENABLED",
-  "CUSTOM_MODEL_LIST",
-  "GOOGLE_CLIENT_ID",
-  "GOOGLE_CLIENT_SECRET",
-  "GOOGLE_API_KEY",
-  "GITHUB_CLIENT_ID",
-  "GITHUB_CLIENT_SECRET",
-];
+const ALLOWED_KEYS: readonly string[] = ADMIN_SETTING_KEYS;
 
 const patchSchema = z.object({
-  memoryEnabled: z.boolean(),
+  memoryEnabled: z.boolean().optional(),
+  defaultModel: z.string().optional(),
+  defaultSshUser: z.string().optional(),
+  autoApproveReadOnly: z.boolean().optional(),
 });
 
 export async function GET() {
@@ -43,10 +24,13 @@ export async function GET() {
 
   const result: Record<string, unknown> = {
     memoryEnabled: user.memoryEnabled,
+    defaultModel: user.defaultModel,
+    defaultSshUser: user.defaultSshUser,
+    autoApproveReadOnly: user.autoApproveReadOnly,
   };
 
   if (user.isAdmin) {
-    result.details = await getDetailedSettings(ALLOWED_KEYS);
+    result.details = await getDetailedSettings([...ALLOWED_KEYS]);
   }
 
   return NextResponse.json(result);
@@ -85,9 +69,14 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
   }
 
+  const updates: Partial<typeof users.$inferInsert> = {
+    ...parsed.data,
+    updatedAt: new Date(),
+  };
+
   await db
     .update(users)
-    .set({ memoryEnabled: parsed.data.memoryEnabled, updatedAt: new Date() })
+    .set(updates)
     .where(eq(users.id, user.id));
 
   return NextResponse.json({ ok: true });

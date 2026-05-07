@@ -5,10 +5,20 @@ import { db } from "@/lib/db";
 import { getRedisClient } from "@/lib/redis";
 import { env } from "@/lib/env";
 import { getDocumentQueue } from "@/lib/queue";
+import { auth } from "@/auth";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
+  const session = await auth();
+  const isAdmin = session?.user?.isAdmin === true;
+
+  // Non-admins get minimal liveness only - no internal details
+  if (!isAdmin) {
+    try { await db.execute(sql`SELECT 1`); return NextResponse.json({ status: "healthy" }); }
+    catch { return NextResponse.json({ status: "unhealthy" }, { status: 503 }); }
+  }
+
   const checks: Record<string, "ok" | "error"> = {};
   const details: Record<string, unknown> = {};
 

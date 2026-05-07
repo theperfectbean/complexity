@@ -1,3 +1,4 @@
+import { logger } from "@/lib/logger";
 import Redis from "ioredis";
 
 import { env } from "@/lib/env";
@@ -22,10 +23,9 @@ export function getRedisClient(): Redis | null {
     process.env.SKIP_ENV_VALIDATION === "true" ||
     process.env.npm_lifecycle_event === "build";
 
-  const isDocker = fs.existsSync("/.dockerenv");
   const isRedisHostname = url.includes("://redis:") || url.includes("@redis:");
 
-  if ((isBuild || (!isDocker && isRedisHostname)) && !process.env.REDIS_REACHABLE_IN_BUILD) {
+  if ((isBuild || (isRedisHostname)) && !process.env.REDIS_REACHABLE_IN_BUILD) {
     return null;
   }
 
@@ -41,7 +41,7 @@ export function getRedisClient(): Redis | null {
         const redisErr = err as { code?: string; message?: string };
         // Only log in development or if it's not a DNS error
         if (redisErr.code !== "ENOTFOUND" && redisErr.code !== "ECONNREFUSED") {
-          console.error("Redis error:", redisErr);
+          logger.error({ err: redisErr }, "Redis error:");
         }
       }
     });

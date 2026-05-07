@@ -15,7 +15,7 @@ vi.mock("./model-registry", () => ({
   MODEL_SETTINGS_KEYS: [],
   getConfiguredModels: vi.fn().mockReturnValue([
     { id: "anthropic/claude-4-5-haiku-latest", label: "Claude 4.5 Haiku", category: "Anthropic", isPreset: false },
-    { id: "perplexity/openai/gpt-5.4", label: "GPT via Perplexity", category: "Search", isPreset: false },
+    { id: "perplexity/openai/gpt-5.4", label: "GPT via Search Agent", category: "Search", isPreset: false },
     { id: "openai/gpt-5.4", label: "GPT-5.4", category: "OpenAI", isPreset: false },
   ]),
   filterModelsByConfiguration: vi.fn((models) => models),
@@ -26,7 +26,7 @@ describe("available-models", () => {
     vi.clearAllMocks();
   });
 
-  it("prefers direct provider models over perplexity wrappers during fuzzy resolution", async () => {
+  it("prefers direct provider models over search provider wrappers during fuzzy resolution", async () => {
     await expect(resolveRequestedModel("gpt-5.4")).resolves.toBe("openai/gpt-5.4");
   });
 

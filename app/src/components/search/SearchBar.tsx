@@ -13,6 +13,10 @@ import { VoiceInput } from "./parts/VoiceInput";
 import { ModelSelector } from "./parts/ModelSelector";
 import { SearchModelOption } from "@/lib/models";
 import { FileAttachments, FileAttachmentsHandle } from "./parts/FileAttachments";
+import { CommandMenu } from "@/components/chat/CommandMenu";
+import { useSlashCommands } from "@/lib/hooks/useSlashCommands";
+import { resolveSearchBackend } from "@/lib/search/registry";
+
 
 type SearchBarProps = {
   value: string;
@@ -32,9 +36,11 @@ type SearchBarProps = {
   webSearchEnabled?: boolean;
   onWebSearchChange?: (enabled: boolean) => void;
   autoFilter?: boolean;
+  hideModelSelector?: boolean;
   "data-testid"?: string;
   id?: string;
   roleId?: string;
+  threadId?: string;
 };
 
 const EMPTY_ATTACHMENTS: File[] = [];
@@ -57,14 +63,17 @@ export function SearchBar({
   webSearchEnabled = runtimeConfig.chat.defaultWebSearch,
   onWebSearchChange,
   autoFilter = true,
+  hideModelSelector = false,
   "data-testid": dataTestId,
   id,
   roleId,
+  threadId,
 }: SearchBarProps) {
   const fileAttachmentsRef = useRef<FileAttachmentsHandle>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [internalAttachments, setInternalAttachments] = useState<File[]>(externalAttachments);
   const [isDragging, setIsDragging] = useState(false);
+
 
   useEffect(() => {
     setInternalAttachments(externalAttachments);
@@ -154,6 +163,31 @@ export function SearchBar({
     handleDrop(event.nativeEvent as DragEvent);
   };
 
+  const { showCommandMenu, commandQuery, handleTextChange, handleCommandSelect, closeMenu, matchedCommands, allCommands } =
+    useSlashCommands(onChange, { threadId });
+
+  // F5: Restore draft from sessionStorage on mount
+  useEffect(() => {
+    if (!threadId || value) return;
+    try {
+      const draft = sessionStorage.getItem(`draft:${threadId}`);
+      if (draft) onChange(draft);
+    } catch { /* sessionStorage unavailable */ }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [threadId]);
+
+  // F5: Persist draft to sessionStorage when value changes
+  useEffect(() => {
+    if (!threadId) return;
+    try {
+      if (value) {
+        sessionStorage.setItem(`draft:${threadId}`, value);
+      } else {
+        sessionStorage.removeItem(`draft:${threadId}`);
+      }
+    } catch { /* sessionStorage unavailable */ }
+  }, [threadId, value]);
+
   return (
     <motion.div
       id={id}
@@ -165,11 +199,19 @@ export function SearchBar({
       onDragLeave={handleDragLeave}
       onDrop={onContainerDrop}
       className={cn(
-        "flex flex-col rounded-[22px] border bg-card p-2 shadow-md transition-all duration-200",
+        "relative flex flex-col rounded-[22px] border bg-card p-2 shadow-md transition-all duration-200",
         "focus-within:border-primary/30 focus-within:ring-4 focus-within:ring-primary/5 focus-within:shadow-lg",
         isDragging && "border-primary/50 ring-4 ring-primary/10 bg-primary/5 shadow-xl scale-[1.01]"
       )}
     >
+      {showCommandMenu && (
+        <CommandMenu
+          query={commandQuery}
+          commands={matchedCommands}
+          onSelect={handleCommandSelect}
+          onClose={closeMenu}
+        />
+      )}
       <FileAttachments
         ref={fileAttachmentsRef}
         attachments={internalAttachments}
@@ -185,9 +227,27 @@ export function SearchBar({
           minRows={compact ? 1 : 2}
           maxRows={12}
           value={value}
-          onChange={(event) => onChange(event.target.value)}
+          onChange={handleTextChange}
           onKeyDown={(event) => {
+            // Block navigation keys while the command picker menu is open
+            if (showCommandMenu && (event.key === "ArrowUp" || event.key === "ArrowDown" || event.key === "Enter" || event.key === "Tab")) {
+              if (event.key === "Enter" || event.key === "Tab") event.preventDefault();
+              return;
+            }
+
             if (event.key === "Enter" && !event.shiftKey) {
+              // Execute a fully-formed slash command: /{trigger} {prompt text}
+              if (value.startsWith("/")) {
+                const matched = allCommands.find((cmd) => {
+                  const prefix = `/${cmd.trigger} `;
+                  return value.toLowerCase().startsWith(prefix.toLowerCase()) && value.length > prefix.length;
+                });
+                if (matched) {
+                  event.preventDefault();
+                  handleCommandSelect(matched);
+                  return;
+                }
+              }
               event.preventDefault();
               event.currentTarget.form?.requestSubmit();
             }
@@ -202,14 +262,17 @@ export function SearchBar({
 
       <div className="mt-1 flex items-center justify-between gap-2 px-1 pb-1">
         <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide">
-          <ModelSelector
-            model={model}
-            onModelChange={onModelChange}
-            modelOptions={modelOptions}
-            autoFilter={autoFilter}
-          />
-
-          <div className="h-4 w-px bg-border/40 mx-0.5" />
+          {!hideModelSelector && (
+            <>
+              <ModelSelector
+                model={model}
+                onModelChange={onModelChange}
+                modelOptions={modelOptions}
+                autoFilter={autoFilter}
+              />
+              <div className="h-4 w-px bg-border/40 mx-0.5" />
+            </>
+          )}
 
           <button
             type="button"
@@ -220,6 +283,13 @@ export function SearchBar({
                 : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
             )}
             aria-label="Toggle web search"
+            title={webSearchEnabled
+              ? (() => {
+                  const provider = runtimeConfig.searchAgent.provider;
+                  const providerName = resolveSearchBackend(provider)?.displayName ?? "Search Agent";
+                  return `Web search active (via ${providerName})`;
+                })()
+              : "Enable web search"}
             onClick={() => onWebSearchChange?.(!webSearchEnabled)}
           >
             <Globe className={cn("h-4 w-4", webSearchEnabled ? "text-primary" : "opacity-60")} />

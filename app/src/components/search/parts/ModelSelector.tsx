@@ -11,11 +11,12 @@ type ModelSelectorProps = {
   onModelChange?: (model: string) => void;
   modelOptions?: readonly SearchModelOption[];
   autoFilter?: boolean;
+  excludeCategories?: string[];
 };
 
 const CATEGORY_ICONS: Record<string, React.ReactNode> = {
   Presets: <Sparkles className="h-3.5 w-3.5" />,
-  Perplexity: <Search className="h-3.5 w-3.5" />,
+  Search: <Search className="h-3.5 w-3.5" />,
   Anthropic: <Brain className="h-3.5 w-3.5" />,
   OpenAI: <Zap className="h-3.5 w-3.5" />,
   Google: <Globe className="h-3.5 w-3.5" />,
@@ -28,8 +29,11 @@ export function ModelSelector({
   onModelChange,
   modelOptions: providedModelOptions,
   autoFilter = true,
+  excludeCategories,
 }: ModelSelectorProps) {
-  const [availableModels, setAvailableModels] = useState<readonly SearchModelOption[]>(providedModelOptions || MODELS);
+  const [availableModels, setAvailableModels] = useState<readonly SearchModelOption[]>(
+    providedModelOptions || (autoFilter ? [] : MODELS)
+  );
   const [hasUserSelectedModel, setHasUserSelectedModel] = useState(false);
   const normalizedModel = normalizeLegacyModelId(model);
 
@@ -44,7 +48,6 @@ export function ModelSelector({
         }
       })
       .catch(() => undefined);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -55,13 +58,20 @@ export function ModelSelector({
         .then(res => res.json())
         .then(data => {
           if (data.models && data.models.length > 0) {
-            setAvailableModels(data.models);
+            const filteredModels = excludeCategories && excludeCategories.length > 0
+              ? data.models.filter((m: SearchModelOption) => !excludeCategories.includes(m.category))
+              : data.models;
             
-            const currentModelIsValid = data.models.some((m: SearchModelOption) => m.id === normalizedModel);
+            // Only update if we actually have models to show
+            if (filteredModels.length > 0) {
+              setAvailableModels(filteredModels);
+            }
+            
+            const currentModelIsValid = filteredModels.some((m: SearchModelOption) => m.id === normalizedModel);
             const isInitialDefault = normalizedModel === getDefaultModel();
 
             if (!currentModelIsValid || (!hasUserSelectedModel && isInitialDefault)) {
-              const topModel = data.models[0].id;
+              const topModel = filteredModels[0]?.id;
               if (topModel && topModel !== normalizedModel) {
                 onModelChange?.(topModel);
               }
@@ -76,7 +86,7 @@ export function ModelSelector({
 
       return () => controller.abort();
     }
-  }, [autoFilter, providedModelOptions, normalizedModel, onModelChange, hasUserSelectedModel]);
+  }, [autoFilter, providedModelOptions, normalizedModel, onModelChange, hasUserSelectedModel, excludeCategories]);
 
   const modelOptions = availableModels;
 
@@ -90,8 +100,9 @@ export function ModelSelector({
     }, {});
   }, [modelOptions]);
 
-  const activeModel = modelOptions.find((item) => item.id === normalizedModel);
-  const activeModelLabel = activeModel ? formatDisplayLabel(activeModel.label) : normalizedModel;
+  const activeModel = modelOptions.find((item) => item.id === normalizedModel)
+    ?? modelOptions.find((item) => normalizeLegacyModelId(item.id) === normalizedModel);
+  const activeModelLabel = activeModel ? formatDisplayLabel(activeModel.label) : formatDisplayLabel(normalizedModel);
 
   const handleModelSelect = useCallback((id: string) => {
     setHasUserSelectedModel(true);
@@ -102,7 +113,7 @@ export function ModelSelector({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ defaultModel: id }),
     }).catch(() => undefined);
-  }, [onModelChange]);
+  }, [onModelChange, setHasUserSelectedModel]);
 
   return (
     <DropdownMenu.Root>
@@ -126,6 +137,11 @@ export function ModelSelector({
           align="start"
           className="z-50 max-h-[80vh] min-w-64 overflow-y-auto rounded-2xl border bg-popover/98 p-1.5 shadow-xl backdrop-blur-md animate-in fade-in zoom-in-95 data-[side=bottom]:slide-in-from-top-2"
         >
+          {Object.keys(groupedModels).length === 0 && (
+            <div className="py-4 px-3 text-center text-xs text-muted-foreground">
+              No models available
+            </div>
+          )}
           {Object.entries(groupedModels).map(([category, options]) => (
             <div key={category} className="py-1 first:pt-0.5">
               <div className="flex items-center gap-2 px-3 pb-1.5 pt-1">
@@ -140,7 +156,7 @@ export function ModelSelector({
                   onSelect={() => handleModelSelect(option.id)}
                   className={cn(
                     "flex cursor-pointer items-center justify-between rounded-lg px-3 py-2 text-sm outline-none transition-all hover:bg-accent hover:text-accent-foreground",
-                    normalizedModel === option.id && "bg-primary/10 text-primary font-medium shadow-2xs"
+                    (normalizedModel === option.id || normalizeLegacyModelId(option.id) === normalizedModel) && "bg-primary/10 text-primary font-medium shadow-2xs"
                   )}
                 >
                   <div className="flex flex-col min-w-0">
@@ -149,7 +165,7 @@ export function ModelSelector({
                       <span aria-hidden="true" className="truncate text-[10px] font-mono opacity-50">{option.id.split('/').pop()}</span>
                     )}
                   </div>
-                  {normalizedModel === option.id && (
+                  {(normalizedModel === option.id || normalizeLegacyModelId(option.id) === normalizedModel) && (
                     <Check className="ml-2 h-3.5 w-3.5 shrink-0" />
                   )}
                 </DropdownMenu.Item>

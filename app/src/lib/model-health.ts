@@ -152,7 +152,7 @@ export async function getModelHealthSnapshot(options?: {
 }): Promise<ModelHealthSnapshot | null> {
   const raw = await getSetting(MODEL_HEALTH_SETTING_KEY);
   const parsed = parseSnapshot(raw);
-  const refreshIfStale = options?.refreshIfStale ?? false;
+  const refreshIfStale = options?.refreshIfStale ?? true;
 
   if (!refreshIfStale) {
     return parsed;

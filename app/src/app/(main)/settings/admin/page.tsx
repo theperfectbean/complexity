@@ -1,0 +1,764 @@
+"use client";
+
+import Link from "next/link";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
+import { useSession } from "next-auth/react";
+import { LoadingSkeleton } from "@/components/shared/LoadingSkeleton";
+import { Check, Info, ShieldCheck, Zap, RefreshCw, Plus, Trash2, GripVertical, Settings2, Users, Activity, BarChart3, ScrollText, SlidersHorizontal } from "lucide-react";
+import { Reorder } from "motion/react";
+import { MODELS } from "@/lib/models";
+import { UserManagement } from "@/components/admin/UserManagement";
+import { HealthDashboard } from "@/components/admin/HealthDashboard";
+import { AnalyticsDashboard } from "@/components/admin/AnalyticsDashboard";
+import { AuditLog } from "@/components/admin/AuditLog";
+
+type SettingInfo = {
+  value: string | null;
+  source: "db" | "env" | "none";
+};
+
+type ProviderConfig = {
+  id: string;
+  name: string;
+  keyName: string;
+  toggleName?: string;
+  placeholder: string;
+  description: string;
+};
+
+type ModelOption = {
+  id: string;
+  label: string;
+  category: string;
+  isPreset: boolean;
+  providerModelId?: string;
+  capability?: "high" | "medium" | "low";
+};
+
+type DiscoveredModel = {
+  id: string;
+  name: string;
+  provider: string;
+  normalizedId: string;
+};
+
+type ModelHealthEntry = {
+  status: "healthy" | "unavailable" | "disabled" | "unknown";
+  reason: string | null;
+  checkedAt: string;
+  targetId: string;
+};
+
+import { listProviders } from "@/lib/providers/registry";
+
+const PROVIDER_DESCRIPTIONS: Record<string, { placeholder: string; description: string }> = {
+  perplexity: { placeholder: "pplx-...", description: "Optional managed search provider for Sonar and explicitly selected wrapped models." },
+  anthropic: { placeholder: "sk-ant-...", description: "Enables Claude models (e.g., Sonnet, Opus, Haiku)." },
+  openai: { placeholder: "sk-...", description: "Enables GPT models (e.g., GPT-4o)." },
+  google: { placeholder: "AIza...", description: "Enables Gemini models (e.g., Pro, Flash)." },
+  xai: { placeholder: "xai-...", description: "Enables Grok models." },
+  ollama: { placeholder: "http://localhost:11434/api", description: "Enables locally running models via Ollama." },
+  "local-openai": { placeholder: "http://localhost:1234/v1", description: "Enables custom OpenAI-compatible endpoints (e.g., LM Studio, vLLM)." },
+};
+
+const PROVIDERS: ProviderConfig[] = listProviders().map((p) => ({
+  id: p.id,
+  name: p.displayName,
+  keyName: p.settingsKey,
+  toggleName: p.toggleKey,
+  placeholder: PROVIDER_DESCRIPTIONS[p.id]?.placeholder || "...",
+  description: PROVIDER_DESCRIPTIONS[p.id]?.description || "AI Provider",
+}));
+
+type IntegrationConfig = {
+  id: string;
+  name: string;
+  description: string;
+  toggleName?: string;
+  primaryKey?: string;
+  fields: { key: string; label: string; placeholder: string; type?: string }[];
+};
+
+const INTEGRATIONS: IntegrationConfig[] = [
+  {
+    id: "google-drive",
+    name: "Google Drive (RAG)",
+    description: "Allow users to import documents from Google Drive. Requires a Google Cloud Project.",
+    toggleName: "INTEGRATION_GOOGLE_DRIVE_ENABLED",
+    primaryKey: "GOOGLE_CLIENT_ID",
+    fields: [
+      { key: "GOOGLE_CLIENT_ID", label: "Client ID", placeholder: "your-client-id.apps.googleusercontent.com" },
+      { key: "GOOGLE_CLIENT_SECRET", label: "Client Secret", placeholder: "GOCSPX-...", type: "password" },
+      { key: "GOOGLE_API_KEY", label: "API Key (Picker)", placeholder: "AIza...", type: "password" },
+    ]
+  },
+  {
+    id: "github",
+    name: "GitHub Auth",
+    description: "Enable signing in with GitHub.",
+    toggleName: "INTEGRATION_GITHUB_ENABLED",
+    primaryKey: "GITHUB_CLIENT_ID",
+    fields: [
+      { key: "GITHUB_CLIENT_ID", label: "Client ID", placeholder: "ov2-..." },
+      { key: "GITHUB_CLIENT_SECRET", label: "Client Secret", placeholder: "github_pat_...", type: "password" },
+    ]
+  },
+  {
+    id: "search",
+    name: "Search Provider",
+    description: "Configure the generic search engine used for Fast and Pro search presets.",
+    toggleName: "INTEGRATION_SEARCH_ENABLED",
+    primaryKey: "SEARCH_API_KEY",
+    fields: [
+      { key: "SEARCH_PROVIDER_TYPE", label: "Provider Type", placeholder: "perplexity or tavily" },
+      { key: "SEARCH_API_KEY", label: "API Key", placeholder: "tvly-... or pplx-...", type: "password" },
+      { key: "TAVILY_API_KEY", label: "Tavily Key (Legacy)", placeholder: "tvly-...", type: "password" },
+    ]
+  },
+];
+
+export default function AdminSettingsPage() {
+  const { data: session, status } = useSession();
+  const [details, setDetails] = useState<Record<string, SettingInfo>>({});
+  const [formData, setFormData] = useState<Record<string, string>>({});
+  const [activeTab, setActiveTab] = useState<"providers" | "models" | "internals" | "users" | "health" | "analytics" | "audit-logs">("providers");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  // Model Management State
+  const [activeModels, setActiveModels] = useState<ModelOption[]>([]);
+  const [discoveredModels, setDiscoveredModels] = useState<DiscoveredModel[]>([]);
+  const [modelHealth, setModelHealth] = useState<Record<string, ModelHealthEntry>>({});
+  const [fetchingModels, setFetchingModels] = useState(false);
+  const [hasFetchedModelData, setHasFetchedModelData] = useState(false);
+
+  useEffect(() => {
+    if (status !== "authenticated") {
+      return;
+    }
+
+    loadSettings();
+  }, [status, session]);
+
+  async function loadSettings() {
+    try {
+      const res = await fetch("/api/settings");
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      
+      if (data.details) {
+        setDetails(data.details);
+        const initialForm: Record<string, string> = {};
+        
+        // Load all database-sourced settings into form
+        Object.entries(data.details).forEach(([key, info]) => {
+          const settingInfo = info as SettingInfo;
+          if (settingInfo.source === "db") {
+            initialForm[key] = settingInfo.value || "";
+          }
+        });
+
+        // Set default toggles if they weren't in DB
+        PROVIDERS.forEach(provider => {
+          if (provider.toggleName && !initialForm[provider.toggleName]) {
+            const keyInfo = data.details[provider.keyName];
+            const hasKey = keyInfo && keyInfo.source !== "none";
+            initialForm[provider.toggleName] = hasKey ? "true" : "false";
+          }
+        });
+
+        // Set default toggles for integrations
+        INTEGRATIONS.forEach(integration => {
+          if (integration.toggleName && !initialForm[integration.toggleName]) {
+            const keyInfo = integration.primaryKey ? data.details[integration.primaryKey] : null;
+            const hasKey = keyInfo && keyInfo.source !== "none";
+            initialForm[integration.toggleName] = hasKey ? "true" : "false";
+          }
+        });
+
+        if (data.details["CUSTOM_MODEL_LIST"]?.source === "db") {
+          initialForm["CUSTOM_MODEL_LIST"] = data.details["CUSTOM_MODEL_LIST"].value || "";
+        }
+
+        // Initialize title generation toggle
+        if (!initialForm["CHAT_ENABLE_TITLE_GENERATION"]) {
+          initialForm["CHAT_ENABLE_TITLE_GENERATION"] = data.details["CHAT_ENABLE_TITLE_GENERATION"]?.value || "false";
+        }
+
+        setFormData(initialForm);
+
+        if (data.details["CUSTOM_MODEL_LIST"]?.value) {
+          try {
+            setActiveModels(JSON.parse(data.details["CUSTOM_MODEL_LIST"].value));
+          } catch (error) {
+            console.error("Failed to parse model list", error);
+            setActiveModels([...MODELS]);
+          }
+        } else {
+          setActiveModels([...MODELS]);
+        }
+      }
+    } catch (error) {
+      console.error("Failed to load settings", error);
+      toast.error("Failed to load settings");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleSave() {
+    setSaving(true);
+    try {
+      const payload = { ...formData };
+      payload["CUSTOM_MODEL_LIST"] = JSON.stringify(activeModels);
+
+      const res = await fetch("/api/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) throw new Error();
+      toast.success("Settings saved successfully");
+      await loadSettings();
+    } catch (error) {
+      console.error("Failed to save settings", error);
+      toast.error("Failed to save settings");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function fetchModels() {
+    setFetchingModels(true);
+    try {
+      const res = await fetch("/api/admin/fetch-provider-models");
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      setDiscoveredModels(data.models || []);
+      setModelHealth(data.health?.models || {});
+      setHasFetchedModelData(true);
+      toast.success(`Discovered ${data.models?.length || 0} models from enabled providers`);
+    } catch (error) {
+      console.error("Failed to fetch models", error);
+      toast.error("Failed to fetch models from providers. Check your API keys.");
+    } finally {
+      setFetchingModels(false);
+    }
+  }
+
+  const updateField = (key: string, value: string) => {
+    setFormData(prev => ({ ...prev, [key]: value }));
+  };
+
+  const addModel = (discovered: DiscoveredModel) => {
+    const id = discovered.normalizedId;
+
+    if (activeModels.some(m => m.id === id)) {
+      toast.error("Model already in active list");
+      return;
+    }
+
+    const newModel: ModelOption = {
+      id,
+      label: discovered.name,
+      category: discovered.provider,
+      isPreset: false,
+      providerModelId: discovered.id,
+      capability: "medium"
+    };
+    setActiveModels([...activeModels, newModel]);
+  };
+
+  const removeModel = (id: string) => {
+    setActiveModels(activeModels.filter(m => m.id !== id));
+  };
+
+  const updateModelField = (id: string, updates: Partial<ModelOption>) => {
+    setActiveModels(activeModels.map(m => m.id === id ? { ...m, ...updates } : m));
+  };
+
+  useEffect(() => {
+    if (activeTab === "models" && !hasFetchedModelData && !fetchingModels) {
+      void fetchModels();
+    }
+  }, [activeTab, hasFetchedModelData, fetchingModels]);
+
+  const healthBadgeStyles: Record<ModelHealthEntry["status"], string> = {
+    healthy: "bg-emerald-500/10 text-emerald-600",
+    unknown: "bg-amber-500/10 text-amber-600",
+    unavailable: "bg-destructive/10 text-destructive",
+    disabled: "bg-slate-500/10 text-slate-600 dark:text-slate-300",
+  };
+
+  if (status === "loading" || loading) {
+    return <main className="mx-auto max-w-4xl p-6"><LoadingSkeleton lines={10} /></main>;
+  }
+
+  if (!(session?.user as { isAdmin?: boolean })?.isAdmin) {
+    return (
+      <main className="mx-auto max-w-4xl p-6 text-center">
+        <h1 className="text-2xl font-bold text-destructive">Unauthorized</h1>
+        <p className="mt-2">You do not have permission to access this page.</p>
+        <Link href="/" className="mt-4 inline-block text-primary underline">Go back home</Link>
+      </main>
+    );
+  }
+
+  return (
+    <main className="mx-auto max-w-4xl p-6 pb-20">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b pb-6">
+        <div>
+          <h1 className="font-[var(--font-accent)] text-3xl font-semibold tracking-tight">Admin Console</h1>
+          <p className="mt-1 text-muted-foreground">Configure your Complexity workspace.</p>
+        </div>
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="inline-flex h-10 items-center justify-center rounded-lg bg-primary px-6 text-sm font-medium text-primary-foreground shadow-sm transition-all hover:bg-primary/90 disabled:opacity-50 active:scale-95"
+        >
+          {saving ? "Saving..." : "Save Changes"}
+        </button>
+      </div>
+
+      <div className="mt-6 flex gap-1 rounded-xl bg-muted/50 p-1 w-fit">
+        <button
+          onClick={() => setActiveTab("providers")}
+          className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all ${
+            activeTab === "providers" ? "bg-background shadow-sm" : "text-muted-foreground hover:bg-background/50"
+          }`}
+        >
+          <Zap className="h-4 w-4" />
+          Providers & Keys
+        </button>
+        <button
+          onClick={() => setActiveTab("models")}
+          className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all ${
+            activeTab === "models" ? "bg-background shadow-sm" : "text-muted-foreground hover:bg-background/50"
+          }`}
+        >
+          <Settings2 className="h-4 w-4" />
+          Manage Models
+        </button>
+        <button
+          onClick={() => setActiveTab("internals")}
+          className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all ${
+            activeTab === "internals" ? "bg-background shadow-sm" : "text-muted-foreground hover:bg-background/50"
+          }`}
+        >
+          <SlidersHorizontal className="h-4 w-4" />
+          Internals
+        </button>
+        <button
+          onClick={() => setActiveTab("users")}
+          className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all ${
+            activeTab === "users" ? "bg-background shadow-sm" : "text-muted-foreground hover:bg-background/50"
+          }`}
+        >
+          <Users className="h-4 w-4" />
+          Users
+        </button>
+        <button
+          onClick={() => setActiveTab("health")}
+          className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all ${
+            activeTab === "health" ? "bg-background shadow-sm" : "text-muted-foreground hover:bg-background/50"
+          }`}
+        >
+          <Activity className="h-4 w-4" />
+          Health
+        </button>
+        <button
+          onClick={() => setActiveTab("analytics")}
+          className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all ${
+            activeTab === "analytics" ? "bg-background shadow-sm" : "text-muted-foreground hover:bg-background/50"
+          }`}
+        >
+          <BarChart3 className="h-4 w-4" />
+          Analytics
+        </button>
+        <button
+          onClick={() => setActiveTab("audit-logs")}
+          className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all ${
+            activeTab === "audit-logs" ? "bg-background shadow-sm" : "text-muted-foreground hover:bg-background/50"
+          }`}
+        >
+          <ScrollText className="h-4 w-4" />
+          Audit Log
+        </button>
+      </div>
+
+      {activeTab === "providers" ? (
+        <div className="mt-8 space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
+          {PROVIDERS.map((provider) => {
+            const keyInfo = details[provider.keyName] || { value: null, source: "none" };
+            return (
+              <section key={provider.id} className="rounded-2xl border bg-card p-6 shadow-xs transition-shadow hover:shadow-sm">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/5 text-primary">
+                      {provider.id === "perplexity" || provider.id === "search" ? <Zap className="h-5 w-5" /> : <ShieldCheck className="h-5 w-5" />}
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-bold">{provider.name}</h2>
+                      <p className="text-xs text-muted-foreground">{provider.description}</p>
+                    </div>
+                  </div>
+                  
+                {provider.toggleName && (
+                  <div className="flex items-center gap-2">
+                    {(() => {
+                      const isEnabled = formData[provider.toggleName!] === "true";
+                      
+                      return (
+                        <>
+                          <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/60">
+                            {isEnabled ? "Enabled" : "Disabled"}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => updateField(provider.toggleName!, isEnabled ? "false" : "true")}
+                            className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
+                              isEnabled ? "bg-primary" : "bg-muted"
+                            }`}
+                          >
+                            <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${isEnabled ? "translate-x-5" : "translate-x-0"}`} />
+                          </button>
+                        </>
+                      );
+                    })()}
+                  </div>
+                )}                </div>
+
+                <div className="mt-6 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label htmlFor={provider.keyName} className="text-sm font-semibold">{provider.id.includes("URL") ? "Base URL" : "API Key"}</label>
+                    {keyInfo.source === "env" && !formData[provider.keyName] && (
+                      <div className="flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-600">
+                        <Check className="h-3 w-3" /> SET VIA ENVIRONMENT
+                      </div>
+                    )}
+                    {keyInfo.source === "db" && (
+                      <div className="flex items-center gap-1.5 rounded-full bg-blue-500/10 px-2 py-0.5 text-[10px] font-bold text-blue-600">
+                        <ShieldCheck className="h-3 w-3" /> STORED IN DATABASE
+                      </div>
+                    )}
+                  </div>
+                  <input
+                    id={provider.keyName}
+                    type={provider.keyName.includes("KEY") ? "password" : "text"}
+                    className="w-full rounded-xl border bg-background/50 px-4 py-2.5 text-sm transition-all focus:border-primary focus:ring-4 focus:ring-primary/5 outline-hidden"
+                    placeholder={provider.placeholder}
+                    value={formData[provider.keyName] || ""}
+                    onChange={(e) => updateField(provider.keyName, e.target.value)}
+                  />
+                  <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                    <Info className="h-3 w-3" />
+                    {keyInfo.source === "env" && !formData[provider.keyName] 
+                      ? "Currently using the key from your .env file. Enter a value here to override it."
+                      : "Leave empty to fallback to environment variables."}
+                  </p>
+                </div>
+              </section>
+            );
+          })}
+
+          <div className="pt-8 border-t">
+            <h2 className="text-xl font-bold font-[var(--font-accent)] mb-1">External Integrations</h2>
+            <p className="text-sm text-muted-foreground mb-6">Configure OAuth and third-party services.</p>
+          </div>
+
+          {INTEGRATIONS.map((integration) => (
+            <section key={integration.id} className="rounded-2xl border bg-card p-6 shadow-xs transition-shadow hover:shadow-sm">
+              <div className="flex items-start justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/5 text-primary">
+                    <ShieldCheck className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-bold">{integration.name}</h2>
+                    <p className="text-xs text-muted-foreground">{integration.description}</p>
+                  </div>
+                </div>
+                {integration.toggleName && (
+                  <div className="flex items-center gap-2">
+                    {(() => {
+                      const isEnabled = formData[integration.toggleName!] === "true";
+                      return (
+                        <>
+                          <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/60">
+                            {isEnabled ? "Enabled" : "Disabled"}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => updateField(integration.toggleName!, isEnabled ? "false" : "true")}
+                            className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
+                              isEnabled ? "bg-primary" : "bg-muted"
+                            }`}
+                          >
+                            <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${isEnabled ? "translate-x-5" : "translate-x-0"}`} />
+                          </button>
+                        </>
+                      );
+                    })()}
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-6">
+                {integration.fields.map((field) => {
+                  const keyInfo = details[field.key] || { value: null, source: "none" };
+                  return (
+                    <div key={field.key} className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label htmlFor={field.key} className="text-sm font-semibold">{field.label}</label>
+                        {keyInfo.source === "env" && !formData[field.key] && (
+                          <div className="flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-600">
+                            <Check className="h-3 w-3" /> SET VIA ENVIRONMENT
+                          </div>
+                        )}
+                        {keyInfo.source === "db" && (
+                          <div className="flex items-center gap-1.5 rounded-full bg-blue-500/10 px-2 py-0.5 text-[10px] font-bold text-blue-600">
+                            <ShieldCheck className="h-3 w-3" /> STORED IN DATABASE
+                          </div>
+                        )}
+                      </div>
+                      <input
+                        id={field.key}
+                        type={(field.type as string) === "password" ? "password" : "text"}
+                        className="w-full rounded-xl border bg-background/50 px-4 py-2.5 text-sm transition-all focus:border-primary focus:ring-4 focus:ring-primary/5 outline-hidden"
+                        placeholder={field.placeholder}
+                        value={formData[field.key] || ""}
+                        onChange={(e) => updateField(field.key, e.target.value)}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          ))}
+        </div>
+      ) : activeTab === "models" ? (
+        <div className="mt-8 space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
+          <section className="rounded-2xl border bg-card p-6 shadow-xs">
+            <div className="flex items-center justify-between border-b pb-4 mb-6">
+              <div>
+                <h2 className="text-lg font-bold text-foreground">Active Model List</h2>
+                <p className="text-xs text-muted-foreground">Reorder and rename models. Drag to change the sequence in the dropdown.</p>
+              </div>
+              <button 
+                onClick={fetchModels}
+                disabled={fetchingModels}
+                className="flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-medium hover:bg-muted transition-colors disabled:opacity-50"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 ${fetchingModels ? "animate-spin" : ""}`} />
+                Fetch from Providers
+              </button>
+            </div>
+
+            <Reorder.Group axis="y" values={activeModels} onReorder={setActiveModels} className="space-y-2">
+              {activeModels.map((model) => (
+                <Reorder.Item 
+                  key={model.id} 
+                  value={model}
+                  className="group flex flex-col gap-3 rounded-xl border bg-background/50 p-4 shadow-2xs hover:shadow-sm transition-all"
+                >
+                  <div className="flex items-center gap-3">
+                    <GripVertical className="h-4 w-4 cursor-grab text-muted-foreground/40 group-active:cursor-grabbing" />
+                    {(() => {
+                      const health = modelHealth[model.id];
+                      return (
+                        <div className="flex-1 space-y-1">
+                          <div className="flex items-center gap-2">
+                            <input 
+                              type="text" 
+                              value={model.label} 
+                              onChange={(e) => updateModelField(model.id, { label: e.target.value })}
+                              className="bg-transparent text-sm font-semibold outline-hidden focus:text-primary"
+                              placeholder="Display Label"
+                            />
+                            <span className="rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">{model.category}</span>
+                            {health && (
+                              <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${healthBadgeStyles[health.status]}`}>
+                                {health.status}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[10px] font-mono text-muted-foreground/60">{model.id}</p>
+                        </div>
+                      );
+                    })()}
+                    <button 
+                      onClick={() => removeModel(model.id)}
+                      className="rounded-lg p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors md:opacity-0 md:group-hover:opacity-100"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+
+                  <div className="ml-7 grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-muted/30">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">Provider Model ID</label>
+                      <input 
+                        type="text" 
+                        value={model.providerModelId || ""} 
+                        onChange={(e) => updateModelField(model.id, { providerModelId: e.target.value })}
+                        className="w-full bg-muted/30 rounded-md px-2 py-1 text-xs font-mono outline-hidden focus:ring-1 focus:ring-primary/30"
+                        placeholder={model.id.split("/").pop()}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">Capability Tier</label>
+                      <select 
+                        value={model.capability || "medium"} 
+                        onChange={(e) => updateModelField(model.id, { capability: e.target.value as ModelOption["capability"] })}
+                        className="w-full bg-muted/30 rounded-md px-2 py-1 text-xs outline-hidden focus:ring-1 focus:ring-primary/30"
+                      >
+                        <option value="high">High (Reasoning/Complex)</option>
+                        <option value="medium">Medium (Standard)</option>
+                        <option value="low">Low (Fast/Simple)</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {modelHealth[model.id]?.reason && (
+                    <p className="ml-7 text-[11px] text-destructive/80 font-medium">{modelHealth[model.id].reason}</p>
+                  )}
+                </Reorder.Item>
+              ))}
+              {activeModels.length === 0 && (
+                <div className="flex flex-col items-center justify-center py-12 text-center border-2 border-dashed rounded-2xl bg-muted/20">
+                  <Settings2 className="h-8 w-8 text-muted-foreground/30 mb-2" />
+                  <p className="text-sm text-muted-foreground">No models configured. Fetch models or add manually.</p>
+                </div>
+              )}
+            </Reorder.Group>
+          </section>
+
+          {discoveredModels.length > 0 && (
+            <section className="rounded-2xl border bg-card p-6 shadow-xs animate-in zoom-in-95 duration-200">
+              <h2 className="text-lg font-bold text-foreground mb-4">Discovered Models</h2>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {discoveredModels.map((m) => {
+                  const isAdded = activeModels.some(am => am.id === m.normalizedId);
+                  
+                  return (
+                    <div key={m.id + m.provider} className="flex items-center justify-between rounded-xl border p-3 bg-muted/10">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold">{m.name}</p>
+                        <p className="text-[10px] text-muted-foreground">{m.provider}</p>
+                        <p className="text-[10px] font-mono text-muted-foreground/70">{m.normalizedId}</p>
+                      </div>
+                      <button
+                        onClick={() => addModel(m)}
+                        disabled={isAdded}
+                        className={`ml-2 rounded-lg p-1.5 transition-colors ${isAdded ? "text-emerald-500 bg-emerald-500/10 cursor-default" : "text-primary hover:bg-primary/10"}`}
+                      >
+                        {isAdded ? <Check className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          )}
+        </div>
+      ) : activeTab === "users" ? (
+        <div className="mt-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
+          <section className="rounded-2xl border bg-card p-6 shadow-xs">
+            <UserManagement />
+          </section>
+        </div>
+      ) : activeTab === "analytics" ? (
+        <div className="mt-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
+          <AnalyticsDashboard />
+        </div>
+      ) : activeTab === "internals" ? (
+        <div className="mt-8 space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
+          <section className="rounded-2xl border bg-card p-6 shadow-xs">
+            <h2 className="text-lg font-bold text-foreground mb-1">Internal Model Selection</h2>
+            <p className="text-sm text-muted-foreground mb-6">Choose which models power internal operations. These must be enabled providers.</p>
+            <div className="grid gap-5 sm:grid-cols-2">
+              {[
+                { key: "MEMORY_EXTRACTION_MODEL", label: "Memory Extraction Model", description: "Used to extract durable facts from conversations. A fast cheap model is recommended." },
+                { key: "CHAT_TITLING_MODEL", label: "Thread Titling Model", description: "Used to auto-generate thread titles (requires title generation to be enabled)." },
+                { key: "CHAT_ROLE_INSTRUCTION_MODEL", label: "Role Instruction Model", description: "Used to generate expanded role system prompts from short descriptions." },
+              ].map(({ key, label, description }) => (
+                <div key={key} className="space-y-1.5">
+                  <label className="block text-sm font-semibold text-foreground">{label}</label>
+                  <p className="text-xs text-muted-foreground mb-1">{description}</p>
+                  <input
+                    type="text"
+                    value={formData[key] || details[key]?.value || ""}
+                    onChange={(e) => setFormData(prev => ({ ...prev, [key]: e.target.value }))}
+                    placeholder="e.g. anthropic/claude-haiku-4-5"
+                    className="w-full bg-muted/30 rounded-xl px-3 py-2 text-sm font-mono outline-hidden focus:ring-2 focus:ring-primary/20 border border-transparent focus:border-primary/20"
+                  />
+                  {details[key]?.source === "env" && (
+                    <p className="text-[10px] text-amber-600">Currently set via environment variable. Save to override with DB value.</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <section className="rounded-2xl border bg-card p-6 shadow-xs">
+            <h2 className="text-lg font-bold text-foreground mb-1">Behaviour Toggles</h2>
+            <p className="text-sm text-muted-foreground mb-6">Enable or disable optional features.</p>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between rounded-xl border p-4 bg-muted/10">
+                <div>
+                  <p className="text-sm font-semibold">Auto Thread Titles</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Automatically generate a title for new threads after the first reply.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setFormData(prev => ({ ...prev, CHAT_ENABLE_TITLE_GENERATION: prev.CHAT_ENABLE_TITLE_GENERATION === "true" ? "false" : "true" }))}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${formData.CHAT_ENABLE_TITLE_GENERATION === "true" ? "bg-primary" : "bg-muted-foreground/30"}`}
+                >
+                  <span className={`inline-block h-4 w-4 rounded-full bg-white shadow-sm transform transition-transform ${formData.CHAT_ENABLE_TITLE_GENERATION === "true" ? "translate-x-6" : "translate-x-1"}`} />
+                </button>
+              </div>
+            </div>
+          </section>
+
+          <section className="rounded-2xl border bg-card p-6 shadow-xs">
+            <h2 className="text-lg font-bold text-foreground mb-1">Context & Rate Limits</h2>
+            <p className="text-sm text-muted-foreground mb-6">Per-user daily usage caps and context window size. Changes take effect for new requests.</p>
+            <div className="grid gap-5 sm:grid-cols-2">
+              {[
+                { key: "CHAT_MAX_CONTEXT_MESSAGES", label: "Max Context Messages", description: "Max messages kept in context per request (default: 20)." },
+                { key: "CHAT_DAILY_INPUT_TOKEN_BUDGET", label: "Daily Input Token Budget", description: "Per-user daily input token limit before model downgrade." },
+                { key: "CHAT_DAILY_OUTPUT_TOKEN_BUDGET", label: "Daily Output Token Budget", description: "Per-user daily output token limit before model downgrade." },
+                { key: "CHAT_DAILY_SEARCH_BUDGET", label: "Daily Search Budget", description: "Max web searches per user per day before disabling." },
+                { key: "CHAT_DAILY_FETCH_BUDGET", label: "Daily Fetch Budget", description: "Max URL fetches per user per day before disabling." },
+              ].map(({ key, label, description }) => (
+                <div key={key} className="space-y-1.5">
+                  <label className="block text-sm font-semibold text-foreground">{label}</label>
+                  <p className="text-xs text-muted-foreground mb-1">{description}</p>
+                  <input
+                    type="number"
+                    min="1"
+                    value={formData[key] || details[key]?.value || ""}
+                    onChange={(e) => setFormData(prev => ({ ...prev, [key]: e.target.value }))}
+                    className="w-full bg-muted/30 rounded-xl px-3 py-2 text-sm font-mono outline-hidden focus:ring-2 focus:ring-primary/20 border border-transparent focus:border-primary/20"
+                  />
+                </div>
+              ))}
+            </div>
+          </section>
+        </div>
+      ) : activeTab === "audit-logs" ? (
+        <div className="mt-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
+          <section className="rounded-2xl border bg-card p-6 shadow-xs">
+            <AuditLog />
+          </section>
+        </div>
+      ) : (
+        <div className="mt-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
+          <HealthDashboard />
+        </div>
+      )}
+    </main>
+  );
+}

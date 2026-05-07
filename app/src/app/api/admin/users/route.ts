@@ -1,5 +1,6 @@
 import { eq, ilike, or, desc, sql } from "drizzle-orm";
 import { auth } from "@/auth";
+import { requireAdmin } from "@/lib/auth-server";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 import { ApiResponse } from "@/lib/api-response";

@@ -36,3 +36,4 @@ app/local.db
 app/hover-overlap-check-*.png
 Screenshot *.png
 sticky-*.png
+backup_pre_github_sync/

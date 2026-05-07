@@ -25,6 +25,10 @@ export const users = pgTable(
     theme: varchar("theme", { length: 50 }),
     memoryEnabled: boolean("memory_enabled").default(true),
     defaultModel: varchar("default_model", { length: 100 }),
+    defaultSshUser: varchar("default_ssh_user", { length: 50 }).default("root"),
+    autoApproveReadOnly: boolean("auto_approve_read_only").default(false),
+    streamingStyle: varchar("streaming_style", { length: 20 }).default("typewriter"),
+    streamingSpeed: integer("streaming_speed").default(3),
     isAdmin: boolean("is_admin").default(false).notNull(),
     totpSecret: text("totp_secret"),
     totpEnabled: boolean("totp_enabled").default(false).notNull(),
@@ -182,14 +186,15 @@ export const threads = pgTable(
       .references(() => users.id, { onDelete: "cascade" }),
     roleId: text("role_id").references(() => roles.id, { onDelete: "set null" }),
     model: varchar("model", { length: 50 }).notNull().default("anthropic/claude-4-6-sonnet-latest"),
+    compareModels: jsonb("compare_models").$type<string[]>(),
     parentThreadId: text("parent_thread_id"),
     branchPointMessageId: text("branch_point_message_id"),
     systemPrompt: text("system_prompt"),
     pinned: boolean("pinned").notNull().default(false),
-    shareToken: text("share_token"),
     tags: jsonb("tags").$type<string[]>().notNull().default([]),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    shareToken: text("share_token"),
   },
   (table) => [index("threads_user_updated_idx").on(table.userId, table.updatedAt)],
 );
@@ -213,7 +218,10 @@ export const messages = pgTable(
     attachments: jsonb("attachments"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (table) => [index("messages_thread_created_idx").on(table.threadId, table.createdAt)],
+  (table) => [
+    index("messages_thread_created_idx").on(table.threadId, table.createdAt),
+    index("messages_content_fts_idx").using("gin", sql`to_tsvector('english', ${table.content})`),
+  ],
 );
 
 export const memories = pgTable(
@@ -291,6 +299,7 @@ export const usersRelations = relations(users, ({ many }) => ({
   roleAccess: many(roleAccess),
   auditLogs: many(auditLogs),
   webhooks: many(webhooks),
+  prompts: many(prompts),
 }));
 
 export const threadsRelations = relations(threads, ({ one, many }) => ({
@@ -396,3 +405,27 @@ export const webhookDeliveriesRelations = relations(webhookDeliveries, ({ one })
     references: [webhooks.id],
   }),
 }));
+
+export const prompts = pgTable(
+  "prompts",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    title: varchar("title", { length: 100 }).notNull(),
+    content: text("content").notNull(),
+    isSystemPrompt: boolean("is_system_prompt").notNull().default(false),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("prompts_user_idx").on(table.userId)],
+);
+
+
+export const promptsRelations = relations(prompts, ({ one }) => ({
+  user: one(users, {
+    fields: [prompts.userId],
+    references: [users.id],
+  }),
+}));
+

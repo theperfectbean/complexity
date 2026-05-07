@@ -1,0 +1,83 @@
+"use client";
+
+import { useEffect, useMemo, useState, useRef } from "react";
+import { SlashCommand } from "@/plugins/commandRegistry";
+import { cn } from "@/lib/utils";
+
+interface CommandMenuProps {
+  query: string;
+  commands: SlashCommand[];
+  onSelect: (command: SlashCommand) => void;
+  onClose: () => void;
+}
+
+export function CommandMenu({ query, commands, onSelect, onClose }: CommandMenuProps) {
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const onCloseRef = useRef(onClose);
+  useEffect(() => { onCloseRef.current = onClose; });
+  const activeIndex = useMemo(
+    () => Math.min(selectedIndex, Math.max(commands.length - 1, 0)),
+    [commands.length, selectedIndex],
+  );
+
+  useEffect(() => {
+    if (commands.length === 0 && query.length > 0) {
+      onCloseRef.current();
+    }
+  }, [commands, query]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (commands.length === 0) return;
+
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setSelectedIndex((i) => (i + 1) % commands.length);
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setSelectedIndex((i) => (i - 1 + commands.length) % commands.length);
+      } else if (e.key === "Enter" || e.key === "Tab") {
+        e.preventDefault();
+        const selected = commands[activeIndex];
+        if (selected) {
+          onSelect(selected);
+        }
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        onCloseRef.current();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown, true);
+    return () => window.removeEventListener("keydown", handleKeyDown, true);
+  }, [activeIndex, commands, onSelect]);
+
+  if (commands.length === 0) return null;
+
+  return (
+    <div
+      ref={menuRef}
+      className="absolute z-50 min-w-[240px] overflow-hidden rounded-xl border bg-popover text-popover-foreground shadow-xl"
+      style={{ bottom: "100%", left: 0, marginBottom: "8px" }}
+    >
+      <div className="p-1">
+        {commands.map((cmd, index) => (
+          <div
+            key={cmd.id}
+            onClick={() => onSelect(cmd)}
+            className={cn(
+              "flex cursor-pointer items-center justify-between rounded-lg px-3 py-2 text-sm",
+               index === activeIndex ? "bg-primary text-primary-foreground" : "hover:bg-muted"
+             )}
+           >
+            <div className="flex flex-col">
+              <span className="font-semibold">/{cmd.trigger}</span>
+              <span className="text-xs opacity-80">{cmd.label} - {cmd.description}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}

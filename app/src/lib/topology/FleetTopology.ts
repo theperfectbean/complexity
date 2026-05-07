@@ -1,10 +1,7 @@
 /**
  * Authoritative Fleet Topology Model
- *
+ * 
  * Single source of truth for all homelab infrastructure.
- * Updated: May 2026 — migrated from Incus cluster (nas/media/ai)
- *                      to 3-node Proxmox cluster (node01/02/03)
- *
  * Used by:
  * - /console UI (service pages, health checks)
  * - /api/agent/unified backend (routing, policies, auditability)
@@ -12,7 +9,7 @@
  * - Tools (execution context, SSH paths, API endpoints)
  */
 
-export type NodeName = 'node01' | 'node02' | 'node03';
+export type NodeName = 'nas' | 'media' | 'ai';
 export type ContainerRole = 'network' | 'media' | 'audio' | 'downloads' | 'app' | 'ai' | 'devops' | 'agent';
 export type ProtocolType = 'http' | 'https' | 'tcp' | 'ws';
 export type AuthType = 'api-key' | 'session-cookie' | 'bearer' | 'basic' | 'none';
@@ -21,74 +18,84 @@ export interface ServiceEndpoint {
   name: string;
   port: number;
   protocol: ProtocolType;
-  path?: string;
+  path?: string;       // health check or API path
   authType?: AuthType;
-  envKey?: string;
+  envKey?: string;     // .env key for credentials
 }
 
 export interface FleetNode {
   name: NodeName;
-  ip: string;
-  tailscaleIp: string;
+  ip: string;              // LAN IP (primary)
+  tailscaleIp: string;     // Tailscale IP
   os: string;
-  pveVersion: string;
-  sshUser: string;
-  role: string;
+  incusVersion: string;
+  bridge: string;          // Network bridge for containers ('lanbr0' or 'macvlannet')
+  sshUser: string;         // Default SSH user
+  role: string;            // Human-readable role
 }
 
 export interface FleetContainer {
   name: string;
-  ctid: number;
-  ip: string;
+  ip: string;              // LAN IP
   node: NodeName;
   purpose: string;
   tags: ContainerRole[];
   services: ServiceEndpoint[];
-  sshReachable: boolean;
-  execMethod?: 'pct' | 'ssh';
+  sshReachable: boolean;   // Can this container be SSH'd into from complexity container?
+  jumpHost?: NodeName;     // If not directly reachable, jump through this node (e.g., 'nas')
+  // Execution context for tools
+  execMethod?: 'incus' | 'ssh';  // How to execute commands: 'incus exec' or 'ssh'
 }
 
+/**
+ * Cluster nodes
+ */
 export const FLEET_NODES: FleetNode[] = [
   {
-    name: 'node01',
-    ip: '192.168.0.201',
-    tailscaleIp: '100.93.61.101',
-    os: 'Proxmox VE',
-    pveVersion: '8.x',
-    sshUser: 'root',
-    role: 'Media host — Plex, audio, ingestion, arr stack',
-  },
-  {
-    name: 'node02',
+    name: 'nas',
     ip: '192.168.0.202',
-    tailscaleIp: '100.87.167.68',
-    os: 'Proxmox VE',
-    pveVersion: '8.x',
+    tailscaleIp: '100.94.25.108',
+    os: 'Debian 13',
+    incusVersion: '6.0.4',
+    bridge: 'lanbr0',
     sshUser: 'root',
-    role: 'Utility host + authoritative storage — proxy, complexity',
+    role: 'Storage, DNS, reverse proxy, git — primary jump host',
   },
   {
-    name: 'node03',
-    ip: '192.168.0.203',
-    tailscaleIp: '100.107.126.83',
-    os: 'Proxmox VE',
-    pveVersion: '8.x',
+    name: 'media',
+    ip: '192.168.0.201',
+    tailscaleIp: '100.126.26.57',
+    os: 'Debian 13',
+    incusVersion: '6.0.4',
+    bridge: 'macvlannet',
     sshUser: 'root',
-    role: 'Infrastructure/admin host — DNS, ai-tools, docs; Tailscale subnet router',
+    role: 'Media services stack (Plex, *arr, downloads)',
+  },
+  {
+    name: 'ai',
+    ip: '192.168.0.204',
+    tailscaleIp: '100.65.14.34',
+    os: 'Debian 13',
+    incusVersion: '6.23',
+    bridge: 'macvlannet',
+    sshUser: 'root',
+    role: 'LLM inference and agent control plane',
   },
 ];
 
+/**
+ * All containers across the fleet
+ */
 export const FLEET_CONTAINERS: FleetContainer[] = [
-  // ── node03 (infra/admin) ──────────────────────────────────────────────────
+  // ── NAS node ──────────────────────────────────────────────────────────────
   {
     name: 'dns',
-    ctid: 100,
     ip: '192.168.0.53',
-    node: 'node03',
+    node: 'nas',
     purpose: 'Technitium DNS v14 — internal.lan zone + ad-blocking',
     tags: ['network'],
     sshReachable: true,
-    execMethod: 'ssh',
+    execMethod: 'incus',
     services: [
       {
         name: 'Technitium UI',
@@ -101,45 +108,13 @@ export const FLEET_CONTAINERS: FleetContainer[] = [
     ],
   },
   {
-    name: 'ai-tools',
-    ctid: 103,
-    ip: '192.168.0.200',
-    node: 'node03',
-    purpose: 'Sysadmin workstation — Copilot CLI, ansible, gh',
-    tags: ['devops', 'agent'],
-    sshReachable: true,
-    execMethod: 'ssh',
-    services: [],
-  },
-  {
-    name: 'docs',
-    ctid: 108,
-    ip: '192.168.0.210',
-    node: 'node03',
-    purpose: 'MkDocs infrastructure documentation site',
-    tags: ['devops'],
-    sshReachable: true,
-    execMethod: 'ssh',
-    services: [
-      {
-        name: 'Docs',
-        port: 8001,
-        protocol: 'http',
-        authType: 'none',
-      },
-    ],
-  },
-
-  // ── node02 (utility + storage) ────────────────────────────────────────────
-  {
     name: 'proxy',
-    ctid: 101,
     ip: '192.168.0.100',
-    node: 'node02',
+    node: 'nas',
     purpose: 'Caddy reverse proxy — all *.internal.lan web UIs',
     tags: ['network'],
     sshReachable: true,
-    execMethod: 'ssh',
+    execMethod: 'incus',
     services: [
       {
         name: 'Caddy Admin',
@@ -151,114 +126,41 @@ export const FLEET_CONTAINERS: FleetContainer[] = [
     ],
   },
   {
-    name: 'complexity',
-    ctid: 102,
-    ip: '192.168.0.105',
-    node: 'node02',
-    purpose: 'Complexity AI chat app — agent control plane',
-    tags: ['app', 'ai', 'agent'],
-    sshReachable: false,
-    execMethod: 'ssh',
+    name: 'forgejo',
+    ip: '192.168.0.109',
+    node: 'nas',
+    purpose: 'Forgejo git server + docs (port 8001)',
+    tags: ['devops'],
+    sshReachable: true,
+    execMethod: 'incus',
     services: [
       {
-        name: 'Complexity App',
-        port: 3002,
+        name: 'Forgejo',
+        port: 3000,
         protocol: 'http',
-        path: '/api/health',
-        authType: 'session-cookie',
+        path: '/api/v1/version',
+        authType: 'api-key',
+        envKey: 'FORGEJO_TOKEN',
+      },
+      {
+        name: 'Docs',
+        port: 8001,
+        protocol: 'http',
+        authType: 'none',
       },
     ],
   },
 
-  // ── node01 (media) ────────────────────────────────────────────────────────
-  {
-    name: 'plex',
-    ctid: 104,
-    ip: '192.168.0.60',
-    node: 'node01',
-    purpose: 'Plex Media Server',
-    tags: ['media'],
-    sshReachable: true,
-    execMethod: 'ssh',
-    services: [
-      {
-        name: 'Plex',
-        port: 32400,
-        protocol: 'http',
-        path: '/identity',
-        authType: 'api-key',
-        envKey: 'PLEX_TOKEN',
-      },
-    ],
-  },
-  {
-    name: 'audio-stack',
-    ctid: 105,
-    ip: '192.168.0.104',
-    node: 'node01',
-    purpose: 'Audiobookshelf + MAM Audiofinder + Mousehole',
-    tags: ['audio', 'media'],
-    sshReachable: true,
-    execMethod: 'ssh',
-    services: [
-      {
-        name: 'Audiobookshelf',
-        port: 13378,
-        protocol: 'http',
-        path: '/api/ping',
-        authType: 'bearer',
-        envKey: 'AUDIOBOOKSHELF_TOKEN',
-      },
-      {
-        name: 'MAM Audiofinder',
-        port: 8008,
-        protocol: 'http',
-        authType: 'none',
-      },
-      {
-        name: 'Mousehole',
-        port: 5010,
-        protocol: 'http',
-        authType: 'none',
-      },
-    ],
-  },
-  {
-    name: 'ingestion-stack',
-    ctid: 106,
-    ip: '192.168.0.112',
-    node: 'node01',
-    purpose: 'qBittorrent + SABnzbd',
-    tags: ['downloads'],
-    sshReachable: true,
-    execMethod: 'ssh',
-    services: [
-      {
-        name: 'qBittorrent',
-        port: 8080,
-        protocol: 'http',
-        path: '/api/v2/app/version',
-        authType: 'session-cookie',
-        envKey: 'QBIT_PASSWORD',
-      },
-      {
-        name: 'SABnzbd',
-        port: 8081,
-        protocol: 'http',
-        authType: 'api-key',
-        envKey: 'SABNZBD_API_KEY',
-      },
-    ],
-  },
+  // ── Media node ────────────────────────────────────────────────────────────
   {
     name: 'arrstack',
-    ctid: 107,
     ip: '192.168.0.103',
-    node: 'node01',
+    node: 'media',
     purpose: 'Sonarr, Radarr, Prowlarr, Bazarr, Overseerr, Unmanic',
     tags: ['media', 'downloads'],
     sshReachable: true,
-    execMethod: 'ssh',
+    jumpHost: 'nas', // macvlan: use nas as jump
+    execMethod: 'incus',
     services: [
       {
         name: 'Sonarr',
@@ -309,7 +211,141 @@ export const FLEET_CONTAINERS: FleetContainer[] = [
       },
     ],
   },
+  {
+    name: 'ingestion-stack',
+    ip: '192.168.0.112',
+    node: 'media',
+    purpose: 'qBittorrent + MAM monitor/manager',
+    tags: ['downloads'],
+    sshReachable: true,
+    jumpHost: 'nas',
+    execMethod: 'incus',
+    services: [
+      {
+        name: 'qBittorrent',
+        port: 8080,
+        protocol: 'http',
+        path: '/api/v2/app/version',
+        authType: 'session-cookie',
+        envKey: 'QBIT_PASSWORD',
+      },
+    ],
+  },
+  {
+    name: 'audio-stack',
+    ip: '192.168.0.104',
+    node: 'media',
+    purpose: 'Audiobookshelf + audiofinder + mousehole',
+    tags: ['audio', 'media'],
+    sshReachable: true,
+    jumpHost: 'nas',
+    execMethod: 'incus',
+    services: [
+      {
+        name: 'Audiobookshelf',
+        port: 13378,
+        protocol: 'http',
+        path: '/api/ping',
+        authType: 'bearer',
+        envKey: 'AUDIOBOOKSHELF_TOKEN',
+      },
+    ],
+  },
+  {
+    name: 'plex',
+    ip: '192.168.0.60',
+    node: 'media',
+    purpose: 'Plex Media Server',
+    tags: ['media'],
+    sshReachable: true,
+    jumpHost: 'nas',
+    execMethod: 'incus',
+    services: [
+      {
+        name: 'Plex',
+        port: 32400,
+        protocol: 'http',
+        path: '/identity',
+        authType: 'api-key',
+        envKey: 'PLEX_TOKEN',
+      },
+    ],
+  },
+
+  // ── AI node ───────────────────────────────────────────────────────────────
+  {
+    name: 'cli-tools',
+    ip: '192.168.0.200',
+    node: 'ai',
+    purpose: 'Sysadmin workstation — Copilot CLI, ansible, gh',
+    tags: ['devops', 'agent'],
+    sshReachable: true,
+    jumpHost: 'nas',
+    execMethod: 'incus',
+    services: [],
+  },
+  {
+    name: 'complexity',
+    ip: '192.168.0.105',
+    node: 'ai',
+    purpose: 'Complexity AI chat app — agent control plane',
+    tags: ['app', 'ai', 'agent'],
+    sshReachable: false, // Running inside this container
+    execMethod: 'incus',
+    services: [
+      {
+        name: 'Complexity App',
+        port: 3000,
+        protocol: 'http',
+        path: '/api/health',
+        authType: 'session-cookie',
+      },
+    ],
+  },
+  {
+    name: 'ollama',
+    ip: '192.168.0.106',
+    node: 'ai',
+    purpose: 'Ollama LLM inference (deepseek-r1:8b, qwen3:14b, qwen3.5:9b, gemma4)',
+    tags: ['ai'],
+    sshReachable: true,
+    jumpHost: 'nas',
+    execMethod: 'incus',
+    services: [
+      {
+        name: 'Ollama API',
+        port: 11434,
+        protocol: 'http',
+        path: '/api/version',
+        authType: 'none',
+      },
+    ],
+  },
+  {
+    name: 'litellm',
+    ip: '192.168.0.107',
+    node: 'ai',
+    purpose: 'LiteLLM proxy — OpenAI-compatible gateway to Ollama',
+    tags: ['ai'],
+    sshReachable: true,
+    jumpHost: 'nas',
+    execMethod: 'incus',
+    services: [
+      {
+        name: 'LiteLLM Proxy',
+        port: 4000,
+        protocol: 'http',
+        path: '/health',
+        authType: 'bearer',
+        envKey: 'LITELLM_MASTER_KEY',
+      },
+    ],
+  },
 ];
+
+/**
+ * Lookup functions
+ */
 
 export function getContainer(name: string): FleetContainer | undefined {
   return FLEET_CONTAINERS.find((c) => c.name === name);
@@ -327,13 +363,24 @@ export function getContainersByTag(tag: ContainerRole): FleetContainer[] {
   return FLEET_CONTAINERS.filter((c) => c.tags.includes(tag));
 }
 
+/**
+ * Get SSH command to reach a container
+ * Accounts for macvlan host isolation and jump hosts
+ */
 export function getSshCommand(container: FleetContainer, command: string): string {
-  if (!container.sshReachable) {
-    return `# Cannot SSH to ${container.name} (self)`;
+  const target = `root@${container.ip}`;
+
+  if (!container.sshReachable || container.jumpHost) {
+    const jumpNode = container.jumpHost || 'nas';
+    return `ssh -J root@${getNode(jumpNode)?.ip} ${target} "${command}"`;
   }
-  return `ssh root@${container.ip} "${command}"`;
+
+  return `ssh ${target} "${command}"`;
 }
 
+/**
+ * Validation: check that all containers reference valid nodes
+ */
 export function validateTopology(): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
   const nodeNames = new Set(FLEET_NODES.map((n) => n.name));
@@ -341,6 +388,9 @@ export function validateTopology(): { valid: boolean; errors: string[] } {
   for (const container of FLEET_CONTAINERS) {
     if (!nodeNames.has(container.node)) {
       errors.push(`Container ${container.name} references invalid node ${container.node}`);
+    }
+    if (container.jumpHost && !nodeNames.has(container.jumpHost)) {
+      errors.push(`Container ${container.name} references invalid jumpHost ${container.jumpHost}`);
     }
   }
 

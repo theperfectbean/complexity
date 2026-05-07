@@ -1,5 +1,6 @@
+import { logger } from "@/lib/logger";
 import { generateText } from "ai";
-import { getLanguageModel } from "@/lib/llm";
+import { getLanguageModel, getProviderRequestOptions } from "@/lib/llm";
 import { getApiKeys } from "@/lib/settings";
 import { runtimeConfig } from "../config";
 import { extractJsonObject } from "../extraction-utils";
@@ -71,7 +72,6 @@ function shouldExtractMemoriesFromTurn(userMessage: string, assistantMessage: st
     "for future reference",
     "always",
     "never",
-    "use ",
     "don't use ",
   ];
 
@@ -136,11 +136,13 @@ export async function extractMemories({
   
   const keys = await getApiKeys();
   const model = await getLanguageModel(runtimeConfig.memory.extractionModel, keys);
+  const { providerOptions } = await getProviderRequestOptions(runtimeConfig.memory.extractionModel);
 
   const { text: raw } = await generateText({
     model,
     system: runtimeConfig.memory.extractionInstructions,
     prompt: `Existing memories:\n${JSON.stringify(existingMemories)}\n\nUser:\n${userMessage}\n\nAssistant:\n${assistantMessage}`,
+    providerOptions,
   });
 
   const parsed = extractJsonObject(raw) ?? {};
@@ -232,7 +234,7 @@ export async function saveExtractedMemories(params: {
           const { getEmbeddings } = await import("@/lib/rag");
           embeddings = await getEmbeddings(candidates);
         } catch (error) {
-          console.error("[Memory] Failed to generate embeddings for auto-extracted memories:", error);
+          logger.error({ err: error }, "[Memory] Failed to generate embeddings for auto-extracted memories:");
         }
 
         // Semantic deduplication: skip candidates too similar to existing memories
@@ -246,15 +248,7 @@ export async function saveExtractedMemories(params: {
           runtimeConfig.memory.dedupThreshold,
         );
 
-        // Also include any candidates that had no embedding (couldn't embed → insert anyway)
-        const noEmbedding = candidates
-          .filter((_, i) => !embeddings[i] || embeddings[i].length === 0)
-          .map((content) => ({ content, embedding: null as number[] | null }));
-
-        const insertList = [
-          ...dedupedByEmbedding,
-          ...noEmbedding,
-        ];
+        const insertList = dedupedByEmbedding;
 
         if (insertList.length > 0) {
           await MemoryStore.insertMemories(userId, threadId, insertList, roleId);

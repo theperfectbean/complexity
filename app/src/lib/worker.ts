@@ -1,9 +1,9 @@
-import { Worker, Job } from "bullmq";
+import { Worker, Job, Queue } from "bullmq";
 import { env } from "./env";
 import { logger } from "./logger";
 import { db } from "./db";
-import { chunks, documents, webhookDeliveries } from "./db/schema";
 import { eq } from "drizzle-orm";
+import { chunks, documents, webhookDeliveries, webhooks } from "./db/schema";
 import { createId } from "./db/cuid";
 import { extractTextFromFile, type DocumentFileLike } from "./documents";
 import { chunkText, getEmbeddings } from "./rag";
@@ -172,7 +172,10 @@ export function startWebhookWorker() {
   const worker = new Worker(
     "webhooks",
     async (job: Job) => {
-      const { webhookId, url, secret, eventType, eventId, payload } = job.data;
+      const { webhookId, eventType, eventId, payload } = job.data;
+      const [hook] = await db.select({ url: webhooks.url, secret: webhooks.secret }).from(webhooks).where(eq(webhooks.id, webhookId)).limit(1);
+      if (!hook) throw new Error("Webhook not found or deleted: " + webhookId);
+      const { url, secret } = hook;
       const log = logger.child({ webhookId, eventId, eventType });
       const startTime = Date.now();
 
@@ -186,7 +189,8 @@ export function startWebhookWorker() {
       });
 
       await assertSafeWebhookUrl(url);
-      const signature = signWebhookPayload(body, decryptWebhookSecret(secret));
+      const ts = Date.now();
+      const { signature, timestamp: sigTimestamp } = signWebhookPayload(body, decryptWebhookSecret(secret), ts);
 
       try {
         const response = await fetch(url, {
@@ -195,6 +199,7 @@ export function startWebhookWorker() {
           headers: {
             "Content-Type": "application/json",
             "X-Complexity-Signature": signature,
+            "X-Complexity-Timestamp": sigTimestamp.toString(),
             "X-Complexity-Event": eventType,
           },
           body,
@@ -243,6 +248,46 @@ export function startWebhookWorker() {
       }
     },
     { connection, concurrency: 5 }
+  );
+
+  return worker;
+}
+
+/**
+ * R8: Audit log retention cleanup.
+ * Runs daily, deletes audit_logs older than AUDIT_LOG_RETENTION_DAYS (default 90).
+ */
+export function startAuditLogCleanupWorker() {
+  if (!connection) {
+    logger.error({}, "Redis URL not available, cannot start audit cleanup worker");
+    return;
+  }
+
+  const RETENTION_DAYS = parseInt(process.env.AUDIT_LOG_RETENTION_DAYS || "90", 10);
+
+  // Schedule the cleanup job to run every 24h
+  const queue = new Queue("audit-cleanup", { connection });
+  queue.add(
+    "cleanup",
+    { retentionDays: RETENTION_DAYS },
+    {
+      repeat: { every: 24 * 60 * 60 * 1000 },
+      removeOnComplete: true,
+    }
+  ).catch(() => {}); // Fire-and-forget scheduling
+
+  const worker = new Worker(
+    "audit-cleanup",
+    async () => {
+      const cutoff = new Date(Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000);
+      const { lt } = await import("drizzle-orm");
+      const { auditLogs } = await import("./db/schema");
+      const result = await db.delete(auditLogs).where(lt(auditLogs.createdAt, cutoff));
+      logger.info({ retentionDays: RETENTION_DAYS, cutoff }, "Audit log cleanup completed");
+      return result;
+    },
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    { connection: connection!, concurrency: 1 }
   );
 
   return worker;

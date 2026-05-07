@@ -1,5 +1,6 @@
 import { getDetailedSettings } from "./settings";
 import { getDefaultModel, normalizeLegacyModelId } from "./models";
+import { searchBackendRegistry } from "./search/registry";
 import { filterModelsByConfiguration, getConfiguredModels, MODEL_SETTINGS_KEYS } from "./model-registry";
 import { getModelHealthSnapshot, type ModelHealthEntry, type ModelHealthStatus } from "./model-health";
 import type { ModelOption } from "./config";
@@ -40,7 +41,7 @@ export async function getAvailableModels(options?: {
   const enabledModels = filterModelsByConfiguration(configuredModels, settings);
   const healthSnapshot = await getModelHealthSnapshot({
     settings,
-    refreshIfStale: options?.refreshHealthIfStale ?? false,
+    refreshIfStale: options?.refreshHealthIfStale ?? true,
   });
 
   const enrichedModels = enabledModels.map((model) => ({
@@ -48,12 +49,9 @@ export async function getAvailableModels(options?: {
     health: healthSnapshot?.models[model.id],
   }));
 
-  // We only filter out models if they are EXPLICITLY disabled by the provider toggle.
-  // We NO LONGER filter out "unavailable" models from the dropdown, as this is too aggressive
-  // when discovery IDs have slight mismatches.
   const safeModels = enrichedModels.filter((model) => {
     const status = model.health?.status;
-    return status !== "disabled";
+    return status !== "unavailable" && status !== "disabled";
   });
 
   const modelsToReturn = safeModels.length > 0 ? safeModels : enrichedModels;
@@ -79,18 +77,21 @@ export async function resolveRequestedModel(
       return exact.id;
     }
 
-    // 2. Base ID match
+    // 2. Base ID match (e.g. "anthropic/claude-..." matching "perplexity/anthropic/claude-...")
     const baseRequested = normalizedRequestedModel.includes("/")
       ? normalizedRequestedModel.split("/").slice(-2).join("/")
       : normalizedRequestedModel;
     const fuzzyMatches = models.filter((model) => model.id.endsWith(baseRequested));
-    const fuzzyMatch = fuzzyMatches.find((model) => !model.id.startsWith("perplexity/")) ?? fuzzyMatches[0];
+    const backendPrefixes = [...searchBackendRegistry.keys()].map((id) => id + "/");
+    const fuzzyMatch = fuzzyMatches.find(
+      (model) => !backendPrefixes.some((prefix) => model.id.startsWith(prefix))
+    ) ?? fuzzyMatches[0];
     if (fuzzyMatch && (!options?.preferNonPreset || !fuzzyMatch.isPreset)) {
       return fuzzyMatch.id;
     }
   }
 
-  // 3. Prefer non-preset if requested
+  // 3. Prefer non-preset if requested (good for streamText/Chat API tasks)
   if (options?.preferNonPreset) {
     const nonPreset = models.find(m => !m.isPreset);
     if (nonPreset) return nonPreset.id;

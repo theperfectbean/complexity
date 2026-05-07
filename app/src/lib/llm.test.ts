@@ -1,5 +1,12 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { runGeneration, getProviderAndModel, getLanguageModel, GenerationOptions, generateThreadTitle } from "./llm";
+import {
+  runGeneration,
+  getProviderAndModel,
+  getLanguageModel,
+  GenerationOptions,
+  generateThreadTitle,
+  getProviderRequestOptionsForProvider,
+} from "./llm";
 import * as searchAgent from "./search-agent";
 import { UIMessage, generateText, streamText } from "ai";
 
@@ -21,7 +28,7 @@ vi.mock("@ai-sdk/openai", () => ({
 }));
 
 vi.mock("./search-agent", () => ({
-  runPerplexityAgent: vi.fn(),
+  runSearchAgent: vi.fn(),
 }));
 
 vi.mock("./settings", () => ({
@@ -51,7 +58,7 @@ describe("llm.ts", () => {
   });
 
   describe("getProviderAndModel", () => {
-    it("identifies perplexity prefix", () => {
+    it("identifies search provider prefix", () => {
       const { provider, model } = getProviderAndModel("perplexity/sonar-pro");
       expect(provider).toBe("perplexity");
       expect(model).toBe("sonar-pro");
@@ -69,7 +76,7 @@ describe("llm.ts", () => {
       expect(model).toBe("gpt-4o");
     });
 
-    it("handles double-prefixed models for perplexity correctly", () => {
+    it("handles double-prefixed models for search agent correctly", () => {
       const { provider, model } = getProviderAndModel("perplexity/anthropic/claude-4-6-sonnet-latest");
       expect(provider).toBe("perplexity");
       expect(model).toBe("anthropic/claude-4-6-sonnet-latest");
@@ -89,14 +96,14 @@ describe("llm.ts", () => {
   });
 
   describe("runGeneration", () => {
-    it("routes Perplexity models via prefix to runPerplexityAgent", async () => {
+    it("routes Search models via prefix to runSearchAgent", async () => {
       const mockResult = { 
         text: "hello", 
         completedResponse: {}, 
         usage: { promptTokens: 10, completionTokens: 5 } 
       };
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      vi.mocked(searchAgent.runPerplexityAgent).mockResolvedValue(mockResult as any);
+      vi.mocked(searchAgent.runSearchAgent).mockResolvedValue(mockResult as any);
 
       const mockWriter = { write: vi.fn() };
 
@@ -111,18 +118,18 @@ describe("llm.ts", () => {
         keys: { "PERPLEXITY_API_KEY": "test" },
       });
 
-      expect(searchAgent.runPerplexityAgent).toHaveBeenCalled();
+      expect(searchAgent.runSearchAgent).toHaveBeenCalled();
       expect(result.text).toBe("hello");
     });
 
-    it("routes Perplexity provider models through the search agent even without webSearch", async () => {
+    it("routes Search provider models through the search agent even without webSearch", async () => {
       const mockResult = {
         text: "hello",
         completedResponse: {},
         usage: { promptTokens: 10, completionTokens: 5 },
       };
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      vi.mocked(searchAgent.runPerplexityAgent).mockResolvedValue(mockResult as any);
+      vi.mocked(searchAgent.runSearchAgent).mockResolvedValue(mockResult as any);
 
       await runGeneration({
         modelId: "perplexity/anthropic/claude-4-5-haiku-latest",
@@ -133,7 +140,7 @@ describe("llm.ts", () => {
         keys: { "PERPLEXITY_API_KEY": "test" },
       });
 
-      expect(searchAgent.runPerplexityAgent).toHaveBeenCalled();
+      expect(searchAgent.runSearchAgent).toHaveBeenCalled();
     });
 
     it("throws when direct provider streaming completes without text output", async () => {
@@ -155,9 +162,37 @@ describe("llm.ts", () => {
       })).rejects.toThrow("Provider stream completed without text output");
     });
 
+    it("forces OpenAI system prompts to use the system role", async () => {
+      vi.mocked(streamText).mockReturnValue({
+        fullStream: (async function* () {
+          yield { type: "text-delta", text: "hello" };
+        })(),
+      } as unknown as ReturnType<typeof streamText>);
+
+      const result = await runGeneration({
+        modelId: "openai/gpt-5.4",
+        messages: [{ role: "user", content: "hi" } as unknown as UIMessage],
+        writer: { write: vi.fn() } as unknown as GenerationOptions["writer"],
+        textId: "test-id",
+        requestId: "req-id",
+        keys: { "OPENAI_API_KEY": "test" },
+      });
+
+      expect(result.text).toBe("hello");
+      expect(streamText).toHaveBeenCalledWith(
+        expect.objectContaining({
+          providerOptions: {
+            openai: {
+              systemMessageMode: "system",
+            },
+          },
+        }),
+      );
+    });
+
     it("throws when search-provider fallback completes without text output", async () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      vi.mocked(searchAgent.runPerplexityAgent).mockRejectedValue(new Error("agent stream failed") as any);
+      vi.mocked(searchAgent.runSearchAgent).mockRejectedValue(new Error("agent stream failed") as any);
       vi.mocked(generateText).mockResolvedValue({ text: "   " } as unknown as Awaited<ReturnType<typeof generateText>>);
 
       await expect(runGeneration({
@@ -177,7 +212,7 @@ describe("llm.ts", () => {
       await expect(getLanguageModel("anthropic/claude-3", {})).rejects.toThrow("ANTHROPIC_API_KEY is not configured");
     });
 
-    it("keeps explicit Perplexity-wrapped models intact", async () => {
+    it("keeps explicit Search-wrapped models intact", async () => {
       await getLanguageModel("perplexity/anthropic/claude-4-5-haiku-latest", {
         PERPLEXITY_API_KEY: "test",
       });
@@ -192,7 +227,7 @@ describe("llm.ts", () => {
         usage: { promptTokens: 10, completionTokens: 5 },
       };
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      vi.mocked(searchAgent.runPerplexityAgent).mockResolvedValue(mockResult as any);
+      vi.mocked(searchAgent.runSearchAgent).mockResolvedValue(mockResult as any);
 
       await runGeneration({
         modelId: "anthropic/claude-haiku-4-5",
@@ -204,9 +239,9 @@ describe("llm.ts", () => {
         keys: { "PERPLEXITY_API_KEY": "test" },
       });
 
-      expect(searchAgent.runPerplexityAgent).toHaveBeenCalledWith(
+      expect(searchAgent.runSearchAgent).toHaveBeenCalledWith(
         expect.objectContaining({
-          modelId: expect.arrayContaining(["anthropic/claude-haiku-4-5", "perplexity/sonar"]),
+          modelId: ["anthropic/claude-haiku-4-5"],
         }),
       );
     });
@@ -230,6 +265,22 @@ describe("llm.ts", () => {
       const title = await generateThreadTitle(query, "anthropic/claude-3", keys);
       
       expect(title).toBe(query.slice(0, 60) + "...");
+    });
+  });
+
+  describe("getProviderRequestOptionsForProvider", () => {
+    it("forces OpenAI requests to keep system messages as system", () => {
+      expect(getProviderRequestOptionsForProvider("openai")).toEqual({
+        providerOptions: {
+          openai: {
+            systemMessageMode: "system",
+          },
+        },
+      });
+    });
+
+    it("returns no provider overrides for non-OpenAI providers", () => {
+      expect(getProviderRequestOptionsForProvider("anthropic")).toEqual({});
     });
   });
 });

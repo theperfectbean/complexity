@@ -21,6 +21,7 @@ vi.mock("@/lib/settings", () => ({
 
 vi.mock("@/lib/llm", () => ({
   getLanguageModel: vi.fn(),
+  getProviderRequestOptions: vi.fn().mockResolvedValue({}),
 }));
 
 vi.mock("@/lib/extraction-utils", () => ({

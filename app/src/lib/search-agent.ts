@@ -1,7 +1,8 @@
 import { UIMessageChunk, UIMessage } from "ai";
 import { encode } from "gpt-tokenizer";
 import { extractTextFromMessage, collectFileParts } from "./chat-utils";
-import { isPresetModel, normalizeLegacyModelId, normalizePerplexityModelId } from "./models";
+import { isPresetModel, normalizeLegacyModelId } from "./models";
+import { normalizeSearchModelId } from "./search/backends/perplexity";
 import { safeParseJsonLine } from "./sse";
 import { asRecord, extractAssistantText } from "./extraction-utils";
 import { runtimeConfig } from "./config";
@@ -63,7 +64,7 @@ function extractCompletedResponseText(response: unknown): string {
   return extractAssistantText(responseRecord);
 }
 
-export async function runPerplexityAgent(options: SearchAgentOptions): Promise<SearchAgentResult> {
+export async function runSearchAgent(options: SearchAgentOptions): Promise<SearchAgentResult> {
   const { modelId: rawModelId, messages, instructions, webSearch, apiKey, writer, textId, requestId } = options;
   const log = getLogger(requestId);
   const toAgentModelId = (modelId: string): string => {
@@ -74,14 +75,14 @@ export async function runPerplexityAgent(options: SearchAgentOptions): Promise<S
     }
 
     if (normalized.startsWith("perplexity/")) {
-      return normalizePerplexityModelId(normalized);
+      return normalizeSearchModelId(normalized);
     }
 
     if (normalized === "sonar") {
       return "perplexity/sonar";
     }
 
-    return normalizePerplexityModelId(normalized);
+    return normalizeSearchModelId(normalized);
   };
 
   const normalizedModelId = Array.isArray(rawModelId)
@@ -132,11 +133,19 @@ export async function runPerplexityAgent(options: SearchAgentOptions): Promise<S
     return true;
   });
 
+  // Embed instructions as an explicit system message in the input array rather than
+  // relying on the separate `instructions` field. When Perplexity routes cross-provider
+  // models (e.g. openai/gpt-5.4) it converts the `instructions` field into a `developer`
+  // role message, which GPT-5.x rejects. An explicit `system` role in `input` is passed
+  // through unchanged to the underlying provider.
+  const inputWithInstructions = instructions
+    ? [{ type: "message", role: "system", content: [{ type: "input_text", text: instructions }] }, ...filteredInput]
+    : filteredInput;
+
   const requestBodyBase = {
     ...modelConfig,
-    input: filteredInput,
-    instructions: instructions,
-    tools: webSearch && runtimeConfig.searchAgent.webTools.length > 0 ? runtimeConfig.searchAgent.webTools : undefined,
+    input: inputWithInstructions,
+    tools: webSearch ? runtimeConfig.searchAgent.webTools : [],
   };
 
   const requestBody = {
@@ -144,7 +153,7 @@ export async function runPerplexityAgent(options: SearchAgentOptions): Promise<S
     stream: true,
   };
 
-  log.info({ modelConfig, inputCount: filteredInput.length, instructionsLength: instructions.length }, "Sending request to Search Provider Agent API");
+  log.info({ modelConfig, inputCount: inputWithInstructions.length, instructionsLength: instructions.length }, "Sending request to Search Provider Agent API");
   // log.debug({ requestBody }, "Search Provider Agent API request body");
 
   // Calculate prompt tokens
@@ -334,7 +343,7 @@ export async function runPerplexityAgent(options: SearchAgentOptions): Promise<S
 
           if (eventRecord.type === "response.failed") {
             const message = eventRecord.error?.message || "";
-            log.error({ eventRecord }, "Perplexity Agent API reported failure");
+            log.error({ eventRecord }, "Search Provider Agent API reported failure");
             if (!hasWrittenTextDelta) {
               streamingFailed = true;
               return;

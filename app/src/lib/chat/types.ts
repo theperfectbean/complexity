@@ -34,4 +34,5 @@ export interface ThreadInfo {
   memoryEnabled: boolean | null;
   roleInstructions: string;
   systemPrompt?: string | null;
+  compareModels: string[] | null;
 }

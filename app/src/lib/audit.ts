@@ -2,6 +2,7 @@ import { headers } from "next/headers";
 import { db } from "./db";
 import { auditLogs } from "./db/schema";
 import { createId } from "./db/cuid";
+import { logger } from "./logger";
 
 export type AuditAction = 
   | "update_setting"
@@ -35,6 +36,6 @@ export async function logAuditEvent(
       userAgent,
     });
   } catch (error) {
-    console.error("Failed to log audit event:", error);
+    logger.warn({ err: error }, "Failed to log audit event");
   }
 }

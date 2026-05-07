@@ -3,7 +3,7 @@ import { getModelProvider } from "./model-registry";
 
 describe("model-registry", () => {
   describe("getModelProvider", () => {
-    it("keeps search presets on perplexity", () => {
+    it("keeps search presets on search agent provider", () => {
       expect(getModelProvider({ id: "fast-search", isPreset: true })).toBe("perplexity");
     });
 

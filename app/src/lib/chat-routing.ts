@@ -83,24 +83,42 @@ function normalize(text: string): string {
 export function shouldUseRag(userText: string): boolean {
   const normalized = normalize(userText);
   if (!normalized) return false;
-  return RAG_SIGNALS.some((signal) => normalized.includes(signal));
+  return RAG_SIGNALS.some((signal) => new RegExp("\\b" + signal.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\b").test(normalized));
 }
+
+const SHORT_MEMORY_SIGNALS = [
+  "again",
+  "as before",
+  "previous",
+  "yesterday",
+  "last time",
+  "earlier",
+];
 
 export function shouldUseMemory(userText: string): boolean {
   const normalized = normalize(userText);
   if (!normalized) return false;
 
-  if (MEMORY_SIGNALS.some((signal) => normalized.includes(signal))) {
+  // Check explicit signals
+  if (MEMORY_SIGNALS.some((signal) => new RegExp("\\b" + signal.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\b").test(normalized))) {
     return true;
   }
 
-  return /\b(i|my|me)\b/.test(normalized) && normalized.split(/\s+/).length >= 16;
+  // Check short context-dependent signals
+  if (SHORT_MEMORY_SIGNALS.some((signal) => new RegExp("\\b" + signal.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\b").test(normalized))) {
+    return true;
+  }
+
+  // Heuristic for substantive personal messages (exclude questions)
+  const isQuestion = normalized.endsWith("?") || normalized.startsWith("who") || normalized.startsWith("what") || normalized.startsWith("how") || normalized.startsWith("why") || normalized.startsWith("when");
+  
+  return !isQuestion && /\b(i|my|me)\b/.test(normalized) && normalized.split(/\s+/).length >= 25;
 }
 
 export function shouldUseWebSearch(userText: string): boolean {
   const normalized = normalize(userText);
   if (!normalized) return false;
-  return WEB_SIGNALS.some((signal) => normalized.includes(signal));
+  return WEB_SIGNALS.some((signal) => new RegExp("\\b" + signal.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\b").test(normalized));
 }
 
 export function getChatRoutingDecision(input: ChatRoutingInput): ChatRoutingDecision {
@@ -111,8 +129,7 @@ export function getChatRoutingDecision(input: ChatRoutingInput): ChatRoutingDeci
   if (input.webSearchExplicit) {
     allowWebSearch = !!input.webSearchRequested;
   } else if (!useRag) {
-    // LLM decides via tool-choice when web search is available
-    allowWebSearch = true;
+    allowWebSearch = shouldUseWebSearch(input.userText);
   }
 
   const route = allowWebSearch ? "web" : useRag ? "rag" : useMemory ? "memory" : "plain";

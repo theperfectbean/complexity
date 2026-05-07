@@ -1,14 +1,13 @@
 import { desc, eq } from "drizzle-orm";
 import { auth } from "@/auth";
+import { requireAdmin } from "@/lib/auth-server";
 import { db } from "@/lib/db";
 import { auditLogs, users } from "@/lib/db/schema";
 import { ApiResponse } from "@/lib/api-response";
 
 export async function GET(request: Request) {
-  const session = await auth();
-  if (!session?.user?.isAdmin) {
-    return ApiResponse.unauthorized();
-  }
+  const adminResult = await requireAdmin();
+  if (adminResult instanceof Response) return adminResult;
 
   const { searchParams } = new URL(request.url);
   const limit = Math.min(parseInt(searchParams.get("limit") || "50"), 100);

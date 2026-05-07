@@ -13,6 +13,7 @@ export class ChatSessionValidator {
         userId: threads.userId,
         roleId: threads.roleId,
         systemPrompt: threads.systemPrompt,
+        compareModels: threads.compareModels,
         memoryEnabled: users.memoryEnabled,
       })
       .from(threads)

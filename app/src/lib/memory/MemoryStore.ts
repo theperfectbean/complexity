@@ -1,3 +1,4 @@
+import { logger } from "@/lib/logger";
 import { cosineDistance, desc, eq, inArray, isNull, or, and } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { memories } from "@/lib/db/schema";
@@ -29,7 +30,33 @@ function shouldUseSemanticMemorySearch(userText: string, memoryCount: number, to
     "personalize",
   ];
 
-  return retrievalSignals.some((signal) => normalized.includes(signal)) || normalized.split(/\s+/).length >= 16;
+  return retrievalSignals.some((signal) => normalized.includes(signal)) || normalized.split(/\s+/).length >= 25;
+}
+
+function rankByKeywords(userText: string, memories: string[], k: number): string[] {
+  const queryWords = new Set(userText.toLowerCase().split(/\W+/).filter(w => w.length > 2));
+  if (queryWords.size === 0) return memories.slice(0, k);
+
+  const scored = memories.map(content => {
+    const memoryWords = content.toLowerCase().split(/\W+/);
+    let matches = 0;
+    const seen = new Set();
+    for (const word of memoryWords) {
+      if (queryWords.has(word) && !seen.has(word)) {
+        matches++;
+        seen.add(word);
+      }
+    }
+    // Normalized score: matches / (log(length) + 1) to penalize excessive wordiness
+    const score = matches / (Math.log(content.length) + 1);
+    return { content, score };
+  });
+
+  return scored
+    .filter(s => s.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, k)
+    .map(s => s.content);
 }
 
 export async function getMemoryContents(userId: string, roleId?: string | null, useCache = true): Promise<string[]> {
@@ -115,7 +142,7 @@ export async function searchMemories(userId: string, userText?: string, roleId?:
   }
 
   if (!shouldUseSemanticMemorySearch(userText, allMemories.length, k)) {
-    return allMemories.slice(0, k);
+    return rankByKeywords(userText, allMemories, k);
   }
 
   try {
@@ -134,8 +161,8 @@ export async function searchMemories(userId: string, userText?: string, roleId?:
       
     return rows.map((r) => r.content);
   } catch (error) {
-    console.error("[Memory] Semantic search failed:", error);
-    return allMemories.slice(0, k);
+    logger.error({ err: error }, "[Memory] Semantic search failed:");
+    return rankByKeywords(userText, allMemories, k);
   }
 }
 

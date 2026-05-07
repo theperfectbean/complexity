@@ -1,3 +1,4 @@
+import { logger } from "@/lib/logger";
 import mammoth from "mammoth";
 import { PDFParse } from "pdf-parse";
 import { runtimeConfig } from "./config";
@@ -6,7 +7,7 @@ import { env } from "./env";
 export type DocumentFileLike = Pick<File, "name" | "type" | "arrayBuffer">;
 
 export async function performOcr(buffer: Buffer, fileName: string) {
-  console.log(`[OCR] Requesting OCR for ${fileName} (${buffer.length} bytes)...`);
+  logger.debug({}, `[OCR] Requesting OCR for ${fileName} (${buffer.length} bytes)...`);
   const formData = new FormData();
   const blob = new Blob([new Uint8Array(buffer)], { type: "application/pdf" });
   formData.append("file", blob, fileName);
@@ -22,7 +23,7 @@ export async function performOcr(buffer: Buffer, fileName: string) {
 
   const data = await response.json();
   const text = (data.text as string) || "";
-  console.log(`[OCR] Received ${text.length} chars from OCR service`);
+  logger.debug({}, `[OCR] Received ${text.length} chars from OCR service`);
   return text;
 }
 
@@ -40,7 +41,7 @@ export async function extractTextFromDataUrl(dataUrl: string, name: string, cont
 
 async function extractTextFromBuffer(buffer: Buffer, name: string, contentType: string) {
   if (contentType === "application/pdf" || name.toLowerCase().endsWith(".pdf")) {
-    console.log(`[PDF EXTRACTION] Parsing ${name} with PDFParse...`);
+    logger.debug({}, `[PDF EXTRACTION] Parsing ${name} with PDFParse...`);
     const parser = new PDFParse({ data: buffer });
     const result = await parser.getText();
     await parser.destroy();
@@ -49,20 +50,20 @@ async function extractTextFromBuffer(buffer: Buffer, name: string, contentType: 
 
     // Trigger OCR if text is very short (likely just headers or empty)
     if (!text || text.trim().length < 100) {
-      console.warn(`[PDF EXTRACTION] Insufficient text (${text?.trim().length || 0} chars) from ${name}. Attempting OCR fallback.`);
+      logger.warn({}, `[PDF EXTRACTION] Insufficient text (${text?.trim().length || 0} chars) from ${name}. Attempting OCR fallback.`);
       try {
         const ocrText = await performOcr(buffer, name);
         if (ocrText.trim().length > (text?.trim().length || 0)) {
           text = ocrText;
-          console.log(`[PDF EXTRACTION] OCR provided better results for ${name}.`);
+          logger.debug({}, `[PDF EXTRACTION] OCR provided better results for ${name}.`);
         } else {
-          console.log(`[PDF EXTRACTION] OCR did not provide more text than original parse.`);
+          logger.debug({}, `[PDF EXTRACTION] OCR did not provide more text than original parse.`);
         }
       } catch (ocrError) {
-        console.error(`[PDF EXTRACTION] OCR failed for ${name}:`, ocrError);
+        logger.error({ err: ocrError }, `[PDF EXTRACTION] OCR failed for ${name}:`);
       }
     } else {
-      console.log(`[PDF EXTRACTION] Successfully extracted ${text.length} chars from ${name}`);
+      logger.debug({}, `[PDF EXTRACTION] Successfully extracted ${text.length} chars from ${name}`);
     }
     
     return text;

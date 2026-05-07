@@ -1,3 +1,4 @@
+import { logger } from "@/lib/logger";
 import nodemailer from "nodemailer";
 import { env } from "./env";
 import { runtimeConfig } from "./config";
@@ -30,6 +31,6 @@ export async function sendEmail({
       ...(html ? { html } : {}),
     });
   } else {
-    console.warn(`[Email] SMTP not configured — would send "${subject}" to ${to}`);
+    logger.warn({}, `[Email] SMTP not configured — would send "${subject}" to ${to}`);
   }
 }

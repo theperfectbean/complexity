@@ -23,10 +23,10 @@ export class ChatHistoryManager {
     this.log = getLogger(requestId);
   }
 
-  generateCacheKey(session: ChatSession, roleInstructions: string, memoryEnabled: boolean, userText: string): string {
+  generateCacheKey(session: ChatSession, roleInstructions: string, memoryEnabled: boolean, userText: string, memoryHash?: string): string {
     const { userEmail, model, roleId, webSearch } = session;
     const roleHash = roleInstructions ? crypto.createHash("sha256").update(roleInstructions).digest("hex").slice(0, 12) : "none";
-    return `cache:chat:${userEmail}:${model}:${roleId ?? "none"}:${memoryEnabled ? "mem-on" : "mem-off"}:${webSearch ? "web-on" : "web-off"}:${roleHash}:${Buffer.from(userText).toString("base64")}`;
+    return `cache:chat:${userEmail}:${model}:${roleId ?? "none"}:${memoryEnabled ? "mem-on" : "mem-off"}:${memoryHash ?? "no-hash"}:${webSearch ? "web-on" : "web-off"}:${roleHash}:${Buffer.from(userText).toString("base64")}`;
   }
 
   async handleRegeneration(session: ChatSession): Promise<boolean> {

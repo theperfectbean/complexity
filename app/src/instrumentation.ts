@@ -10,8 +10,14 @@ export async function register() {
       return;
     }
 
-    const { startWorker, startWebhookWorker } = await import("./lib/worker");
+    // R2: Warn if ENCRYPTION_KEY is absent in production
+    if (!process.env.ENCRYPTION_KEY) {
+      console.warn("[Complexity] WARNING: ENCRYPTION_KEY is not set. Sensitive settings (API keys, webhook secrets) will be stored unencrypted. Set a 32-character random key in .env.");
+    }
+
+    const { startWorker, startWebhookWorker, startAuditLogCleanupWorker } = await import("./lib/worker");
     startWorker();
     startWebhookWorker();
+    startAuditLogCleanupWorker();
   }
 }

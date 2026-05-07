@@ -52,14 +52,14 @@ describe("model-health", () => {
         {
           id: "fast-search",
           name: "Fast Search",
-          provider: "Perplexity",
+          provider: "Search Agent",
           providerId: "perplexity",
           normalizedId: "fast-search",
         },
         {
           id: "perplexity/sonar",
           name: "Sonar",
-          provider: "Perplexity",
+          provider: "Search Agent",
           providerId: "perplexity",
           normalizedId: "perplexity/sonar",
         },
@@ -119,14 +119,14 @@ describe("model-health", () => {
         {
           id: "fast-search",
           name: "Fast Search",
-          provider: "Perplexity",
+          provider: "Search Agent",
           providerId: "perplexity",
           normalizedId: "fast-search",
         },
         {
           id: "perplexity/sonar",
           name: "Sonar",
-          provider: "Perplexity",
+          provider: "Search Agent",
           providerId: "perplexity",
           normalizedId: "perplexity/sonar",
         },
