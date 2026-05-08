@@ -106,7 +106,8 @@ describe("POST /api/roles/[roleId]/upload", () => {
 
     const response = await POST(request, { params: Promise.resolve({ roleId: "role-1" }) });
     expect(response.status).toBe(400);
-    await expect(response.json()).resolves.toEqual(expect.objectContaining({ error: "Only pdf/docx/txt/md are allowed" }));
+    const body = await response.json() as { error: string };
+    expect(body.error).toMatch(/Only .* files are allowed/);
   });
 
   it("returns accepted status for successful upload processing initialization", async () => {

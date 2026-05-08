@@ -137,7 +137,7 @@ export function FileUploader({ roleId, onUploaded, variant = "button" }: FileUpl
           type="file"
           ref={fileInputRef}
           className="hidden"
-          accept=".pdf,.docx,.txt,.md"
+          accept=".pdf,.docx,.txt,.md,.zip,.csv"
           onChange={handleFileChange}
           disabled={uploading}
           multiple
@@ -218,7 +218,7 @@ export function FileUploader({ roleId, onUploaded, variant = "button" }: FileUpl
             type="file"
             ref={fileInputRef}
             className="absolute inset-0 cursor-pointer opacity-0"
-            accept=".pdf,.docx,.txt,.md"
+            accept=".pdf,.docx,.txt,.md,.zip,.csv"
             onChange={handleFileChange}
             disabled={uploading}
             multiple
@@ -233,7 +233,7 @@ export function FileUploader({ roleId, onUploaded, variant = "button" }: FileUpl
             )}
             <div className="space-y-1">
               <p className="text-sm font-medium">Local files</p>
-              <p className="text-xs text-muted-foreground">PDF, DOCX, TXT, MD</p>
+              <p className="text-xs text-muted-foreground">PDF, DOCX, TXT, MD, ZIP, CSV</p>
             </div>
           </div>
         </div>

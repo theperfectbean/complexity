@@ -7,22 +7,24 @@ process.env.DATABASE_URL = process.env.DATABASE_URL ?? "postgresql://postgres:po
 process.env.EMBEDDER_URL = process.env.EMBEDDER_URL ?? "http://embedder:8000";
 process.env.REDIS_URL = process.env.REDIS_URL ?? "redis://localhost:6379";
 
-Object.defineProperty(window, "matchMedia", {
-  writable: true,
-  value: (query: string) => ({
-    media: query,
-    matches: false,
-    onchange: null,
-    addListener: () => {},
-    removeListener: () => {},
-    addEventListener: () => {},
-    removeEventListener: () => {},
-    dispatchEvent: () => false,
-  }),
-});
+if (typeof window !== "undefined") {
+  Object.defineProperty(window, "matchMedia", {
+    writable: true,
+    value: (query: string) => ({
+      media: query,
+      matches: false,
+      onchange: null,
+      addListener: () => {},
+      removeListener: () => {},
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      dispatchEvent: () => false,
+    }),
+  });
 
-window.HTMLElement.prototype.scrollIntoView = function() {};
-window.scrollTo = vi.fn();
+  window.HTMLElement.prototype.scrollIntoView = function() {};
+  (window as Window & typeof globalThis).scrollTo = vi.fn();
+}
 
 // Mock global fetch
 const runLive = process.env.RUN_AGENT_SMOKE === "1" || process.env.RUN_LIVE_CHAT_ROUTE === "1";

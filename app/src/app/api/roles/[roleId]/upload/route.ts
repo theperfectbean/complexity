@@ -56,7 +56,8 @@ export async function POST(
 
   for (const file of files) {
     if (!isAllowedDocument(file)) {
-      return ApiResponse.badRequest("Only pdf/docx/txt/md are allowed");
+      const allowed = runtimeConfig.documents.allowedExtensions.join(", ");
+      return ApiResponse.badRequest(`Only ${allowed} files are allowed`);
     }
 
     if (file.size > maxSizeBytes) {

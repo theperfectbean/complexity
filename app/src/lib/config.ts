@@ -175,7 +175,7 @@ export const runtimeConfig = {
     maxRetriesPerRequest: env.REDIS_MAX_RETRIES_PER_REQUEST ?? 1,
   },
   documents: {
-    allowedExtensions: (env.DOCUMENT_ALLOWED_EXTENSIONS || ".pdf,.docx,.txt,.md")
+    allowedExtensions: (env.DOCUMENT_ALLOWED_EXTENSIONS || ".pdf,.docx,.txt,.md,.zip,.csv")
       .split(",")
       .map((ext) => ext.trim().toLowerCase())
       .filter(Boolean),
