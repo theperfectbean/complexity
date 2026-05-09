@@ -1,6 +1,5 @@
 import { UIMessage } from "ai";
 import { runtimeConfig } from "@/lib/config";
-import { extractTextFromDataUrl } from "@/lib/documents";
 import { logger } from "./logger";
 import { asRecord } from "./extraction-utils";
 
@@ -115,12 +114,10 @@ export async function extractTextFromMessage(message: UIMessage): Promise<string
   const fileParts = collectFileParts(message);
   logger.info({ filePartsCount: fileParts.length }, "Collected file parts");
 
-  let attachmentsInfo = "";
+  // Validate file attachments for size limits but do NOT inject their contents into the prompt
   if (fileParts.length > 0) {
-    const attachmentsContents = await Promise.all(
-      fileParts.map(async (att) => {
-        if (!att.url || !att.url.startsWith("data:")) return "";
-
+    for (const att of fileParts) {
+      if (att.url && att.url.startsWith("data:")) {
         const name = att.filename || att.name || "unnamed";
         const mediaType = att.mediaType || att.contentType || "";
         const base64Payload = getBase64Payload(att.url);
@@ -131,27 +128,8 @@ export async function extractTextFromMessage(message: UIMessage): Promise<string
             throw new AttachmentTooLargeError(`Attachment exceeds ${Math.floor(maxBytes / (1024 * 1024))}MB limit.`);
           }
         }
-
-        if (mediaType.startsWith("image/")) {
-          return `[Attached Image: ${name}]`;
-        }
-
-        try {
-          logger.info({ filename: name, mediaType }, "Extracting text from attachment");
-          const content = await extractTextFromDataUrl(att.url, String(name), String(mediaType));
-          logger.info({ filename: name, contentSnippet: content.slice(0, 100) }, "Extraction successful");
-          return `--- START ATTACHED FILE: ${name} ---\n${content}\n--- END ATTACHED FILE: ${name} ---`;
-        } catch (e) {
-          logger.error({ err: e, filename: name }, "Error extracting attachment content");
-          return `[Error extracting file: ${name}]`;
-        }
-      })
-    );
-
-    attachmentsInfo = attachmentsContents.filter(Boolean).join("\n\n");
-
-    if (attachmentsInfo) {
-      finalText = finalText ? `${finalText}\n\n${attachmentsInfo}` : attachmentsInfo;
+        logger.info({ filename: name, mediaType, sizeBytes: getBase64Payload(att.url) ? getDecodedByteLength(getBase64Payload(att.url)!) : 0 }, "Validated file attachment");
+      }
     }
   }
 
