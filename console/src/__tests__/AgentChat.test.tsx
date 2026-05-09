@@ -37,13 +37,13 @@ function renderChat() {
 describe('AgentChat initial state', () => {
   it('renders the empty state prompt', () => {
     renderChat();
-    expect(screen.getByText('Fleet Agent')).toBeInTheDocument();
-    expect(screen.getByText(/Ask anything about your homelab/)).toBeInTheDocument();
+    expect(screen.getByText('Fleet Console')).toBeInTheDocument();
+    expect(screen.getByText(/Ask about your Proxmox cluster/)).toBeInTheDocument();
   });
 
   it('renders a text input with placeholder', () => {
     renderChat();
-    expect(screen.getByPlaceholderText('Ask the fleet agent...')).toBeInTheDocument();
+    expect(screen.getByTestId('message-input')).toBeInTheDocument();
   });
 
   it('send button is disabled when input is empty', () => {
@@ -71,32 +71,13 @@ describe('AgentChat initial state', () => {
 // ---------- Submitting a message ----------
 
 describe('AgentChat message submission', () => {
-  it('shows slash command suggestions when the user types slash', async () => {
-    renderChat();
 
-    const input = screen.getByPlaceholderText('Ask the fleet agent...');
-    await userEvent.type(input, '/');
-
-    expect(screen.getByRole('listbox', { name: 'Slash commands' })).toBeInTheDocument();
-    expect(screen.getByText('/list')).toBeInTheDocument();
-    expect(screen.getByText('/inspect')).toBeInTheDocument();
-  });
-
-  it('lets the user pick a slash command with keyboard', async () => {
-    renderChat();
-
-    const input = screen.getByPlaceholderText('Ask the fleet agent...');
-    await userEvent.type(input, '/');
-    await userEvent.keyboard('{ArrowDown}{Enter}');
-
-    expect(input).toHaveValue('/status plex ');
-  });
 
   it('shows user message as a bubble after submit', async () => {
     mockStream([]);
     renderChat();
 
-    const input = screen.getByPlaceholderText('Ask the fleet agent...');
+    const input = screen.getByTestId('message-input');
     await userEvent.type(input, 'check plex status');
     await userEvent.keyboard('{Enter}');
 
@@ -110,7 +91,7 @@ describe('AgentChat message submission', () => {
     mockStream([]);
     renderChat();
 
-    const input = screen.getByPlaceholderText('Ask the fleet agent...');
+    const input = screen.getByTestId('message-input');
     await userEvent.type(input, 'hello');
     await userEvent.keyboard('{Enter}');
 
@@ -123,7 +104,7 @@ describe('AgentChat message submission', () => {
     const spy = mockStream([]);
     renderChat();
 
-    const input = screen.getByPlaceholderText('Ask the fleet agent...');
+    const input = screen.getByTestId('message-input');
     await userEvent.type(input, 'restart qbittorrent');
     await userEvent.keyboard('{Enter}');
 
@@ -144,7 +125,7 @@ describe('AgentChat message submission', () => {
     mockStream([]);
     renderChat();
 
-    const input = screen.getByPlaceholderText('Ask the fleet agent...');
+    const input = screen.getByTestId('message-input');
     await userEvent.type(input, 'restart qbittorrent on ingestion');
     await userEvent.keyboard('{Enter}');
 
@@ -170,7 +151,7 @@ describe('AgentChat event rendering', () => {
     mockStream([{ type: 'text', content: 'Plex is running normally.' }]);
     renderChat();
 
-    const input = screen.getByPlaceholderText('Ask the fleet agent...');
+    const input = screen.getByTestId('message-input');
     await userEvent.type(input, 'check plex');
     await userEvent.keyboard('{Enter}');
 
@@ -186,7 +167,7 @@ describe('AgentChat event rendering', () => {
     ]);
     renderChat();
 
-    const input = screen.getByPlaceholderText('Ask the fleet agent...');
+    const input = screen.getByTestId('message-input');
     await userEvent.type(input, 'check plex');
     await userEvent.keyboard('{Enter}');
 
@@ -208,7 +189,7 @@ describe('AgentChat event rendering', () => {
     );
 
     renderChat();
-    const input = screen.getByPlaceholderText('Ask the fleet agent...');
+    const input = screen.getByTestId('message-input');
     await userEvent.type(input, 'check plex');
     await userEvent.keyboard('{Enter}');
 
@@ -225,7 +206,7 @@ describe('AgentChat event rendering', () => {
     ]);
     renderChat();
 
-    await userEvent.type(screen.getByPlaceholderText('Ask the fleet agent...'), 'restart q');
+    await userEvent.type(screen.getByTestId('message-input'), 'restart q');
     await userEvent.keyboard('{Enter}');
 
     await waitFor(() => {
@@ -237,7 +218,7 @@ describe('AgentChat event rendering', () => {
     mockStream([{ type: 'tool_error', tool: 'ssh_exec', error: 'Connection refused' }]);
     renderChat();
 
-    await userEvent.type(screen.getByPlaceholderText('Ask the fleet agent...'), 'test');
+    await userEvent.type(screen.getByTestId('message-input'), 'test');
     await userEvent.keyboard('{Enter}');
 
     await waitFor(() => {
@@ -256,7 +237,7 @@ describe('AgentChat event rendering', () => {
     }]);
     renderChat();
 
-    await userEvent.type(screen.getByPlaceholderText('Ask the fleet agent...'), 'stop plex');
+    await userEvent.type(screen.getByTestId('message-input'), 'stop plex');
     await userEvent.keyboard('{Enter}');
 
     await waitFor(() => {
@@ -288,7 +269,7 @@ describe('AgentChat event rendering', () => {
 
     renderChat();
 
-    await userEvent.type(screen.getByPlaceholderText('Ask the fleet agent...'), 'stop plex');
+    await userEvent.type(screen.getByTestId('message-input'), 'stop plex');
     await userEvent.keyboard('{Enter}');
 
     await waitFor(() => {
@@ -333,14 +314,14 @@ describe('AgentChat event rendering', () => {
 
     renderChat();
 
-    await userEvent.type(screen.getByPlaceholderText('Ask the fleet agent...'), 'stop plex');
+    await userEvent.type(screen.getByTestId('message-input'), 'stop plex');
     await userEvent.keyboard('{Enter}');
 
     await waitFor(() => {
       expect(screen.getByText('Approve')).toBeInTheDocument();
     });
 
-    await userEvent.type(screen.getByPlaceholderText('Ask the fleet agent...'), 'CONFIRM');
+    await userEvent.type(screen.getByTestId('message-input'), 'CONFIRM');
     await userEvent.keyboard('{Enter}');
 
     await waitFor(() => {
@@ -363,7 +344,7 @@ describe('AgentChat event rendering', () => {
     mockStream([{ type: 'error', message: 'LLM timeout: upstream took too long' }]);
     renderChat();
 
-    await userEvent.type(screen.getByPlaceholderText('Ask the fleet agent...'), 'test');
+    await userEvent.type(screen.getByTestId('message-input'), 'test');
     await userEvent.keyboard('{Enter}');
 
     await waitFor(() => {
@@ -375,7 +356,7 @@ describe('AgentChat event rendering', () => {
     mockStream([{ type: 'run_started', runId: 'abc' }, { type: 'context', domain: 'media', model: 'default' }]);
     renderChat();
 
-    await userEvent.type(screen.getByPlaceholderText('Ask the fleet agent...'), 'test');
+    await userEvent.type(screen.getByTestId('message-input'), 'test');
     await userEvent.keyboard('{Enter}');
 
     await waitFor(() => {
@@ -392,7 +373,7 @@ describe('AgentChat cancel', () => {
     vi.spyOn(api, 'streamAgentRun').mockImplementation(() => { /* never calls onDone */ });
     renderChat();
 
-    await userEvent.type(screen.getByPlaceholderText('Ask the fleet agent...'), 'test');
+    await userEvent.type(screen.getByTestId('message-input'), 'test');
     await userEvent.keyboard('{Enter}');
 
     await waitFor(() => {
@@ -420,7 +401,7 @@ describe('AgentChat threads', () => {
     mockStream([]);
     renderChat();
 
-    const input = screen.getByPlaceholderText('Ask the fleet agent...');
+    const input = screen.getByTestId('message-input');
     await userEvent.type(input, 'check disk space');
     await userEvent.keyboard('{Enter}');
 
@@ -435,7 +416,7 @@ describe('AgentChat threads', () => {
   it('populates input from initialContext prop', async () => {
     render(<AgentChat initialContext="Tell me about the plex service" onContextUsed={() => {}} />);
     await waitFor(() => {
-      const input = screen.getByPlaceholderText('Ask the fleet agent...');
+      const input = screen.getByTestId('message-input');
       expect(input).toHaveValue('Tell me about the plex service');
     });
   });

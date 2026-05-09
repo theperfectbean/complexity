@@ -187,9 +187,9 @@ describe('ServiceList', () => {
   it('renders all three node headings as uppercase section labels', () => {
     render(<ServiceList selectedService={null} onSelectService={() => {}} />);
     // Node headings are uppercase spans — use getAllByText to tolerate multiple matches
-    expect(screen.getAllByText('nas').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText('media').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText('ai').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('node03').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('node01').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('node02').length).toBeGreaterThanOrEqual(1);
   });
 
   it('calls onSelectService with service name when a service is clicked', async () => {

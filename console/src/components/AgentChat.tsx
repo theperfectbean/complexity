@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Send, Loader2, Terminal, Activity, Book } from 'lucide-react';
+import { Send, Loader2, Activity } from 'lucide-react';
 import { streamAgentRun, type AgentRunEvent } from '../lib/api';
 import { uuid } from '../lib/uuid';
 import { Markdown } from './Markdown';
@@ -36,9 +36,7 @@ function loadThreads(): Thread[] {
 }
 
 function saveThreads(threads: Thread[]): void {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(threads));
-  } catch { /* ignore */ }
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(threads)); } catch { /* ignore */ }
 }
 
 function makeThread(): Thread {
@@ -56,6 +54,7 @@ export function AgentChat({ initialContext, onContextUsed }: Props) {
   });
   const [input, setInput] = useState('');
   const [isRunning, setIsRunning] = useState(false);
+  const [pendingApproval, setPendingApproval] = useState<{approvalId: string; threadId?: string} | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -71,7 +70,6 @@ export function AgentChat({ initialContext, onContextUsed }: Props) {
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); });
   useEffect(() => { saveThreads(threads); }, [threads]);
 
-  // Auto-resize textarea
   useEffect(() => {
     const el = textareaRef.current;
     if (el) { el.style.height = 'auto'; el.style.height = `${el.scrollHeight}px`; }
@@ -81,7 +79,7 @@ export function AgentChat({ initialContext, onContextUsed }: Props) {
     setThreads(prev => prev.map(t => t.id === threadId ? updater(t) : t));
   }, []);
 
-  const submitMessage = (userMessage: string) => {
+  const submitMessage = (userMessage: string, extraBodyOverride?: Record<string, unknown>) => {
     const thread = threads.find(t => t.id === activeId);
     if (thread === undefined || isRunning || userMessage.trim() === '') return;
 
@@ -96,12 +94,26 @@ export function AgentChat({ initialContext, onContextUsed }: Props) {
       turns: [...t.turns, { id: turnId, userMessage, events: [], isRunning: true }],
     }));
 
+    let extraBody: Record<string, unknown> = { threadId: thread.id };
+    if (extraBodyOverride) {
+      extraBody = extraBodyOverride;
+    } else if (pendingApproval) {
+      extraBody = { approvalId: pendingApproval.approvalId, threadId: pendingApproval.threadId ?? thread.id };
+      setPendingApproval(null);
+    }
+
     streamAgentRun(
       userMessage,
       'default',
-      (event) => updateThread(thread.id, t => ({
+      (event) => {
+        updateThread(thread.id, t => ({
         ...t, turns: t.turns.map(tr => tr.id === turnId ? { ...tr, events: [...tr.events, event] } : tr),
-      })),
+        }));
+        if (event.type === 'destructive_confirm') {
+          const ev = event as Record<string, unknown>;
+          setPendingApproval({ approvalId: String(ev.approvalId), threadId: ev.threadId as string | undefined });
+        }
+      },
       () => {
         setIsRunning(false);
         updateThread(thread.id, t => ({
@@ -116,6 +128,7 @@ export function AgentChat({ initialContext, onContextUsed }: Props) {
         }));
       },
       ab.signal,
+      extraBody,
     );
   };
 
@@ -134,10 +147,14 @@ export function AgentChat({ initialContext, onContextUsed }: Props) {
   };
 
   const activeThread = threads.find(t => t.id === activeId);
-  const sidebarThreads = threads.map(t => ({ id: t.id, title: t.turns[0]?.userMessage.slice(0, 40) || t.title, createdAt: t.createdAt }));
+  const sidebarThreads = threads.map(t => ({
+    id: t.id,
+    title: t.turns[0]?.userMessage.slice(0, 40) || t.title,
+    createdAt: t.createdAt,
+  }));
 
   return (
-    <div data-testid="agent-chat" style={{ display: 'flex', height: '100%', background: 'var(--bg-page)', color: 'var(--text)', fontFamily: 'Inter, sans-serif' }}>
+    <div data-testid="agent-chat" style={{ display: 'flex', height: '100%', background: 'var(--bg-page)', color: 'var(--text)', fontFamily: 'inherit' }}>
       <ThreadSidebar
         threads={sidebarThreads}
         activeId={activeId}
@@ -145,24 +162,49 @@ export function AgentChat({ initialContext, onContextUsed }: Props) {
         onNew={handleNewThread}
       />
 
-      <main style={{ flex: 1, display: 'flex', flexDirection: 'column', maxWidth: '900px', margin: '0 auto', position: 'relative' }}>
+      <main style={{ flex: 1, display: 'flex', flexDirection: 'column', maxWidth: '860px', margin: '0 auto', position: 'relative', width: '100%' }}>
         <div data-testid="turn-list" style={{ flex: 1, overflowY: 'auto', padding: '2rem 1.5rem', display: 'flex', flexDirection: 'column', gap: '2.5rem' }}>
+          {activeThread?.turns.length === 0 && (
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text-empty)', textAlign: 'center', padding: '3rem 2rem', gap: '1rem', minHeight: '40vh' }}>
+              <div style={{ padding: '1rem', borderRadius: '50%', background: 'var(--accent-subtle)' }}>
+                <Activity size={28} style={{ color: 'var(--accent)' }} />
+              </div>
+              <div>
+                <p style={{ margin: '0 0 0.5rem', fontSize: '1.05rem', fontWeight: 500, color: 'var(--text-secondary)' }}>Fleet Console</p>
+                <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--text-empty)', maxWidth: '360px' }}>
+                  Ask about your Proxmox cluster — container status, resource usage, service health, and more.
+                </p>
+              </div>
+            </div>
+          )}
           {activeThread?.turns.map(turn => (
             <div key={turn.id} data-testid="conversation-turn" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
               <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                <div data-testid="user-message" style={{ maxWidth: '80%', padding: '0.8rem 1.25rem', background: 'var(--bg-surface)', borderRadius: '1.25rem', borderBottomRightRadius: '0.25rem', fontSize: '0.93rem', lineHeight: 1.5 }}>
+                <div data-testid="user-message" style={{ maxWidth: '80%', padding: '0.75rem 1.125rem', background: 'var(--accent)', color: 'var(--primary-foreground)', borderRadius: '1.25rem', borderBottomRightRadius: '0.25rem', fontSize: '0.93rem', lineHeight: 1.5 }}>
                   {turn.userMessage}
                 </div>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-                {turn.events.map((ev, idx) => <EventBlock key={idx} event={ev} />)}
+                {turn.events.map((ev, idx) => (
+                  <EventBlock
+                    key={idx}
+                    event={ev}
+                    onApprove={(approvalId, threadId) =>
+                      submitMessage('CONFIRM', {
+                        approvalId,
+                        threadId: threadId ?? activeThread?.id,
+                      })
+                    }
+                    onCancelApproval={() => setPendingApproval(null)}
+                  />
+                ))}
               </div>
             </div>
           ))}
           <div ref={bottomRef} />
         </div>
 
-        <div style={{ padding: '1.5rem', background: `linear-gradient(to top, var(--bg-page) 80%, transparent)` }}>
+        <div style={{ padding: '1.25rem 1.5rem 1.5rem', background: `linear-gradient(to top, var(--bg-page) 80%, transparent)` }}>
           <form
             data-testid="message-form"
             onSubmit={(e) => { e.preventDefault(); submitMessage(input); setInput(''); }}
@@ -174,27 +216,50 @@ export function AgentChat({ initialContext, onContextUsed }: Props) {
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Message Proxmox Agent…  (Enter to send, Shift+Enter for newline)"
+              placeholder="Ask about your cluster…  (Enter to send, Shift+Enter for newline)"
               disabled={isRunning}
               rows={1}
-              style={{ width: '100%', padding: '0.875rem 3.5rem 0.875rem 1.25rem', background: 'var(--bg-surface-alt)', border: '1px solid var(--border)', borderRadius: '1rem', color: 'var(--text)', fontSize: '0.95rem', outline: 'none', resize: 'none', overflow: 'hidden', lineHeight: 1.5, maxHeight: '200px', overflowY: 'auto' }}
+              style={{
+                width: '100%', padding: '0.875rem 3.5rem 0.875rem 1.125rem',
+                background: 'var(--bg-surface)', border: '1px solid var(--border)',
+                borderRadius: '0.875rem', color: 'var(--text)', fontSize: '0.9375rem',
+                outline: 'none', resize: 'none', overflow: 'hidden', lineHeight: 1.5,
+                maxHeight: '200px', overflowY: 'auto', boxShadow: 'var(--shadow-sm)',
+              }}
             />
+            {isRunning && (
+              <button
+                data-testid="cancel-btn"
+                type="button"
+                onClick={() => { abortRef.current?.abort(); }}
+                style={{
+                  position: 'absolute', right: '3.5rem', bottom: '0.5rem',
+                  background: 'none', border: 'none', borderRadius: '0.5rem',
+                  padding: '0.4rem 0.5rem', cursor: 'pointer',
+                  color: 'var(--text-secondary)', fontSize: '0.75rem',
+                }}
+              >
+                Stop
+              </button>
+            )}
             <button
               data-testid="send-btn"
               type="submit"
               disabled={input.trim() === '' || isRunning}
-              style={{ position: 'absolute', right: '0.75rem', bottom: '0.6rem', background: isRunning ? 'transparent' : 'var(--text)', border: 'none', borderRadius: '0.5rem', padding: '0.4rem', cursor: 'pointer', display: 'flex', alignItems: 'center', opacity: input.trim() !== '' ? 1 : 0.3 }}
+              style={{
+                position: 'absolute', right: '0.625rem', bottom: '0.5rem',
+                background: isRunning ? 'transparent' : 'var(--accent)',
+                border: 'none', borderRadius: '0.5rem', padding: '0.4rem 0.45rem',
+                cursor: 'pointer', display: 'flex', alignItems: 'center',
+                opacity: input.trim() !== '' || isRunning ? 1 : 0.35,
+                transition: 'opacity 0.15s',
+              }}
             >
               {isRunning
-                ? <Loader2 size={18} className="animate-spin" style={{ color: 'var(--text-secondary)' }} />
-                : <Send size={18} style={{ color: 'var(--bg-page)' }} />}
+                ? <Loader2 size={17} className="animate-spin" style={{ color: 'var(--text-secondary)' }} />
+                : <Send size={17} style={{ color: 'var(--primary-foreground)' }} />}
             </button>
           </form>
-          <div style={{ marginTop: '0.75rem', display: 'flex', justifyContent: 'center', gap: '1.5rem', fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}><Terminal size={12} /> Proxmox Native</span>
-            <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}><Activity size={12} /> Cluster Aware</span>
-            <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}><Book size={12} /> Docs Integrated</span>
-          </div>
         </div>
       </main>
     </div>
@@ -204,16 +269,20 @@ export function AgentChat({ initialContext, onContextUsed }: Props) {
 function ToolResult({ toolName, result }: { toolName: string; result: unknown }) {
   const [open, setOpen] = useState(false);
   return (
-    <div data-testid="tool-result" style={{ border: '1px solid var(--border)', borderRadius: '0.75rem', overflow: 'hidden' }}>
+    <div data-testid="tool-result" style={{ border: '1px solid var(--border)', borderRadius: '0.75rem', overflow: 'hidden', boxShadow: 'var(--shadow-sm)' }}>
       <button
         onClick={() => setOpen(o => !o)}
-        style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.5rem 0.75rem', background: 'var(--bg-surface-alt)', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '0.75rem', textAlign: 'left' }}
+        style={{
+          width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '0.5rem 0.875rem', background: 'var(--bg-surface-alt)', border: 'none',
+          cursor: 'pointer', color: 'var(--text-secondary)', fontSize: '0.775rem', textAlign: 'left',
+        }}
       >
-        <span>Result: <span style={{ color: 'var(--accent-light)' }}>{toolName}</span></span>
-        <span style={{ transition: 'transform 0.2s', transform: open ? 'rotate(180deg)' : 'none', fontSize: '0.65rem' }}>▾</span>
+        <span>Result: <span style={{ color: 'var(--accent)', fontWeight: 500 }}>{toolName}</span></span>
+        <span style={{ transition: 'transform 0.2s', transform: open ? 'rotate(180deg)' : 'none', fontSize: '0.65rem', opacity: 0.6 }}>▾</span>
       </button>
       <div style={{ maxHeight: open ? '600px' : '0', overflow: 'hidden', transition: 'max-height 0.25s ease' }}>
-        <div style={{ padding: '0.75rem' }}>
+        <div style={{ padding: '0.875rem' }}>
           <WidgetRenderer toolName={toolName} result={result as ToolResultEnvelope} />
         </div>
       </div>
@@ -221,29 +290,81 @@ function ToolResult({ toolName, result }: { toolName: string; result: unknown })
   );
 }
 
-function EventBlock({ event }: { event: AgentRunEvent }) {
+function EventBlock({ event, onApprove, onCancelApproval }: {
+  event: AgentRunEvent;
+  onApprove?: (approvalId: string, threadId?: string) => void;
+  onCancelApproval?: () => void;
+}) {
   const e = event as Record<string, unknown>;
   switch (event.type) {
     case 'text':
     case 'assistant_message': {
       const text = (e.content as string) || ((e.message as Record<string, string>)?.text ?? '');
-      return <div data-testid="assistant-message" style={{ fontSize: '0.95rem', lineHeight: 1.6, color: 'var(--text)' }}><Markdown text={text} /></div>;
+      return (
+        <div data-testid="assistant-message" style={{ fontSize: '0.9375rem', lineHeight: 1.65, color: 'var(--text)' }}>
+          <Markdown text={text} />
+        </div>
+      );
     }
     case 'tool_start':
       return (
         <div data-testid="tool-start" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
           <Loader2 size={12} className="animate-spin" />
-          <span>Using <code style={{ color: 'var(--accent-light)' }}>{String(e.tool)}</code>…</span>
+          <span>Using <code style={{ color: 'var(--accent)', fontWeight: 500 }}>{String(e.tool)}</code>…</span>
         </div>
       );
     case 'tool_result':
       return <ToolResult toolName={String(e.tool)} result={e.result} />;
     case 'error':
       return (
-        <div data-testid="error-block" style={{ color: 'var(--error)', fontSize: '0.85rem', padding: '0.75rem', background: 'rgba(239,68,68,0.1)', borderRadius: '0.5rem' }}>
+        <div data-testid="error-block" style={{ color: 'var(--error)', fontSize: '0.85rem', padding: '0.75rem 1rem', background: 'color-mix(in srgb, var(--error) 10%, transparent)', borderRadius: '0.625rem', border: '1px solid color-mix(in srgb, var(--error) 25%, transparent)' }}>
           Error: {String(e.message ?? e.error)}
         </div>
       );
+    case 'tool_error':
+      return (
+        <div data-testid="tool-error-block" style={{ color: 'var(--error)', fontSize: '0.85rem', padding: '0.75rem 1rem', background: 'color-mix(in srgb, var(--error) 10%, transparent)', borderRadius: '0.625rem', border: '1px solid color-mix(in srgb, var(--error) 25%, transparent)' }}>
+          ✗ {String(e.error ?? e.message)}
+        </div>
+      );
+    case 'run_started':
+    case 'run_status': {
+      const runId = String(e.runId ?? '');
+      const status = e.status ? String(e.status) : undefined;
+      return (
+        <div data-testid="run-meta" style={{ fontSize: '0.75rem', color: 'var(--text-muted)', opacity: 0.7 }}>
+          <span>{runId}</span>
+          {status && <> &middot; <span>{status}</span></>}
+        </div>
+      );
+    }
+    case 'destructive_confirm': {
+      const approvalId = String(e.approvalId ?? '');
+      const approvalThreadId = e.threadId as string | undefined;
+      return (
+        <div data-testid="destructive-confirm" style={{ padding: '1rem', border: '1px solid color-mix(in srgb, var(--error) 40%, transparent)', borderRadius: '0.75rem', background: 'color-mix(in srgb, var(--error) 8%, transparent)', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+          <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--text)' }}>
+            {String(e.message ?? 'Destructive action requires approval.')}
+          </p>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <button
+              type="button"
+              onClick={() => onApprove?.(approvalId, approvalThreadId)}
+              style={{ padding: '0.375rem 1rem', background: 'var(--accent)', color: 'var(--primary-foreground)', border: 'none', borderRadius: '0.5rem', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 500 }}
+            >
+              Approve
+            </button>
+            <button
+              type="button"
+              onClick={() => onCancelApproval?.()}
+              style={{ padding: '0.375rem 1rem', background: 'transparent', color: 'var(--text-secondary)', border: '1px solid var(--border)', borderRadius: '0.5rem', cursor: 'pointer', fontSize: '0.85rem' }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      );
+    }
     default: return null;
   }
 }

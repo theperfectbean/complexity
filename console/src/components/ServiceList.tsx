@@ -8,9 +8,9 @@ interface Props {
 }
 
 const NODE_COLORS: Record<string, string> = {
-  nas:   '#38a169',
-  media: '#3182ce',
-  ai:    '#7c3aed',
+  node01: '#3182ce',
+  node02: '#38a169',
+  node03: '#7c3aed',
 };
 
 export function ServiceList({ selectedService, onSelectService }: Props) {

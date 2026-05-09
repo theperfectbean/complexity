@@ -1,71 +1,85 @@
 @import "tailwindcss";
 
-/* ── Theme tokens ─────────────────────────────────────────────────────────── */
-:root,
+/* ── Complexity exact theme tokens ────────────────────────────────────────── */
+:root {
+  --background:            oklch(0.9821 0 0);
+  --foreground:            oklch(0.2435 0 0);
+  --card:                  oklch(0.9911 0 0);
+  --card-foreground:       oklch(0.2435 0 0);
+  --muted:                 oklch(0.9521 0 0);
+  --muted-foreground:      oklch(0.5032 0 0);
+  --primary:               oklch(0.4341 0.0392 41.99);
+  --primary-foreground:    oklch(1 0 0);
+  --secondary:             oklch(0.92 0.0651 74.37);
+  --secondary-foreground:  oklch(0.2789 0.0193 46.98);
+  --border:                oklch(0.8822 0 0);
+  --input:                 oklch(0.8822 0 0);
+  --ring:                  oklch(0.4341 0.0392 41.99);
+  --sidebar:               oklch(0.9881 0 0);
+  --sidebar-border:        oklch(0.902 0 0);
+  --sidebar-foreground:    oklch(0.2435 0 0);
+  --destructive:           oklch(0.6271 0.1936 33.34);
+
+  --bg-page:       var(--background);
+  --bg-surface:    var(--card);
+  --bg-surface-alt: var(--sidebar);
+  --bg-input:      var(--muted);
+  --bg-selected:   color-mix(in srgb, var(--primary) 9%, transparent);
+  --text:          var(--foreground);
+  --text-secondary: var(--muted-foreground);
+  --text-muted:    color-mix(in srgb, var(--muted-foreground) 80%, transparent);
+  --text-empty:    oklch(0.75 0 0);
+  --accent:        var(--primary);
+  --accent-light:  var(--primary);
+  --accent-subtle: color-mix(in srgb, var(--primary) 10%, transparent);
+  --success:       oklch(0.5225 0.12 154.55);
+  --error:         var(--destructive);
+  --warning:       oklch(0.65 0.14 65);
+
+  --shadow-sm: 0 2px 6px oklch(0.1 0 0 / 0.06);
+  --shadow:    0 6px 20px oklch(0.1 0 0 / 0.07);
+
+  --font-sans: "Aptos", "Segoe UI Variable", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+
+  color-scheme: light;
+}
+
 :root[data-theme="dark"] {
-  --bg-page:         #0f1117;
-  --bg-surface:      #1e2030;
-  --bg-surface-alt:  #0d1117;
-  --bg-input:        #2d3748;
-  --bg-selected:     rgba(124,58,237,0.13);
-  --border:          #2d3748;
-  --text:            #e2e8f0;
-  --text-secondary:  #718096;
-  --text-muted:      #a0aec0;
-  --text-empty:      #4a5568;
-  --accent:          #7c3aed;
-  --accent-light:    #a78bfa;
-  --accent-subtle:   rgba(124,58,237,0.13);
-  --success:         #22c55e;
-  --error:           #ef4444;
-  --warning:         #f59e0b;
-}
+  --background:            oklch(0.1776 0 0);
+  --foreground:            oklch(0.9491 0 0);
+  --card:                  oklch(0.2134 0 0);
+  --card-foreground:       oklch(0.9491 0 0);
+  --muted:                 oklch(0.2453 0.0087 91.25);
+  --muted-foreground:      oklch(0.7118 0 0);
+  --primary:               oklch(0.9247 0.0524 66.17);
+  --primary-foreground:    oklch(0.2625 0.0206 43.95);
+  --secondary:             oklch(0.273 0.018 70.08);
+  --secondary-foreground:  oklch(0.9491 0 0);
+  --border:                oklch(0.2351 0.0115 91.75);
+  --input:                 oklch(0.2351 0.0115 91.75);
+  --ring:                  oklch(0.9247 0.0524 66.17);
+  --sidebar:               oklch(0.1961 0 0);
+  --sidebar-border:        oklch(0.273 0.012 92.4);
+  --sidebar-foreground:    oklch(0.9491 0 0);
+  --destructive:           oklch(0.7044 0.1913 22.22);
 
-:root[data-theme="dim"] {
-  --bg-page:         #1a1b2e;
-  --bg-surface:      #25283d;
-  --bg-surface-alt:  #13141f;
-  --bg-input:        #3d4166;
-  --bg-selected:     rgba(124,58,237,0.18);
-  --border:          #3d4166;
-  --text:            #c0caf5;
-  --text-secondary:  #6272a4;
-  --text-muted:      #9aa5ce;
-  --text-empty:      #4d5780;
-  --accent:          #7c3aed;
-  --accent-light:    #a78bfa;
-  --accent-subtle:   rgba(124,58,237,0.15);
-  --success:         #50fa7b;
-  --error:           #ff5555;
-  --warning:         #ffb86c;
-}
+  --bg-input:      var(--muted);
+  --bg-selected:   color-mix(in srgb, var(--primary) 12%, transparent);
+  --text-empty:    oklch(0.4 0 0);
+  --success:       oklch(0.68 0.11 154.55);
 
-:root[data-theme="light"] {
-  --bg-page:         #f8fafc;
-  --bg-surface:      #ffffff;
-  --bg-surface-alt:  #f1f5f9;
-  --bg-input:        #e2e8f0;
-  --bg-selected:     rgba(124,58,237,0.08);
-  --border:          #cbd5e1;
-  --text:            #1e293b;
-  --text-secondary:  #64748b;
-  --text-muted:      #94a3b8;
-  --text-empty:      #94a3b8;
-  --accent:          #7c3aed;
-  --accent-light:    #7c3aed;
-  --accent-subtle:   rgba(124,58,237,0.1);
-  --success:         #16a34a;
-  --error:           #dc2626;
-  --warning:         #d97706;
+  color-scheme: dark;
 }
 
 @layer base {
   * { box-sizing: border-box; }
   body {
-    background: var(--bg-page);
-    color: var(--text);
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
     margin: 0;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
   }
   html, body, #root { height: 100%; }
 }

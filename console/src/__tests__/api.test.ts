@@ -111,7 +111,6 @@ describe('streamAgentRun()', () => {
 
     await new Promise<void>((resolve) => {
       streamAgentRun('test', 'default', () => {}, resolve, onError, ac.signal);
-      // Give microtask queue a chance to process
       setTimeout(resolve, 50);
     });
 
@@ -119,7 +118,6 @@ describe('streamAgentRun()', () => {
   });
 
   it('handles chunked SSE lines across multiple reads', async () => {
-    // Split a single SSE line across two encoder chunks
     const encoder = new TextEncoder();
     const part1 = encoder.encode('data: {"type":"text","cont');
     const part2 = encoder.encode('ent":"hello"}\n\ndata: {"type":"done"}\n\n');
@@ -231,13 +229,11 @@ describe('SERVICES registry', () => {
     const names = SERVICES.map(s => s.name);
     expect(names).toContain('dns');
     expect(names).toContain('proxy');
-    expect(names).toContain('forgejo');
+    expect(names).toContain('complexity');
     expect(names).toContain('arrstack');
     expect(names).toContain('ingestion-stack');
     expect(names).toContain('audio-stack');
     expect(names).toContain('plex');
-    expect(names).toContain('ollama');
-    expect(names).toContain('complexity');
   });
 
   it('every service has required fields: name, ip, node, purpose, tags', () => {
@@ -246,7 +242,7 @@ describe('SERVICES registry', () => {
       expect(svc.name.length).toBeGreaterThan(0);
       expect(typeof svc.ip).toBe('string');
       expect(svc.ip).toMatch(/^\d+\.\d+\.\d+\.\d+$/);
-      expect(['nas', 'media', 'ai']).toContain(svc.node);
+      expect(['node01', 'node02', 'node03']).toContain(svc.node);
       expect(typeof svc.purpose).toBe('string');
       expect(Array.isArray(svc.tags)).toBe(true);
     }
@@ -254,9 +250,9 @@ describe('SERVICES registry', () => {
 
   it('services are distributed across all three nodes', () => {
     const nodes = new Set(SERVICES.map(s => s.node));
-    expect(nodes).toContain('nas');
-    expect(nodes).toContain('media');
-    expect(nodes).toContain('ai');
+    expect(nodes).toContain('node01');
+    expect(nodes).toContain('node02');
+    expect(nodes).toContain('node03');
   });
 
   it('ingestion-stack has qbittorrent link', () => {
@@ -274,13 +270,6 @@ describe('SERVICES registry', () => {
     expect(labels).toContain('Sonarr');
     expect(labels).toContain('Radarr');
     expect(labels).toContain('Prowlarr');
-  });
-
-  it('forgejo has separate git and docs links', () => {
-    const forgejo = SERVICES.find(s => s.name === 'forgejo');
-    const labels = (forgejo?.links ?? []).map(l => l.label);
-    expect(labels).toContain('Git');
-    expect(labels).toContain('Docs');
   });
 
   it('does not expose the proxy admin endpoint as a service link', () => {
