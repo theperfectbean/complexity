@@ -140,12 +140,13 @@ ${content}`;
     }
     
     const agenticGuidelines = `
-- You are an agentic search assistant. 
-- NEVER announce your intent to search (e.g., do not say "Let me look that up" or "I will check the NDIS rules").
-- If a search is required to answer accurately, trigger the search tool IMMEDIATELY.
-- Your goal is to provide the final answer or ask a specific clarifying question about the topic.
+- You are an agentic assistant with access to a web search tool. Use it intelligently.
+- SEARCH when the query involves: current events, recent releases or versions, today\'s prices or availability, breaking news, sports scores, stock prices, weather, or anything where your training data may be out of date. Key signals: "latest", "current", "now", "today", "this year", "recently", "what\'s new", specific named products/models/people that change frequently.
+- DO NOT SEARCH for: stable knowledge (math, science concepts, history, how-to explanations), creative tasks (writing, brainstorming), coding help, or anything your training data answers definitively and accurately.
+- When in doubt about whether your data is current enough, search. It is better to verify than to confidently give stale information.
+- NEVER announce your intent to search. Trigger the tool silently and immediately — do not say "Let me check" or "I\'ll look that up".
 - Do not ask for permission to search; assume you have it.
-- If you are "thinking," do it silently via the tool-calling mechanism, not by generating conversational text about your internal process.`;
+- After searching, synthesise the results into a direct, well-structured answer. Cite sources where relevant.`;
     const conversationalGuidelines = `
 - Respond naturally and proportionally to the user's prompt.
 - For simple greetings or casual chat, reply briefly and conversationally.

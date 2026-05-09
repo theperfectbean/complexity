@@ -18,7 +18,6 @@ export default function Home() {
   const [model, setModel] = useState<string>(getDefaultModel());
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
-  const [webSearchEnabled, setWebSearchEnabled] = useState(runtimeConfig.chat.defaultWebSearch);
   const [attachments, setAttachments] = useState<File[]>([]);
 
   async function startThread(event: FormEvent<HTMLFormElement>) {
@@ -55,7 +54,7 @@ export default function Home() {
         await saveAttachmentsToSession(payload.thread.id, attachments);
       }
 
-      router.push(`/search/${payload.thread.id}?q=${encodeURIComponent(query.trim())}&web=${webSearchEnabled}`);
+      router.push(`/search/${payload.thread.id}?q=${encodeURIComponent(query.trim())}`);
     } catch (error) {
       setLoading(false);
       toast.error(error instanceof Error ? error.message : "An unexpected error occurred");
@@ -95,7 +94,7 @@ export default function Home() {
             <h1 className="font-[var(--font-accent)] text-4xl font-semibold tracking-tight sm:text-5xl">
               Complexity
             </h1>
-            <p className="text-lg text-muted-foreground">Web-grounded AI search with roles</p>
+            <p className="text-lg text-muted-foreground">Your open-source AI assistant, locally hosted.</p>
           </div>
           <SearchBar
             key="home-searchbar"
@@ -104,8 +103,6 @@ export default function Home() {
             onChange={setQuery}
             model={model}
             onModelChange={setModel}
-            webSearchEnabled={webSearchEnabled}
-            onWebSearchChange={setWebSearchEnabled}
             placeholder="Ask anything..."
             submitLabel={loading ? "Starting..." : "Start"}
             disabled={loading}

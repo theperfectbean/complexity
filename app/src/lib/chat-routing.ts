@@ -57,6 +57,7 @@ const MEMORY_SIGNALS = [
 ];
 
 const WEB_SIGNALS = [
+  // Time-sensitive topics
   "today",
   "latest",
   "news",
@@ -65,6 +66,20 @@ const WEB_SIGNALS = [
   "recent",
   "this week",
   "this month",
+  "just released",
+  "newly released",
+  "new release",
+  // Explicit search intent
+  "search",
+  "look up",
+  "look it up",
+  "find out",
+  "check online",
+  "check the web",
+  "search the web",
+  "search for",
+  "do a search",
+  // Market and factual data
   "price",
   "prices",
   "release date",

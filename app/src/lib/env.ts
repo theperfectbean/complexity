@@ -38,7 +38,7 @@ const envSchema = z.object({
   MODELS_JSON: z.string().optional(),
   DEFAULT_MODEL: z.string().optional(),
   SEARCH_API_BASE_URL: z.string().url().optional(),
-  PERPLEXITY_API_BASE_URL: z.string().url().default("https://api.perplexity.ai/v1/responses"),
+  PERPLEXITY_API_BASE_URL: z.string().url().default("https://api.perplexity.ai/v1/agent"),
   SEARCH_STREAM_TIMEOUT_MS: z.coerce.number().int().positive().optional(),
   PERPLEXITY_STREAM_TIMEOUT_MS: z.coerce.number().int().positive().default(1000 * 60 * 5),
   SEARCH_WEB_TOOLS: z.string().optional(),

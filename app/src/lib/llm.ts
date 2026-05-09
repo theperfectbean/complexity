@@ -491,6 +491,7 @@ export async function runGeneration(options: GenerationOptions): Promise<Generat
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const tools: Record<string, any> = {};
         if (options.webSearch && searchApiKey) {
+          // Use Tavily if a dedicated key is set; fall back to Perplexity sonar
           tools.webSearch = createWebSearchTool(searchApiKey);
           tools.fetchUrl = createFetchUrlTool();
         }
