@@ -1,6 +1,6 @@
 import { buildFleetManifest, DISAMBIGUATION_RULES } from './fleet-manifest';
 import { classifyIntent, getDomainToolPrefixes, IntentDomain } from './intent-classifier';
-import { getToolsForDomain, buildOpenAiToolList, getAllTools } from '../ToolRegistry';
+import { getToolsForDomain, buildOpenAiToolList } from '../ToolRegistry';
 
 let cachedManifest: string | null = null;
 

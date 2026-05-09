@@ -142,7 +142,7 @@ describe('ProxmoxTool', () => {
     it('pve_start issues pct start command', async () => {
       mockSshExec.mockResolvedValue(makeSsh('started', 0));
       const { pve_start } = await import('@/lib/agent/v2/tools/infra/ProxmoxTool');
-      const r = await pve_start({ container: 'dns' }) as { output: string };
+      await pve_start({ container: 'dns' });
       expect(mockSshExec).toHaveBeenCalledOnce();
       const [, cmd] = mockSshExec.mock.calls[0];
       expect(cmd).toContain('pct start');
@@ -200,7 +200,7 @@ describe('ProxmoxTool', () => {
     it('calls pvesh get status for a known node', async () => {
       mockSshExec.mockResolvedValue(makeSsh(JSON.stringify({ cpu: 0.12, memory: { used: 1000 } })));
       const { pve_node_status } = await import('@/lib/agent/v2/tools/infra/ProxmoxTool');
-      const r = await pve_node_status({ node: 'node01' });
+      await pve_node_status({ node: 'node01' });
       expect(mockSshExec).toHaveBeenCalledOnce();
       const [, cmd] = mockSshExec.mock.calls[0];
       expect(cmd).toContain('pvesh get');

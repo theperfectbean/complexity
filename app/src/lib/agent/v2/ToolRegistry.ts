@@ -10,7 +10,7 @@ import * as audio from './tools/audio/AudioTool';
 import * as ansible from './tools/devops/AnsibleTool';
 import * as git from './tools/devops/GitTool';
 import * as auditTool from './tools/devops/AuditTool';
-import { evaluateToolRisk, RiskTier } from './policy/RiskPolicy';
+import { evaluateToolRisk, RiskTier, RiskDecision } from './policy/RiskPolicy';
 import { auditWrite } from './audit/AuditLog';
 
 export type ToolFn = (params: Record<string, unknown>) => Promise<unknown>;
@@ -66,7 +66,7 @@ export async function executeTool(
   params: Record<string, unknown>,
   user = 'agent',
   confirmed = false,
-): Promise<{ result: unknown; tier: number; decision: any }> {
+): Promise<{ result: unknown; tier: number; decision: RiskDecision }> {
   const entry = REGISTRY[name];
   if (!entry) throw new Error(`Unknown tool: ${name}`);
   const decision = evaluateToolRisk(name);
