@@ -1,6 +1,6 @@
 import { UIMessageChunk, UIMessage } from "ai";
 import { encode } from "gpt-tokenizer";
-import { extractTextFromMessage, collectFileParts } from "./chat-utils";
+import { extractTextFromMessage, collectFileParts, buildAttachmentPromptText } from "./chat-utils";
 import { isPresetModel, normalizeLegacyModelId } from "./models";
 import { normalizeSearchModelId } from "./search/backends/perplexity";
 import { safeParseJsonLine } from "./sse";
@@ -111,6 +111,11 @@ export async function runSearchAgent(options: SearchAgentOptions): Promise<Searc
     
     if (text.trim()) {
       content.push({ type: "input_text", text });
+    }
+
+    const attachmentPromptText = await buildAttachmentPromptText(msg, log);
+    if (attachmentPromptText) {
+      content.push({ type: "input_text", text: attachmentPromptText });
     }
 
     collectFileParts(msg).forEach((att) => {

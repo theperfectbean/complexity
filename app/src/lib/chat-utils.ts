@@ -150,7 +150,7 @@ export type ConvertMessagesToCoreOptions = {
   includeAttachmentTextInPrompt?: boolean;
 };
 
-async function buildAttachmentPromptText(
+export async function buildAttachmentPromptText(
   message: UIMessage,
   log: { error: (obj: { err: unknown }, msg: string) => void }
 ): Promise<string> {
