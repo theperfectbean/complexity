@@ -41,6 +41,8 @@ const REGISTRY: Record<string, RegistryEntry> = {
     parametersSchema: { type: 'object', properties: { container: { type: 'string' }, lines: { type: 'number' } }, required: ['container'] } },
   pve_set_limit:{ fn: (p) => pve.pve_set_limit(p as { container: string; cpu?: number; memory?: string }), description: 'Adjust CPU/memory limits', tier: 2,
     parametersSchema: { type: 'object', properties: { container: { type: 'string' }, cpu: { type: 'number' }, memory: { type: 'string' } }, required: ['container'] } },
+  pve_node_status: { fn: (p) => pve.pve_node_status(p as { node: string }), description: 'Get CPU/memory/load for a Proxmox node', tier: 0,
+    parametersSchema: { type: 'object', properties: { node: { type: 'string', enum: ['node01', 'node02', 'node03'] } }, required: ['node'] } },
 
   disk_usage:           { fn: () => storage.disk_usage(), description: 'Show disk usage across all nodes', tier: 0 },
   dns_query:            { fn: (p) => dns.dns_query(p as { name: string }), description: 'Look up internal DNS', tier: 0 },

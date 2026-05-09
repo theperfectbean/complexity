@@ -1,5 +1,5 @@
 export type NodeName = 'node01' | 'node02' | 'node03';
-export type ContainerRole = 'network' | 'media' | 'audio' | 'downloads' | 'app' | 'ai' | 'devops' | 'agent';
+export type ContainerRole = 'network' | 'media' | 'audio' | 'downloads' | 'app' | 'ai' | 'devops' | 'agent' | 'monitoring';
 export type ProtocolType = 'http' | 'https' | 'tcp' | 'ws';
 export type AuthType = 'api-key' | 'session-cookie' | 'bearer' | 'basic' | 'none';
 
@@ -46,10 +46,10 @@ export const FLEET_CONTAINERS: FleetContainer[] = [
     vmid: 100,
     ip: '192.168.0.53',
     node: 'node03',
-    purpose: 'Technitium DNS',
+    purpose: 'dnsmasq DNS — resolves *.internal.lan to Caddy proxy',
     tags: ['network'],
     execMethod: 'pct',
-    services: [{ name: 'Technitium UI', port: 5380, protocol: 'http', path: '/api/user/login', authType: 'session-cookie', envKey: 'TECHNITIUM_PASSWORD' }],
+    services: [],
   },
   {
     name: 'proxy',
@@ -99,7 +99,10 @@ export const FLEET_CONTAINERS: FleetContainer[] = [
     purpose: 'qBittorrent + SABnzbd',
     tags: ['downloads'],
     execMethod: 'pct',
-    services: [{ name: 'qBittorrent', port: 8080, protocol: 'http', path: '/api/v2/app/version', authType: 'session-cookie', envKey: 'QBIT_PASSWORD' }],
+    services: [
+      { name: 'qBittorrent', port: 8080, protocol: 'http', path: '/api/v2/app/version', authType: 'session-cookie', envKey: 'QBIT_PASSWORD' },
+      { name: 'SABnzbd', port: 8081, protocol: 'http', path: '/api?mode=version', authType: 'api-key', envKey: 'SABNZBD_API_KEY' },
+    ],
   },
   {
     name: 'arrstack',
@@ -121,8 +124,52 @@ export const FLEET_CONTAINERS: FleetContainer[] = [
     execMethod: 'pct',
     services: [],
   },
-];
 
+  {
+    name: 'ai-tools',
+    vmid: 103,
+    ip: '192.168.0.200',
+    node: 'node03',
+    purpose: 'AI agent workspace (Copilot/Gemini CLI)',
+    tags: ['ai', 'devops'],
+    execMethod: 'pct',
+    services: [],
+  },
+  {
+    name: 'gotify',
+    vmid: 109,
+    ip: '192.168.0.109',
+    node: 'node03',
+    purpose: 'Gotify push notification server',
+    tags: ['devops'],
+    execMethod: 'pct',
+    services: [{ name: 'Gotify', port: 80, protocol: 'http', path: '/health', authType: 'bearer', envKey: 'GOTIFY_TOKEN' }],
+  },
+  {
+    name: 'pdm',
+    vmid: 110,
+    ip: '192.168.0.110',
+    node: 'node03',
+    purpose: 'Proxmox Datacenter Manager',
+    tags: ['devops'],
+    execMethod: 'pct',
+    services: [{ name: 'PDM', port: 8443, protocol: 'https', path: '/', authType: 'session-cookie' }],
+  },
+  {
+    name: 'monitoring',
+    vmid: 111,
+    ip: '192.168.0.111',
+    node: 'node03',
+    purpose: 'Grafana + Prometheus + pve-exporter',
+    tags: ['monitoring', 'devops'],
+    execMethod: 'pct',
+    services: [
+      { name: 'Grafana', port: 3000, protocol: 'http', path: '/api/health', authType: 'bearer', envKey: 'GRAFANA_TOKEN' },
+      { name: 'Prometheus', port: 9090, protocol: 'http', path: '/-/healthy', authType: 'none' },
+    ],
+  },
+
+];
 export function getContainer(name: string): FleetContainer | undefined {
   return FLEET_CONTAINERS.find((c) => c.name === name);
 }
