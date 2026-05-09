@@ -2,6 +2,8 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { Send, Loader2, Activity } from 'lucide-react';
 import { streamAgentRun, type AgentRunEvent } from '../lib/api';
 import { uuid } from '../lib/uuid';
+import { matchCommands, type SlashCommand } from '../lib/commands';
+import { CommandMenu } from './CommandMenu';
 import { Markdown } from './Markdown';
 import { ThreadSidebar } from './ThreadSidebar';
 import { WidgetRenderer } from './WidgetRenderer';
@@ -55,6 +57,8 @@ export function AgentChat({ initialContext, onContextUsed }: Props) {
   const [input, setInput] = useState('');
   const [isRunning, setIsRunning] = useState(false);
   const [pendingApproval, setPendingApproval] = useState<{approvalId: string; threadId?: string} | null>(null);
+  const [showCmdMenu, setShowCmdMenu] = useState(false);
+  const [cmdQuery, setCmdQuery] = useState('');
   const abortRef = useRef<AbortController | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -151,7 +155,52 @@ export function AgentChat({ initialContext, onContextUsed }: Props) {
     });
   };
 
+  const clearActiveThread = () => {
+    setThreads(prev => prev.map(t => t.id === activeId ? { ...t, turns: [] } : t));
+    setShowCmdMenu(false);
+    setCmdQuery('');
+    setInput('');
+  };
+
+  const handleCommandSelect = (cmd: SlashCommand) => {
+    const result = cmd.action({ clearThread: clearActiveThread });
+    if (result !== null) {
+      setInput(result);
+    }
+    setShowCmdMenu(false);
+    setCmdQuery('');
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const val = e.target.value;
+    setInput(val);
+    if (val.startsWith('/')) {
+      const afterSlash = val.substring(1);
+      if (!afterSlash.includes(' ')) {
+        setShowCmdMenu(true);
+        setCmdQuery(afterSlash);
+        return;
+      }
+    }
+    setShowCmdMenu(false);
+    setCmdQuery('');
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (showCmdMenu && (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'Tab')) {
+      e.preventDefault();
+      return;
+    }
+    if (showCmdMenu && e.key === 'Enter') {
+      e.preventDefault();
+      return;
+    }
+    if (e.key === 'Escape' && showCmdMenu) {
+      e.preventDefault();
+      setShowCmdMenu(false);
+      setCmdQuery('');
+      return;
+    }
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       submitMessage(input);
@@ -224,11 +273,18 @@ export function AgentChat({ initialContext, onContextUsed }: Props) {
             onSubmit={(e) => { e.preventDefault(); submitMessage(input); setInput(''); }}
             style={{ position: 'relative', display: 'flex', alignItems: 'flex-end' }}
           >
+            {showCmdMenu && (
+              <CommandMenu
+                commands={matchCommands(cmdQuery)}
+                onSelect={handleCommandSelect}
+                onClose={() => { setShowCmdMenu(false); setCmdQuery(''); }}
+              />
+            )}
             <textarea
               ref={textareaRef}
               data-testid="message-input"
               value={input}
-              onChange={e => setInput(e.target.value)}
+              onChange={handleInputChange}
               onKeyDown={handleKeyDown}
               placeholder="Ask about your cluster…  (Enter to send, Shift+Enter for newline)"
               disabled={isRunning}
