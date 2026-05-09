@@ -619,33 +619,58 @@ export function MessageList({
     return scrollY + innerHeight >= scrollHeight - FOLLOW_THRESHOLD_PX;
   }, [FOLLOW_THRESHOLD_PX]);
 
-  const scrollToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {
-    const now = Date.now();
-    if (now - lastScrollTimeRef.current < 33) return;
-    lastScrollTimeRef.current = now;
+  const scrollTimerRef = useRef<NodeJS.Timeout | null>(null);
 
+  const scrollToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {
     isAutoScrollingRef.current = true;
-    if (bottomRef.current) {
-      bottomRef.current.scrollIntoView({ behavior, block: "end" });
-    } else {
-      window.scrollTo({ top: document.documentElement.scrollHeight, behavior });
-    }
     
-    // Use a RAF to release the lock
-    requestAnimationFrame(() => {
-       requestAnimationFrame(() => {
-          isAutoScrollingRef.current = false;
-       });
-    });
+    if (bottomRef.current) {
+      bottomRef.current.scrollIntoView(false);
+    } else {
+      window.scrollTo(0, document.documentElement.scrollHeight);
+    }
+
+    if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
+    scrollTimeoutRef.current = setTimeout(() => {
+      isAutoScrollingRef.current = false;
+    }, behavior === "smooth" ? 600 : 100);
   }, []);
+    isAutoScrollingRef.current = true;
+    
+    if (behavior === "smooth") {
+      if (bottomRef.current) {
+        bottomRef.current.scrollIntoView({ behavior: "smooth", block: "end" });
+      } else {
+        window.scrollTo({ top: document.documentElement.scrollHeight, behavior: "smooth" });
+      }
+    } else {
+      // Use the most robust, legacy instant scroll API to avoid frame dropping
+      if (bottomRef.current) {
+        bottomRef.current.scrollIntoView(false);
+      } else {
+        window.scrollTo(0, document.documentElement.scrollHeight);
+      }
+    }
+
+    if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
+    scrollTimeoutRef.current = setTimeout(() => {
+      isAutoScrollingRef.current = false;
+    }, behavior === "smooth" ? 600 : 100);
+  }, []);
+  const lastScrollYRef = useRef(typeof window !== "undefined" ? window.scrollY : 0);
 
   const handleScroll = useCallback(() => {
-    // If we are far from the bottom, stop following immediately
+    if (isAutoScrollingRef.current) return;
+    
     const nearBottom = isNearBottom();
-    if (!nearBottom) {
+    const currentScrollY = window.scrollY;
+    const scrollingUp = currentScrollY < lastScrollYRef.current - 300;
+    lastScrollYRef.current = currentScrollY;
+
+    if (isFollowingRef.current && !nearBottom && scrollingUp) {
        isFollowingRef.current = false;
        setIsFollowingLatest(false);
-    } else {
+    } else if (!isFollowingRef.current && nearBottom) {
        // Only resume if it was NOT a programmatic scroll
        if (!isAutoScrollingRef.current) {
           isFollowingRef.current = true;
@@ -663,28 +688,30 @@ export function MessageList({
     };
   }, [handleScroll]);
 
-  // Reliable follow using MutationObserver
+  // Reliable follow using ResizeObserver on the document element to track true height changes
   useEffect(() => {
-    if (!isStreaming) return;
-
-    let rafId: number;
-    const observer = new MutationObserver(() => {
+    let isRafQueued = false;
+    const resizeObserver = new ResizeObserver(() => {
       if (!isFollowingRef.current) return;
-      
-      cancelAnimationFrame(rafId);
-      rafId = requestAnimationFrame(() => {
+
+      if (isRafQueued) return;
+      isRafQueued = true;
+
+      requestAnimationFrame(() => {
+        isRafQueued = false;
         if (isFollowingRef.current) {
            scrollToBottom("auto");
         }
       });
     });
 
-    observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+    resizeObserver.observe(document.documentElement);
+    
     return () => {
-      observer.disconnect();
-      cancelAnimationFrame(rafId);
+      resizeObserver.disconnect();
     };
-  }, [isStreaming, scrollToBottom]);
+  }, [scrollToBottom]);
+
 
   useLayoutEffect(() => {
     if (messages.length === 0) {
@@ -701,12 +728,12 @@ export function MessageList({
       hasAutoScrolledRef.current = true;
       isFollowingRef.current = true;
       setIsFollowingLatest(true);
-      requestAnimationFrame(() => scrollToBottom("auto"));
+      scrollToBottom("auto");
       return;
     }
 
     if (isFollowingRef.current) {
-      requestAnimationFrame(() => scrollToBottom("auto"));
+      scrollToBottom("auto");
     }
   }, [messages, scrollToBottom]);
 
@@ -727,7 +754,7 @@ export function MessageList({
   const showScrollButton = !isFollowingLatest && messages.length > 0;
 
   return (
-    <div className="relative space-y-6 pb-4">
+    <div className="relative space-y-6 pb-40 overflow-anchor-none">
       {hasMore && onLoadMore && (
         <div className="flex justify-center pt-2 pb-6">
           <button
@@ -754,7 +781,7 @@ export function MessageList({
             onClick={() => {
               isFollowingRef.current = true;
               setIsFollowingLatest(true);
-              scrollToBottom("smooth");
+              scrollToBottom("auto");
             }}
             aria-label="Jump to latest messages"
             className="fixed bottom-32 left-1/2 z-50 flex h-10 w-10 -translate-x-1/2 items-center justify-center rounded-full border bg-background shadow-lg transition-transform active:scale-95 md:bottom-40 md:ml-32"
@@ -813,7 +840,7 @@ export function MessageList({
         );
       })()}
 
-      <div ref={bottomRef} className="h-px w-full scroll-mt-40" />
+      <div ref={bottomRef} className="h-px w-full" style={{ overflowAnchor: "auto" }} />
     </div>
   );
 }

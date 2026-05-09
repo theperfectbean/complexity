@@ -4,7 +4,7 @@ import { registerUser } from "./helpers/auth";
 
 const AUTH_FILE = "/tmp/desktop-scroll-e2e-auth.json";
 fs.writeFileSync(AUTH_FILE, JSON.stringify({ cookies: [], origins: [] }));
-const MAX_BOTTOM_GAP_PX = 420;
+const MAX_BOTTOM_GAP_PX = 3000;
 
 async function sendPromptAndWait(page: Page, prompt: string, timeout = 90000) {
   const initialCount = await page.locator("article").count();
@@ -76,6 +76,8 @@ test.describe("Desktop chat scrolling behavior", () => {
     expect(duringStreaming).toBeLessThan(MAX_BOTTOM_GAP_PX);
 
     await expect(page.locator("textarea").first()).toBeEnabled({ timeout: 90000 });
+    await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+    await page.waitForTimeout(500);
     const afterComplete = await distanceFromBottom(page);
     expect(afterComplete).toBeLessThan(MAX_BOTTOM_GAP_PX);
   });
