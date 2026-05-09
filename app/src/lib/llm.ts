@@ -421,7 +421,7 @@ export async function runGeneration(options: GenerationOptions): Promise<Generat
         const langModel = await getLanguageModel(options.modelId, options.keys);
         const { providerOptions } = getProviderRequestOptionsForProvider(providerId);
         const { convertMessagesToCore } = await import("./chat-utils");
-        const coreMessages = await convertMessagesToCore(options.messages, log);
+        const coreMessages = await convertMessagesToCore(options.messages, log, { includeAttachmentTextInPrompt: providerId === "ollama" || providerId === "local-openai" });
 
         const { text } = await generateText({
           model: langModel,
@@ -459,7 +459,7 @@ export async function runGeneration(options: GenerationOptions): Promise<Generat
     } as UIMessageChunk);
 
     const { convertMessagesToCore } = await import("./chat-utils");
-    const coreMessages = await convertMessagesToCore(options.messages, log);
+    const coreMessages = await convertMessagesToCore(options.messages, log, { includeAttachmentTextInPrompt: providerId === "ollama" || providerId === "local-openai" });
 
     const searchIntegrationEnabled = (options.keys["INTEGRATION_SEARCH_ENABLED"] ?? "true") !== "false";
     const searchApiKey = searchIntegrationEnabled

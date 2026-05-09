@@ -1,5 +1,6 @@
 import { UIMessage } from "ai";
 import { runtimeConfig } from "@/lib/config";
+import { extractTextFromDataUrl } from "@/lib/documents";
 import { logger } from "./logger";
 import { asRecord } from "./extraction-utils";
 
@@ -69,7 +70,7 @@ export function collectFileParts(message: UIMessage): FilePart[] {
 
 export async function extractTextFromMessage(message: UIMessage): Promise<string> {
   logger.info({ id: message.id, role: message.role, hasParts: !!message.parts, partsCount: message.parts?.length }, "Extracting text from message");
-  
+
   const partsText =
     message.parts
       ?.filter((part) => part.type === "text")
@@ -128,7 +129,7 @@ export async function extractTextFromMessage(message: UIMessage): Promise<string
             throw new AttachmentTooLargeError(`Attachment exceeds ${Math.floor(maxBytes / (1024 * 1024))}MB limit.`);
           }
         }
-        logger.info({ filename: name, mediaType, sizeBytes: getBase64Payload(att.url) ? getDecodedByteLength(getBase64Payload(att.url)!) : 0 }, "Validated file attachment");
+        logger.info({ filename: name, mediaType, sizeBytes: base64Payload ? getDecodedByteLength(base64Payload) : 0 }, "Validated file attachment");
       }
     }
   }
@@ -145,19 +146,62 @@ export type CoreMessageLike = {
   content: CoreMessageContent[];
 };
 
+export type ConvertMessagesToCoreOptions = {
+  includeAttachmentTextInPrompt?: boolean;
+};
+
+async function buildAttachmentPromptText(
+  message: UIMessage,
+  log: { error: (obj: { err: unknown }, msg: string) => void }
+): Promise<string> {
+  const fileParts = collectFileParts(message);
+  if (fileParts.length === 0) return "";
+
+  const attachmentsContents = await Promise.all(
+    fileParts.map(async (att) => {
+      if (!att.url || !att.url.startsWith("data:")) return "";
+
+      const name = att.filename || att.name || "unnamed";
+      const mediaType = att.mediaType || att.contentType || "";
+
+      if (mediaType.startsWith("image/")) {
+        return `[Attached Image: ${name}]`;
+      }
+
+      try {
+        const content = await extractTextFromDataUrl(att.url, String(name), String(mediaType));
+        return `--- START ATTACHED FILE: ${name} ---\n${content}\n--- END ATTACHED FILE: ${name} ---`;
+      } catch (e) {
+        log.error({ err: e }, `Failed to extract attachment for prompt context: ${name}`);
+        return `[Error extracting file: ${name}]`;
+      }
+    })
+  );
+
+  return attachmentsContents.filter(Boolean).join("\n\n");
+}
+
 /**
  * B10: Converts an array of UIMessages into CoreMessage format for AI SDK consumption.
  * Extracts text content and inline image attachments. Deduplicates from llm.ts.
  */
 export async function convertMessagesToCore(
   messages: UIMessage[],
-  log: { error: (obj: { err: unknown }, msg: string) => void }
+  log: { error: (obj: { err: unknown }, msg: string) => void },
+  options: ConvertMessagesToCoreOptions = {}
 ): Promise<CoreMessageLike[]> {
   return Promise.all(
     messages.map(async (msg) => {
       const text = await extractTextFromMessage(msg);
       const content: CoreMessageContent[] = [];
       if (text.trim()) content.push({ type: "text", text });
+
+      if (options.includeAttachmentTextInPrompt) {
+        const attachmentPromptText = await buildAttachmentPromptText(msg, log);
+        if (attachmentPromptText) {
+          content.push({ type: "text", text: attachmentPromptText });
+        }
+      }
 
       collectFileParts(msg).forEach((att) => {
         if (att.url?.startsWith("data:") && (att.mediaType || att.contentType || "").startsWith("image/")) {
