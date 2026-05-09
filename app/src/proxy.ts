@@ -19,6 +19,11 @@ export const config = {
  */
 export const proxy = auth(async (req) => {
   const { nextUrl, auth: session, method, headers } = req;
+
+  // Always allow OPTIONS (CORS preflight) — route handler sends the actual CORS headers
+  if (method === 'OPTIONS') {
+    return NextResponse.next();
+  }
   const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
   const hasApiToken =
     headers.get("x-api-key")?.trim() ||
@@ -40,6 +45,8 @@ export const proxy = auth(async (req) => {
         try {
           const originUrl = new URL(origin);
           if (originUrl.host === host) isValid = true;
+          // Allow Fleet Console (cross-origin with API token)
+          if (originUrl.hostname === host?.split(':')[0] && originUrl.port === '3001') isValid = true;
         } catch {
           isValid = false;
         }

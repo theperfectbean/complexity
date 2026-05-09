@@ -191,6 +191,19 @@ function makeRunState(
   };
 }
 
+
+const CONSOLE_ORIGIN = 'http://192.168.0.105:3001';
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': CONSOLE_ORIGIN,
+  'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, X-Api-Key',
+  'Access-Control-Max-Age': '86400',
+};
+
+export async function OPTIONS(): Promise<NextResponse> {
+  return new NextResponse(null, { status: 200, headers: CORS_HEADERS });
+}
+
 export async function POST(req: NextRequest): Promise<NextResponse> {
   const authResult = await requireUserOrApiToken(req);
   if (authResult instanceof NextResponse) return authResult;
@@ -613,6 +626,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache',
       'Connection': 'keep-alive',
+      ...CORS_HEADERS,
     },
   });
 }
