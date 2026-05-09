@@ -24,13 +24,13 @@ export function classifyIntent(query: string): IntentDomain {
 }
 
 const DOMAIN_TOOLS: Record<IntentDomain, string[]> = {
-  media:   ['sonarr_', 'radarr_', 'plex_', 'qbit_', 'prowlarr_', 'seerr_', 'nfs_mount_status', 'audiobookshelf_'],
-  infra:   ['incus_', 'service_', 'journalctl', 'ssh_exec', 'ansible_'],
-  storage: ['disk_usage', 'find_large_files', 'storage_pool_', 'journal_disk_usage', 'truncate_logs', 'snapraid_', 'nfs_mount_status'],
+  media:   ['sonarr_', 'radarr_', 'plex_', 'qbit_', 'prowlarr_', 'seerr_', 'audiobookshelf_'],
+  infra:   ['pve_', 'service_', 'ssh_exec', 'ansible_'],
+  storage: ['disk_usage', 'find_large_files', 'journal_disk_usage', 'truncate_logs', 'snapraid_'],
   network: ['dns_', 'caddy_'],
   git:     ['git_', 'ansible_list_playbooks', 'ansible_run_playbook'],
   audit:   ['audit_query'],
-  general: ["incus_list", "disk_usage", "service_status", "journalctl", "incus_status"],
+  general: ['pve_list', 'pve_status', 'pve_node_status', 'disk_usage', 'service_status'],
 };
 
 export function getDomainToolPrefixes(domain: IntentDomain): string[] {

@@ -80,3 +80,27 @@ export async function executeTool(
   }
   return { result, tier: decision.tier, decision };
 }
+
+
+export function getToolsForDomain(prefixes: string[]): Record<string, RegistryEntry> {
+  const all = getAllTools();
+  if (prefixes.length === 0) return all;
+  return Object.fromEntries(
+    Object.entries(all).filter(([name]) =>
+      prefixes.some((prefix) => name.startsWith(prefix) || name === prefix)
+    )
+  );
+}
+
+export function buildOpenAiToolList(
+  entries: Record<string, RegistryEntry>,
+): Array<{ type: 'function'; function: { name: string; description: string; parameters: object } }> {
+  return Object.entries(entries).map(([name, entry]) => ({
+    type: 'function' as const,
+    function: {
+      name,
+      description: entry.description,
+      parameters: entry.parametersSchema ?? { type: 'object', properties: {} },
+    },
+  }));
+}

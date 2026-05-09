@@ -1,9 +1,9 @@
 import { sshExec } from '../tools/base/SshTool';
 
 interface SnapData {
-  nas?: string;
-  media?: string;
-  ai?: string;
+  node01?: string;
+  node02?: string;
+  node03?: string;
   fetchedAt: string;
 }
 
@@ -16,18 +16,18 @@ const SNAP_TTL_MS = 60_000;
 export async function getStateSnapshot(): Promise<string> {
   if (_cache && _cacheExpiry > Date.now()) return formatSnapshot(_cache);
 
-  const snapCmd = 'hostname && cat /proc/loadavg | cut -d" " -f1-3 && df -h / | tail -1 | awk "{print \$5}" | xargs echo disk:';
+  const snapCmd = 'hostname && cat /proc/loadavg | cut -d" " -f1-3 && df -h / | tail -1 | awk "{print $5}" | xargs echo disk:';
 
-  const [nasRes, mediaRes, aiRes] = await Promise.allSettled([
-    sshExec('nas',   snapCmd),
-    sshExec('media', snapCmd),
-    sshExec('ai',    snapCmd),
+  const [n1Res, n2Res, n3Res] = await Promise.allSettled([
+    sshExec('node01', snapCmd),
+    sshExec('node02', snapCmd),
+    sshExec('node03', snapCmd),
   ]);
 
   _cache = {
-    nas:   nasRes.status   === 'fulfilled' ? nasRes.value.stdout   : 'unreachable',
-    media: mediaRes.status === 'fulfilled' ? mediaRes.value.stdout : 'unreachable',
-    ai:    aiRes.status    === 'fulfilled' ? aiRes.value.stdout    : 'unreachable',
+    node01: n1Res.status === 'fulfilled' ? n1Res.value.stdout : 'unreachable',
+    node02: n2Res.status === 'fulfilled' ? n2Res.value.stdout : 'unreachable',
+    node03: n3Res.status === 'fulfilled' ? n3Res.value.stdout : 'unreachable',
     fetchedAt: new Date().toISOString(),
   };
   _cacheExpiry = Date.now() + SNAP_TTL_MS;
@@ -36,5 +36,10 @@ export async function getStateSnapshot(): Promise<string> {
 }
 
 function formatSnapshot(s: SnapData): string {
-  return ('## Current State (' + s.fetchedAt.slice(11,19) + ' UTC)\n' + (s.nas ?? '') + '\n' + (s.media ?? '') + '\n' + (s.ai ?? '')).trim();
+  return (
+    '## Current State (' + s.fetchedAt.slice(11, 19) + ' UTC)\n' +
+    (s.node01 ?? '') + '\n' +
+    (s.node02 ?? '') + '\n' +
+    (s.node03 ?? '')
+  ).trim();
 }

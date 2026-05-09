@@ -4,12 +4,12 @@ import { capOutput } from '../base/RestApiTool';
 const ANSIBLE_DIR = '/opt/complexity/ansible';
 
 export async function ansible_ping(): Promise<object> {
-  const r = await sshExec('ai', `cd ${ANSIBLE_DIR} && ansible homelab -m ping -i inventory 2>&1`);
+  const r = await sshExec('node03', `cd ${ANSIBLE_DIR} && ansible homelab -m ping -i inventory 2>&1`);
   return { output: capOutput(r.stdout, 2048), exitCode: r.exitCode };
 }
 
 export async function ansible_list_playbooks(): Promise<object> {
-  const r = await sshExec('ai', `incus exec complexity -- ls /opt/complexity/playbooks/ 2>/dev/null || echo "no playbooks directory"`);
+  const r = await sshExec('node03', `pct exec 103 -- ls /opt/complexity/playbooks/ 2>/dev/null || echo "no playbooks directory"`);
   return { playbooks: r.stdout.trim().split('\n').filter(Boolean) };
 }
 
@@ -22,7 +22,7 @@ export async function ansible_run_playbook(params: { playbook: string; extraVars
     ? Object.entries(params.extraVars).map(([k, v]) => `${k}=${v}`).join(' ')
     : '';
   const extraVarsFlag = extraVarsStr ? `--extra-vars "${extraVarsStr}"` : '';
-  const cmd = `incus exec complexity -- bash -c "cd /opt/complexity/ansible && ansible-playbook playbooks/${params.playbook} ${extraVarsFlag} -i inventory 2>&1"`;
-  const r = await sshExec('ai', cmd, { timeoutMs: 120000, maxLines: 200 });
+  const cmd = `pct exec 103 -- bash -c "cd /opt/complexity/ansible && ansible-playbook playbooks/${params.playbook} ${extraVarsFlag} -i inventory 2>&1"`;
+  const r = await sshExec('node03', cmd, { timeoutMs: 120000, maxLines: 200 });
   return { playbook: params.playbook, output: capOutput(r.stdout, 8192), exitCode: r.exitCode };
 }
