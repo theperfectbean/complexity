@@ -50,7 +50,6 @@ export default function RoleDetailPage() {
   const [model, setModel] = useState<string>(getDefaultModel());
   const [prompt, setPrompt] = useState("");
   const [creatingThread, setCreatingThread] = useState(false);
-  const [webSearchEnabled, setWebSearchEnabled] = useState(runtimeConfig.chat.defaultWebSearch);
   const [attachments, setAttachments] = useState<File[]>([]);
 
   const loadDocuments = useCallback(async () => {
@@ -178,7 +177,7 @@ export default function RoleDetailPage() {
       }
 
       setPrompt("");
-      router.push(`/search/${payload.thread.id}?q=${encodeURIComponent(currentPrompt)}&web=${webSearchEnabled}`);
+      router.push(`/search/${payload.thread.id}?q=${encodeURIComponent(currentPrompt)}`);
     } finally {
       setCreatingThread(false);
     }
@@ -306,8 +305,6 @@ export default function RoleDetailPage() {
               disabled={creatingThread}
               model={model}
               onModelChange={setModel}
-              webSearchEnabled={webSearchEnabled}
-              onWebSearchChange={setWebSearchEnabled}
               attachments={attachments}
               onRemoveAttachment={(index) => {
                 setAttachments((prev) => prev.filter((_, i) => i !== index));

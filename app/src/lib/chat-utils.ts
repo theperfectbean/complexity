@@ -1,6 +1,5 @@
 import { UIMessage } from "ai";
 import { runtimeConfig } from "@/lib/config";
-import { extractTextFromDataUrl } from "@/lib/documents";
 import { logger } from "./logger";
 import { asRecord } from "./extraction-utils";
 

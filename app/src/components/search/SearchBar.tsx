@@ -1,6 +1,6 @@
 "use client";
 
-import { Globe, Paperclip, SendHorizontal, Square } from "lucide-react";
+import { Paperclip, SendHorizontal, Square } from "lucide-react";
 import { motion } from "motion/react";
 import { useRef, useState, useEffect, useCallback } from "react";
 import TextareaAutosize from "react-textarea-autosize";
@@ -15,7 +15,6 @@ import { SearchModelOption } from "@/lib/models";
 import { FileAttachments, FileAttachmentsHandle } from "./parts/FileAttachments";
 import { CommandMenu } from "@/components/chat/CommandMenu";
 import { useSlashCommands } from "@/lib/hooks/useSlashCommands";
-import { resolveSearchBackend } from "@/lib/search/registry";
 
 
 type SearchBarProps = {
@@ -33,8 +32,6 @@ type SearchBarProps = {
   onAttachClick?: (files: FileList | null) => void;
   attachments?: File[];
   onRemoveAttachment?: (index: number) => void;
-  webSearchEnabled?: boolean;
-  onWebSearchChange?: (enabled: boolean) => void;
   autoFilter?: boolean;
   hideModelSelector?: boolean;
   "data-testid"?: string;
@@ -60,8 +57,6 @@ export function SearchBar({
   onAttachClick,
   attachments: externalAttachments = EMPTY_ATTACHMENTS,
   onRemoveAttachment,
-  webSearchEnabled = runtimeConfig.chat.defaultWebSearch,
-  onWebSearchChange,
   autoFilter = true,
   hideModelSelector = false,
   "data-testid": dataTestId,
@@ -273,28 +268,6 @@ export function SearchBar({
               <div className="h-4 w-px bg-border/40 mx-0.5" />
             </>
           )}
-
-          <button
-            type="button"
-            className={cn(
-              "inline-flex h-8 items-center gap-1.5 rounded-xl px-2 text-[13px] font-medium transition-all",
-              webSearchEnabled
-                ? "text-primary hover:bg-primary/10"
-                : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
-            )}
-            aria-label="Toggle web search"
-            title={webSearchEnabled
-              ? (() => {
-                  const provider = runtimeConfig.searchAgent.provider;
-                  const providerName = resolveSearchBackend(provider)?.displayName ?? "Search Agent";
-                  return `Web search active (via ${providerName})`;
-                })()
-              : "Enable web search"}
-            onClick={() => onWebSearchChange?.(!webSearchEnabled)}
-          >
-            <Globe className={cn("h-4 w-4", webSearchEnabled ? "text-primary" : "opacity-60")} />
-            <span className="hidden sm:inline">Search</span>
-          </button>
 
 
           <button

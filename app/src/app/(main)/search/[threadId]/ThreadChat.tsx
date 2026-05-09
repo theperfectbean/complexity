@@ -99,7 +99,6 @@ export type ThreadChatProps = {
   initialHistory: ChatMessageItem[];
   initialHasMore: boolean;
   initialNextCursor: string | null;
-  initialWebSearch: boolean;
   attachments: File[];
   setAttachments: React.Dispatch<React.SetStateAction<File[]>>;
   isLoading?: boolean;
@@ -116,7 +115,6 @@ export function ThreadChat({
   initialHistory,
   initialHasMore,
   initialNextCursor,
-  initialWebSearch,
   attachments,
   setAttachments,
   isLoading,
@@ -130,7 +128,6 @@ export function ThreadChat({
   const [threadSystemPrompt, setThreadSystemPrompt] = useState(initialSystemPrompt);
   const [pinned, setPinned] = useState(initialPinned);
   const [tags, setTags] = useState(initialTags);
-  const [webSearchEnabled, setWebSearchEnabled] = useState(initialWebSearch);
   const [branches, setBranches] = useState<Array<{ id: string; title: string; branchPointMessageId: string | null }>>([]);
   const [hasMore, setHasMore] = useState(initialHasMore);
   const [nextCursor, setNextCursor] = useState(initialNextCursor);
@@ -159,12 +156,12 @@ export function ThreadChat({
       threadId,
       model,
       roleId,
-      webSearch: webSearchEnabled,
+      webSearch: true,
       trigger: triggerRef.current,
     };
     triggerRef.current = undefined;
     return body;
-  }, [threadId, model, roleId, webSearchEnabled]);
+  }, [threadId, model, roleId]);
 
   const [data, setData] = useState<Record<string, unknown>[]>([]);
   const { messages, setMessages, sendMessage, regenerate, stop, status, error } = useChat({
@@ -328,9 +325,9 @@ export function ThreadChat({
       const payload = await res.json();
       const newThreadId = payload.threadId;
       window.dispatchEvent(new CustomEvent("thread-list-updated"));
-      router.push(`/search/${newThreadId}?q=${encodeURIComponent(newContent)}&web=${webSearchEnabled}`);
+      router.push(`/search/${newThreadId}?q=${encodeURIComponent(newContent)}`);
     },
-    [threadId, router, webSearchEnabled],
+    [threadId, router],
   );
 
   const handleBranchChange = useCallback(
@@ -637,8 +634,6 @@ export function ThreadChat({
               compact
               model={model}
               onModelChange={setModel}
-              webSearchEnabled={webSearchEnabled}
-              onWebSearchChange={setWebSearchEnabled}
               attachments={attachments}
               onRemoveAttachment={(index) => {
                 setAttachments((prev) => prev.filter((_, i) => i !== index));

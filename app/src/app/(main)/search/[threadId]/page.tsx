@@ -151,10 +151,6 @@ export default function ThreadPage() {
     };
   }, [threadId, searchParams]);
 
-  const webSearchParam = searchParams.get("web");
-  // Note: localStorage is not readable here during SSR. Per-thread preference is
-  // restored client-side via a useEffect in ThreadChat.tsx after hydration.
-  const webSearchDefault = webSearchParam !== null ? webSearchParam !== "false" : runtimeConfig.chat.defaultWebSearch;
 
   return (
     <main className="relative mx-auto flex h-full min-h-screen w-full max-w-3xl flex-col px-6 pt-16 pb-48">
@@ -175,7 +171,6 @@ export default function ThreadPage() {
           initialHistory={threadData.history}
           initialHasMore={threadData.hasMore}
           initialNextCursor={threadData.nextCursor}
-          initialWebSearch={webSearchDefault}
           attachments={attachments}
           setAttachments={setAttachments}
           isLoading={loading}
