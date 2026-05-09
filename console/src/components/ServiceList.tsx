@@ -7,38 +7,58 @@ interface Props {
   onSelectService: (name: string) => void;
 }
 
-const NODE_COLORS: Record<string, string> = {
-  node01: '#3182ce',
-  node02: '#38a169',
-  node03: '#7c3aed',
-};
-
 export function ServiceList({ selectedService, onSelectService }: Props) {
   const nodes = Array.from(new Set(SERVICES.map(svc => svc.node)));
   const grouped = nodes.map(node => ({
     node,
     services: SERVICES.filter(s => s.node === node),
-    color: NODE_COLORS[node] ?? '#718096',
   }));
 
   return (
-    <div style={{ padding: '1rem' }}>
-      <h2 style={{ margin: '0 0 1rem', fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-secondary)' }}>
+    <div style={{ padding: '0.75rem 0.5rem 1rem' }}>
+      <h2 style={{
+        margin: '0 0.5rem 0.75rem',
+        fontSize: '0.65rem',
+        fontWeight: 600,
+        textTransform: 'uppercase',
+        letterSpacing: '0.08em',
+        color: 'var(--text-muted)',
+      }}>
         Services
       </h2>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-        {grouped.map(({ node, services, color }) => (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+        {grouped.map(({ node, services }) => (
           <div key={node}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-              <span style={{ display: 'inline-block', height: '0.5rem', width: '0.5rem', borderRadius: '50%', background: color, flexShrink: 0 }} />
-              <span style={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color }}>{node}</span>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+              padding: '0 0.5rem',
+              marginBottom: '0.25rem',
+            }}>
+              <span style={{
+                display: 'inline-block',
+                height: '0.375rem',
+                width: '0.375rem',
+                borderRadius: '50%',
+                background: 'var(--text-muted)',
+                flexShrink: 0,
+              }} />
+              <span style={{
+                fontSize: '0.675rem',
+                fontWeight: 600,
+                textTransform: 'uppercase',
+                letterSpacing: '0.06em',
+                color: 'var(--text-muted)',
+              }}>
+                {node}
+              </span>
             </div>
-            <div style={{ paddingLeft: '1rem', display: 'flex', flexDirection: 'column', gap: '0.125rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.125rem' }}>
               {services.map(svc => (
                 <ServiceRow
                   key={svc.name}
                   service={svc}
-                  nodeColor={color}
                   selected={selectedService === svc.name}
                   onClick={() => onSelectService(svc.name)}
                 />
@@ -51,9 +71,8 @@ export function ServiceList({ selectedService, onSelectService }: Props) {
   );
 }
 
-function ServiceRow({ service, nodeColor, selected, onClick }: {
+function ServiceRow({ service, selected, onClick }: {
   service: ServiceInfo;
-  nodeColor: string;
   selected: boolean;
   onClick: () => void;
 }) {
@@ -65,23 +84,40 @@ function ServiceRow({ service, nodeColor, selected, onClick }: {
         alignItems: 'center',
         gap: '0.625rem',
         borderRadius: '0.5rem',
-        padding: '0.5rem 0.625rem',
+        padding: '0.45rem 0.75rem',
         cursor: 'pointer',
         background: selected ? 'var(--bg-selected)' : 'transparent',
         borderLeft: selected ? '2px solid var(--accent)' : '2px solid transparent',
-        transition: 'background 0.1s',
+        transition: 'background 0.15s',
+      }}
+      onMouseEnter={e => {
+        if (!selected) (e.currentTarget as HTMLElement).style.background = 'color-mix(in srgb, var(--foreground) 5%, transparent)';
+      }}
+      onMouseLeave={e => {
+        if (!selected) (e.currentTarget as HTMLElement).style.background = 'transparent';
       }}
     >
-      <span style={{ display: 'inline-block', height: '0.5rem', width: '0.5rem', borderRadius: '50%', background: 'var(--success)', flexShrink: 0 }} />
+      <span style={{
+        display: 'inline-block',
+        height: '0.5rem',
+        width: '0.5rem',
+        borderRadius: '50%',
+        background: 'var(--success)',
+        flexShrink: 0,
+      }} />
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: '0.825rem', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: 'var(--text)' }}>
+        <div style={{
+          fontSize: '0.825rem',
+          fontWeight: 500,
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          color: 'var(--text)',
+        }}>
           {service.name}
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', marginTop: '0.125rem' }}>
-          <span style={{ fontFamily: 'monospace', fontSize: '0.7rem', color: 'var(--text-secondary)' }}>{service.ip}</span>
-          <span style={{ borderRadius: '0.2rem', padding: '0.0625rem 0.3rem', fontSize: '0.6rem', fontWeight: 600, color: '#fff', background: nodeColor }}>
-            {service.node}
-          </span>
+        <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontFamily: 'monospace', marginTop: '0.1rem' }}>
+          {service.ip}
         </div>
       </div>
       {service.url ? (
@@ -91,18 +127,27 @@ function ServiceRow({ service, nodeColor, selected, onClick }: {
           rel="noopener noreferrer"
           onClick={e => e.stopPropagation()}
           title={`Open ${service.name}`}
-          style={{ color: 'var(--accent-light)', display: 'flex', alignItems: 'center', flexShrink: 0, padding: '0.25rem', borderRadius: '0.25rem' }}
+          style={{
+            color: 'var(--text-muted)',
+            display: 'flex',
+            alignItems: 'center',
+            flexShrink: 0,
+            padding: '0.25rem',
+            borderRadius: '0.25rem',
+            opacity: 0.6,
+          }}
         >
-          <ExternalLink size={13} />
+          <ExternalLink size={12} />
         </a>
       ) : (
-        <a
-          href={`#/services/${service.name}`}
-          onClick={e => e.stopPropagation()}
-          style={{ color: 'var(--accent-light)', fontSize: '0.75rem', textDecoration: 'none', flexShrink: 0 }}
-        >
+        <span style={{
+          color: 'var(--text-muted)',
+          fontSize: '0.75rem',
+          flexShrink: 0,
+          opacity: 0.5,
+        }}>
           →
-        </a>
+        </span>
       )}
     </div>
   );

@@ -389,7 +389,7 @@ describe('AgentChat cancel', () => {
 describe('AgentChat threads', () => {
   it('creates a new thread when + button is clicked', async () => {
     renderChat();
-    const newBtn = screen.getByTitle('New thread');
+    const newBtn = screen.getAllByRole('button', { name: /New conversation/ })[0];
     await userEvent.click(newBtn);
 
     // Two threads should now exist — "New conversation" appears at least once

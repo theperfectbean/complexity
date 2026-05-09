@@ -138,6 +138,19 @@ export function AgentChat({ initialContext, onContextUsed }: Props) {
     setActiveId(t.id);
   };
 
+  const handleDeleteThread = (id: string) => {
+    setThreads(prev => {
+      const next = prev.filter(t => t.id !== id);
+      if (id === activeId) {
+        const remaining = next.length > 0 ? next : [makeThread()];
+        const newThreads = next.length > 0 ? next : remaining;
+        setActiveId(remaining[0].id);
+        return newThreads;
+      }
+      return next.length > 0 ? next : [makeThread()];
+    });
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -160,6 +173,7 @@ export function AgentChat({ initialContext, onContextUsed }: Props) {
         activeId={activeId}
         onSelect={setActiveId}
         onNew={handleNewThread}
+        onDelete={handleDeleteThread}
       />
 
       <main style={{ flex: 1, display: 'flex', flexDirection: 'column', maxWidth: '860px', margin: '0 auto', position: 'relative', width: '100%' }}>
