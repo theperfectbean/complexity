@@ -6,6 +6,9 @@
  * - Legacy AgentService run-state and approval semantics (richer state)
  * - New CommandRegistry for slash commands and intent classification
  * - Single event contract for /console UI
+ *
+ * UPDATE 2026-05-09: Eliminated hardcoded local Ollama/OpenAI dependencies.
+ * Now uses the main Complexity model registry and pipeline.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -23,13 +26,14 @@ import {
   type ParsedCommand,
 } from '@/lib/agent/v2/command';
 
+// Complexity Core LLM Infrastructure
+import { getLanguageModel, getProviderRequestOptions } from '@/lib/llm';
+import { generateText } from 'ai';
+import { getDetailedSettings } from '@/lib/settings';
+import { MODEL_SETTINGS_KEYS } from '@/lib/model-registry';
+
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-
-const LOCAL_OPENAI_BASE = process.env.LOCAL_OPENAI_BASE_URL ?? 'http://192.168.0.107:4000/v1';
-const LOCAL_OPENAI_KEY = process.env.LOCAL_OPENAI_API_KEY ?? 'sk-complexity-local';
-const MODEL_DEFAULT = process.env.LOCAL_MODEL_DEFAULT ?? 'default';
-const MODEL_SMART = process.env.LOCAL_MODEL_SMART ?? 'smart';
 
 const SMART_KEYWORDS = /\b(design|architecture|compare|debug|plan|analyse|analyze|complex|explain in detail)\b/i;
 
@@ -73,8 +77,15 @@ type PersistedConsoleEvent = ConsoleEvent & {
   timestamp: string;
 };
 
+/**
+ * Selects a default model if none specified.
+ * Defaults to the standard cloud haiku model for the console.
+ */
 function selectModel(message: string): string {
-  return SMART_KEYWORDS.test(message) || message.length > 600 ? MODEL_SMART : MODEL_DEFAULT;
+  if (SMART_KEYWORDS.test(message) || message.length > 600) {
+      return "perplexity/anthropic/claude-sonnet-4-5";
+  }
+  return "perplexity/anthropic/claude-haiku-4-5";
 }
 
 function stripThinking(text: string): string {
@@ -121,35 +132,48 @@ function extractAssistantResponse(content: string): string {
       const textVal = args.text ?? args.content ?? args.message ?? args.answer ?? args.response ?? args.output;
       if (typeof textVal === 'string' && textVal.length > 20) return textVal;
     }
-    if (typeof parsed.name === 'string' && typeof parsed.status === 'string') {
-      const { name, status, ip, node } = parsed as Record<string, string>;
-      return `${name} is ${status}${ip ? ` at ${ip}` : ''}${node ? ` on ${node}` : ''}.`;
-    }
-    const keys = Object.keys(parsed);
-    if (keys.length === 1 && Array.isArray(parsed[keys[0]])) {
-      const arr = parsed[keys[0]] as Array<Record<string, string>>;
-      if (arr.length > 0 && typeof arr[0] === 'object') {
-        return arr.map((item) =>
-          Object.entries(item).map(([k, v]) => `${k}: ${v}`).join(', ')
-        ).join('\n');
-      }
-    }
   } catch { /* not JSON */ }
   return content;
 }
 
-async function llmCall(messages: object[], tools: object[], model: string, signal?: AbortSignal): Promise<Response> {
-  const body: Record<string, unknown> = { model, messages, stream: false, think: false };
-  if (tools.length > 0) body.tools = tools;
-  return fetch(`${LOCAL_OPENAI_BASE}/chat/completions`, {
-    method: 'POST',
-    signal,
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${LOCAL_OPENAI_KEY}`,
-    },
-    body: JSON.stringify(body),
-  });
+/**
+ * Modern LLM Call using Complexity's core pipeline.
+ * Completely eliminates hardcoded local backends.
+ */
+async function llmCall(messages: object[], tools: object[], modelId: string, signal?: AbortSignal): Promise<any> {
+    const settings = await getDetailedSettings([...MODEL_SETTINGS_KEYS]);
+    const keys = Object.keys(settings).reduce((acc, k) => ({ ...acc, [k]: (settings as any)[k].value }), {});
+    
+    const langModel = await getLanguageModel(modelId, keys);
+    const { providerOptions } = await getProviderRequestOptions(modelId);
+    
+    // Using generateText to maintain compatibility with the existing orchestration loop
+    const result = await generateText({
+        model: langModel,
+        messages: messages as any,
+        tools: tools as any,
+        providerOptions,
+        abortSignal: signal,
+    });
+
+    return {
+        ok: true,
+        json: async () => ({
+            choices: [{
+                message: {
+                    role: 'assistant',
+                    content: result.text,
+                    tool_calls: result.toolCalls?.map(tc => ({
+                        id: tc.toolCallId,
+                        function: {
+                            name: tc.toolName,
+                            arguments: JSON.stringify((tc as any).args ?? {})
+                        }
+                    }))
+                }
+            }]
+        })
+    };
 }
 
 function toConsoleStatus(status: UnifiedRunState['status']): Extract<ConsoleEvent, { type: 'run_status' }>['status'] {
@@ -192,7 +216,7 @@ function makeRunState(
 }
 
 
-const CONSOLE_ORIGIN = 'http://192.168.0.105:3001';
+const CONSOLE_ORIGIN = "*";
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': CONSOLE_ORIGIN,
   'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
@@ -215,12 +239,14 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     stateSnapshot,
     approvalId,
     commandMode = 'auto',
+    modelId,
   } = await req.json() as {
     message: string;
     threadId?: string;
     stateSnapshot?: Partial<UnifiedRunState>;
     approvalId?: string;
     commandMode?: 'auto' | 'slash' | 'natural';
+    modelId?: string;
   };
 
   const redis = getRedisClient();
@@ -290,6 +316,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         emit({ type: 'run_started', userMessage: message, commandMode: runState.commandMode });
         emit({ type: 'run_status', status: 'running' });
 
+        let forceSynthesis = false;
+
         if (approvalId) {
           const approval = await consumeApproval(approvalId, userId, runState.threadId);
           if (!approval) {
@@ -314,34 +342,29 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
               const cmdResult = await cmdRegistry.executeCommand(approval.command, userId, true);
               if (!cmdResult.success) {
                 emit({ type: 'error', message: cmdResult.error ?? 'Command failed.' });
-                runState.toolCallHistory.push({
-                  tool: `cmd:${approval.command.action}`,
-                  params: { resource: approval.command.resource, options: approval.command.options },
-                  error: cmdResult.error ?? 'Command failed.',
-                });
                 await finish('error');
                 return;
               }
-              emit({
-                type: 'text',
-                content: typeof cmdResult.output === 'string'
-                  ? cmdResult.output
-                  : JSON.stringify(cmdResult.output, null, 2),
-                role: 'assistant',
-              });
-              runState.toolCallHistory.push({
-                tool: `cmd:${approval.command.action}`,
-                params: { resource: approval.command.resource, options: approval.command.options },
-                result: cmdResult.output,
-              });
+              
+              if (runState.commandMode === 'slash') {
+                emit({
+                  type: 'text',
+                  content: typeof cmdResult.output === 'string'
+                    ? cmdResult.output
+                    : JSON.stringify(cmdResult.output, null, 2),
+                  role: 'assistant',
+                });
+                await finish('completed');
+                return;
+              }
+
+              runState.messages.push({ role: 'user', content: message });
+              runState.messages.push({ role: 'assistant', content: null, tool_calls: [{ id: 'cmd_call', function: { name: `cmd:${approval.command.action}`, arguments: JSON.stringify(approval.command.options) } }] });
+              runState.messages.push({ role: 'tool', tool_call_id: 'cmd_call', content: JSON.stringify(cmdResult.output) });
+              forceSynthesis = true;
             } catch (err) {
               const errMsg = err instanceof Error ? err.message : String(err);
               emit({ type: 'error', message: errMsg });
-              runState.toolCallHistory.push({
-                tool: `cmd:${approval.command.action}`,
-                params: { resource: approval.command.resource, options: approval.command.options },
-                error: errMsg,
-              });
               await finish('error');
               return;
             }
@@ -349,145 +372,97 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
             emit({ type: 'tool_start', tool: approval.tool.name, params: approval.tool.params, tier: 3 });
             try {
               const { result } = await executeTool(approval.tool.name, approval.tool.params, userId, true);
-              emit({
-                type: 'tool_result',
-                tool: approval.tool.name,
-                result,
-                tier: 3,
-              });
-              runState.toolCallHistory.push({
-                tool: approval.tool.name,
-                params: approval.tool.params,
-                result,
-              });
-              emit({
-                type: 'text',
-                content: typeof result === 'string' ? result : JSON.stringify(result, null, 2),
-                role: 'assistant',
-              });
+              emit({ type: 'tool_result', tool: approval.tool.name, result, tier: 3 });
+              
+              runState.messages.push({ role: 'tool', tool_call_id: 'approval_call', content: JSON.stringify(result) });
+              forceSynthesis = true;
             } catch (err) {
               const errMsg = err instanceof Error ? err.message : String(err);
               emit({ type: 'tool_error', tool: approval.tool.name, error: errMsg });
-              runState.toolCallHistory.push({
-                tool: approval.tool.name,
-                params: approval.tool.params,
-                error: errMsg,
+              await finish('error');
+              return;
+            }
+          }
+        } else {
+          let parsedCommand: ParsedCommand | null = null;
+          if (commandMode === 'slash' || commandMode === 'auto') {
+            parsedCommand = parseSlashCommand(message);
+          }
+          if (!parsedCommand && (commandMode === 'natural' || commandMode === 'auto')) {
+            parsedCommand = classifyNaturalLanguage(message);
+          }
+
+          if (parsedCommand) {
+            emit({ type: 'command_parsed', command: parsedCommand, tier: parsedCommand.tier });
+            runState.lastCommand = parsedCommand;
+
+            const cmdRegistry = new CommandRegistry();
+            if (parsedCommand.requiresApproval) {
+              const pendingId = await createCommandApproval(parsedCommand, userId, runState.threadId);
+              runState.pendingApprovalId = pendingId;
+              persistRunState();
+              const confirmMsg = `Destructive action: \`${parsedCommand.action}\` on \`${parsedCommand.resource}\`. This cannot be undone. Reply \`CONFIRM\` to proceed or \`CANCEL\` to abort.`;
+              emit({ type: 'destructive_confirm', approvalId: pendingId, command: parsedCommand, message: confirmMsg });
+              await finish('paused_for_approval');
+              return;
+            }
+
+            try {
+              emit({
+                type: 'tool_start',
+                tool: `cmd:${parsedCommand.action}`,
+                params: { resource: parsedCommand.resource, options: parsedCommand.options },
+                tier: parsedCommand.tier === 'tier3' ? 3 : 0,
               });
+              const cmdResult = await cmdRegistry.executeCommand(parsedCommand, userId, true);
+              if (!cmdResult.success) {
+                emit({ type: 'error', message: cmdResult.error ?? 'Command failed.' });
+                await finish('error');
+                return;
+              }
+              emit({
+                type: 'tool_result',
+                tool: `cmd:${parsedCommand.action}`,
+                result: cmdResult.output,
+                tier: parsedCommand.tier === 'tier3' ? 3 : 0,
+              });
+
+              if (runState.commandMode === 'slash') {
+                emit({
+                  type: 'text',
+                  content: typeof cmdResult.output === 'string'
+                    ? cmdResult.output
+                    : JSON.stringify(cmdResult.output, null, 2),
+                  role: 'assistant',
+                });
+                await finish('completed');
+                return;
+              }
+
+              runState.messages.push({ role: 'user', content: message });
+              runState.messages.push({ role: 'assistant', content: null, tool_calls: [{ id: 'cmd_call', function: { name: `cmd:${parsedCommand.action}`, arguments: JSON.stringify(parsedCommand.options) } }] });
+              runState.messages.push({ role: 'tool', tool_call_id: 'cmd_call', content: JSON.stringify(cmdResult.output) });
+              forceSynthesis = true;
+            } catch (err) {
+              const errMsg = err instanceof Error ? err.message : String(err);
               emit({ type: 'error', message: errMsg });
               await finish('error');
               return;
             }
+          } else {
+            runState.messages.push({ role: 'user', content: message });
           }
-
-          persistRunState();
-          await finish('completed');
-          return;
-        }
-
-        let parsedCommand: ParsedCommand | null = null;
-        if (commandMode === 'slash' || commandMode === 'auto') {
-          parsedCommand = parseSlashCommand(message);
-        }
-        if (!parsedCommand && (commandMode === 'natural' || commandMode === 'auto')) {
-          parsedCommand = classifyNaturalLanguage(message);
-        }
-
-        if (parsedCommand) {
-          emit({ type: 'command_parsed', command: parsedCommand, tier: parsedCommand.tier });
-          runState.lastCommand = parsedCommand;
-
-          const cmdRegistry = new CommandRegistry();
-          if (parsedCommand.requiresApproval) {
-            const pendingId = await createCommandApproval(parsedCommand, userId, runState.threadId);
-            runState.pendingApprovalId = pendingId;
-            persistRunState();
-            const confirmMsg = `Destructive action: \`${parsedCommand.action}\` on \`${parsedCommand.resource}\`. This cannot be undone. Reply \`CONFIRM\` to proceed or \`CANCEL\` to abort.`;
-            emit({
-              type: 'destructive_confirm',
-              approvalId: pendingId,
-              command: parsedCommand,
-              message: confirmMsg,
-            });
-            emit({ type: 'text', content: confirmMsg });
-            await finish('paused_for_approval');
-            return;
-          }
-
-          try {
-            emit({
-              type: 'tool_start',
-              tool: `cmd:${parsedCommand.action}`,
-              params: { resource: parsedCommand.resource, options: parsedCommand.options },
-              tier: parsedCommand.tier === 'tier3' ? 3 : parsedCommand.tier === 'tier2' ? 2 : parsedCommand.tier === 'tier1' ? 1 : 0,
-            });
-            const cmdResult = await cmdRegistry.executeCommand(parsedCommand, userId, true);
-            if (!cmdResult.success) {
-              emit({
-                type: 'tool_error',
-                tool: `cmd:${parsedCommand.action}`,
-                error: cmdResult.error ?? 'Command failed.',
-              });
-              emit({ type: 'error', message: cmdResult.error ?? 'Command failed.' });
-              runState.toolCallHistory.push({
-                tool: `cmd:${parsedCommand.action}`,
-                params: { resource: parsedCommand.resource, options: parsedCommand.options },
-                error: cmdResult.error ?? 'Command failed.',
-              });
-              await finish('error');
-              return;
-            }
-            emit({
-              type: 'tool_result',
-              tool: `cmd:${parsedCommand.action}`,
-              result: cmdResult.output,
-              tier: parsedCommand.tier === 'tier3' ? 3 : parsedCommand.tier === 'tier2' ? 2 : parsedCommand.tier === 'tier1' ? 1 : 0,
-            });
-            emit({
-              type: 'text',
-              content: typeof cmdResult.output === 'string'
-                ? cmdResult.output
-                : JSON.stringify(cmdResult.output, null, 2),
-              role: 'assistant',
-            });
-            runState.toolCallHistory.push({
-              tool: `cmd:${parsedCommand.action}`,
-              params: { resource: parsedCommand.resource, options: parsedCommand.options },
-              result: cmdResult.output,
-            });
-          } catch (err) {
-            const errMsg = err instanceof Error ? err.message : String(err);
-            emit({
-              type: 'tool_error',
-              tool: `cmd:${parsedCommand.action}`,
-              error: errMsg,
-            });
-            emit({ type: 'error', message: errMsg });
-            runState.toolCallHistory.push({
-              tool: `cmd:${parsedCommand.action}`,
-              params: { resource: parsedCommand.resource, options: parsedCommand.options },
-              error: errMsg,
-            });
-            await finish('error');
-            return;
-          }
-
-          persistRunState();
-          await finish('completed');
-          return;
         }
 
         const ctx = buildAgentContext(message, stateSnapshot);
-        const model = selectModel(message);
+        const model = modelId ?? selectModel(message);
         emit({ type: 'context', domain: ctx.domain, model, commandMode });
 
         const messages: object[] = runState.messages.length > 0
           ? [...runState.messages]
           : [{ role: 'system', content: ctx.systemPrompt }];
 
-        messages.push({ role: 'user', content: message });
-
         const calledTools = new Set<string>();
-        let forceSynthesis = false;
         let encounteredError = false;
 
         for (let round = runState.round; round < 10; round++) {
@@ -561,21 +536,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
               runState.pendingApprovalId = pendingId;
               runState.messages = messages;
               persistRunState();
-              const confirmMsg = `I need to execute \`${toolName}\` with params: \`${JSON.stringify(params)}\`. This is a **destructive** action (tier 3). Reply \`CONFIRM\` to proceed or \`CANCEL\` to abort.`;
-              emit({
-                type: 'destructive_confirm',
-                approvalId: pendingId,
-                tool: toolName,
-                params,
-                message: confirmMsg,
-              });
-              emit({ type: 'text', content: confirmMsg });
+              const confirmMsg = `I need to execute \`${toolName}\` with params: \`${JSON.stringify(params)}\`. This is a **destructive** action. Reply \`CONFIRM\` to proceed or \`CANCEL\` to abort.`;
+              emit({ type: 'destructive_confirm', approvalId: pendingId, tool: toolName, params, message: confirmMsg });
               await finish('paused_for_approval');
               return;
             }
 
             emit({ type: 'tool_start', tool: toolName, params, tier: tierNum });
-            emit({ type: 'text', content: `Executing ${toolName}...` });
 
             try {
               const { result } = await executeTool(toolName, params, userId, false);

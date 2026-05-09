@@ -61,7 +61,7 @@ export default function Home() {
     }
   }
 
-  if (status === "loading") {
+  if (false && status === "loading") {
     return <main className="mx-auto flex min-h-screen max-w-3xl items-center justify-center">Loading...</main>;
   }
 

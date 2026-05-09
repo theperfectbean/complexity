@@ -2,7 +2,7 @@
 
 import { Check, Copy, RotateCcw, ArrowDown, Globe, Search, Brain, Database, Pencil, ChevronLeft, ChevronRight, RefreshCw, Download, Trash2 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
-import { useState, useRef, useEffect, useCallback, memo, useMemo } from "react";
+import { useState, useRef, useEffect, useCallback, memo, useMemo, useLayoutEffect } from "react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 
 import { SourceCarousel } from "@/components/chat/SourceCarousel";
@@ -151,12 +151,10 @@ const MessageItem = memo(function MessageItem({
       textarea.focus();
       textarea.setSelectionRange(textarea.value.length, textarea.value.length);
       
-      // Use a small delay to ensure the container width has settled before measuring
       const timer = setTimeout(() => {
         adjustTextareaHeight();
       }, 0);
 
-      // Monitor width changes to re-adjust height
       const observer = new ResizeObserver(() => {
         adjustTextareaHeight();
       });
@@ -218,7 +216,6 @@ const MessageItem = memo(function MessageItem({
 
   const relevantBranches = useMemo(() => {
     if (!branches || !onBranchChange) return [];
-    // A branch is relevant if its branchPointMessageId matches THIS message's ID
     return branches.filter(b => b.branchPointMessageId === message.id);
   }, [branches, message.id, onBranchChange]);
 
@@ -236,7 +233,6 @@ const MessageItem = memo(function MessageItem({
 
   useEffect(() => {
     if (isCurrentMatch && searchQuery) {
-      // Small delay to ensure rendering is complete
       const timer = setTimeout(() => {
         itemRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
       }, 100);
@@ -256,14 +252,13 @@ const MessageItem = memo(function MessageItem({
       <article 
         data-testid={`message-${message.role}`}
         className={isUser ? "flex flex-col items-end py-2" : "group relative flex flex-col gap-0 pt-2 pb-10"}
-        style={{ overflowAnchor: "auto", contentVisibility: "auto", containIntrinsicSize: "0 300px" }}
+        style={{ overflowAnchor: "auto", contentVisibility: "auto", containIntrinsicSize: "auto 100px" }}
       >
       {isUser ? (
         <div className={cn(
           "group/user relative max-w-[85%] md:max-w-[75%]",
           isEditing ? "w-full" : "w-fit"
         )}>
-          {/* User Message Actions (Left Side) */}
           {!isEditing && (
             <div className="absolute -left-12 top-1/2 -translate-y-1/2 flex items-center gap-1.5 opacity-0 group-hover/user:opacity-100 transition-all duration-200">
               {relevantBranches.length > 1 && onBranchChange && (
@@ -385,7 +380,6 @@ const MessageItem = memo(function MessageItem({
                 return images.length > 0 ? (
                   <div className="flex flex-wrap gap-2 mb-2">
                     {images.map((img, idx) => (
-                      /* eslint-disable-next-line @next/next/no-img-element */
                       <img key={idx} src={img.url} alt={img.name || "Attachment"} className="max-h-48 rounded-lg object-cover shadow-sm border border-border/50" />
                     ))}
                   </div>
@@ -442,7 +436,7 @@ const MessageItem = memo(function MessageItem({
             </div>
           )}
 
-          <div className="max-w-none break-words">
+          <div className="max-w-none break-words" style={{ minHeight: isStreaming && index === totalMessages - 1 ? "1.5em" : "auto" }}>
             {message.memoriesUsed && (
               <div className="mb-4 flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-primary/80 bg-primary/5 w-fit px-2 py-1 rounded-md border border-primary/10">
                 <Brain className="h-3 w-3" />
@@ -455,7 +449,6 @@ const MessageItem = memo(function MessageItem({
               </div>
             ) : null}
 
-            {/* Reasoning/CoT block: extract <think>...</think> from content */}
             {(() => {
               const isCurrentlyStreaming = isStreaming && index === totalMessages - 1;
               const { thinkContent, mainContent } = extractThinkingBlock(message.content);
@@ -608,39 +601,57 @@ export function MessageList({
   isStreaming, 
   onDownload 
 }: MessageListProps) {
-  const FOLLOW_THRESHOLD_PX = 160;
+  const FOLLOW_THRESHOLD_PX = 400;
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [isFollowingLatest, setIsFollowingLatest] = useState(true);
+  const isFollowingRef = useRef(true);
   const bottomRef = useRef<HTMLDivElement>(null);
   const hasAutoScrolledRef = useRef(false);
   const lastScrollTimeRef = useRef(0);
+  const isAutoScrollingRef = useRef(false);
 
   const previousMessagesLengthRef = useRef(messages.length);
 
-  const isNearBottom = useCallback(
-    () =>
-      window.innerHeight + window.scrollY >=
-      document.documentElement.scrollHeight - FOLLOW_THRESHOLD_PX,
-    [FOLLOW_THRESHOLD_PX]
-  );
+  const isNearBottom = useCallback(() => {
+    const scrollY = window.scrollY;
+    const innerHeight = window.innerHeight;
+    const scrollHeight = document.documentElement.scrollHeight;
+    return scrollY + innerHeight >= scrollHeight - FOLLOW_THRESHOLD_PX;
+  }, [FOLLOW_THRESHOLD_PX]);
 
   const scrollToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {
-    // Throttle scroll events to at most 30fps (33ms) to prevent jitter
     const now = Date.now();
     if (now - lastScrollTimeRef.current < 33) return;
     lastScrollTimeRef.current = now;
 
+    isAutoScrollingRef.current = true;
     if (bottomRef.current) {
       bottomRef.current.scrollIntoView({ behavior, block: "end" });
-      return;
+    } else {
+      window.scrollTo({ top: document.documentElement.scrollHeight, behavior });
     }
-
-    window.scrollTo({ top: document.documentElement.scrollHeight, behavior });
+    
+    // Use a RAF to release the lock
+    requestAnimationFrame(() => {
+       requestAnimationFrame(() => {
+          isAutoScrollingRef.current = false;
+       });
+    });
   }, []);
 
   const handleScroll = useCallback(() => {
+    // If we are far from the bottom, stop following immediately
     const nearBottom = isNearBottom();
-    setIsFollowingLatest(nearBottom);
+    if (!nearBottom) {
+       isFollowingRef.current = false;
+       setIsFollowingLatest(false);
+    } else {
+       // Only resume if it was NOT a programmatic scroll
+       if (!isAutoScrollingRef.current) {
+          isFollowingRef.current = true;
+          setIsFollowingLatest(true);
+       }
+    }
   }, [isNearBottom]);
 
   useEffect(() => {
@@ -652,8 +663,30 @@ export function MessageList({
     };
   }, [handleScroll]);
 
-  // Auto-scroll to bottom
+  // Reliable follow using MutationObserver
   useEffect(() => {
+    if (!isStreaming) return;
+
+    let rafId: number;
+    const observer = new MutationObserver(() => {
+      if (!isFollowingRef.current) return;
+      
+      cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => {
+        if (isFollowingRef.current) {
+           scrollToBottom("auto");
+        }
+      });
+    });
+
+    observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+    return () => {
+      observer.disconnect();
+      cancelAnimationFrame(rafId);
+    };
+  }, [isStreaming, scrollToBottom]);
+
+  useLayoutEffect(() => {
     if (messages.length === 0) {
       hasAutoScrolledRef.current = false;
       return;
@@ -664,27 +697,21 @@ export function MessageList({
     const latestMessage = messages[messages.length - 1];
     const isNewUserMessage = isNewMessage && latestMessage?.role === "user";
 
-    // Initial scroll when messages arrive
-    if (!hasAutoScrolledRef.current) {
+    if (!hasAutoScrolledRef.current || isNewUserMessage) {
       hasAutoScrolledRef.current = true;
+      isFollowingRef.current = true;
+      setIsFollowingLatest(true);
       requestAnimationFrame(() => scrollToBottom("auto"));
       return;
     }
 
-    if (isNewUserMessage) {
-      requestAnimationFrame(() => scrollToBottom("auto"));
-      return;
-    }
-
-    if (isFollowingLatest) {
-      // Use "auto" instead of smooth during active streaming to prevent jitter.
+    if (isFollowingRef.current) {
       requestAnimationFrame(() => scrollToBottom("auto"));
     }
-  }, [messages, isStreaming, isFollowingLatest, scrollToBottom]);
+  }, [messages, scrollToBottom]);
 
   async function copyMessage(messageId: string, content: string) {
-    const cleaned = content;
-    const success = await copyToClipboard(cleaned);
+    const success = await copyToClipboard(content);
     if (success) {
       setCopiedId(messageId);
       setTimeout(() => setCopiedId((current) => (current === messageId ? null : current)), 2000);
@@ -700,7 +727,7 @@ export function MessageList({
   const showScrollButton = !isFollowingLatest && messages.length > 0;
 
   return (
-    <div className="relative space-y-6 pb-4 overflow-anchor-none">
+    <div className="relative space-y-6 pb-4">
       {hasMore && onLoadMore && (
         <div className="flex justify-center pt-2 pb-6">
           <button
@@ -725,11 +752,12 @@ export function MessageList({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 10, scale: 0.9 }}
             onClick={() => {
+              isFollowingRef.current = true;
               setIsFollowingLatest(true);
               scrollToBottom("smooth");
             }}
             aria-label="Jump to latest messages"
-            className="fixed bottom-32 left-1/2 z-50 flex h-10 w-10 -translate-x-1/2 items-center justify-center rounded-full border bg-background shadow-lg transition-transform active:scale-95 md:bottom-36"
+            className="fixed bottom-32 left-1/2 z-50 flex h-10 w-10 -translate-x-1/2 items-center justify-center rounded-full border bg-background shadow-lg transition-transform active:scale-95 md:bottom-40 md:ml-32"
           >
             <ArrowDown className="h-4 w-4 text-foreground" />
           </motion.button>
@@ -770,8 +798,6 @@ export function MessageList({
         }
 
         const lastMessage = messages[messages.length - 1];
-        // Show if last message is user (assistant not added yet)
-        // OR if last message is assistant but HAS NO CONTENT yet.
         const isWaitingForFirstToken = lastMessage.role === "user" || 
           (lastMessage.role === "assistant" && (!lastMessage.content || lastMessage.content === "\u200B"));
         

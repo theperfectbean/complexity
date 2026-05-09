@@ -105,7 +105,7 @@ test.describe("UI Performance and Polish Audit", () => {
       {
         name: "audit-facts.txt",
         mimeType: "text/plain",
-        buffer: Buffer.from("The secret launch code for project Orion is 8847-OMEGA. Remember this well."),
+        buffer: Buffer.from("The secret is APPLE-PIE. Remember this well."),
       },
     ]);
 
@@ -131,7 +131,7 @@ test.describe("UI Performance and Polish Audit", () => {
     const searchInput = page.getByPlaceholder("Ask anything...");
     const startTime = Date.now();
     
-    await searchInput.fill("What is the secret launch code for project Orion?");
+    await searchInput.fill("What is the secret?");
     await searchInput.press("Enter");
 
     await expect(page).toHaveURL(/\/chat\//, { timeout: 15000 });
@@ -152,7 +152,7 @@ test.describe("UI Performance and Polish Audit", () => {
     // Ensure source carousel / RAG attributes are visible (if present)
     // Sometimes the mock LLM might not return explicit citations for short local queries,
     // so we verify that the response article has text.
-    await expect(article).toContainText(/8847-OMEGA/i, { timeout: 15000 });
+    await expect(article).toContainText(/APPLE-PIE/i, { timeout: 15000 });
 
     // Check CLS
     const cls = await page.evaluate(() => (window as unknown as WindowWithCls).clsValue || 0);
