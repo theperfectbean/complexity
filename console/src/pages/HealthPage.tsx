@@ -5,19 +5,16 @@ import { FLEET_CONTAINERS, FLEET_NODES } from '../../../app/src/lib/topology';
 const NODES = FLEET_NODES.map(node => ({
   name: node.name,
   ip: node.ip,
-  tailscale: node.tailscaleIp,
+  tailscale: node.tailscaleIp || '-',
   containers: FLEET_CONTAINERS.filter(container => container.node === node.name).length,
 }));
 
 const DISKS = [
-  { node: 'nas',   device: 'nvme0n1p2', size: '238G', mount: '/',              pct: 2  },
-  { node: 'nas',   device: 'sda1',      size: '954G', mount: '/data',          pct: 3  },
-  { node: 'nas',   device: 'sdb1',      size: '1.8T', mount: '/mnt/disk3',     pct: 71 },
-  { node: 'nas',   device: 'sdc1',      size: '1.8T', mount: '/mnt/usb-parity',pct: 12 },
-  { node: 'media', device: 'nvme0n1p2', size: '238G', mount: '/',              pct: 65 },
-  { node: 'media', device: 'sda1',      size: '220G', mount: '(unmounted)',     pct: 100},
-  { node: 'ai',    device: 'nvme1n1p2', size: '476G', mount: '/',              pct: 2  },
-  { node: 'ai',    device: 'nvme0n1p1', size: '954G', mount: '/data',          pct: 3  },
+  { node: 'node02', device: 'nvme0n1p2', size: '238G', mount: '/',              pct: 2  },
+  { node: 'node02', device: 'sda1',      size: '954G', mount: '/data',          pct: 3  },
+  { node: 'node02', device: 'sdb1',      size: '1.8T', mount: '/mnt/disk3',     pct: 71 },
+  { node: 'node01', device: 'nvme0n1p2', size: '238G', mount: '/',              pct: 65 },
+  { node: 'node03', device: 'nvme1n1p2', size: '476G', mount: '/',              pct: 2  },
 ];
 
 export default function HealthPage() {
@@ -31,7 +28,6 @@ export default function HealthPage() {
           <h1 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700 }}>Node Health</h1>
         </div>
 
-        {/* Node cards */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '1rem', marginBottom: '1.5rem' }}>
           {NODES.map(node => (
             <div key={node.name} style={{ borderRadius: '0.75rem', border: '1px solid #2d3748', background: '#1e2030', padding: '1.25rem' }}>
@@ -49,7 +45,6 @@ export default function HealthPage() {
           ))}
         </div>
 
-        {/* Disk usage */}
         <div style={{ borderRadius: '0.75rem', border: '1px solid #2d3748', background: '#1e2030', padding: '1.25rem', marginBottom: '1rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
             <HardDrive size={14} style={{ color: '#7c3aed' }} />
@@ -72,7 +67,6 @@ export default function HealthPage() {
           </div>
         </div>
 
-        {/* CPU/Mem placeholders */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '1rem' }}>
           {NODES.map(node => (
             <div key={node.name} style={{ borderRadius: '0.75rem', border: '1px solid #2d3748', background: '#1e2030', padding: '1rem' }}>

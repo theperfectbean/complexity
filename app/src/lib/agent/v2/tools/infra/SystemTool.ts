@@ -1,7 +1,7 @@
-import { sshExec, SshHost } from '../base/SshTool';
+import { sshExec, type SshHost } from '../base/SshTool';
 import { capLines } from '../base/RestApiTool';
 
-const ALLOWED_HOSTS: SshHost[] = ['nas', 'media', 'ai'];
+const ALLOWED_HOSTS: SshHost[] = ['node01', 'node02', 'node03'];
 
 function toHost(h: string): SshHost {
   if (ALLOWED_HOSTS.includes(h as SshHost)) return h as SshHost;
@@ -28,7 +28,7 @@ export async function journalctl(params: { host: string; service?: string; lines
 const SSH_EXEC_ALLOWLIST = [
   /^df\b/, /^du\b/, /^ls\b/, /^cat\b/, /^echo\b/, /^ps\b/, /^free\b/, /^uptime\b/,
   /^netstat\b/, /^ss\b/, /^ip\b/, /^ping\b/, /^curl\b/, /^systemctl status\b/,
-  /^journalctl\b/, /^incus (list|info|config show)\b/, /^find\b/, /^tail\b/, /^head\b/,
+  /^journalctl\b/, /^pvesh\b/, /^pct\b/, /^qm\b/, /^find\b/, /^tail\b/, /^head\b/,
 ];
 
 export async function ssh_exec(params: { host: string; command: string }): Promise<object> {
