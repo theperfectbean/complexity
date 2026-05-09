@@ -5,17 +5,15 @@ import { expect } from '@playwright/test';
  * Type a command into the AgentChat input and submit it.
  */
 export async function submitCommand(page: Page, command: string): Promise<void> {
-  const input = page.getByPlaceholder('Ask the fleet agent...');
+  const input = page.locator('[data-testid="message-input"]');
   await input.fill(command);
   await expect(input).toHaveValue(command);
   await input.press('Enter');
-  // Input should clear after submit
   await expect(input).toHaveValue('', { timeout: 5000 });
 }
 
 /**
  * Wait until the agent emits an event of a given type matching optional text.
- * Watches for visible text in the chat area.
  */
 export async function waitForEventType(
   page: Page,
@@ -30,72 +28,57 @@ export async function waitForEventType(
       }
       break;
     case 'tool_start':
-      // tool_start renders "Running <toolname>…"
       if (options.textMatch) {
         await page.getByText(options.textMatch).first().waitFor({ state: 'visible', timeout });
       } else {
-        await page.getByText(/Running .+…/).first().waitFor({ state: 'visible', timeout });
+        await page.getByText(/Using .+…/).first().waitFor({ state: 'visible', timeout });
       }
       break;
     case 'tool_result':
-      // tool_result renders "✓" followed by tool name
       if (options.textMatch) {
         await page.getByText(options.textMatch).first().waitFor({ state: 'visible', timeout });
       } else {
-        await page.getByText('✓').first().waitFor({ state: 'visible', timeout });
+        await page.locator('[data-testid="tool-result"]').first().waitFor({ state: 'visible', timeout });
       }
       break;
     case 'tool_error':
-      await page.getByText('✗').first().waitFor({ state: 'visible', timeout });
+      await page.locator('[data-testid="error-block"]').first().waitFor({ state: 'visible', timeout });
       break;
     case 'destructive_confirm':
       await page.getByText('Confirmation Required').first().waitFor({ state: 'visible', timeout });
       break;
     case 'error':
-      await page.getByText(/✗/).first().waitFor({ state: 'visible', timeout });
+      await page.locator('[data-testid="error-block"]').first().waitFor({ state: 'visible', timeout });
       break;
   }
 }
 
 /**
  * Wait for the agent to produce any assistant text response.
- * The agent emits a `text` event rendered as a message bubble.
  */
 export async function waitForAgentResponse(page: Page, timeoutMs = 90_000): Promise<string> {
-  // Wait for any assistant text bubble to appear (div with var(--bg-surface) background)
-  const bubble = page.locator('div').filter({ hasText: /\w{5,}/ }).first();
+  const bubble = page.locator('[data-testid="assistant-message"]').first();
   await bubble.waitFor({ state: 'visible', timeout: timeoutMs });
   return bubble.innerText();
 }
 
 /**
- * Wait for the agent run to finish (no more spinner visible, cancel btn gone).
- * Returns when the send button is re-enabled.
+ * Wait for the agent run to finish (send button re-enabled).
  */
 export async function waitForRunComplete(page: Page, timeoutMs = 120_000): Promise<void> {
-  // The "cancel" (Loader2) button appears while running; disappears when done
-  // We wait for the send button (svg lucide-send) to be visible again
-  await page.waitForFunction(
-    () => {
-      const btns = document.querySelectorAll('button[type="submit"]');
-      return btns.length > 0;
-    },
-    { timeout: timeoutMs },
-  );
-  // Additional short wait for UI to settle
-  await page.waitForTimeout(500);
+  await page.locator('[data-testid="send-btn"]:not([disabled])').waitFor({ state: 'visible', timeout: timeoutMs });
+  await page.waitForTimeout(300);
 }
 
 /**
  * Check that the agent produced a tool_result event for a given tool.
- * Returns the result row element.
  */
 export async function waitForToolResult(
   page: Page,
   toolName: string,
   timeoutMs = 90_000,
 ): Promise<void> {
-  await page.getByText(toolName).first().waitFor({ state: 'visible', timeout: timeoutMs });
+  await page.getByText(`Result: ${toolName}`).first().waitFor({ state: 'visible', timeout: timeoutMs });
 }
 
 /**
@@ -112,5 +95,5 @@ export async function clearThreads(page: Page): Promise<void> {
  */
 export async function gotoConsole(page: Page): Promise<void> {
   await page.goto('/');
-  await page.getByPlaceholder('Ask the fleet agent...').waitFor({ state: 'visible', timeout: 10_000 });
+  await page.locator('[data-testid="message-input"]').waitFor({ state: 'visible', timeout: 10_000 });
 }

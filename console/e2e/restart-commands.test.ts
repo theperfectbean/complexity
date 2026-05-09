@@ -17,7 +17,7 @@ test.beforeEach(async ({ page }) => {
   await gotoConsole(page);
   await clearThreads(page);
   await page.reload();
-  await page.getByPlaceholder('Ask the fleet agent...').waitFor({ state: 'visible' });
+  await page.locator('[data-testid=\message-input\]').waitFor({ state: 'visible' });
 });
 
 test.describe('Service restart commands', () => {

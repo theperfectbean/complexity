@@ -12,12 +12,12 @@ test.beforeEach(async ({ page }) => {
   await gotoConsole(page);
   await clearThreads(page);
   await page.reload();
-  await page.getByPlaceholder('Ask the fleet agent...').waitFor({ state: 'visible' });
+  await page.locator('[data-testid=\message-input\]').waitFor({ state: 'visible' });
 });
 
 test.describe('Input validation', () => {
   test('empty input cannot be submitted', async ({ page }) => {
-    const input = page.getByPlaceholder('Ask the fleet agent...');
+    const input = page.locator('[data-testid=\message-input\]');
     // Input is empty
     await expect(input).toHaveValue('');
 
@@ -29,17 +29,17 @@ test.describe('Input validation', () => {
     await expect(blocks).toHaveCount(0, { timeout: 3000 }).catch(() => {});
 
     // Input should still be empty and the page should be intact
-    await expect(page.getByPlaceholder('Ask the fleet agent...')).toBeVisible();
+    await expect(page.locator('[data-testid=\message-input\]')).toBeVisible();
   });
 
   test('whitespace-only input cannot be submitted', async ({ page }) => {
-    const input = page.getByPlaceholder('Ask the fleet agent...');
+    const input = page.locator('[data-testid=\message-input\]');
     await input.fill('   ');
     await input.press('Enter');
 
     // Should not start a run — input field should still be present and clear
     await page.waitForTimeout(1000);
-    await expect(page.getByPlaceholder('Ask the fleet agent...')).toBeVisible();
+    await expect(page.locator('[data-testid=\message-input\]')).toBeVisible();
   });
 
   test('very long input is handled gracefully', async ({ page }) => {
@@ -50,7 +50,7 @@ test.describe('Input validation', () => {
 
     // Should either complete or show an error — must not freeze the UI
     await waitForRunComplete(page, 90_000);
-    await expect(page.getByPlaceholder('Ask the fleet agent...')).toBeVisible();
+    await expect(page.locator('[data-testid=\message-input\]')).toBeVisible();
   });
 });
 
@@ -76,7 +76,7 @@ test.describe('Unknown host / service', () => {
     await waitForRunComplete(page, 60_000);
 
     // Should not crash the page
-    await expect(page.getByPlaceholder('Ask the fleet agent...')).toBeVisible();
+    await expect(page.locator('[data-testid=\message-input\]')).toBeVisible();
   });
 });
 
@@ -92,7 +92,7 @@ test.describe('Multi-turn conversation', () => {
     await waitForRunComplete(page, 90_000);
 
     // Should still be functional
-    await expect(page.getByPlaceholder('Ask the fleet agent...')).toBeVisible();
+    await expect(page.locator('[data-testid=\message-input\]')).toBeVisible();
   });
 
   test('new thread button clears the conversation', async ({ page }) => {
@@ -107,7 +107,7 @@ test.describe('Multi-turn conversation', () => {
       await newThreadBtn.click();
       // Chat area should be empty
       await page.waitForTimeout(500);
-      const input = page.getByPlaceholder('Ask the fleet agent...');
+      const input = page.locator('[data-testid=\message-input\]');
       await expect(input).toBeVisible();
       await expect(input).toHaveValue('');
     }
@@ -143,7 +143,7 @@ test.describe('SSE stream reliability', () => {
     const hasLoadingState = await page.waitForFunction(
       () => {
         // Look for disabled input or stop button
-        const input = document.querySelector('textarea, input[type="text"]') as HTMLInputElement | null;
+        const input = document.querySelector('[data-testid="message-input"]') as HTMLTextAreaElement | null;
         const cancelBtn = document.querySelector('[aria-label*="cancel"], [aria-label*="stop"]');
         return (input && input.disabled) || cancelBtn !== null;
       },
@@ -153,7 +153,7 @@ test.describe('SSE stream reliability', () => {
     // If no loading state is found, that's okay — the run may complete very fast
     // The important thing is the run completes without errors
     await waitForRunComplete(page, 90_000);
-    await expect(page.getByPlaceholder('Ask the fleet agent...')).toBeVisible();
+    await expect(page.locator('[data-testid=\message-input\]')).toBeVisible();
   });
 
   test('submitting a second command after first completes works correctly', async ({ page }) => {
@@ -166,6 +166,6 @@ test.describe('SSE stream reliability', () => {
     await submitCommand(page, 'show NAS disk usage');
     await waitForRunComplete(page, 90_000);
 
-    await expect(page.getByPlaceholder('Ask the fleet agent...')).toBeVisible();
+    await expect(page.locator('[data-testid=\message-input\]')).toBeVisible();
   });
 });
