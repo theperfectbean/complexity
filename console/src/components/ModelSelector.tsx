@@ -105,7 +105,6 @@ export function ModelSelector({ value, onChange }: Props) {
   }, [enabledModels]);
 
   const activeModel = enabledModels.find((model) => model.id === value) ?? enabledModels[0];
-  const activeCategory = activeModel?.category || "Other";
   const activeModelLabel = activeModel ? formatDisplayLabel(activeModel.label) : "Model";
 
   const setEnabledIds = (ids: string[]) => {
@@ -155,14 +154,14 @@ export function ModelSelector({ value, onChange }: Props) {
         <button
           type="button"
           className="inline-flex h-7 items-center gap-1 rounded-lg bg-transparent px-1.5 text-[12px] font-medium text-muted-foreground transition-all hover:bg-muted/40 hover:text-foreground group active:scale-95"
-          aria-label="Select model"
-          title="Select model"
+          aria-label="Model settings"
+          title="Model settings"
         >
-          <div className="flex h-3.5 w-3.5 items-center justify-center opacity-70 group-hover:opacity-100 transition-opacity">
-            {CATEGORY_ICONS[activeCategory] || <Settings2 className="h-3.5 w-3.5" />}
+          <div className="flex h-3.5 w-3.5 items-center justify-center opacity-80 group-hover:opacity-100 transition-opacity">
+            <Settings2 className="h-3.5 w-3.5" />
           </div>
-          <span className="hidden sm:inline max-w-28 truncate">{activeModelLabel}</span>
-          <span className="sm:hidden text-xs">Model</span>
+          <span className="text-xs font-semibold">Model settings</span>
+          <span className="hidden lg:inline max-w-32 truncate text-[11px] text-muted-foreground/80">{activeModelLabel}</span>
           <ChevronDown className="h-3 w-3 opacity-40 group-hover:opacity-70 transition-opacity" />
         </button>
       </DropdownMenu.Trigger>
