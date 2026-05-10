@@ -83,9 +83,9 @@ type PersistedConsoleEvent = ConsoleEvent & {
  */
 function selectModel(message: string): string {
   if (SMART_KEYWORDS.test(message) || message.length > 600) {
-      return "perplexity/anthropic/claude-sonnet-4-5";
+      return "perplexity/sonar-pro";
   }
-  return "perplexity/anthropic/claude-haiku-4-5";
+  return "perplexity/sonar";
 }
 
 function stripThinking(text: string): string {
@@ -136,6 +136,100 @@ function extractAssistantResponse(content: string): string {
   return content;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function parseMaybeJson(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text;
+  }
+}
+
+function normalizeUnifiedMessages(messages: object[]): object[] {
+  const toolNameByCallId = new Map<string, string>();
+  const normalized: object[] = [];
+
+  for (const raw of messages) {
+    if (!isRecord(raw) || typeof raw.role !== 'string') continue;
+
+    if (raw.role === 'system') {
+      normalized.push({
+        role: 'system',
+        content: typeof raw.content === 'string' ? raw.content : JSON.stringify(raw.content ?? ''),
+      });
+      continue;
+    }
+
+    if (raw.role === 'user') {
+      normalized.push({
+        role: 'user',
+        content: typeof raw.content === 'string' ? raw.content : String(raw.content ?? ''),
+      });
+      continue;
+    }
+
+    if (raw.role === 'assistant') {
+      const toolCalls = Array.isArray(raw.tool_calls) ? raw.tool_calls : [];
+      const parts: Array<Record<string, unknown>> = [];
+
+      if (typeof raw.content === 'string' && raw.content.trim().length > 0) {
+        parts.push({ type: 'text', text: raw.content });
+      }
+
+      for (const tc of toolCalls) {
+        if (!isRecord(tc)) continue;
+        const id = typeof tc.id === 'string' ? tc.id : `tool_call_${toolNameByCallId.size + 1}`;
+        const fn = isRecord(tc.function) ? tc.function : {};
+        const name = typeof fn.name === 'string' ? fn.name : 'unknown_tool';
+        const args = typeof fn.arguments === 'string' ? parseMaybeJson(fn.arguments) : {};
+        toolNameByCallId.set(id, name);
+        parts.push({
+          type: 'tool-call',
+          toolCallId: id,
+          toolName: name,
+          input: args,
+        });
+      }
+
+      if (parts.length === 0) {
+        normalized.push({ role: 'assistant', content: typeof raw.content === 'string' ? raw.content : '' });
+      } else {
+        normalized.push({ role: 'assistant', content: parts });
+      }
+      continue;
+    }
+
+    if (raw.role === 'tool') {
+      const toolCallId = typeof raw.tool_call_id === 'string'
+        ? raw.tool_call_id
+        : (typeof raw.toolCallId === 'string' ? raw.toolCallId : 'legacy_tool_call');
+      const toolName = toolNameByCallId.get(toolCallId)
+        ?? (typeof raw.toolName === 'string' ? raw.toolName : 'unknown_tool');
+
+      const contentValue = typeof raw.content === 'string'
+        ? parseMaybeJson(raw.content)
+        : raw.content;
+
+      normalized.push({
+        role: 'tool',
+        content: [{
+          type: 'tool-result',
+          toolCallId,
+          toolName,
+          output: typeof contentValue === 'string'
+            ? { type: 'text', value: contentValue }
+            : { type: 'json', value: contentValue },
+        }],
+      });
+    }
+  }
+
+  return normalized;
+}
+
 /**
  * Modern LLM Call using Complexity's core pipeline.
  * Completely eliminates hardcoded local backends.
@@ -148,12 +242,13 @@ async function llmCall(messages: object[], tools: object[], modelId: string, sig
     
     const langModel = await getLanguageModel(modelId, keys);
     const { providerOptions } = await getProviderRequestOptions(modelId);
+    const normalizedMessages = normalizeUnifiedMessages(messages);
     
     // Using generateText to maintain compatibility with the existing orchestration loop
     const result = await generateText({
         model: langModel,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        messages: messages as any,
+      messages: normalizedMessages as any,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         tools: tools as any,
         providerOptions,
@@ -258,6 +353,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const runStore = new RedisUnifiedRunStore<UnifiedRunState>(redis);
   const eventStore = new RedisUnifiedEventStore<PersistedConsoleEvent>(redis);
   const effectiveThreadId = threadId ?? stateSnapshot?.threadId ?? `thread_${Date.now()}`;
+  const isExplicitSlashInput = message.trim().startsWith('/');
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
@@ -364,7 +460,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
               }
 
               runState.messages.push({ role: 'user', content: message });
-              runState.messages.push({ role: 'assistant', content: null, tool_calls: [{ id: 'cmd_call', function: { name: `cmd:${approval.command.action}`, arguments: JSON.stringify(approval.command.options) } }] });
+              runState.messages.push({ role: 'assistant', content: '', tool_calls: [{ id: 'cmd_call', function: { name: `cmd:${approval.command.action}`, arguments: JSON.stringify(approval.command.options) } }] });
               runState.messages.push({ role: 'tool', tool_call_id: 'cmd_call', content: JSON.stringify(cmdResult.output) });
               forceSynthesis = true;
             } catch (err) {
@@ -392,6 +488,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           let parsedCommand: ParsedCommand | null = null;
           if (commandMode === 'slash' || commandMode === 'auto') {
             parsedCommand = parseSlashCommand(message);
+          }
+          if (parsedCommand && isExplicitSlashInput) {
+            runState.commandMode = 'slash';
           }
           if (!parsedCommand && (commandMode === 'natural' || commandMode === 'auto')) {
             parsedCommand = classifyNaturalLanguage(message);
@@ -445,7 +544,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
               }
 
               runState.messages.push({ role: 'user', content: message });
-              runState.messages.push({ role: 'assistant', content: null, tool_calls: [{ id: 'cmd_call', function: { name: `cmd:${parsedCommand.action}`, arguments: JSON.stringify(parsedCommand.options) } }] });
+              runState.messages.push({ role: 'assistant', content: '', tool_calls: [{ id: 'cmd_call', function: { name: `cmd:${parsedCommand.action}`, arguments: JSON.stringify(parsedCommand.options) } }] });
               runState.messages.push({ role: 'tool', tool_call_id: 'cmd_call', content: JSON.stringify(cmdResult.output) });
               forceSynthesis = true;
             } catch (err) {
@@ -509,7 +608,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
             const fallbackCalls = parseToolCallsFromContent(msg.content);
             if (fallbackCalls && fallbackCalls.length > 0) {
               msg.tool_calls = fallbackCalls;
-              msg.content = null;
+              msg.content = '';
             }
           }
 
