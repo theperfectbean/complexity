@@ -140,8 +140,10 @@ function extractAssistantResponse(content: string): string {
  * Modern LLM Call using Complexity's core pipeline.
  * Completely eliminates hardcoded local backends.
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function llmCall(messages: object[], tools: object[], modelId: string, signal?: AbortSignal): Promise<any> {
     const settings = await getDetailedSettings([...MODEL_SETTINGS_KEYS]);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const keys = Object.keys(settings).reduce((acc, k) => ({ ...acc, [k]: (settings as any)[k].value }), {});
     
     const langModel = await getLanguageModel(modelId, keys);
@@ -150,7 +152,9 @@ async function llmCall(messages: object[], tools: object[], modelId: string, sig
     // Using generateText to maintain compatibility with the existing orchestration loop
     const result = await generateText({
         model: langModel,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         messages: messages as any,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         tools: tools as any,
         providerOptions,
         abortSignal: signal,
@@ -167,6 +171,7 @@ async function llmCall(messages: object[], tools: object[], modelId: string, sig
                         id: tc.toolCallId,
                         function: {
                             name: tc.toolName,
+                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
                             arguments: JSON.stringify((tc as any).args ?? {})
                         }
                     }))
