@@ -66,6 +66,115 @@ function isAssistantMessage(value: unknown): value is { role: "assistant"; conte
     && (value as { role?: unknown }).role === "assistant";
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function normalizeToolOutput(value: unknown): { type: "json"; value: unknown } | { type: "text"; value: string } {
+  if (typeof value === "string") {
+    return { type: "text", value };
+  }
+  return { type: "json", value };
+}
+
+
+function normalizeTextOrImageParts(parts: unknown[]): Array<Record<string, unknown>> {
+  const normalized: Array<Record<string, unknown>> = [];
+
+  for (const part of parts) {
+    if (!isRecord(part) || typeof part.type !== "string") continue;
+
+    if (part.type === "text" && typeof part.text === "string") {
+      normalized.push({ type: "text", text: part.text });
+      continue;
+    }
+
+    if (part.type === "image" && typeof part.image === "string") {
+      const imagePart: Record<string, unknown> = { type: "image", image: part.image };
+      if (typeof part.mediaType === "string") {
+        imagePart.mediaType = part.mediaType;
+      }
+      normalized.push(imagePart);
+    }
+  }
+
+  return normalized;
+}
+
+function normalizeToolContentPart(
+  part: unknown,
+  fallbackToolCallId: string,
+  fallbackToolName: string,
+): { type: "tool-result"; toolCallId: string; toolName: string; output: { type: "json"; value: unknown } | { type: "text"; value: string } } | null {
+  if (!isRecord(part)) return null;
+  if (part.type !== "tool-result") return null;
+
+  const toolCallId = typeof part.toolCallId === "string" ? part.toolCallId : fallbackToolCallId;
+  const toolName = typeof part.toolName === "string" ? part.toolName : fallbackToolName;
+
+  if (isRecord(part.output) && typeof part.output.type === "string") {
+    // Keep already-normalized output as-is.
+    return {
+      type: "tool-result",
+      toolCallId,
+      toolName,
+      output: part.output as { type: "json"; value: unknown } | { type: "text"; value: string },
+    };
+  }
+
+  return {
+    type: "tool-result",
+    toolCallId,
+    toolName,
+    output: normalizeToolOutput(part.output ?? ("result" in part ? part.result : part)),
+  };
+}
+
+function normalizeMessage(message: unknown): { role: "system" | "user" | "assistant" | "tool"; content: unknown } | null {
+  if (!isRecord(message) || typeof message.role !== "string") return null;
+
+  if (message.role === "system") {
+    return {
+      role: "system",
+      content: typeof message.content === "string" ? message.content : JSON.stringify(message.content ?? ""),
+    };
+  }
+
+  if (message.role === "user" || message.role === "assistant") {
+    const content = message.content;
+    if (typeof content === "string") {
+      return { role: message.role, content };
+    }
+    if (Array.isArray(content)) {
+      const parts = normalizeTextOrImageParts(content);
+      return { role: message.role, content: parts.length > 0 ? parts : "" };
+    }
+    return { role: message.role, content: typeof content === "undefined" || content === null ? "" : String(content) };
+  }
+
+  if (message.role === "tool") {
+    const rawContent = Array.isArray(message.content) ? message.content : [message.content];
+    const fallbackToolCallId = typeof message.toolCallId === "string" ? message.toolCallId : "legacy_tool_call";
+    const fallbackToolName = typeof message.toolName === "string" ? message.toolName : "unknown_tool";
+    const content = rawContent
+      .map((part) => normalizeToolContentPart(part, fallbackToolCallId, fallbackToolName))
+      .filter((part): part is NonNullable<typeof part> => part !== null);
+
+    if (content.length === 0) {
+      content.push({
+        type: "tool-result",
+        toolCallId: fallbackToolCallId,
+        toolName: fallbackToolName,
+        output: normalizeToolOutput(message.content),
+      });
+    }
+
+    return { role: "tool", content };
+  }
+
+  return null;
+}
+
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
   if (typeof error === "object" && error !== null && "message" in error) {
@@ -243,7 +352,9 @@ export class AgentService {
   /** Pass through ModelMessage[] - step.response.messages already returns the correct format
    * (tool-call parts use "input"; tool-result parts use "output: {type,value}"). */
   private toCoreMsgs(msgs: unknown[]): unknown[] {
-    return msgs;
+    return msgs
+      .map((msg) => normalizeMessage(msg))
+      .filter((msg): msg is NonNullable<typeof msg> => msg !== null);
   }
 
   private async continueAgentLoop(
@@ -256,7 +367,7 @@ export class AgentService {
     await this.deps.llm.streamAgentResponse({
       model: args.model,
       system: args.system,
-      messages: state.messageHistory as never,
+      messages: this.toCoreMsgs(state.messageHistory as unknown[]) as never,
       providerOptions,
       tools: sdkTools,
       maxSteps: state.approvalState === "approved" ? 20 : 1,
