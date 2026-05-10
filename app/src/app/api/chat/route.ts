@@ -13,7 +13,6 @@ import { UIMessage } from "ai";
 import { requireUserOrApiToken } from "@/lib/auth-server";
 import { ApiResponse } from "@/lib/api-response";
 import { getChatRoutingDecision } from "@/lib/chat-routing";
-import { triggerWebhook } from "@/lib/webhooks";
 
 const schema = z.object({
   threadId: z.string().min(1),

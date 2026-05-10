@@ -4,7 +4,6 @@ import { saveExtractedMemories, getMemoryPrompt } from "./memory";
 import { runGeneration, generateImage } from "./llm";
 import crypto from "node:crypto";
 import { getApiKeys } from "./settings";
-import { triggerWebhook } from "./webhooks";
 import { db } from "./db";
 import { threads } from "./db/schema";
 import { eq } from "drizzle-orm";
@@ -54,7 +53,7 @@ export class ChatService {
     const thread = await this.validator.validate(this.session);
     const isRegenerate = await this.history.handleRegeneration(this.session);
     
-    // Fetch thread title for webhook/notifications
+    // Fetch thread title
     const threadTitle = thread.id ? (await db.query.threads.findFirst({
       where: eq(threads.id, thread.id),
       columns: { title: true }

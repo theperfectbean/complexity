@@ -48,10 +48,6 @@ vi.mock("./settings", () => ({
   getApiKeys: vi.fn().mockResolvedValue({ PERPLEXITY_API_KEY: "test-key" }),
 }));
 
-vi.mock("./webhooks", () => ({
-  triggerWebhook: vi.fn().mockResolvedValue(undefined),
-}));
-
 describe("ChatService", () => {
   const dbSelectMock = db.select as unknown as ReturnType<typeof vi.fn>;
 

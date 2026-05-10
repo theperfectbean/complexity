@@ -1,6 +1,6 @@
 "use client";
 
-import { Brain, Home, BookOpen, Users, LogOut, Webhook } from "lucide-react";
+import { Brain, Home, BookOpen, Users, LogOut } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
 import Link from "next/link";
 import { Drawer } from "vaul";
@@ -57,14 +57,6 @@ export function MobileNav({ open, onClose }: MobileNavProps) {
             >
               <Brain className="h-4 w-4" />
               Memory
-            </Link>
-            <Link 
-              className="flex items-center gap-2 rounded-lg border bg-card px-3 py-2 hover:bg-black/5 dark:hover:bg-white/5" 
-              href="/settings/webhooks" 
-              onClick={onClose}
-            >
-              <Webhook className="h-4 w-4" />
-              Webhooks
             </Link>
             <Link 
               className="flex items-center gap-2 rounded-lg border bg-card px-3 py-2 hover:bg-black/5 dark:hover:bg-white/5" 

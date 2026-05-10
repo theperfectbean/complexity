@@ -3,11 +3,10 @@ import { env } from "./env";
 import { logger } from "./logger";
 import { db } from "./db";
 import { eq } from "drizzle-orm";
-import { chunks, documents, webhookDeliveries, webhooks } from "./db/schema";
+import { chunks, documents } from "./db/schema";
 import { createId } from "./db/cuid";
 import { extractTextFromFile, type DocumentFileLike } from "./documents";
 import { chunkText, getEmbeddings } from "./rag";
-import { assertSafeWebhookUrl, decryptWebhookSecret, signWebhookPayload, WEBHOOK_DELIVERY_TIMEOUT_MS } from "./webhooks";
 import { GoogleDriveService } from "./google-drive";
 import { runtimeConfig } from "./config";
 import fs from "fs/promises";
@@ -162,93 +161,6 @@ export function startWorker() {
   worker.on("failed", (job, err) => {
     logger.error({ jobId: job?.id, documentId: job?.data?.documentId, err }, "Job failed");
   });
-
-  return worker;
-}
-
-export function startWebhookWorker() {
-  if (!connection) return;
-
-  const worker = new Worker(
-    "webhooks",
-    async (job: Job) => {
-      const { webhookId, eventType, eventId, payload } = job.data;
-      const [hook] = await db.select({ url: webhooks.url, secret: webhooks.secret }).from(webhooks).where(eq(webhooks.id, webhookId)).limit(1);
-      if (!hook) throw new Error("Webhook not found or deleted: " + webhookId);
-      const { url, secret } = hook;
-      const log = logger.child({ webhookId, eventId, eventType });
-      const startTime = Date.now();
-
-      log.info({ url }, "Attempting webhook delivery");
-
-      const body = JSON.stringify({
-        id: eventId,
-        type: eventType,
-        created_at: new Date().toISOString(),
-        data: payload,
-      });
-
-      await assertSafeWebhookUrl(url);
-      const ts = Date.now();
-      const { signature, timestamp: sigTimestamp } = signWebhookPayload(body, decryptWebhookSecret(secret), ts);
-
-      try {
-        const response = await fetch(url, {
-          method: "POST",
-          signal: AbortSignal.timeout(WEBHOOK_DELIVERY_TIMEOUT_MS),
-          headers: {
-            "Content-Type": "application/json",
-            "X-Complexity-Signature": signature,
-            "X-Complexity-Timestamp": sigTimestamp.toString(),
-            "X-Complexity-Event": eventType,
-          },
-          body,
-        });
-
-        const durationMs = Date.now() - startTime;
-        const responseText = await response.text();
-
-        await db.insert(webhookDeliveries).values({
-          id: createId(),
-          webhookId,
-          eventId,
-          eventType,
-          status: response.status,
-          payload,
-          response: responseText.slice(0, 1000),
-          durationMs,
-        });
-
-        if (!response.ok) {
-          throw new Error(`Webhook target returned ${response.status}`);
-        }
-
-        log.info({ status: response.status, durationMs }, "Webhook delivered successfully");
-      } catch (error) {
-        const durationMs = Date.now() - startTime;
-        log.error({ err: error, durationMs }, "Webhook delivery failed");
-
-        // Log failed attempt if it hasn't been logged yet
-        try {
-          await db.insert(webhookDeliveries).values({
-            id: createId(),
-            webhookId,
-            eventId,
-            eventType,
-            status: (error as Error & { status?: number }).status || 0,
-            payload,
-            response: (error as Error).message,
-            durationMs,
-          });
-        } catch (dbErr) {
-          log.warn({ err: dbErr }, "Failed to log webhook delivery failure to database");
-        }
-
-        throw error;
-      }
-    },
-    { connection, concurrency: 5 }
-  );
 
   return worker;
 }

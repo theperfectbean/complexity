@@ -68,7 +68,6 @@ export const proxy = auth(async (req) => {
   // 2. Authentication and Authorization Logic
   const isApiAuth = nextUrl.pathname.startsWith("/api/auth");
   const isApiHealth = nextUrl.pathname === "/api/health";
-  const isApiWebhook = nextUrl.pathname.startsWith("/api/webhooks");
   const isApiChat = nextUrl.pathname === "/api/chat";
   const isPublicAsset = nextUrl.pathname.startsWith("/_next") || nextUrl.pathname.startsWith("/favicon");
   const isAdminPage = nextUrl.pathname.startsWith("/settings/admin");
@@ -85,7 +84,6 @@ export const proxy = auth(async (req) => {
   const isPublic =
     isApiAuth ||
     isApiHealth ||
-    isApiWebhook ||
     isApiChat ||
     isApiTools ||
     isApiSearch ||

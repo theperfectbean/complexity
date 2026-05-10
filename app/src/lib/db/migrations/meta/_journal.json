@@ -155,6 +155,13 @@
       "when": 1775450031984,
       "tag": "0021_dapper_ultragirl",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1747010000000,
+      "tag": "0022_remove_webhooks",
+      "breakpoints": true
     }
   ]
 }
