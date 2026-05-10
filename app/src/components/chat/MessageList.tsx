@@ -127,6 +127,7 @@ export function MessageList({
       setIsFollowingLatest(false);
     } else if (!isFollowingRef.current && nearBottom) {
       isFollowingRef.current = true;
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setIsFollowingLatest(true);
     }
   }, [isNearBottom]);
@@ -176,6 +177,7 @@ export function MessageList({
     if (!hasAutoScrolledRef.current || isNewUserMessage) {
       hasAutoScrolledRef.current = true;
       isFollowingRef.current = true;
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setIsFollowingLatest(true);
       scrollToBottom("auto");
       return;
@@ -232,7 +234,8 @@ export function MessageList({
             exit={{ opacity: 0, y: 10, scale: 0.9 }}
             onClick={() => {
               isFollowingRef.current = true;
-              setIsFollowingLatest(true);
+              // eslint-disable-next-line react-hooks/set-state-in-effect
+      setIsFollowingLatest(true);
               scrollToBottom("auto");
             }}
             aria-label="Jump to latest messages"
