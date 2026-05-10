@@ -23,6 +23,11 @@ if (typeof window !== "undefined") {
   });
 
   window.HTMLElement.prototype.scrollIntoView = function() {};
+  global.ResizeObserver = class ResizeObserver {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  };
   (window as Window & typeof globalThis).scrollTo = vi.fn();
 }
 
