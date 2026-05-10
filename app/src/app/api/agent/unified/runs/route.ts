@@ -458,10 +458,15 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
                 await finish('completed');
                 return;
               }
+              runState.messages.push({
+                role: 'user',
+                content: `${message}
 
-              runState.messages.push({ role: 'user', content: message });
-              runState.messages.push({ role: 'assistant', content: '', tool_calls: [{ id: 'cmd_call', function: { name: `cmd:${approval.command.action}`, arguments: JSON.stringify(approval.command.options) } }] });
-              runState.messages.push({ role: 'tool', tool_call_id: 'cmd_call', content: JSON.stringify(cmdResult.output) });
+A command has already been executed successfully. Answer directly in plain English using this result and do not call any more tools.
+Command: ${approval.command.action} ${approval.command.resource ?? ''}
+Result:
+${typeof cmdResult.output === 'string' ? cmdResult.output : JSON.stringify(cmdResult.output, null, 2)}`,
+              });
               forceSynthesis = true;
             } catch (err) {
               const errMsg = err instanceof Error ? err.message : String(err);
@@ -474,8 +479,15 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
             try {
               const { result } = await executeTool(approval.tool.name, approval.tool.params, userId, true);
               emit({ type: 'tool_result', tool: approval.tool.name, result, tier: 3 });
-              
-              runState.messages.push({ role: 'tool', tool_call_id: 'approval_call', content: JSON.stringify(result) });
+              runState.messages.push({
+                role: 'user',
+                content: `${message}
+
+A tool has already been executed successfully. Answer directly in plain English using this result and do not call any more tools.
+Tool: ${approval.tool.name}
+Result:
+${JSON.stringify(result, null, 2)}`,
+              });
               forceSynthesis = true;
             } catch (err) {
               const errMsg = err instanceof Error ? err.message : String(err);
@@ -542,10 +554,15 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
                 await finish('completed');
                 return;
               }
+              runState.messages.push({
+                role: 'user',
+                content: `${message}
 
-              runState.messages.push({ role: 'user', content: message });
-              runState.messages.push({ role: 'assistant', content: '', tool_calls: [{ id: 'cmd_call', function: { name: `cmd:${parsedCommand.action}`, arguments: JSON.stringify(parsedCommand.options) } }] });
-              runState.messages.push({ role: 'tool', tool_call_id: 'cmd_call', content: JSON.stringify(cmdResult.output) });
+A command has already been executed successfully. Answer directly in plain English using this result and do not call any more tools.
+Command: ${parsedCommand.action} ${parsedCommand.resource ?? ''}
+Result:
+${typeof cmdResult.output === 'string' ? cmdResult.output : JSON.stringify(cmdResult.output, null, 2)}`,
+              });
               forceSynthesis = true;
             } catch (err) {
               const errMsg = err instanceof Error ? err.message : String(err);
