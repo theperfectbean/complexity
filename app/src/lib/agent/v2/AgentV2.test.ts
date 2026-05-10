@@ -119,13 +119,13 @@ describe('AgentContextPipeline', () => {
     const { buildAgentContext } = await import('./context/AgentContextPipeline');
     const ctx = buildAgentContext('check disk space on nas', []);
     expect(ctx.systemPrompt).toContain('NAS');
-    expect(ctx.tools.length).toBeGreaterThan(0);
+    expect(Object.keys(ctx.tools).length).toBeGreaterThan(0);
   });
 
   it('narrows tool list for infra queries', async () => {
     const { buildAgentContext } = await import('./context/AgentContextPipeline');
     const ctx = buildAgentContext('restart the arrstack container', []);
-    const names = ctx.tools.map((t: {function: {name: string}}) => t.function.name);
+    const names = Object.keys(ctx.tools);
     expect(names.some((n: string) => n.startsWith('pve_'))).toBe(true);
   });
 });

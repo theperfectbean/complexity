@@ -102,9 +102,9 @@ function extractAssistantResponse(content: string): string {
   return content;
 }
 
-async function llmCall(messages: object[], tools: object[], model: string): Promise<Response> {
+async function llmCall(messages: object[], tools: Record<string, unknown>, model: string): Promise<Response> {
   const body: Record<string, unknown> = { model, messages, stream: false, think: false };
-  if (tools.length > 0) body.tools = tools;
+  if (Object.keys(tools).length > 0) body.tools = tools;
   return fetch(`${LOCAL_OPENAI_BASE}/chat/completions`, {
     method: 'POST',
     headers: {
@@ -175,7 +175,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         let forceSynthesis = false; // set true after tool results to force no-tool synthesis round
         for (let round = 0; round < 10; round++) {
           // After executing tools, call without tools to force a synthesis response
-          const roundTools = forceSynthesis ? [] : ctx.tools;
+          const roundTools = forceSynthesis ? {} : ctx.tools;
           forceSynthesis = false;
           const llmRes = await llmCall(messages, roundTools, model);
           if (!llmRes.ok) {

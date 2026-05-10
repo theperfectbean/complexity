@@ -10,6 +10,8 @@ import * as audio from './tools/audio/AudioTool';
 import * as ansible from './tools/devops/AnsibleTool';
 import * as git from './tools/devops/GitTool';
 import * as auditTool from './tools/devops/AuditTool';
+import { tool } from 'ai';
+import { z } from 'zod';
 import { evaluateToolRisk, RiskTier, RiskDecision } from './policy/RiskPolicy';
 import { auditWrite } from './audit/AuditLog';
 
@@ -20,6 +22,42 @@ export interface RegistryEntry {
   description: string;
   tier: RiskTier;
   parametersSchema?: Record<string, unknown>;
+}
+
+const makeSdkTool = tool as (args: unknown) => unknown;
+
+function toZodForProperty(schema: Record<string, unknown> | undefined): z.ZodTypeAny {
+  const type = typeof schema?.type === 'string' ? schema.type : 'string';
+
+  if (type === 'number' || type === 'integer') {
+    return z.number();
+  }
+
+  if (type === 'boolean') {
+    return z.boolean();
+  }
+
+  if (Array.isArray(schema?.enum) && schema.enum.every((v) => typeof v === 'string') && schema.enum.length > 0) {
+    const values = schema.enum as [string, ...string[]];
+    return z.enum(values);
+  }
+
+  return z.string();
+}
+
+function toZodObjectSchema(schema: Record<string, unknown> | undefined): z.ZodTypeAny {
+  const properties = (schema?.properties && typeof schema.properties === 'object')
+    ? schema.properties as Record<string, Record<string, unknown>>
+    : {};
+  const required = new Set(Array.isArray(schema?.required) ? schema.required.filter((v): v is string => typeof v === 'string') : []);
+
+  const shape: Record<string, z.ZodTypeAny> = {};
+  for (const [name, propertySchema] of Object.entries(properties)) {
+    const base = toZodForProperty(propertySchema);
+    shape[name] = required.has(name) ? base : base.optional();
+  }
+
+  return z.object(shape);
 }
 
 const REGISTRY: Record<string, RegistryEntry> = {
@@ -45,12 +83,17 @@ const REGISTRY: Record<string, RegistryEntry> = {
     parametersSchema: { type: 'object', properties: { node: { type: 'string', enum: ['node01', 'node02', 'node03'] } }, required: ['node'] } },
 
   disk_usage:           { fn: () => storage.disk_usage(), description: 'Show disk usage across all nodes', tier: 0 },
-  dns_query:            { fn: (p) => dns.dns_query(p as { name: string }), description: 'Look up internal DNS', tier: 0 },
+  dns_query:            { fn: (p) => dns.dns_query(p as { name: string }), description: 'Look up internal DNS', tier: 0,
+    parametersSchema: { type: 'object', properties: { name: { type: 'string' } }, required: ['name'] } },
   caddy_list_routes:    { fn: () => caddy.caddy_list_routes(), description: 'List reverse proxy routes', tier: 0 },
-  service_status:       { fn: (p) => system.service_status(p as { host: string; service: string }), description: 'Systemd status on host', tier: 0 },
-  service_restart:      { fn: (p) => system.service_restart(p as { host: string; service: string }), description: 'Restart systemd service', tier: 1 },
-  ssh_exec:             { fn: (p) => system.ssh_exec(p as { host: string; command: string }), description: 'Run allowlisted SSH command', tier: 1 },
-  audit_query:          { fn: (p) => auditTool.audit_query(p), description: 'Search agent audit logs', tier: 0 },
+  service_status:       { fn: (p) => system.service_status(p as { host: string; service: string }), description: 'Systemd status on host', tier: 0,
+    parametersSchema: { type: 'object', properties: { host: { type: 'string' }, service: { type: 'string' } }, required: ['host', 'service'] } },
+  service_restart:      { fn: (p) => system.service_restart(p as { host: string; service: string }), description: 'Restart systemd service', tier: 1,
+    parametersSchema: { type: 'object', properties: { host: { type: 'string' }, service: { type: 'string' } }, required: ['host', 'service'] } },
+  ssh_exec:             { fn: (p) => system.ssh_exec(p as { host: string; command: string }), description: 'Run allowlisted SSH command', tier: 1,
+    parametersSchema: { type: 'object', properties: { host: { type: 'string' }, command: { type: 'string' } }, required: ['host', 'command'] } },
+  audit_query:          { fn: (p) => auditTool.audit_query(p), description: 'Search agent audit logs', tier: 0,
+    parametersSchema: { type: 'object', properties: {} } },
 };
 
 export function getToolEntry(name: string): RegistryEntry | undefined {
@@ -81,7 +124,6 @@ export async function executeTool(
   return { result, tier: decision.tier, decision };
 }
 
-
 export function getToolsForDomain(prefixes: string[]): Record<string, RegistryEntry> {
   const all = getAllTools();
   if (prefixes.length === 0) return all;
@@ -89,6 +131,20 @@ export function getToolsForDomain(prefixes: string[]): Record<string, RegistryEn
     Object.entries(all).filter(([name]) =>
       prefixes.some((prefix) => name.startsWith(prefix) || name === prefix)
     )
+  );
+}
+
+export function buildSdkToolMap(
+  entries: Record<string, RegistryEntry>,
+): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(entries).map(([name, entry]) => [
+      name,
+      makeSdkTool({
+        description: entry.description,
+        inputSchema: toZodObjectSchema(entry.parametersSchema),
+      }),
+    ]),
   );
 }
 

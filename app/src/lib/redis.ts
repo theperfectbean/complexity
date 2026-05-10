@@ -25,7 +25,7 @@ export function getRedisClient(): Redis | null {
 
   const isRedisHostname = url.includes("://redis:") || url.includes("@redis:");
 
-  if ((isBuild || (isRedisHostname)) && !process.env.REDIS_REACHABLE_IN_BUILD) {
+  if (isBuild && isRedisHostname && !process.env.REDIS_REACHABLE_IN_BUILD) {
     return null;
   }
 

@@ -235,7 +235,7 @@ function normalizeUnifiedMessages(messages: object[]): object[] {
  * Completely eliminates hardcoded local backends.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function llmCall(messages: object[], tools: object[], modelId: string, signal?: AbortSignal): Promise<any> {
+async function llmCall(messages: object[], tools: Record<string, unknown>, modelId: string, signal?: AbortSignal): Promise<any> {
     const settings = await getDetailedSettings([...MODEL_SETTINGS_KEYS]);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const keys = Object.keys(settings).reduce((acc, k) => ({ ...acc, [k]: (settings as any)[k].value }), {});
@@ -571,7 +571,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
         for (let round = runState.round; round < 10; round++) {
           runState.round = round;
-          const roundTools = forceSynthesis ? [] : ctx.tools;
+          const roundTools = forceSynthesis ? {} : ctx.tools;
           forceSynthesis = false;
 
           if (req.signal.aborted) {

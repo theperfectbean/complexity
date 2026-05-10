@@ -1,6 +1,6 @@
 import { buildFleetManifest, DISAMBIGUATION_RULES } from './fleet-manifest';
 import { classifyIntent, getDomainToolPrefixes, IntentDomain } from './intent-classifier';
-import { getToolsForDomain, buildOpenAiToolList } from '../ToolRegistry';
+import { getToolsForDomain, buildSdkToolMap } from '../ToolRegistry';
 
 let cachedManifest: string | null = null;
 
@@ -34,7 +34,7 @@ RESPONSE FORMAT (strictly enforced):
 
 export interface AgentContext {
   systemPrompt: string;
-  tools: ReturnType<typeof buildOpenAiToolList>;
+  tools: ReturnType<typeof buildSdkToolMap>;
   domain: IntentDomain;
 }
 
@@ -50,7 +50,7 @@ export function buildAgentContext(userMessage: string, stateSnapshot?: object): 
 
   return {
     systemPrompt,
-    tools: buildOpenAiToolList(toolEntries),
+    tools: buildSdkToolMap(toolEntries),
     domain,
   };
 }
