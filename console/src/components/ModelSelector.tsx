@@ -94,7 +94,7 @@ export function ModelSelector({ value, onChange }: Props) {
   }, [enabledModelIds, models]);
 
   const groupedModels = useMemo(() => {
-    return enabledModels.reduce<Record<string, Model[]>>((accumulator, model) => {
+    return models.reduce<Record<string, Model[]>>((accumulator, model) => {
       const category = model.category || "Other";
       if (!accumulator[category]) {
         accumulator[category] = [];
