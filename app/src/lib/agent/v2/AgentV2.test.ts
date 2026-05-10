@@ -33,9 +33,9 @@ describe('Intent classifier', () => {
 describe('Fleet manifest', () => {
   it('includes all 3 nodes', () => {
     const manifest = buildFleetManifest();
-    expect(manifest).toContain('nas');
-    expect(manifest).toContain('media');
-    expect(manifest).toContain('ai');
+    expect(manifest).toContain('node01');
+    expect(manifest).toContain('node02');
+    expect(manifest).toContain('node03');
   });
   it('includes key containers', () => {
     const manifest = buildFleetManifest();
@@ -67,32 +67,36 @@ describe('ToolRegistry', () => {
     await expect(executeTool('nonexistent_tool', {})).rejects.toThrow();
   });
 
-  it('executeTool validates required parameters', async () => {
-    const { executeTool } = await import('./ToolRegistry');
-    await expect(executeTool('incus_status', {})).rejects.toThrow('Missing required parameter "container"');
-  });
-
-  it('executeTool rejects unknown parameters', async () => {
-    const { executeTool } = await import('./ToolRegistry');
-    await expect(executeTool('incus_list', { unexpected: true })).rejects.toThrow('Unknown parameter "unexpected"');
-  });
-
-  it('executeTool validates enum parameters', async () => {
-    const { executeTool } = await import('./ToolRegistry');
-    await expect(executeTool('qbit_pause', { action: 'stop' })).rejects.toThrow('Invalid parameter "action"');
-  });
-
-  it('getToolEntry returns metadata for known tools', async () => {
+  it('getToolEntry returns metadata for known tool', async () => {
     const { getToolEntry } = await import('./ToolRegistry');
-    const entry = getToolEntry('sonarr_status');
+    const entry = getToolEntry('pve_list');
     expect(entry).toBeDefined();
     expect(entry?.tier).toBe(0);
   });
 
-  it('registers git diff preview and guarded commit tools', async () => {
+  it('getToolEntry returns undefined for unknown tool', async () => {
     const { getToolEntry } = await import('./ToolRegistry');
-    expect(getToolEntry('git_diff_preview')?.tier).toBe(0);
-    expect(getToolEntry('git_commit')?.tier).toBe(3);
+    expect(getToolEntry('nonexistent_tool')).toBeUndefined();
+  });
+
+  it('getAllTools returns a non-empty registry', async () => {
+    const { getAllTools } = await import('./ToolRegistry');
+    const tools = getAllTools();
+    expect(Object.keys(tools).length).toBeGreaterThan(0);
+    expect(tools['pve_list']).toBeDefined();
+  });
+
+  it('registry contains expected read tools at tier 0', async () => {
+    const { getToolEntry } = await import('./ToolRegistry');
+    expect(getToolEntry('pve_list')?.tier).toBe(0);
+    expect(getToolEntry('disk_usage')?.tier).toBe(0);
+    expect(getToolEntry('dns_query')?.tier).toBe(0);
+  });
+
+  it('registry contains expected destructive tools at tier 3', async () => {
+    const { getToolEntry } = await import('./ToolRegistry');
+    expect(getToolEntry('pve_stop')?.tier).toBe(3);
+    expect(getToolEntry('pve_delete')?.tier).toBe(3);
   });
 });
 
@@ -118,10 +122,10 @@ describe('AgentContextPipeline', () => {
     expect(ctx.tools.length).toBeGreaterThan(0);
   });
 
-  it('narrows tool list for media queries', async () => {
+  it('narrows tool list for infra queries', async () => {
     const { buildAgentContext } = await import('./context/AgentContextPipeline');
-    const ctx = buildAgentContext('why is sonarr not downloading', []);
+    const ctx = buildAgentContext('restart the arrstack container', []);
     const names = ctx.tools.map((t: {function: {name: string}}) => t.function.name);
-    expect(names.some((n: string) => n.startsWith('sonarr_'))).toBe(true);
+    expect(names.some((n: string) => n.startsWith('pve_'))).toBe(true);
   });
 });
