@@ -393,10 +393,13 @@ export async function runGeneration(options: GenerationOptions): Promise<Generat
       // endpoint must use the single `model` field — mixing them with a bare "sonar" in a `models`
       // array causes Perplexity to reject the request.
       const isPrimaryNativeBackendModel = !primaryModel.includes("/") || primaryModel.startsWith(`${searchBackend.id}/`);
-      const modelId = isPreset ? primaryModel : Array.from(new Set([
-        primaryModel,
-        ...(searchBackend.fallbackModelId && isPrimaryNativeBackendModel ? [searchBackend.fallbackModelId] : []),
-      ])).slice(0, 5);
+      // Cross-provider models must be a single string; only native backend models support fallback arrays.
+      const modelId = (isPreset || !isPrimaryNativeBackendModel)
+        ? primaryModel
+        : Array.from(new Set([
+            primaryModel,
+            ...(searchBackend.fallbackModelId ? [searchBackend.fallbackModelId] : []),
+          ])).slice(0, 5);
 
       const result = await searchBackend.run({
         modelId,
