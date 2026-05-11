@@ -60,6 +60,7 @@ import { buildAgentContext } from '@/lib/agent/v2/context/AgentContextPipeline';
 import { createToolApproval, consumeApproval } from '@/lib/agent/v2/approval/ApprovalStore';
 import { executeLegacyToolEnvelope, getLegacyToolManifest } from '@/lib/agent/v2/LegacyToolBridge';
 import { parseSlashCommand, classifyNaturalLanguage } from '@/lib/agent/v2/command';
+import { dispatchSlashCommand } from '@/lib/agent/meta';
 import { getAgentSettings } from '@/lib/models/AgentSettings';
 import { getDetailedSettings } from '@/lib/settings';
 import { discoverModels } from '@/lib/models/ModelDiscovery';
@@ -153,6 +154,7 @@ describe('/api/agent/unified/runs', () => {
     } as never);
     vi.mocked(parseSlashCommand).mockReturnValue(null);
     vi.mocked(classifyNaturalLanguage).mockReturnValue(null);
+    vi.mocked(dispatchSlashCommand).mockResolvedValue({ handled: false, events: [], done: false } as never);
     vi.mocked(getAgentSettings).mockResolvedValue({
       defaultModel: 'perplexity/sonar',
       heavyModel: 'perplexity/sonar-pro',
@@ -296,6 +298,36 @@ describe('/api/agent/unified/runs', () => {
       && event.from === 'perplexity/sonar'
       && event.to === 'openai/gpt-4o-mini')).toBe(true);
     expect(events.some((event) => event.type === 'text' && event.content === 'fallback succeeded')).toBe(true);
+  });
+
+  it('emits terminal completion events for handled meta commands', async () => {
+    vi.mocked(dispatchSlashCommand).mockResolvedValue({
+      handled: true,
+      done: true,
+      events: [
+        {
+          type: 'tool_result',
+          tool: 'help',
+          result: {
+            ok: true,
+            summary: 'Available slash commands',
+            widgetHint: { type: 'table' },
+            data: [{ command: '/help' }],
+          },
+        },
+      ],
+    } as never);
+
+    const response = await POST(createPostRequest('http://localhost/api/agent/unified/runs', {
+      message: '/help',
+      threadId: 'thread-1',
+      commandMode: 'auto',
+    }) as never);
+
+    const events = parseEvents(await response.text());
+    expect(events.some((event) => event.type === 'tool_result' && event.tool === 'help')).toBe(true);
+    expect(events.some((event) => event.type === 'run_status' && event.status === 'completed')).toBe(true);
+    expect(events.some((event) => event.type === 'done')).toBe(true);
   });
 
   it('returns a terminal error when an approval id is invalid or expired', async () => {

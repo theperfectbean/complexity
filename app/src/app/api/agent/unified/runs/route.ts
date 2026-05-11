@@ -526,11 +526,7 @@ ${JSON.stringify(executed.result, null, 2)}`,
                 activeModel = metaResult.switchToModel;
               }
               if (metaResult.done) {
-                runState.status = 'completed';
-                persistRunState();
-                await flushPersistence();
-                closed = true;
-                controller.close();
+                await finish('completed');
                 return;
               }
             }
