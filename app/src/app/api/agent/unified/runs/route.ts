@@ -31,6 +31,8 @@ import { getLanguageModel, getProviderRequestOptions } from '@/lib/llm';
 import { generateText } from 'ai';
 import { getDetailedSettings } from '@/lib/settings';
 import { MODEL_SETTINGS_KEYS } from '@/lib/model-registry';
+import { dispatchSlashCommand as dispatchMetaCommand } from '@/lib/agent/meta';
+import { ModelRegistry } from '@/lib/models/ModelRegistry';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -497,6 +499,48 @@ ${JSON.stringify(result, null, 2)}`,
             }
           }
         } else {
+          // Meta slash-command intercept (/model, /help, /clear, /status)
+          // Falls through if unrecognised so existing infra command parsing continues unchanged.
+          if (isExplicitSlashInput) {
+            let availableModels: Array<{ id: string; label: string; local: boolean }> = [];
+            try {
+              const metaSettings = await getDetailedSettings([...MODEL_SETTINGS_KEYS]);
+              const registry = new ModelRegistry(metaSettings);
+              const discovered = await registry.list();
+              availableModels = discovered.map((m) => ({ id: m.id, label: m.label, local: m.local }));
+            } catch { /* proceed with empty list on discovery failure */ }
+
+            const metaResult = await dispatchMetaCommand(message, {
+              runId: runState.runId,
+              userId,
+              threadId: effectiveThreadId,
+              currentModelId: modelId ?? selectModel(message),
+              availableModels,
+            });
+
+            if (metaResult.handled) {
+              for (const evt of metaResult.events) {
+                const persistedEvt = {
+                  ...evt,
+                  runId: runState.runId,
+                  threadId: runState.threadId,
+                  seq: ++seq,
+                  timestamp: new Date().toISOString(),
+                };
+                controller.enqueue(encoder.encode(`data: ${JSON.stringify(persistedEvt)}\n\n`));
+                queuePersist(eventStore.append(runState.runId, persistedEvt as PersistedConsoleEvent));
+              }
+              if (metaResult.done) {
+                runState.status = 'completed';
+                persistRunState();
+                await flushPersistence();
+                closed = true;
+                controller.close();
+              }
+              return;
+            }
+          }
+
           let parsedCommand: ParsedCommand | null = null;
           if (commandMode === 'slash' || commandMode === 'auto') {
             parsedCommand = parseSlashCommand(message);

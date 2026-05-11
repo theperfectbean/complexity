@@ -5,12 +5,56 @@ import { DataTable } from './widgets/DataTable';
 import { KeyValue } from './widgets/KeyValue';
 import { TaskStatus } from './widgets/TaskStatus';
 
+interface ModelSwitchedEvent {
+  type: 'model_switched';
+  from: string;
+  to: string;
+  reason: string;
+}
+
+interface ContextSummarizedEvent {
+  type: 'context_summarized';
+  originalTokens: number;
+  summaryTokens: number;
+}
+
+type StreamEventNotification = ModelSwitchedEvent | ContextSummarizedEvent;
+
 interface Props {
   toolName: string;
   result: ToolResultEnvelope;
+  streamEvent?: StreamEventNotification;
 }
 
-export function WidgetRenderer({ toolName, result }: Props) {
+const noticeStyle: React.CSSProperties = {
+  borderRadius: '0.75rem',
+  border: '1px solid var(--border)',
+  background: 'var(--bg-surface)',
+  padding: '0.75rem',
+  fontSize: '0.75rem',
+  color: 'var(--text-muted)',
+};
+
+export function WidgetRenderer({ toolName, result, streamEvent }: Props) {
+  // Handle special stream events passed directly (no LLM round-trip)
+  if (streamEvent?.type === 'model_switched') {
+    const { from, to, reason } = streamEvent;
+    return (
+      <div style={noticeStyle}>
+        <KeyValue data={{ 'switched from': from, 'switched to': to, reason }} />
+      </div>
+    );
+  }
+
+  if (streamEvent?.type === 'context_summarized') {
+    const { originalTokens, summaryTokens } = streamEvent;
+    return (
+      <div style={noticeStyle}>
+        <span>Context compressed: {originalTokens}&rarr;{summaryTokens} tokens</span>
+      </div>
+    );
+  }
+
   const hintType = result.widgetHint?.type;
 
   const inner = (() => {
@@ -30,22 +74,22 @@ export function WidgetRenderer({ toolName, result }: Props) {
   })();
 
   return (
-    <div style={{ borderRadius: '0.75rem', border: '1px solid #2d3748', background: '#1e2030', padding: '0.75rem' }}>
+    <div style={{ borderRadius: '0.75rem', border: '1px solid var(--border)', background: 'var(--bg-surface)', padding: '0.75rem' }}>
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem', paddingBottom: '0.5rem', borderBottom: '1px solid #2d3748' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem', paddingBottom: '0.5rem', borderBottom: '1px solid var(--border)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <span style={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#a78bfa' }}>{toolName}</span>
-          <span style={{ fontSize: '0.65rem', fontWeight: 600, color: result.ok ? '#22c55e' : '#ef4444' }}>
-            {result.ok ? '✓ OK' : '✗ FAILED'}
+          <span style={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--accent)' }}>{toolName}</span>
+          <span style={{ fontSize: '0.65rem', fontWeight: 600, color: result.ok ? 'var(--success, #22c55e)' : 'var(--error, #ef4444)' }}>
+            {result.ok ? '\u2713 OK' : '\u2717 FAILED'}
           </span>
         </div>
         {result.diagnostics?.durationMs != null && (
-          <span style={{ fontSize: '0.65rem', color: '#718096' }}>{result.diagnostics.durationMs}ms</span>
+          <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>{result.diagnostics.durationMs}ms</span>
         )}
       </div>
       {/* Summary */}
       {result.summary && (
-        <p style={{ margin: '0 0 0.5rem', fontSize: '0.75rem', color: '#718096' }}>{result.summary}</p>
+        <p style={{ margin: '0 0 0.5rem', fontSize: '0.75rem', color: 'var(--text-muted)' }}>{result.summary}</p>
       )}
       {/* Widget content */}
       {inner}
