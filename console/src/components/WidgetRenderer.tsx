@@ -18,7 +18,14 @@ interface ContextSummarizedEvent {
   summaryTokens: number;
 }
 
-type StreamEventNotification = ModelSwitchedEvent | ContextSummarizedEvent;
+interface DiagnosticEvent {
+  type: 'diagnostic';
+  category: 'routing' | 'context' | 'approval' | 'tool';
+  message: string;
+  data?: Record<string, string | number | boolean | null>;
+}
+
+type StreamEventNotification = ModelSwitchedEvent | ContextSummarizedEvent | DiagnosticEvent;
 
 interface Props {
   toolName: string;
@@ -51,6 +58,20 @@ export function WidgetRenderer({ toolName, result, streamEvent }: Props) {
     return (
       <div style={noticeStyle}>
         <span>Context compressed: {originalTokens}&rarr;{summaryTokens} tokens</span>
+      </div>
+    );
+  }
+
+  if (streamEvent?.type === 'diagnostic') {
+    return (
+      <div style={noticeStyle}>
+        <KeyValue
+          data={{
+            category: streamEvent.category,
+            message: streamEvent.message,
+            ...(streamEvent.data ?? {}),
+          }}
+        />
       </div>
     );
   }

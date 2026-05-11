@@ -68,6 +68,12 @@ type ConsoleEvent =
   | { type: 'run_started'; userMessage: string; commandMode: string }
   | { type: 'run_status'; status: 'running' | 'waiting_for_approval' | 'completed' | 'cancelled' | 'error' }
   | { type: 'context'; domain: string; model: string; commandMode: string }
+  | {
+      type: 'diagnostic';
+      category: 'routing' | 'context' | 'approval' | 'tool';
+      message: string;
+      data?: Record<string, string | number | boolean | null>;
+    }
   | { type: 'command_parsed'; command: ParsedCommand; tier: string }
   | { type: 'text'; content: string; role?: 'assistant' | 'system' }
   | { type: 'tool_start'; tool: string; params: Record<string, unknown>; tier: number; toolCallId?: string }
@@ -276,6 +282,14 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         queuePersist(eventStore.append(runState.runId, persistedEvent));
       };
 
+      const emitDiagnostic = (
+        category: Extract<ConsoleEvent, { type: 'diagnostic' }>['category'],
+        message: string,
+        data?: Record<string, string | number | boolean | null>,
+      ) => {
+        emit({ type: 'diagnostic', category, message, data });
+      };
+
       const finish = (status: UnifiedRunState['status']) => {
         if (closed) return;
         runState.status = status;
@@ -326,6 +340,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         }) => {
           const ctx = buildAgentContext(input.contextMessage, stateSnapshot);
           emit({ type: 'context', domain: ctx.domain, model: input.resumeModelId ?? activeModel, commandMode });
+          emitDiagnostic('routing', 'AgentService execution context prepared', {
+            model: input.resumeModelId ?? activeModel,
+            task: input.routingTask ?? classifyModelTask(input.contextMessage),
+            resumed: Boolean(input.resumeToolCall),
+          });
 
           const agentService = new AgentService({
             router: modelRouter,
@@ -333,8 +352,33 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
             listModels: async () => (await modelRegistry.list()).map((m) => ({ id: m.id, label: m.label, local: m.local })),
             getToolDefinitions: () => ctx.tools,
             executeTool: async (toolName, params, toolCtx) => {
-              const executed = await executeLegacyToolEnvelope(toolName, (params ?? {}) as Record<string, unknown>, toolCtx.actorId, false);
-              return executed.result;
+              const startedAt = Date.now();
+              try {
+                const executed = await executeLegacyToolEnvelope(toolName, (params ?? {}) as Record<string, unknown>, toolCtx.actorId, false);
+                const durationMs = Date.now() - startedAt;
+                const result = executed.result.diagnostics?.durationMs != null
+                  ? executed.result
+                  : {
+                      ...executed.result,
+                      diagnostics: {
+                        ...executed.result.diagnostics,
+                        durationMs,
+                      },
+                    };
+                emitDiagnostic('tool', 'Tool completed', {
+                  tool: toolName,
+                  durationMs,
+                  ok: result.ok,
+                  tier: executed.manifest.riskTier,
+                });
+                return result;
+              } catch (error) {
+                emitDiagnostic('tool', 'Tool failed', {
+                  tool: toolName,
+                  durationMs: Date.now() - startedAt,
+                });
+                throw error;
+              }
             },
             getToolManifest: (toolName) => getLegacyToolManifest(toolName),
             streamLLM: streamUnifiedAgentLlm,
@@ -386,6 +430,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         if (approvalId) {
           const approval = await consumeApproval(approvalId, userId, runState.threadId);
           if (!approval) {
+            emitDiagnostic('approval', 'Approval token invalid or expired', {
+              approvalId,
+              outcome: 'expired',
+            });
             emit({ type: 'error', message: 'Approval request is invalid or has expired.' });
             await finish('error');
             return;
@@ -393,11 +441,20 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
           const userConfirmed = message.trim().toUpperCase() === 'CONFIRM';
           if (!userConfirmed) {
+            emitDiagnostic('approval', 'Approval denied by operator', {
+              approvalId,
+              outcome: 'cancelled',
+            });
             emit({ type: 'text', content: 'Action cancelled.' });
             emit({ type: 'approval_decision', approved: false });
             await finish('cancelled');
             return;
           }
+          emitDiagnostic('approval', 'Approval granted by operator', {
+            approvalId,
+            outcome: 'approved',
+            kind: approval.kind,
+          });
           emit({ type: 'approval_decision', approved: true });
 
           if (approval.kind === 'command') {
@@ -552,6 +609,11 @@ ${JSON.stringify(executed.result, null, 2)}`,
               const pendingId = await createCommandApproval(parsedCommand, userId, runState.threadId);
               runState.pendingApprovalId = pendingId;
               persistRunState();
+              emitDiagnostic('approval', 'Approval requested for command', {
+                approvalId: pendingId,
+                action: parsedCommand.action,
+                target: parsedCommand.resource ?? null,
+              });
               const confirmMsg = `Destructive action: \`${parsedCommand.action}\` on \`${parsedCommand.resource}\`. This cannot be undone. Reply \`CONFIRM\` to proceed or \`CANCEL\` to abort.`;
               emit({ type: 'destructive_confirm', approvalId: pendingId, command: parsedCommand, message: confirmMsg });
               await finish('paused_for_approval');
@@ -628,6 +690,12 @@ ${typeof cmdResult.output === 'string' ? cmdResult.output : JSON.stringify(cmdRe
           activeProviderModel = route.model;
           activeFallbackChain = route.fallbackChain;
           routedModelId = route.model.id;
+          emitDiagnostic('routing', 'Model routing decision', {
+            requestedModel: activeModel,
+            selectedModel: routedModelId,
+            task: classifyModelTask(message),
+            fallbackCandidates: activeFallbackChain.length,
+          });
           if (routedModelId !== activeModel) {
             emit({ type: 'model_switched', from: activeModel, to: routedModelId, reason: 'task routing' });
           }
@@ -661,6 +729,11 @@ ${typeof cmdResult.output === 'string' ? cmdResult.output : JSON.stringify(cmdRe
           if (activeProviderModel) {
             const budget = checkContextBudget(activeProviderModel, messages as Array<{ role: string; content: unknown }>, agentSettings);
             if (budget.action !== 'ok') {
+              emitDiagnostic('context', 'Context budget action required', {
+                model: activeProviderModel.id,
+                estimatedTokens: budget.estimatedTokens,
+                action: budget.action,
+              });
               if (budget.action === 'summarize') {
                 const summary = await summarizeConversation(messages, agentSettings.fastModel, req.signal);
                 const systemMessages = messages.filter((entry) => isRecord(entry) && entry.role === 'system');
@@ -698,6 +771,11 @@ ${typeof cmdResult.output === 'string' ? cmdResult.output : JSON.stringify(cmdRe
                 activeProviderModel = to;
                 activeModel = to.id;
                 activeFallbackChain = activeFallbackChain.filter((candidate) => candidate.id !== to.id);
+                emitDiagnostic('routing', 'Fallback model selected', {
+                  from: from.id,
+                  to: to.id,
+                  reason,
+                });
                 emit({ type: 'model_switched', from: from.id, to: to.id, reason });
               },
             );
@@ -760,6 +838,11 @@ ${typeof cmdResult.output === 'string' ? cmdResult.output : JSON.stringify(cmdRe
               runState.pendingApprovalId = pendingId;
               runState.messages = messages;
               persistRunState();
+              emitDiagnostic('approval', 'Approval requested for tool', {
+                approvalId: pendingId,
+                tool: toolName,
+                toolCallId: tc.id,
+              });
               const confirmMsg = `I need to execute \`${toolName}\` with params: \`${JSON.stringify(params)}\`. This is a **destructive** action. Reply \`CONFIRM\` to proceed or \`CANCEL\` to abort.`;
               emit({ type: 'destructive_confirm', approvalId: pendingId, tool: toolName, params, message: confirmMsg });
               await finish('paused_for_approval');
@@ -769,14 +852,35 @@ ${typeof cmdResult.output === 'string' ? cmdResult.output : JSON.stringify(cmdRe
             emit({ type: 'tool_start', tool: toolName, params, tier: tierNum });
 
             try {
+              const startedAt = Date.now();
               const executed = await executeLegacyToolEnvelope(toolName, params, userId, false);
-              emit({ type: 'tool_result', tool: toolName, result: executed.result, tier: executed.manifest.riskTier });
-              toolResults.push({ tool_call_id: tc.id, role: 'tool', content: JSON.stringify(executed.result) });
-              runState.toolCallHistory.push({ tool: toolName, params, result: executed.result });
+              const durationMs = Date.now() - startedAt;
+              const result = executed.result.diagnostics?.durationMs != null
+                ? executed.result
+                : {
+                    ...executed.result,
+                    diagnostics: {
+                      ...executed.result.diagnostics,
+                      durationMs,
+                    },
+                  };
+              emit({ type: 'tool_result', tool: toolName, result, tier: executed.manifest.riskTier });
+              emitDiagnostic('tool', 'Tool completed', {
+                tool: toolName,
+                durationMs,
+                ok: result.ok,
+                tier: executed.manifest.riskTier,
+              });
+              toolResults.push({ tool_call_id: tc.id, role: 'tool', content: JSON.stringify(result) });
+              runState.toolCallHistory.push({ tool: toolName, params, result });
               allUnknown = false;
             } catch (err) {
               const errMsg = err instanceof Error ? err.message : String(err);
               emit({ type: 'tool_error', tool: toolName, error: errMsg });
+              emitDiagnostic('tool', 'Tool failed', {
+                tool: toolName,
+                tier: tierNum,
+              });
               toolResults.push({ tool_call_id: tc.id, role: 'tool', content: `Error: ${errMsg}` });
               runState.toolCallHistory.push({ tool: toolName, params, error: errMsg });
             }

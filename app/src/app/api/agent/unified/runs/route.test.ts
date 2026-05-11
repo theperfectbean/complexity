@@ -217,6 +217,14 @@ describe('/api/agent/unified/runs', () => {
     expect(events.filter((event) => event.type === 'tool_start')).toHaveLength(1);
     expect(events.some((event) => event.type === 'tool_result')).toBe(true);
     expect(events.some((event) => event.type === 'text' && event.content === 'final answer')).toBe(true);
+    expect(events.some((event) =>
+      event.type === 'diagnostic'
+      && event.category === 'routing'
+      && event.message === 'Model routing decision')).toBe(true);
+    expect(events.some((event) =>
+      event.type === 'diagnostic'
+      && event.category === 'tool'
+      && event.message === 'Tool completed')).toBe(true);
   });
 
   it('resumes an approved agent tool call from durable approval payload without needing client stateSnapshot', async () => {
@@ -343,6 +351,10 @@ describe('/api/agent/unified/runs', () => {
     const events = parseEvents(await response.text());
     expect(events.some((event) => event.type === 'error' && String(event.message).includes('invalid or has expired'))).toBe(true);
     expect(events.some((event) => event.type === 'run_status' && event.status === 'error')).toBe(true);
+    expect(events.some((event) =>
+      event.type === 'diagnostic'
+      && event.category === 'approval'
+      && event.message === 'Approval token invalid or expired')).toBe(true);
   });
 
   it('cancels a pending approval without executing the stored tool call', async () => {

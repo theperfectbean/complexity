@@ -43,6 +43,12 @@ export type AgentStreamEvent =
   | { type: "run_started"; runId: string; model: string; userMessage: string; commandMode?: string }
   | { type: "run_status"; status: AgentRunStatus }
   | { type: "context"; domain: string; model: string; commandMode?: string }
+  | {
+      type: "diagnostic";
+      category: "routing" | "context" | "approval" | "tool";
+      message: string;
+      data?: Record<string, string | number | boolean | null>;
+    }
   | { type: "reasoning"; text: string; source: ReasoningSource; phase: "delta" | "final" }
   | { type: "text"; content: string; role?: "assistant" | "system" }
   | { type: "tool_start"; tool: string; params: unknown; tier: number; toolCallId?: string }

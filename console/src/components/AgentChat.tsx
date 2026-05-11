@@ -412,6 +412,21 @@ function EventBlock({ event, onApprove, onCancelApproval }: {
           />
         </div>
       );
+    case 'diagnostic':
+      return (
+        <div className='my-3'>
+          <WidgetRenderer
+            toolName='agent_event'
+            result={streamNoticeResult}
+            streamEvent={event as {
+              type: 'diagnostic';
+              category: 'routing' | 'context' | 'approval' | 'tool';
+              message: string;
+              data?: Record<string, string | number | boolean | null>;
+            }}
+          />
+        </div>
+      );
     case 'error':
       return (
         <div data-testid='error-block' className='my-4 text-destructive text-sm px-4 py-3 bg-destructive/5 rounded-xl border border-destructive/20'>

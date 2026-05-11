@@ -194,4 +194,25 @@ describe('WidgetRenderer', () => {
     render(<WidgetRenderer toolName="ssh_exec" result={env} />);
     expect(screen.getByText(/unique-output-value/)).toBeInTheDocument();
   });
+
+  it('renders diagnostic stream events as key-value notices', () => {
+    render(
+      <WidgetRenderer
+        toolName="agent_event"
+        result={makeEnvelope({ widgetHint: { type: 'key_value' }, data: {} })}
+        streamEvent={{
+          type: 'diagnostic',
+          category: 'routing',
+          message: 'Model routing decision',
+          data: {
+            requestedModel: 'perplexity/sonar',
+            selectedModel: 'openai/gpt-4o-mini',
+          },
+        }}
+      />,
+    );
+    expect(screen.getByText('routing')).toBeInTheDocument();
+    expect(screen.getByText('Model routing decision')).toBeInTheDocument();
+    expect(screen.getByText('openai/gpt-4o-mini')).toBeInTheDocument();
+  });
 });
