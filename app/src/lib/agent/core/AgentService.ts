@@ -10,10 +10,8 @@
  * - Emit normalized ToolResultEnvelope events
  * - Manage round limit and terminal status transitions
  *
- * This is a STUB implementation that establishes the interface and
- * flow for wiring into the unified route in a later phase.
- * It delegates heavy lifting to existing helpers (ModelRouter,
- * ContextWindowManager, ToolResultNormalizer) to remain backward-compatible.
+ * This implementation now powers the unified route's non-command path
+ * and delegates model/context/tool helpers through injected dependencies.
  */
 
 import type { AgentRunState, ModelTask } from "./AgentState";

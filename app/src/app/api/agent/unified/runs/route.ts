@@ -362,7 +362,12 @@ async function* streamUnifiedAgentLlm(
   tools: unknown,
   signal?: AbortSignal,
 ): AsyncGenerator<AgentStreamEvent> {
-  const llmRes = await llmCall(messages as object[], (tools ?? {}) as Record<string, unknown>, modelId, signal);
+  let llmRes;
+  try {
+    llmRes = await llmCall(messages as object[], (tools ?? {}) as Record<string, unknown>, modelId, signal);
+  } catch (error) {
+    throw classifyProviderFailure(error);
+  }
   if (!llmRes.ok) {
     const errText = await llmRes.text();
     throw classifyProviderFailure(new Error(`LLM error ${llmRes.status}: ${errText.slice(0, 200)}`));

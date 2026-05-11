@@ -130,6 +130,13 @@ const model = {
   availability: 'available',
   local: false,
 };
+const fallbackModel = {
+  ...model,
+  id: 'openai/gpt-4o-mini',
+  providerId: 'openai',
+  providerModelId: 'gpt-4o-mini',
+  label: 'GPT-4o mini',
+};
 
 describe('/api/agent/unified/runs', () => {
   beforeEach(() => {
@@ -157,7 +164,7 @@ describe('/api/agent/unified/runs', () => {
       providerFallbacks: {},
     } as never);
     vi.mocked(getDetailedSettings).mockResolvedValue({} as never);
-    vi.mocked(discoverModels).mockResolvedValue({ models: [model] } as never);
+    vi.mocked(discoverModels).mockResolvedValue({ models: [model, fallbackModel] } as never);
     vi.mocked(getLanguageModel).mockResolvedValue({ provider: 'mock' } as never);
     vi.mocked(getProviderRequestOptions).mockResolvedValue({ providerOptions: {} } as never);
     vi.mocked(createToolApproval).mockResolvedValue('approval-1');
@@ -266,5 +273,28 @@ describe('/api/agent/unified/runs', () => {
     expect(secondEvents.filter((event) => event.type === 'tool_start')).toHaveLength(1);
     expect(secondEvents.some((event) => event.type === 'tool_result')).toBe(true);
     expect(secondEvents.some((event) => event.type === 'text' && event.content === 'approval resumed')).toBe(true);
+  });
+
+  it('falls back to the next model when the first AgentService LLM attempt is retryable', async () => {
+    vi.mocked(generateText)
+      .mockImplementationOnce(async () => {
+        throw new Error('429 rate limit from provider');
+      })
+      .mockImplementationOnce(async () => ({ text: 'fallback succeeded', toolCalls: [] } as never));
+
+    const response = await POST(createPostRequest('http://localhost/api/agent/unified/runs', {
+      message: 'summarize node status',
+      threadId: 'thread-1',
+      commandMode: 'auto',
+    }) as never);
+
+    expect(response.status).toBe(200);
+    const events = parseEvents(await response.text());
+
+    expect(events.some((event) =>
+      event.type === 'model_switched'
+      && event.from === 'perplexity/sonar'
+      && event.to === 'openai/gpt-4o-mini')).toBe(true);
+    expect(events.some((event) => event.type === 'text' && event.content === 'fallback succeeded')).toBe(true);
   });
 });
