@@ -297,4 +297,50 @@ describe('/api/agent/unified/runs', () => {
       && event.to === 'openai/gpt-4o-mini')).toBe(true);
     expect(events.some((event) => event.type === 'text' && event.content === 'fallback succeeded')).toBe(true);
   });
+
+  it('returns a terminal error when an approval id is invalid or expired', async () => {
+    vi.mocked(consumeApproval).mockResolvedValue(null);
+
+    const response = await POST(createPostRequest('http://localhost/api/agent/unified/runs', {
+      message: 'CONFIRM',
+      threadId: 'thread-1',
+      approvalId: 'missing-approval',
+      commandMode: 'auto',
+    }) as never);
+
+    const events = parseEvents(await response.text());
+    expect(events.some((event) => event.type === 'error' && String(event.message).includes('invalid or has expired'))).toBe(true);
+    expect(events.some((event) => event.type === 'run_status' && event.status === 'error')).toBe(true);
+  });
+
+  it('cancels a pending approval without executing the stored tool call', async () => {
+    vi.mocked(consumeApproval).mockResolvedValue({
+      kind: 'tool',
+      ownerId: 'user-1',
+      threadId: 'thread-1',
+      tool: { name: 'pve_stop', params: { container: 'plex' } },
+      resume: {
+        runId: 'run-1',
+        activeModelId: 'perplexity/sonar',
+        routingTask: 'chat',
+        round: 1,
+        commandMode: 'auto',
+        toolCallId: 'call-stop-1',
+        messages: [],
+        toolCallHistory: [],
+      },
+    } as never);
+
+    const response = await POST(createPostRequest('http://localhost/api/agent/unified/runs', {
+      message: 'CANCEL',
+      threadId: 'thread-1',
+      approvalId: 'approval-1',
+      commandMode: 'auto',
+    }) as never);
+
+    const events = parseEvents(await response.text());
+    expect(events.some((event) => event.type === 'approval_decision' && event.approved === false)).toBe(true);
+    expect(events.some((event) => event.type === 'run_status' && event.status === 'cancelled')).toBe(true);
+    expect(events.some((event) => event.type === 'tool_start')).toBe(false);
+  });
 });

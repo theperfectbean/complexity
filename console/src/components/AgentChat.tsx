@@ -32,6 +32,7 @@ interface Props {
   setThreads: React.Dispatch<React.SetStateAction<Thread[]>>;
   activeId: string;
   focusToken?: number;
+  onModelSwitch?: (modelId: string) => void;
 }
 
 const STORAGE_KEY = 'fleet_console_threads_v1';
@@ -59,6 +60,7 @@ export function AgentChat({
   setThreads,
   activeId,
   focusToken = 0,
+  onModelSwitch,
 }: Props) {
   const [input, setInput] = useState('');
   const [isRunning, setIsRunning] = useState(false);
@@ -125,6 +127,12 @@ export function AgentChat({
         if (event.type === 'destructive_confirm') {
           const ev = event as Record<string, unknown>;
           setPendingApproval({ approvalId: String(ev.approvalId), threadId: ev.threadId as string | undefined });
+        }
+        if (event.type === 'model_switched') {
+          const ev = event as Record<string, unknown>;
+          if (typeof ev.to === 'string' && typeof ev.reason === 'string' && ev.reason.startsWith('User switched via /model')) {
+            onModelSwitch?.(ev.to);
+          }
         }
       },
       () => {
@@ -236,7 +244,12 @@ export function AgentChat({
                         threadId: threadId ?? activeThread?.id,
                       })
                     }
-                    onCancelApproval={() => setPendingApproval(null)}
+                    onCancelApproval={(approvalId, threadId) =>
+                      submitMessage('CANCEL', {
+                        approvalId,
+                        threadId: threadId ?? activeThread?.id,
+                      })
+                    }
                   />
                 ))}
               </div>
@@ -314,7 +327,7 @@ function ToolResult({ toolName, result }: { toolName: string; result: unknown })
 function EventBlock({ event, onApprove, onCancelApproval }: {
   event: AgentRunEvent;
   onApprove?: (approvalId: string, threadId?: string) => void;
-  onCancelApproval?: () => void;
+  onCancelApproval?: (approvalId: string, threadId?: string) => void;
 }) {
   const e = event as Record<string, unknown>;
   const streamNoticeResult: ToolResultEnvelope = {
@@ -419,7 +432,7 @@ function EventBlock({ event, onApprove, onCancelApproval }: {
             </button>
             <button
               type='button'
-              onClick={() => onCancelApproval?.()}
+              onClick={() => onCancelApproval?.(e_id, t_id)}
               className='px-5 py-2 bg-background text-muted-foreground border border-border rounded-xl cursor-pointer text-xs font-bold uppercase tracking-wider hover:bg-muted transition-colors'
             >
               Cancel

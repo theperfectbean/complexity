@@ -141,6 +141,7 @@ export default function MainPage() {
             setThreads={setThreads}
             activeId={activeId}
             focusToken={focusToken}
+            onModelSwitch={setModelId}
           />
         </div>
       </div>

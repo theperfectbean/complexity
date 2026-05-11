@@ -1,6 +1,7 @@
 import { executeTool } from '../ToolRegistry';
 import { RiskPolicy, ToolTier } from '../policy/RiskPolicy';
 import { FLEET_CONTAINERS, FLEET_NODES } from '@/lib/topology';
+import type { ToolResultEnvelope } from '../../core/AgentEvents';
 
 function shellQuote(value: string): string {
   return `'${value.replace(/'/g, "'\\''")}'`;
@@ -160,32 +161,32 @@ export class CommandRegistry {
           };
         }
         const toolResult = await executeTool('pve_list', {}, userId, confirmed);
-        return toolResult.result as Record<string, unknown>;
+        return unwrapToolResult(toolResult.result);
       }
 
       case 'status': {
         const toolResult = await executeTool('pve_status', { container: resource }, userId, confirmed);
-        return toolResult.result as Record<string, unknown>;
+        return unwrapToolResult(toolResult.result);
       }
 
       case 'start': {
         const toolResult = await executeTool('pve_start', { container: resource }, userId, confirmed);
-        return toolResult.result as Record<string, unknown>;
+        return unwrapToolResult(toolResult.result);
       }
 
       case 'stop': {
         const toolResult = await executeTool('pve_stop', { container: resource }, userId, confirmed);
-        return toolResult.result as Record<string, unknown>;
+        return unwrapToolResult(toolResult.result);
       }
 
       case 'restart': {
         const toolResult = await executeTool('pve_restart', { container: resource }, userId, confirmed);
-        return toolResult.result as Record<string, unknown>;
+        return unwrapToolResult(toolResult.result);
       }
 
       case 'delete': {
         const toolResult = await executeTool('pve_delete', { container: resource }, userId, confirmed);
-        return toolResult.result as Record<string, unknown>;
+        return unwrapToolResult(toolResult.result);
       }
 
       case 'logs': {
@@ -193,7 +194,7 @@ export class CommandRegistry {
           container: resource,
           lines: options.lines ? parseInt(options.lines as string) : 100,
         }, userId, confirmed);
-        return toolResult.result as Record<string, unknown>;
+        return unwrapToolResult(toolResult.result);
       }
 
       case 'inspect': {
@@ -203,13 +204,13 @@ export class CommandRegistry {
           container: resource,
           command: `cat -- ${shellQuote(path)}`,
         }, userId, confirmed);
-        return toolResult.result as Record<string, unknown>;
+        return unwrapToolResult(toolResult.result);
       }
 
       case 'check': {
         if (resource === 'disk') {
           const toolResult = await executeTool('disk_usage', {}, userId, confirmed);
-          return toolResult.result as Record<string, unknown>;
+          return unwrapToolResult(toolResult.result);
         }
         throw new Error(`Unknown check target: ${resource}`);
       }
@@ -218,4 +219,19 @@ export class CommandRegistry {
         throw new Error(`Unknown action: ${action}`);
     }
   }
+}
+
+function unwrapToolResult(result: unknown): string | Record<string, unknown> {
+  if (
+    typeof result === 'object' &&
+    result !== null &&
+    'ok' in result &&
+    'widgetHint' in result &&
+    'summary' in result &&
+    'data' in result
+  ) {
+    return (result as ToolResultEnvelope).data as string | Record<string, unknown>;
+  }
+
+  return result as string | Record<string, unknown>;
 }

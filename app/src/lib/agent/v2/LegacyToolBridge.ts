@@ -2,6 +2,7 @@ import { executeTool, getToolEntry } from './ToolRegistry';
 import { evaluateToolRisk } from './policy/RiskPolicy';
 import { normalizeToolResult } from '../tools/ToolResultNormalizer';
 import type { ToolResultEnvelope, WidgetHint } from '../core/AgentEvents';
+import { executeNativeToolEnvelope, getNativeToolManifest } from '../tools/NativeToolRegistry';
 
 export interface LegacyToolManifest {
   name: string;
@@ -28,6 +29,19 @@ function inferWidgetHint(toolName: string): WidgetHint {
 }
 
 export function getLegacyToolManifest(name: string): LegacyToolManifest | null {
+  const nativeManifest = getNativeToolManifest(name);
+  if (nativeManifest) {
+    return {
+      name: nativeManifest.name,
+      description: nativeManifest.description,
+      jsonSchema: nativeManifest.jsonSchema,
+      widgetHint: nativeManifest.widgetHint,
+      riskTier: nativeManifest.riskTier,
+      requiresApproval: nativeManifest.requiresApproval,
+      readOnly: nativeManifest.readOnly,
+    };
+  }
+
   const entry = getToolEntry(name);
   if (!entry) return null;
 
@@ -59,6 +73,11 @@ export async function executeLegacyToolEnvelope(
   const manifest = getLegacyToolManifest(name);
   if (!manifest) {
     throw new Error(`Unknown tool: ${name}`);
+  }
+
+  const nativeManifest = getNativeToolManifest(name);
+  if (nativeManifest) {
+    return executeNativeToolEnvelope(name, params, { actorId: user });
   }
 
   const executed = await executeTool(name, params, user, confirmed);

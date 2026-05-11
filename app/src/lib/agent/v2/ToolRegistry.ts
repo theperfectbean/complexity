@@ -14,6 +14,7 @@ import { tool } from 'ai';
 import { z } from 'zod';
 import { evaluateToolRisk, RiskTier, RiskDecision } from './policy/RiskPolicy';
 import { auditWrite } from './audit/AuditLog';
+import { executeNativeToolEnvelope, getNativeToolEntries, getNativeToolEntry, getNativeToolManifest } from '../tools/NativeToolRegistry';
 
 export type ToolFn = (params: Record<string, unknown>) => Promise<unknown>;
 
@@ -97,11 +98,18 @@ const REGISTRY: Record<string, RegistryEntry> = {
 };
 
 export function getToolEntry(name: string): RegistryEntry | undefined {
+  const nativeEntry = getNativeToolEntry(name);
+  if (nativeEntry) {
+    return nativeEntry;
+  }
   return REGISTRY[name];
 }
 
 export function getAllTools(): Record<string, RegistryEntry> {
-  return REGISTRY;
+  return {
+    ...REGISTRY,
+    ...getNativeToolEntries(),
+  };
 }
 
 export async function executeTool(
@@ -110,6 +118,19 @@ export async function executeTool(
   user = 'agent',
   confirmed = false,
 ): Promise<{ result: unknown; tier: number; decision: RiskDecision }> {
+  const nativeManifest = getNativeToolManifest(name);
+  if (nativeManifest) {
+    const decision = evaluateToolRisk(name);
+    if (!decision.allow && !confirmed) {
+      throw new Error(`Tool ${name} requires confirmation (tier ${decision.tier})`);
+    }
+    const executed = await executeNativeToolEnvelope(name, params, { actorId: user });
+    if (decision.auditWrite) {
+      auditWrite(decision.tier, name, params, executed.result.summary, user);
+    }
+    return { result: executed.result, tier: decision.tier, decision };
+  }
+
   const entry = REGISTRY[name];
   if (!entry) throw new Error(`Unknown tool: ${name}`);
   const decision = evaluateToolRisk(name);
