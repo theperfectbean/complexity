@@ -15,7 +15,7 @@ test.describe('Slash commands', () => {
 
     await page.getByText('Tool Result: help').click();
     await expect(page.getByText(/Available slash commands/i)).toBeVisible();
-    await expect(page.getByText('/model')).toBeVisible();
+    await expect(page.getByRole('cell', { name: '/model', exact: true })).toBeVisible();
     await expect(page.getByText('Confirmation Required')).not.toBeVisible();
   });
 
