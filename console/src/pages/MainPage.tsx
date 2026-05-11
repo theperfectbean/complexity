@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Menu } from 'lucide-react';
-import { Sidebar } from '../components/Sidebar';
+import { ThreadSidebar } from '../components/ThreadSidebar';
 import { AgentChat, loadThreads, makeThread } from '../components/AgentChat';
 import { ModelSelector } from '../components/ModelSelector';
 
@@ -98,13 +98,12 @@ export default function MainPage() {
   return (
     <div className='relative flex min-h-[100dvh] bg-background text-foreground'>
       <div className='sticky top-0 z-50 hidden h-[100dvh] w-[278px] shrink-0 border-r border-sidebar-border bg-sidebar md:block'>
-        <Sidebar 
+        <ThreadSidebar 
           threads={sidebarThreads} 
           activeId={activeId}
           onSelect={setActiveId}
           onNew={handleNewChat}
           onDelete={handleDeleteThread}
-          collapsed={false}
         />
       </div>
 
