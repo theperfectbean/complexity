@@ -106,4 +106,42 @@ describe('ApprovalStore', () => {
     expect([first, second].filter((value) => value !== null)).toHaveLength(1);
     expect(await consumeApproval(approvalId, 'user-1', 'thread-1')).toBeNull();
   });
+
+  it('persists tool approval resume state for durable agent resumption', async () => {
+    const { createToolApproval, consumeApproval } = await import('@/lib/agent/v2/approval/ApprovalStore');
+
+    const approvalId = await createToolApproval(
+      'pve_stop',
+      { container: 'plex' },
+      'user-1',
+      'thread-1',
+      {
+        runId: 'run-1',
+        activeModelId: 'perplexity/sonar',
+        routingTask: 'chat',
+        round: 2,
+        commandMode: 'auto',
+        toolCallId: 'call-stop-1',
+        messages: [
+          { role: 'system', content: 'System prompt' },
+          { role: 'user', content: 'stop plex' },
+        ],
+        toolCallHistory: [],
+      },
+    );
+
+    const approval = await consumeApproval(approvalId, 'user-1', 'thread-1');
+    expect(approval).toMatchObject({
+      kind: 'tool',
+      tool: { name: 'pve_stop', params: { container: 'plex' } },
+      resume: {
+        runId: 'run-1',
+        activeModelId: 'perplexity/sonar',
+        routingTask: 'chat',
+        round: 2,
+        toolCallId: 'call-stop-1',
+      },
+    });
+  });
+
 });

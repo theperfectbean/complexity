@@ -75,6 +75,7 @@ export interface AgentServiceDeps {
     state: AgentRunState;
     toolName: string;
     params: unknown;
+    toolCallId?: string;
     suggestedApprovalId: string;
   }) => Promise<string>;
 }
@@ -83,6 +84,11 @@ export interface AgentServiceInput {
   state: AgentRunState;
   userMessage: string;
   signal?: AbortSignal;
+  resumeToolCall?: {
+    toolName: string;
+    params: unknown;
+    toolCallId?: string;
+  };
 }
 
 export type AgentServiceOutput = AsyncGenerator<AgentStreamEvent, AgentRunState, unknown>;
@@ -92,7 +98,7 @@ export class AgentService {
 
   async *run(input: AgentServiceInput): AgentServiceOutput {
     let state = input.state;
-    const { userMessage, signal } = input;
+    const { userMessage, signal, resumeToolCall } = input;
 
     // ── 1. Slash command interception ─────────────────────────────
     if (userMessage.trim().startsWith("/")) {
@@ -123,10 +129,13 @@ export class AgentService {
     // ── 2. Route to model ─────────────────────────────────────────
     let route: ModelRoute;
     try {
+      const routingMessage = userMessage.trim().length > 0
+        ? userMessage
+        : ([...state.messages].reverse().find((message) => message.role === "user" && typeof message.content === "string")?.content as string | undefined) ?? "";
       route = await this.deps.router.select({
         requestedModelId: state.activeModelId,
         task: state.routingTask as ModelTask,
-        message: userMessage,
+        message: routingMessage,
       });
       if (route.model.id !== state.activeModelId) {
         yield {
@@ -147,18 +156,23 @@ export class AgentService {
     }
 
     // ── 3. Context window budget ──────────────────────────────────
-    const messages = [...state.messages, { role: "user", content: userMessage }];
+    const messages = resumeToolCall ? [...state.messages] : [...state.messages, { role: "user", content: userMessage }];
     const budget = checkContextBudget(route.model as ProviderModel, messages, this.deps.settings);
 
     if (budget.action !== "ok") {
       if (budget.action === "summarize" && this.deps.summarize) {
         yield makeStatusEvent("summarizing_context");
         const summary = await this.deps.summarize(messages);
-        const compressed = [
-          messages[0],
-          { role: "assistant", content: `[Context summary: ${summary}]` },
-          { role: "user", content: userMessage },
-        ];
+        const compressed = resumeToolCall
+          ? [
+              messages[0],
+              { role: "assistant", content: `[Context summary: ${summary}]` },
+            ]
+          : [
+              messages[0],
+              { role: "assistant", content: `[Context summary: ${summary}]` },
+              { role: "user", content: userMessage },
+            ];
         yield {
           type: "context_summarized",
           originalTokens: budget.estimatedTokens,
@@ -175,6 +189,54 @@ export class AgentService {
     let round = state.round;
     const maxRounds = this.deps.settings.maxAgentRounds;
     const toolDefinitions = this.deps.getToolDefinitions?.() ?? [];
+
+
+    if (resumeToolCall) {
+      const manifest = this.deps.getToolManifest(resumeToolCall.toolName);
+      yield {
+        type: "tool_start",
+        tool: resumeToolCall.toolName,
+        params: resumeToolCall.params,
+        tier: manifest?.riskTier ?? 1,
+        toolCallId: resumeToolCall.toolCallId,
+      };
+
+      try {
+        const raw = await this.deps.executeTool(resumeToolCall.toolName, resumeToolCall.params, {
+          runId: state.runId,
+          threadId: state.threadId,
+          actorId: state.userId,
+        });
+        const envelope = normalizeToolResult(resumeToolCall.toolName, raw, manifest?.widgetHint);
+        yield makeToolResultEvent(resumeToolCall.toolName, envelope, manifest?.riskTier);
+        messages.push({
+          role: "tool",
+          tool_call_id: resumeToolCall.toolCallId ?? "approved_tool_call",
+          content: JSON.stringify({ toolName: resumeToolCall.toolName, result: envelope }),
+        } as { role: string; content: unknown });
+        state.toolCallHistory.push({
+          tool: resumeToolCall.toolName,
+          params: (resumeToolCall.params ?? {}) as Record<string, unknown>,
+          result: envelope,
+          timestamp: new Date().toISOString(),
+        });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        yield { type: "tool_error", tool: resumeToolCall.toolName, error: msg };
+        const errEnvelope = makeErrorEnvelope(resumeToolCall.toolName, msg);
+        messages.push({
+          role: "tool",
+          tool_call_id: resumeToolCall.toolCallId ?? "approved_tool_call",
+          content: JSON.stringify({ toolName: resumeToolCall.toolName, result: errEnvelope }),
+        } as { role: string; content: unknown });
+        state.toolCallHistory.push({
+          tool: resumeToolCall.toolName,
+          params: (resumeToolCall.params ?? {}) as Record<string, unknown>,
+          error: msg,
+          timestamp: new Date().toISOString(),
+        });
+      }
+    }
 
     while (round < maxRounds) {
       if (signal?.aborted) {
@@ -259,6 +321,7 @@ export class AgentService {
                   state,
                   toolName: call.toolName,
                   params: call.params,
+                  toolCallId: call.id,
                   suggestedApprovalId: decision.approvalId,
                 })
               : decision.approvalId;

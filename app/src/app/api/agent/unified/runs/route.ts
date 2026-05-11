@@ -160,6 +160,17 @@ function parseMaybeJson(text: string): unknown {
   }
 }
 
+function extractLatestUserMessage(messages: object[]): string | null {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const raw = messages[index];
+    if (!isRecord(raw) || raw.role !== 'user') continue;
+    if (typeof raw.content === 'string' && raw.content.trim().length > 0) {
+      return raw.content;
+    }
+  }
+  return null;
+}
+
 function normalizeUnifiedMessages(messages: object[]): object[] {
   const toolNameByCallId = new Map<string, string>();
   const normalized: object[] = [];
@@ -555,6 +566,76 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         let activeProviderModel: ProviderModel | null = null;
         let activeFallbackChain: ProviderModel[] = [];
 
+        const runAgentServiceLoop = async (input: {
+          resumeModelId?: string;
+          routingTask?: ReturnType<typeof classifyModelTask>;
+          contextMessage: string;
+          userMessage: string;
+          resumeToolCall?: {
+            toolName: string;
+            params: Record<string, unknown>;
+            toolCallId?: string;
+          };
+        }) => {
+          const ctx = buildAgentContext(input.contextMessage, stateSnapshot);
+          emit({ type: 'context', domain: ctx.domain, model: input.resumeModelId ?? activeModel, commandMode });
+
+          const agentService = new AgentService({
+            router: modelRouter,
+            settings: agentSettings,
+            listModels: async () => (await modelRegistry.list()).map((m) => ({ id: m.id, label: m.label, local: m.local })),
+            getToolDefinitions: () => ctx.tools,
+            executeTool: async (toolName, params, toolCtx) => {
+              const executed = await executeLegacyToolEnvelope(toolName, (params ?? {}) as Record<string, unknown>, toolCtx.actorId, false);
+              return executed.result;
+            },
+            getToolManifest: (toolName) => getLegacyToolManifest(toolName),
+            streamLLM: streamUnifiedAgentLlm,
+            summarize: async (messages) => summarizeConversation(messages as object[], agentSettings.fastModel, req.signal),
+            requestToolApproval: async ({ state, toolName, params, toolCallId }) => createToolApproval(toolName, (params ?? {}) as Record<string, unknown>, userId, runState.threadId, { runId: state.runId, activeModelId: state.activeModelId, routingTask: state.routingTask, round: state.round, commandMode: state.commandMode, toolCallId, messages: state.messages.map((entry) => entry as Record<string, unknown>), toolCallHistory: state.toolCallHistory }),
+          });
+
+          const agentState = toAgentRunState(runState, input.resumeModelId ?? activeModel, input.routingTask ?? classifyModelTask(input.contextMessage));
+          if (agentState.messages.length === 0 || agentState.messages[0]?.role !== 'system') {
+            agentState.messages.unshift({ role: 'system', content: ctx.systemPrompt });
+          }
+          const runner = agentService.run({
+            state: agentState,
+            userMessage: input.userMessage,
+            signal: req.signal,
+            resumeToolCall: input.resumeToolCall,
+          });
+
+          let next = await runner.next();
+          while (!next.done) {
+            if (next.value.type !== 'run_status' && next.value.type !== 'done') {
+              const mapped = mapAgentEventToConsoleEvent(next.value);
+              if (mapped) {
+                emit(mapped as ConsoleEvent);
+              }
+            }
+            next = await runner.next();
+          }
+
+          const finalState = next.value;
+          applyAgentStateToUnified(runState, finalState);
+
+          if (finalState.status === 'waiting_for_approval') {
+            await finish('paused_for_approval');
+            return;
+          }
+          if (finalState.status === 'cancelled') {
+            await finish('cancelled');
+            return;
+          }
+          if (finalState.status === 'error') {
+            await finish('error');
+            return;
+          }
+
+          await finish('completed');
+        };
+
         if (approvalId) {
           const approval = await consumeApproval(approvalId, userId, runState.threadId);
           if (!approval) {
@@ -611,6 +692,27 @@ ${typeof cmdResult.output === 'string' ? cmdResult.output : JSON.stringify(cmdRe
               return;
             }
           } else {
+            if (approval.resume) {
+              runState.runId = approval.resume.runId;
+              runState.messages = approval.resume.messages as object[];
+              runState.toolCallHistory = approval.resume.toolCallHistory.map((entry) => ({ tool: entry.tool, params: entry.params, result: entry.result, error: entry.error }));
+              runState.round = approval.resume.round;
+              runState.commandMode = approval.resume.commandMode;
+              runState.pendingApprovalId = undefined;
+              await runAgentServiceLoop({
+                resumeModelId: approval.resume.activeModelId,
+                routingTask: approval.resume.routingTask,
+                contextMessage: extractLatestUserMessage(runState.messages) ?? approval.tool.name,
+                userMessage: '',
+                resumeToolCall: {
+                  toolName: approval.tool.name,
+                  params: approval.tool.params,
+                  toolCallId: approval.resume.toolCallId,
+                },
+              });
+              return;
+            }
+
             const approvedManifest = getLegacyToolManifest(approval.tool.name);
             emit({
               type: 'tool_start',
@@ -766,62 +868,10 @@ ${typeof cmdResult.output === 'string' ? cmdResult.output : JSON.stringify(cmdRe
         }
 
         if (deferToAgentService && !forceSynthesis) {
-          const ctx = buildAgentContext(message, stateSnapshot);
-          emit({ type: 'context', domain: ctx.domain, model: activeModel, commandMode });
-
-          const agentService = new AgentService({
-            router: modelRouter,
-            settings: agentSettings,
-            listModels: async () => (await modelRegistry.list()).map((m) => ({ id: m.id, label: m.label, local: m.local })),
-            getToolDefinitions: () => ctx.tools,
-            executeTool: async (toolName, params, toolCtx) => {
-              const executed = await executeLegacyToolEnvelope(toolName, (params ?? {}) as Record<string, unknown>, toolCtx.actorId, false);
-              return executed.result;
-            },
-            getToolManifest: (toolName) => getLegacyToolManifest(toolName),
-            streamLLM: streamUnifiedAgentLlm,
-            summarize: async (messages) => summarizeConversation(messages as object[], agentSettings.fastModel, req.signal),
-            requestToolApproval: async ({ toolName, params }) => createToolApproval(toolName, (params ?? {}) as Record<string, unknown>, userId, runState.threadId),
-          });
-
-          const agentState = toAgentRunState(runState, activeModel, classifyModelTask(message));
-          if (agentState.messages.length === 0 || agentState.messages[0]?.role !== 'system') {
-            agentState.messages.unshift({ role: 'system', content: ctx.systemPrompt });
-          }
-          const runner = agentService.run({
-            state: agentState,
+          await runAgentServiceLoop({
+            contextMessage: message,
             userMessage: message,
-            signal: req.signal,
           });
-
-          let next = await runner.next();
-          while (!next.done) {
-            if (next.value.type !== 'run_status' && next.value.type !== 'done') {
-              const mapped = mapAgentEventToConsoleEvent(next.value);
-              if (mapped) {
-                emit(mapped as ConsoleEvent);
-              }
-            }
-            next = await runner.next();
-          }
-
-          const finalState = next.value;
-          applyAgentStateToUnified(runState, finalState);
-
-          if (finalState.status === 'waiting_for_approval') {
-            await finish('paused_for_approval');
-            return;
-          }
-          if (finalState.status === 'cancelled') {
-            await finish('cancelled');
-            return;
-          }
-          if (finalState.status === 'error') {
-            await finish('error');
-            return;
-          }
-
-          await finish('completed');
           return;
         }
 

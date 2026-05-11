@@ -151,4 +151,59 @@ describe("AgentService Phase 2", () => {
     expect(executeTool).toHaveBeenCalledTimes(1);
   });
 
+
+  it("replays an approved tool call into the next LLM round with its original toolCallId", async () => {
+    const executeTool = vi.fn(async () => ({ ok: true }));
+    const llmInputs: Array<Array<{ role: string; content: unknown; tool_call_id?: string }>> = [];
+
+    const service = new AgentService({
+      router: {
+        select: vi.fn(async () => ({ model, fallbackChain: [] })),
+      } as never,
+      settings: {
+        defaultModel: "perplexity/sonar",
+        heavyModel: "perplexity/sonar-pro",
+        fastModel: "perplexity/sonar",
+        autoApproveReads: true,
+        maxAgentRounds: 2,
+        contextStrategy: "rolling_summary",
+        contextUtilizationThreshold: 0.8,
+        providerFallbacks: {},
+      },
+      listModels: async () => [],
+      getToolDefinitions: () => ({ pve_stop: {} }),
+      executeTool,
+      getToolManifest: () => ({
+        name: "pve_stop",
+        riskTier: 3,
+        requiresApproval: true,
+        readOnly: false,
+        widgetHint: { type: "command_result" },
+      }),
+      streamLLM: async function* (_modelId, messages) {
+        llmInputs.push(messages as Array<{ role: string; content: unknown; tool_call_id?: string }>);
+        yield { type: "text", content: "approved complete", role: "assistant" } as const;
+        yield { type: "done" } as const;
+      },
+    });
+
+    const runner = service.run({
+      state: createState(),
+      userMessage: "",
+      resumeToolCall: { toolName: "pve_stop", params: { container: "plex" }, toolCallId: "call-approved-1" },
+    });
+
+    let next = await runner.next();
+    while (!next.done) {
+      next = await runner.next();
+    }
+
+    expect(llmInputs).toHaveLength(1);
+    expect(llmInputs[0]?.find((message) => message.role === "tool")).toMatchObject({
+      role: "tool",
+      tool_call_id: "call-approved-1",
+    });
+    expect(executeTool).toHaveBeenCalledTimes(1);
+  });
+
 });

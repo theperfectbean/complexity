@@ -1,8 +1,27 @@
 import { getRedisClient } from '@/lib/redis';
 import type { ParsedCommand } from '../command';
+import type { ModelTask } from '@/lib/agent/core/AgentState';
 
 const APPROVAL_TTL_SECONDS = 10 * 60;
 const KEY_PREFIX = 'agent:approval';
+
+
+export interface ToolApprovalResumeState {
+  runId: string;
+  activeModelId: string;
+  routingTask: ModelTask;
+  round: number;
+  commandMode: 'auto' | 'slash' | 'natural';
+  toolCallId?: string;
+  messages: Array<Record<string, unknown>>;
+  toolCallHistory: Array<{
+    tool: string;
+    params: Record<string, unknown>;
+    result?: unknown;
+    error?: string;
+    timestamp?: string;
+  }>;
+}
 
 type PendingApprovalPayload =
   | {
@@ -16,6 +35,7 @@ type PendingApprovalPayload =
       ownerId: string;
       threadId?: string;
       tool: { name: string; params: Record<string, unknown> };
+      resume?: ToolApprovalResumeState;
     };
 
 function keyFor(id: string): string {
@@ -46,8 +66,9 @@ export async function createToolApproval(
   params: Record<string, unknown>,
   ownerId: string,
   threadId?: string,
+  resume?: ToolApprovalResumeState,
 ): Promise<string> {
-  return persistApproval({ kind: 'tool', ownerId, threadId, tool: { name, params } });
+  return persistApproval({ kind: 'tool', ownerId, threadId, tool: { name, params }, resume });
 }
 
 export async function consumeApproval(
