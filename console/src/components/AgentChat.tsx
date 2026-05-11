@@ -28,9 +28,9 @@ interface Props {
   initialContext?: string;
   onContextUsed?: () => void;
   modelId?: string;
-  threads: Thread[];
-  setThreads: React.Dispatch<React.SetStateAction<Thread[]>>;
-  activeId: string;
+  threads?: Thread[];
+  setThreads?: React.Dispatch<React.SetStateAction<Thread[]>>;
+  activeId?: string;
   focusToken?: number;
   onModelSwitch?: (modelId: string) => void;
 }
@@ -55,7 +55,7 @@ export function makeThread(): Thread {
 export function AgentChat({ 
   initialContext, 
   onContextUsed, 
-  modelId = 'perplexity/sonar',
+  modelId = 'default',
   threads,
   setThreads,
   activeId,
@@ -67,9 +67,17 @@ export function AgentChat({
   const [pendingApproval, setPendingApproval] = useState<{approvalId: string; threadId?: string} | null>(null);
   const [showCmdMenu, setShowCmdMenu] = useState(false);
   const [cmdQuery, setCmdQuery] = useState('');
+  const [internalThreads, setInternalThreads] = useState<Thread[]>(() => {
+    const saved = loadThreads();
+    return saved.length > 0 ? saved : [makeThread()];
+  });
   const abortRef = useRef<AbortController | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const effectiveThreads = threads ?? internalThreads;
+  const effectiveSetThreads = setThreads ?? setInternalThreads;
+  const effectiveActiveId = activeId ?? effectiveThreads[0]?.id ?? '';
 
   useEffect(() => {
     if (initialContext) { setInput(initialContext); onContextUsed?.(); }
@@ -78,8 +86,8 @@ export function AgentChat({
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); });
   
   useEffect(() => { 
-    if (threads.length > 0) saveThreads(threads); 
-  }, [threads]);
+    if (effectiveThreads.length > 0) saveThreads(effectiveThreads); 
+  }, [effectiveThreads]);
 
   useEffect(() => {
     const el = textareaRef.current;
@@ -88,14 +96,14 @@ export function AgentChat({
 
   useEffect(() => {
     textareaRef.current?.focus();
-  }, [focusToken, activeId]);
+  }, [focusToken, effectiveActiveId]);
 
   const updateThread = useCallback((threadId: string, updater: (t: Thread) => Thread) => {
-    setThreads(prev => prev.map(t => t.id === threadId ? updater(t) : t));
-  }, [setThreads]);
+    effectiveSetThreads(prev => prev.map(t => t.id === threadId ? updater(t) : t));
+  }, [effectiveSetThreads]);
 
   const submitMessage = (userMessage: string, extraBodyOverride?: Record<string, unknown>) => {
-    const thread = threads.find(t => t.id === activeId);
+    const thread = effectiveThreads.find(t => t.id === effectiveActiveId);
     if (thread === undefined || isRunning || userMessage.trim() === '') return;
 
     const turnId = uuid();
@@ -154,7 +162,7 @@ export function AgentChat({
   };
 
   const clearActiveThread = () => {
-    updateThread(activeId, t => ({ ...t, turns: [] }));
+    updateThread(effectiveActiveId, t => ({ ...t, turns: [] }));
     setShowCmdMenu(false);
     setCmdQuery('');
     setInput('');
@@ -206,7 +214,7 @@ export function AgentChat({
     }
   };
 
-  const activeThread = threads.find(t => t.id === activeId);
+  const activeThread = effectiveThreads.find(t => t.id === effectiveActiveId);
 
   return (
     <div data-testid='agent-chat' className='flex h-full bg-background text-foreground font-inherit'>
@@ -218,10 +226,10 @@ export function AgentChat({
                 <Activity size={32} className='text-primary' />
               </div>
               <div>
-                <p className='m-0 mb-2 text-xl font-semibold tracking-tight'>Cluster Console</p>
-                <p className='m-0 text-sm text-muted-foreground max-w-[400px] leading-relaxed'>
-                  How can I help you manage your Proxmox infrastructure today?
-                </p>
+                 <p className='m-0 mb-2 text-xl font-semibold tracking-tight'>Fleet Console</p>
+                 <p className='m-0 text-sm text-muted-foreground max-w-[400px] leading-relaxed'>
+                   Ask about your Proxmox cluster, services, and infrastructure operations.
+                 </p>
               </div>
             </div>
           )}
@@ -428,7 +436,7 @@ function EventBlock({ event, onApprove, onCancelApproval }: {
               onClick={() => onApprove?.(e_id, t_id)}
               className='px-5 py-2 bg-destructive text-white border-none rounded-xl cursor-pointer text-xs font-bold uppercase tracking-wider hover:opacity-90 transition-opacity shadow-sm'
             >
-              Approve Action
+               Approve
             </button>
             <button
               type='button'

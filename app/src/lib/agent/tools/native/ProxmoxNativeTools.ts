@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { BaseTool, makeManifest, type ToolExecutionContext, type ToolResultEnvelope } from "../BaseTool";
-import { pve_list, pve_stop, resolveContainer } from "../../agent/v2/tools/infra/ProxmoxTool";
+import { pve_list, pve_stop, resolveContainer } from "../../v2/tools/infra/ProxmoxTool";
 
 type PveListRow = {
   type: string;
