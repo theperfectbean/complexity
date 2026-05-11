@@ -38,6 +38,8 @@ import { ModelRegistry } from '@/lib/models/ModelRegistry';
 import { ModelRouter } from '@/lib/models/ModelRouter';
 import type { ProviderModel } from '@/lib/models/ProviderModel';
 import { classifyModelTask } from '@/lib/models/RoutingPolicy';
+import { MODEL_SETTINGS_KEYS } from '@/lib/model-registry';
+import { getDetailedSettings } from '@/lib/settings';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
