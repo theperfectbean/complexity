@@ -49,7 +49,7 @@ describe('AgentChat Phase 3 behavior', () => {
     await waitFor(() => {
       expect(onModelSwitch).toHaveBeenCalledWith('openai/gpt-4o-mini');
     });
-    expect(screen.getByTestId('send-btn')).not.toBeDisabled();
+    expect(screen.getByTestId('message-input')).not.toBeDisabled();
   });
 
   it('releases the UI after /help tool results even if the stream stays open', async () => {
@@ -76,7 +76,7 @@ describe('AgentChat Phase 3 behavior', () => {
     await userEvent.keyboard('{Enter}');
 
     await waitFor(() => {
-      expect(screen.getByTestId('send-btn')).not.toBeDisabled();
+      expect(screen.getByTestId('message-input')).not.toBeDisabled();
     });
   });
 

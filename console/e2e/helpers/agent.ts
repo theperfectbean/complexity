@@ -63,10 +63,10 @@ export async function waitForAgentResponse(page: Page, timeoutMs = 90_000): Prom
 }
 
 /**
- * Wait for the agent run to finish (send button re-enabled).
+ * Wait for the agent run to finish (input re-enabled).
  */
 export async function waitForRunComplete(page: Page, timeoutMs = 120_000): Promise<void> {
-  await page.locator('[data-testid="send-btn"]:not([disabled])').waitFor({ state: 'visible', timeout: timeoutMs });
+  await page.locator('[data-testid="message-input"]:not([disabled])').waitFor({ state: 'visible', timeout: timeoutMs });
   await page.waitForTimeout(300);
 }
 
