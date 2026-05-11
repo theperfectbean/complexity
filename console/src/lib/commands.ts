@@ -76,3 +76,22 @@ export function matchCommands(query: string): SlashCommand[] {
     c => c.trigger.toLowerCase().includes(lq) || c.label.toLowerCase().includes(lq),
   );
 }
+
+// ---- /model command ----
+// Backend intercepts this before LLM; frontend entry registers it for CommandMenu autocomplete.
+export const modelCommand: SlashCommand = {
+  id: "model",
+  trigger: "model",
+  label: "Switch model",
+  description: "Switch active LLM (e.g. /model claude or /model llama3)",
+  action: () => null,
+};
+
+// ---- /help command ----
+export const helpCommand: SlashCommand = {
+  id: "help",
+  trigger: "help",
+  label: "Help",
+  description: "Show available slash commands and tools",
+  action: () => null,
+};
