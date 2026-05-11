@@ -1,5 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
+const consolePort = Number(process.env.PLAYWRIGHT_CONSOLE_PORT ?? '4173');
+
 export default defineConfig({
   testDir: './e2e',
   timeout: 180_000,
@@ -9,7 +11,7 @@ export default defineConfig({
   reporter: [['list'], ['html', { open: 'never' }]],
 
   use: {
-    baseURL: 'http://localhost:3001',
+    baseURL: `http://127.0.0.1:${consolePort}`,
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
   },
@@ -22,9 +24,9 @@ export default defineConfig({
   ],
 
   webServer: {
-    command: 'npm run dev',
-    port: 3001,
-    reuseExistingServer: !process.env.CI,
+    command: `npm run dev -- --host 127.0.0.1 --port ${consolePort}`,
+    port: consolePort,
+    reuseExistingServer: false,
     timeout: 60_000,
   },
 });
