@@ -90,4 +90,65 @@ describe("AgentService Phase 2", () => {
     expect(next.value.status).toBe("waiting_for_approval");
     expect(next.value.pendingApproval?.approvalId).toBe("approval-123");
   });
+
+  it("preserves provider tool call ids in follow-up tool messages without duplicating tool_start", async () => {
+    const executeTool = vi.fn(async () => ({ ok: true }));
+    const llmInputs: Array<Array<{ role: string; content: unknown; tool_call_id?: string }>> = [];
+    let llmRound = 0;
+
+    const service = new AgentService({
+      router: {
+        select: vi.fn(async () => ({ model, fallbackChain: [] })),
+      } as never,
+      settings: {
+        defaultModel: "perplexity/sonar",
+        heavyModel: "perplexity/sonar-pro",
+        fastModel: "perplexity/sonar",
+        autoApproveReads: true,
+        maxAgentRounds: 2,
+        contextStrategy: "rolling_summary",
+        contextUtilizationThreshold: 0.8,
+        providerFallbacks: {},
+      },
+      listModels: async () => [],
+      getToolDefinitions: () => ({ pve_list: {} }),
+      executeTool,
+      getToolManifest: () => ({
+        name: "pve_list",
+        riskTier: 0,
+        requiresApproval: false,
+        readOnly: true,
+        widgetHint: { type: "table" },
+      }),
+      streamLLM: async function* (_modelId, messages) {
+        llmInputs.push(messages as Array<{ role: string; content: unknown; tool_call_id?: string }>);
+        llmRound += 1;
+        if (llmRound === 1) {
+          yield { type: "tool_start", tool: "pve_list", params: { node: "node01" }, tier: 0, toolCallId: "call-123" } as const;
+          yield { type: "done" } as const;
+          return;
+        }
+        yield { type: "text", content: "done", role: "assistant" } as const;
+        yield { type: "done" } as const;
+      },
+    });
+
+    const runner = service.run({ state: createState(), userMessage: "list containers" });
+    const events: Array<{ type: string; [key: string]: unknown }> = [];
+
+    let next = await runner.next();
+    while (!next.done) {
+      events.push(next.value as { type: string; [key: string]: unknown });
+      next = await runner.next();
+    }
+
+    expect(events.filter((event) => event.type === "tool_start")).toHaveLength(1);
+    expect(llmInputs).toHaveLength(2);
+    expect(llmInputs[1]?.find((message) => message.role === "tool")).toMatchObject({
+      role: "tool",
+      tool_call_id: "call-123",
+    });
+    expect(executeTool).toHaveBeenCalledTimes(1);
+  });
+
 });

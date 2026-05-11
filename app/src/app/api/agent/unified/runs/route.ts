@@ -71,7 +71,7 @@ type ConsoleEvent =
   | { type: 'context'; domain: string; model: string; commandMode: string }
   | { type: 'command_parsed'; command: ParsedCommand; tier: string }
   | { type: 'text'; content: string; role?: 'assistant' | 'system' }
-  | { type: 'tool_start'; tool: string; params: Record<string, unknown>; tier: number }
+  | { type: 'tool_start'; tool: string; params: Record<string, unknown>; tier: number; toolCallId?: string }
   | { type: 'tool_result'; tool: string; result: unknown; tier: number }
   | { type: 'tool_error'; tool: string; error: string }
   | { type: 'destructive_confirm'; approvalId: string; command?: ParsedCommand; tool?: string; params?: Record<string, unknown>; message: string }
@@ -397,6 +397,7 @@ async function* streamUnifiedAgentLlm(
       tool: tc.function.name,
       params,
       tier: manifest?.riskTier ?? 1,
+      toolCallId: tc.id,
     };
   }
 
@@ -784,6 +785,9 @@ ${typeof cmdResult.output === 'string' ? cmdResult.output : JSON.stringify(cmdRe
           });
 
           const agentState = toAgentRunState(runState, activeModel, classifyModelTask(message));
+          if (agentState.messages.length === 0 || agentState.messages[0]?.role !== 'system') {
+            agentState.messages.unshift({ role: 'system', content: ctx.systemPrompt });
+          }
           const runner = agentService.run({
             state: agentState,
             userMessage: message,

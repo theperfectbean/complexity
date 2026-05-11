@@ -45,7 +45,7 @@ export type AgentStreamEvent =
   | { type: "context"; domain: string; model: string; commandMode?: string }
   | { type: "reasoning"; text: string; source: ReasoningSource; phase: "delta" | "final" }
   | { type: "text"; content: string; role?: "assistant" | "system" }
-  | { type: "tool_start"; tool: string; params: unknown; tier: number }
+  | { type: "tool_start"; tool: string; params: unknown; tier: number; toolCallId?: string }
   | { type: "tool_result"; tool: string; result: ToolResultEnvelope; tier?: number }
   | { type: "tool_error"; tool: string; error: string }
   | { type: "tool_stdout"; toolCallId: string; chunk: string }
@@ -76,8 +76,8 @@ export function makeErrorEvent(message: string, code?: string, retryable?: boole
   return { type: "error", message, code, retryable };
 }
 
-export function makeToolStartEvent(tool: string, params: unknown, tier: number): AgentStreamEvent {
-  return { type: "tool_start", tool, params, tier };
+export function makeToolStartEvent(tool: string, params: unknown, tier: number, toolCallId?: string): AgentStreamEvent {
+  return { type: "tool_start", tool, params, tier, toolCallId };
 }
 
 export function makeToolResultEvent(

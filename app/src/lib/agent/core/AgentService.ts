@@ -22,7 +22,6 @@ import type { AgentStreamEvent } from "./AgentEvents";
 import {
   makeStatusEvent,
   makeErrorEvent,
-  makeToolStartEvent,
   makeToolResultEvent,
 } from "./AgentEvents";
 import {
@@ -198,7 +197,7 @@ export class AgentService {
           }
           if (event.type === "tool_start") {
             pendingToolCalls.push({
-              id: String(pendingToolCalls.length),
+              id: event.toolCallId ?? String(pendingToolCalls.length),
               toolName: event.tool,
               params: event.params,
             });
@@ -287,8 +286,6 @@ export class AgentService {
           }
         }
 
-        yield makeToolStartEvent(call.toolName, call.params, manifest?.riskTier ?? 1);
-
         try {
           const raw = await this.deps.executeTool(call.toolName, call.params, {
             runId: state.runId,
@@ -300,8 +297,9 @@ export class AgentService {
 
           messages.push({
             role: "tool",
+            tool_call_id: call.id,
             content: JSON.stringify({ toolName: call.toolName, result: envelope }),
-          });
+          } as { role: string; content: unknown });
           state.toolCallHistory.push({
             tool: call.toolName,
             params: (call.params ?? {}) as Record<string, unknown>,
@@ -315,8 +313,9 @@ export class AgentService {
           const errEnvelope = makeErrorEnvelope(call.toolName, msg);
           messages.push({
             role: "tool",
+            tool_call_id: call.id,
             content: JSON.stringify({ toolName: call.toolName, result: errEnvelope }),
-          });
+          } as { role: string; content: unknown });
           state.toolCallHistory.push({
             tool: call.toolName,
             params: (call.params ?? {}) as Record<string, unknown>,
