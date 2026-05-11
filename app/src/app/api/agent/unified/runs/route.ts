@@ -276,7 +276,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         queuePersist(eventStore.append(runState.runId, persistedEvent));
       };
 
-      const finish = async (status: UnifiedRunState['status']) => {
+      const finish = (status: UnifiedRunState['status']) => {
         if (closed) return;
         runState.status = status;
         if (status !== 'paused_for_approval') {
@@ -285,9 +285,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         persistRunState();
         emit({ type: 'run_status', status: toConsoleStatus(status) });
         emit({ type: 'done' });
-        await flushPersistence();
         closed = true;
         controller.close();
+        void flushPersistence();
       };
 
       const handleAbort = () => {
