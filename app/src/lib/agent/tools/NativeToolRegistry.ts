@@ -1,8 +1,8 @@
 import type { ToolResultEnvelope } from "../core/AgentEvents";
-import type { ToolManifest, ToolExecutionContext } from "./BaseTool";
+import type { BaseTool, ToolManifest, ToolExecutionContext } from "./BaseTool";
 import { nativeProxmoxTools } from "./native/ProxmoxNativeTools";
 
-type NativeTool = (typeof nativeProxmoxTools)[number];
+type NativeTool = BaseTool<Record<string, unknown>, unknown>;
 
 export interface NativeRegistryEntry {
   fn: (params: Record<string, unknown>) => Promise<unknown>;
@@ -11,7 +11,9 @@ export interface NativeRegistryEntry {
   parametersSchema?: Record<string, unknown>;
 }
 
-const TOOL_MAP = new Map<string, NativeTool>(nativeProxmoxTools.map((tool) => [tool.manifest.name, tool]));
+const TOOL_MAP = new Map<string, NativeTool>(
+  nativeProxmoxTools.map((tool) => [tool.manifest.name, tool as NativeTool]),
+);
 
 function defaultContext(actorId: string): ToolExecutionContext {
   return {
