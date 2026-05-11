@@ -15,10 +15,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireUserOrApiToken } from '@/lib/auth-server';
 import { getRedisClient } from '@/lib/redis';
 import { buildAgentContext } from '@/lib/agent/v2/context/AgentContextPipeline';
-import { executeTool } from '@/lib/agent/v2/ToolRegistry';
-import { evaluateToolRisk } from '@/lib/agent/v2/policy/RiskPolicy';
 import { createCommandApproval, createToolApproval, consumeApproval } from '@/lib/agent/v2/approval/ApprovalStore';
 import { RedisUnifiedEventStore, RedisUnifiedRunStore } from '@/lib/agent/v2/unified/RunPersistence';
+import { executeLegacyToolEnvelope, getLegacyToolManifest } from '@/lib/agent/v2/LegacyToolBridge';
 import {
   CommandRegistry,
   parseSlashCommand,
@@ -28,11 +27,17 @@ import {
 
 // Complexity Core LLM Infrastructure
 import { getLanguageModel, getProviderRequestOptions } from '@/lib/llm';
-import { generateText } from 'ai';
-import { getDetailedSettings } from '@/lib/settings';
-import { MODEL_SETTINGS_KEYS } from '@/lib/model-registry';
+import { LLMProviderError } from '@/lib/agent/core/AgentErrors';
 import { dispatchSlashCommand as dispatchMetaCommand } from '@/lib/agent/meta';
+import { getAgentSettings } from '@/lib/models/AgentSettings';
+import { buildSummaryPrompt, checkContextBudget, truncateMessages } from '@/lib/models/ContextWindowManager';
 import { ModelRegistry } from '@/lib/models/ModelRegistry';
+import { ModelRouter } from '@/lib/models/ModelRouter';
+import type { ProviderModel } from '@/lib/models/ProviderModel';
+import { classifyModelTask } from '@/lib/models/RoutingPolicy';
+import { generateText } from 'ai';
+import { MODEL_SETTINGS_KEYS } from '@/lib/model-registry';
+import { getDetailedSettings } from '@/lib/settings';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -69,6 +74,8 @@ type ConsoleEvent =
   | { type: 'destructive_confirm'; approvalId: string; command?: ParsedCommand; tool?: string; params?: Record<string, unknown>; message: string }
   | { type: 'question'; text: string; expectedType?: string }
   | { type: 'approval_decision'; approved: boolean }
+  | { type: 'model_switched'; from: string; to: string; reason: string }
+  | { type: 'context_summarized'; originalTokens: number; summaryTokens: number }
   | { type: 'error'; message: string }
   | { type: 'done' };
 
@@ -278,6 +285,63 @@ async function llmCall(messages: object[], tools: Record<string, unknown>, model
     };
 }
 
+function classifyProviderFailure(error: unknown): LLMProviderError {
+  if (error instanceof LLMProviderError) {
+    return error;
+  }
+
+  const message = error instanceof Error ? error.message : String(error);
+  const lower = message.toLowerCase();
+
+  if (lower.includes('429') || lower.includes('rate limit')) {
+    return new LLMProviderError('rate_limited', message, true, error);
+  }
+  if (
+    lower.includes('401') ||
+    lower.includes('403') ||
+    lower.includes('api key') ||
+    lower.includes('unauthorized') ||
+    lower.includes('authentication')
+  ) {
+    return new LLMProviderError('auth', message, false, error);
+  }
+  if (lower.includes('context') || lower.includes('token limit') || lower.includes('too long')) {
+    return new LLMProviderError('context_exceeded', message, false, error);
+  }
+  if (
+    lower.includes('503') ||
+    lower.includes('502') ||
+    lower.includes('500') ||
+    lower.includes('timeout') ||
+    lower.includes('overloaded') ||
+    lower.includes('temporarily unavailable')
+  ) {
+    return new LLMProviderError('unavailable', message, true, error);
+  }
+
+  return new LLMProviderError('unknown', message, false, error);
+}
+
+async function summarizeConversation(
+  messages: object[],
+  fastModelId: string,
+  signal?: AbortSignal,
+): Promise<string> {
+  const settings = await getDetailedSettings([...MODEL_SETTINGS_KEYS]);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const keys = Object.keys(settings).reduce((acc, key) => ({ ...acc, [key]: (settings as any)[key].value }), {});
+  const model = await getLanguageModel(fastModelId, keys);
+  const { providerOptions } = await getProviderRequestOptions(fastModelId);
+  const result = await generateText({
+    model,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    messages: buildSummaryPrompt(messages as any) as any,
+    providerOptions,
+    abortSignal: signal,
+  });
+  return stripThinking(result.text).trim();
+}
+
 function toConsoleStatus(status: UnifiedRunState['status']): Extract<ConsoleEvent, { type: 'run_status' }>['status'] {
   switch (status) {
     case 'in_progress':
@@ -420,7 +484,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         emit({ type: 'run_status', status: 'running' });
 
         let forceSynthesis = false;
-        let activeModel = modelId ?? selectModel(message);
+        const agentSettings = await getAgentSettings();
+        const modelSettings = await getDetailedSettings([...MODEL_SETTINGS_KEYS]);
+        const modelRegistry = new ModelRegistry(modelSettings);
+        const modelRouter = new ModelRouter(modelRegistry);
+        let activeModel = modelId ?? agentSettings.defaultModel ?? selectModel(message);
+        let activeProviderModel: ProviderModel | null = null;
+        let activeFallbackChain: ProviderModel[] = [];
 
         if (approvalId) {
           const approval = await consumeApproval(approvalId, userId, runState.threadId);
@@ -478,10 +548,21 @@ ${typeof cmdResult.output === 'string' ? cmdResult.output : JSON.stringify(cmdRe
               return;
             }
           } else {
-            emit({ type: 'tool_start', tool: approval.tool.name, params: approval.tool.params, tier: 3 });
+            const approvedManifest = getLegacyToolManifest(approval.tool.name);
+            emit({
+              type: 'tool_start',
+              tool: approval.tool.name,
+              params: approval.tool.params,
+              tier: approvedManifest?.riskTier ?? 3,
+            });
             try {
-              const { result } = await executeTool(approval.tool.name, approval.tool.params, userId, true);
-              emit({ type: 'tool_result', tool: approval.tool.name, result, tier: 3 });
+              const executed = await executeLegacyToolEnvelope(approval.tool.name, approval.tool.params, userId, true);
+              emit({
+                type: 'tool_result',
+                tool: approval.tool.name,
+                result: executed.result,
+                tier: executed.manifest.riskTier,
+              });
               runState.messages.push({
                 role: 'user',
                 content: `${message}
@@ -489,7 +570,7 @@ ${typeof cmdResult.output === 'string' ? cmdResult.output : JSON.stringify(cmdRe
 A tool has already been executed successfully. Answer directly in plain English using this result and do not call any more tools.
 Tool: ${approval.tool.name}
 Result:
-${JSON.stringify(result, null, 2)}`,
+${JSON.stringify(executed.result, null, 2)}`,
               });
               forceSynthesis = true;
             } catch (err) {
@@ -505,9 +586,7 @@ ${JSON.stringify(result, null, 2)}`,
           if (isExplicitSlashInput) {
             let availableModels: Array<{ id: string; label: string; local: boolean }> = [];
             try {
-              const metaSettings = await getDetailedSettings([...MODEL_SETTINGS_KEYS]);
-              const registry = new ModelRegistry(metaSettings);
-              const discovered = await registry.list();
+              const discovered = await modelRegistry.list();
               availableModels = discovered.map((m) => ({ id: m.id, label: m.label, local: m.local }));
             } catch { /* proceed with empty list on discovery failure */ }
 
@@ -623,6 +702,26 @@ ${typeof cmdResult.output === 'string' ? cmdResult.output : JSON.stringify(cmdRe
           }
         }
 
+        let routedModelId = activeModel;
+        try {
+          const route = await modelRouter.select({
+            requestedModelId: activeModel,
+            task: classifyModelTask(message),
+            message,
+          });
+          activeProviderModel = route.model;
+          activeFallbackChain = route.fallbackChain;
+          routedModelId = route.model.id;
+          if (routedModelId !== activeModel) {
+            emit({ type: 'model_switched', from: activeModel, to: routedModelId, reason: 'task routing' });
+          }
+          activeModel = routedModelId;
+        } catch (err) {
+          emit({ type: 'error', message: err instanceof Error ? err.message : 'Model routing failed.' });
+          await finish('error');
+          return;
+        }
+
         const ctx = buildAgentContext(message, stateSnapshot);
         emit({ type: 'context', domain: ctx.domain, model: activeModel, commandMode });
 
@@ -643,10 +742,51 @@ ${typeof cmdResult.output === 'string' ? cmdResult.output : JSON.stringify(cmdRe
             return;
           }
 
-          const llmRes = await llmCall(messages, roundTools, activeModel, req.signal);
-          if (!llmRes.ok) {
-            const errText = await llmRes.text();
-            emit({ type: 'error', message: `LLM error ${llmRes.status}: ${errText.slice(0, 200)}` });
+          if (activeProviderModel) {
+            const budget = checkContextBudget(activeProviderModel, messages as Array<{ role: string; content: unknown }>, agentSettings);
+            if (budget.action !== 'ok') {
+              if (budget.action === 'summarize') {
+                const summary = await summarizeConversation(messages, agentSettings.fastModel, req.signal);
+                const systemMessages = messages.filter((entry) => isRecord(entry) && entry.role === 'system');
+                const recentMessages = messages.filter((entry) => isRecord(entry) && entry.role !== 'system').slice(-4);
+                messages.splice(0, messages.length, ...systemMessages, { role: 'assistant', content: `[Context summary: ${summary}]` }, ...recentMessages);
+                emit({
+                  type: 'context_summarized',
+                  originalTokens: budget.estimatedTokens,
+                  summaryTokens: Math.ceil(summary.length / 4),
+                });
+              } else {
+                const truncated = truncateMessages(activeProviderModel, messages as Array<{ role: string; content: unknown }>);
+                messages.splice(0, messages.length, ...truncated);
+              }
+            }
+          }
+
+          let llmRes;
+          try {
+            llmRes = await modelRouter.withFallback(
+              {
+                model: activeProviderModel ?? { id: activeModel } as ProviderModel,
+                fallbackChain: activeFallbackChain,
+              },
+              async (candidate) => {
+                activeProviderModel = candidate;
+                activeModel = candidate.id;
+                try {
+                  return await llmCall(messages, roundTools, candidate.id, req.signal);
+                } catch (error) {
+                  throw classifyProviderFailure(error);
+                }
+              },
+              (from, to, reason) => {
+                activeProviderModel = to;
+                activeModel = to.id;
+                activeFallbackChain = activeFallbackChain.filter((candidate) => candidate.id !== to.id);
+                emit({ type: 'model_switched', from: from.id, to: to.id, reason });
+              },
+            );
+          } catch (err) {
+            emit({ type: 'error', message: err instanceof Error ? err.message : 'LLM error' });
             encounteredError = true;
             break;
           }
@@ -696,10 +836,10 @@ ${typeof cmdResult.output === 'string' ? cmdResult.output : JSON.stringify(cmdRe
             if (calledTools.has(callKey)) { anyDuplicate = true; break; }
             calledTools.add(callKey);
 
-            const decision = evaluateToolRisk(toolName);
-            const tierNum = decision.tier;
+            const manifest = getLegacyToolManifest(toolName);
+            const tierNum = manifest?.riskTier ?? 1;
 
-            if (decision.requiresConfirm) {
+            if (manifest?.requiresApproval) {
               const pendingId = await createToolApproval(toolName, params, userId, runState.threadId);
               runState.pendingApprovalId = pendingId;
               runState.messages = messages;
@@ -713,10 +853,10 @@ ${typeof cmdResult.output === 'string' ? cmdResult.output : JSON.stringify(cmdRe
             emit({ type: 'tool_start', tool: toolName, params, tier: tierNum });
 
             try {
-              const { result } = await executeTool(toolName, params, userId, false);
-              emit({ type: 'tool_result', tool: toolName, result, tier: tierNum });
-              toolResults.push({ tool_call_id: tc.id, role: 'tool', content: JSON.stringify(result) });
-              runState.toolCallHistory.push({ tool: toolName, params, result });
+              const executed = await executeLegacyToolEnvelope(toolName, params, userId, false);
+              emit({ type: 'tool_result', tool: toolName, result: executed.result, tier: executed.manifest.riskTier });
+              toolResults.push({ tool_call_id: tc.id, role: 'tool', content: JSON.stringify(executed.result) });
+              runState.toolCallHistory.push({ tool: toolName, params, result: executed.result });
               allUnknown = false;
             } catch (err) {
               const errMsg = err instanceof Error ? err.message : String(err);
