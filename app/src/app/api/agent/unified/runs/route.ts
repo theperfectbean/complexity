@@ -28,7 +28,7 @@ import {
 // Complexity Core LLM Infrastructure
 import { AgentService } from '@/lib/agent/core/AgentService';
 import type { AgentStreamEvent } from '@/lib/agent/core/AgentEvents';
-import { classifyProviderFailure, streamUnifiedAgentLlm, summarizeConversation } from '@/lib/agent/core/AgentLlmAdapter';
+import { classifyProviderFailure, llmCall, streamUnifiedAgentLlm, summarizeConversation } from '@/lib/agent/core/AgentLlmAdapter';
 import { LLMProviderError } from '@/lib/agent/core/AgentErrors';
 import { applyAgentStateToUnified, mapAgentEventToConsoleEvent, toAgentRunState } from '@/lib/agent/core/UnifiedRouteAdapters';
 import { dispatchSlashCommand as dispatchMetaCommand } from '@/lib/agent/meta';
