@@ -27,7 +27,10 @@ import {
 
 // Complexity Core LLM Infrastructure
 import { getLanguageModel, getProviderRequestOptions } from '@/lib/llm';
+import { AgentService } from '@/lib/agent/core/AgentService';
+import type { AgentStreamEvent } from '@/lib/agent/core/AgentEvents';
 import { LLMProviderError } from '@/lib/agent/core/AgentErrors';
+import { applyAgentStateToUnified, mapAgentEventToConsoleEvent, toAgentRunState } from '@/lib/agent/core/UnifiedRouteAdapters';
 import { dispatchSlashCommand as dispatchMetaCommand } from '@/lib/agent/meta';
 import { getAgentSettings } from '@/lib/models/AgentSettings';
 import { buildSummaryPrompt, checkContextBudget, truncateMessages } from '@/lib/models/ContextWindowManager';
@@ -342,6 +345,64 @@ async function summarizeConversation(
   return stripThinking(result.text).trim();
 }
 
+async function* streamUnifiedAgentLlm(
+  modelId: string,
+  messages: Array<{ role: string; content: unknown }>,
+  tools: unknown,
+  signal?: AbortSignal,
+): AsyncGenerator<AgentStreamEvent> {
+  const llmRes = await llmCall(messages as object[], (tools ?? {}) as Record<string, unknown>, modelId, signal);
+  if (!llmRes.ok) {
+    const errText = await llmRes.text();
+    throw classifyProviderFailure(new Error(`LLM error ${llmRes.status}: ${errText.slice(0, 200)}`));
+  }
+
+  const completion = await llmRes.json() as {
+    choices: Array<{
+      finish_reason: string;
+      message: { role: string; content?: string | null; tool_calls?: ToolCall[] };
+    }>;
+  };
+
+  const choice = completion.choices[0];
+  if (!choice) {
+    yield { type: 'done' };
+    return;
+  }
+
+  const msg = choice.message;
+  if (msg.content) {
+    msg.content = stripThinking(msg.content);
+    msg.content = extractAssistantResponse(msg.content);
+  }
+
+  if ((!msg.tool_calls || msg.tool_calls.length === 0) && msg.content) {
+    const fallbackCalls = parseToolCallsFromContent(msg.content);
+    if (fallbackCalls && fallbackCalls.length > 0) {
+      msg.tool_calls = fallbackCalls;
+      msg.content = '';
+    }
+  }
+
+  if (msg.content) {
+    yield { type: 'text', content: msg.content, role: 'assistant' };
+  }
+
+  for (const tc of msg.tool_calls ?? []) {
+    let params: Record<string, unknown> = {};
+    try { params = JSON.parse(tc.function.arguments); } catch { /* empty */ }
+    const manifest = getLegacyToolManifest(tc.function.name);
+    yield {
+      type: 'tool_start',
+      tool: tc.function.name,
+      params,
+      tier: manifest?.riskTier ?? 1,
+    };
+  }
+
+  yield { type: 'done' };
+}
+
 function toConsoleStatus(status: UnifiedRunState['status']): Extract<ConsoleEvent, { type: 'run_status' }>['status'] {
   switch (status) {
     case 'in_progress':
@@ -484,6 +545,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         emit({ type: 'run_status', status: 'running' });
 
         let forceSynthesis = false;
+        let deferToAgentService = false;
         const agentSettings = await getAgentSettings();
         const modelSettings = await getDetailedSettings([...MODEL_SETTINGS_KEYS]);
         const modelRegistry = new ModelRegistry(modelSettings);
@@ -698,8 +760,65 @@ ${typeof cmdResult.output === 'string' ? cmdResult.output : JSON.stringify(cmdRe
               return;
             }
           } else {
-            runState.messages.push({ role: 'user', content: message });
+            deferToAgentService = true;
           }
+        }
+
+        if (deferToAgentService && !forceSynthesis) {
+          const ctx = buildAgentContext(message, stateSnapshot);
+          emit({ type: 'context', domain: ctx.domain, model: activeModel, commandMode });
+
+          const agentService = new AgentService({
+            router: modelRouter,
+            settings: agentSettings,
+            listModels: async () => (await modelRegistry.list()).map((m) => ({ id: m.id, label: m.label, local: m.local })),
+            getToolDefinitions: () => ctx.tools,
+            executeTool: async (toolName, params, toolCtx) => {
+              const executed = await executeLegacyToolEnvelope(toolName, (params ?? {}) as Record<string, unknown>, toolCtx.actorId, false);
+              return executed.result;
+            },
+            getToolManifest: (toolName) => getLegacyToolManifest(toolName),
+            streamLLM: streamUnifiedAgentLlm,
+            summarize: async (messages) => summarizeConversation(messages as object[], agentSettings.fastModel, req.signal),
+            requestToolApproval: async ({ toolName, params }) => createToolApproval(toolName, (params ?? {}) as Record<string, unknown>, userId, runState.threadId),
+          });
+
+          const agentState = toAgentRunState(runState, activeModel, classifyModelTask(message));
+          const runner = agentService.run({
+            state: agentState,
+            userMessage: message,
+            signal: req.signal,
+          });
+
+          let next = await runner.next();
+          while (!next.done) {
+            if (next.value.type !== 'run_status' && next.value.type !== 'done') {
+              const mapped = mapAgentEventToConsoleEvent(next.value);
+              if (mapped) {
+                emit(mapped as ConsoleEvent);
+              }
+            }
+            next = await runner.next();
+          }
+
+          const finalState = next.value;
+          applyAgentStateToUnified(runState, finalState);
+
+          if (finalState.status === 'waiting_for_approval') {
+            await finish('paused_for_approval');
+            return;
+          }
+          if (finalState.status === 'cancelled') {
+            await finish('cancelled');
+            return;
+          }
+          if (finalState.status === 'error') {
+            await finish('error');
+            return;
+          }
+
+          await finish('completed');
+          return;
         }
 
         let routedModelId = activeModel;

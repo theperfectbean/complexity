@@ -36,7 +36,6 @@ import type { ProviderModel } from "../../models/ProviderModel";
 import type { ModelRouter, ModelRoute } from "../../models/ModelRouter";
 import { dispatchSlashCommand } from "../meta/SlashCommandRegistry";
 import { evaluateApproval, buildApprovalRequestEvent } from "../approval/ApprovalGate";
-import { waitForApproval } from "../approval/ApprovalQueue";
 import { normalizeToolResult, makeErrorEnvelope } from "../tools/ToolResultNormalizer";
 import type { WidgetHint } from "../tools/BaseTool";
 
@@ -63,13 +62,22 @@ export interface AgentServiceDeps {
   streamLLM: (
     modelId: string,
     messages: Array<{ role: string; content: unknown }>,
-    tools: unknown[],
+    tools: unknown,
     signal?: AbortSignal,
   ) => AsyncIterable<AgentStreamEvent>;
+  /** Tool definitions or provider tool map exposed to the LLM */
+  getToolDefinitions?: () => unknown;
   /** Optional: summarize conversation with a fast model */
   summarize?: (
     messages: Array<{ role: string; content: unknown }>,
   ) => Promise<string>;
+  /** Persist a pending tool approval and return the durable approval id */
+  requestToolApproval?: (input: {
+    state: AgentRunState;
+    toolName: string;
+    params: unknown;
+    suggestedApprovalId: string;
+  }) => Promise<string>;
 }
 
 export interface AgentServiceInput {
@@ -121,6 +129,14 @@ export class AgentService {
         task: state.routingTask as ModelTask,
         message: userMessage,
       });
+      if (route.model.id !== state.activeModelId) {
+        yield {
+          type: "model_switched",
+          from: state.activeModelId,
+          to: route.model.id,
+          reason: "task routing",
+        };
+      }
       state = { ...state, activeModelId: route.model.id };
     } catch (err) {
       yield makeErrorEvent(
@@ -159,6 +175,7 @@ export class AgentService {
     // ── 4. ReAct loop ─────────────────────────────────────────────
     let round = state.round;
     const maxRounds = this.deps.settings.maxAgentRounds;
+    const toolDefinitions = this.deps.getToolDefinitions?.() ?? [];
 
     while (round < maxRounds) {
       if (signal?.aborted) {
@@ -169,12 +186,16 @@ export class AgentService {
 
       round++;
       const pendingToolCalls: Array<{ id: string; toolName: string; params: unknown }> = [];
+      let assistantText = "";
 
       // Stream LLM response
       try {
-        for await (const event of this.deps.streamLLM(route.model.id, messages, [], signal)) {
+        for await (const event of this.deps.streamLLM(route.model.id, messages, toolDefinitions, signal)) {
           yield event;
 
+          if (event.type === "text" && event.role !== "system") {
+            assistantText += event.content;
+          }
           if (event.type === "tool_start") {
             pendingToolCalls.push({
               id: String(pendingToolCalls.length),
@@ -203,6 +224,24 @@ export class AgentService {
         return transitionState(state, "error");
       }
 
+      if (assistantText.length > 0 || pendingToolCalls.length > 0) {
+        messages.push({
+          role: "assistant",
+          content: assistantText,
+          ...(pendingToolCalls.length > 0
+            ? {
+                tool_calls: pendingToolCalls.map((call) => ({
+                  id: call.id,
+                  function: {
+                    name: call.toolName,
+                    arguments: JSON.stringify(call.params ?? {}),
+                  },
+                })),
+              }
+            : {}),
+        } as { role: string; content: unknown });
+      }
+
       // No tool calls → done
       if (pendingToolCalls.length === 0) {
         break;
@@ -216,45 +255,35 @@ export class AgentService {
           const decision = evaluateApproval(manifest as Parameters<typeof evaluateApproval>[0], this.deps.settings);
 
           if (!decision.proceed && decision.approvalId) {
+            const approvalId = this.deps.requestToolApproval
+              ? await this.deps.requestToolApproval({
+                  state,
+                  toolName: call.toolName,
+                  params: call.params,
+                  suggestedApprovalId: decision.approvalId,
+                })
+              : decision.approvalId;
+
+            state = {
+              ...state,
+              messages,
+              round,
+              pendingApproval: {
+                approvalId,
+                kind: "tool",
+                toolName: call.toolName,
+                params: call.params,
+              },
+            };
             state = transitionState(state, "waiting_for_approval");
             yield makeStatusEvent("waiting_for_approval");
             yield buildApprovalRequestEvent(
               call.toolName,
               call.params,
-              decision.approvalId,
+              approvalId,
               manifest.riskTier,
             ) as AgentStreamEvent;
-
-            let approvalResult;
-            try {
-              approvalResult = await waitForApproval(decision.approvalId);
-            } catch {
-              yield makeErrorEvent(
-                `Approval timed out for tool "${call.toolName}"`,
-                "approval_timeout",
-                false,
-              );
-              return transitionState(state, "error");
-            }
-
-            if (!approvalResult.approved) {
-              yield { type: "approval_decision", approved: false };
-              const denialMessage = 'Tool "' + call.toolName + '" was denied by the user.';
-              yield {
-                type: "text",
-                content: denialMessage,
-                role: "assistant",
-              };
-              messages.push({ role: "assistant", content: denialMessage });
-              state = { ...state, messages, round };
-              state = transitionState(state, "cancelled");
-              yield makeStatusEvent("cancelled");
-              yield { type: "done" };
-              return state;
-            }
-
-            yield { type: "approval_decision", approved: true };
-            state = transitionState(state, "running");
+            return state;
           }
         }
 
@@ -273,6 +302,12 @@ export class AgentService {
             role: "tool",
             content: JSON.stringify({ toolName: call.toolName, result: envelope }),
           });
+          state.toolCallHistory.push({
+            tool: call.toolName,
+            params: (call.params ?? {}) as Record<string, unknown>,
+            result: envelope,
+            timestamp: new Date().toISOString(),
+          });
         } catch (err) {
           if (err instanceof ApprovalRequiredError) throw err;
           const msg = err instanceof Error ? err.message : String(err);
@@ -281,6 +316,12 @@ export class AgentService {
           messages.push({
             role: "tool",
             content: JSON.stringify({ toolName: call.toolName, result: errEnvelope }),
+          });
+          state.toolCallHistory.push({
+            tool: call.toolName,
+            params: (call.params ?? {}) as Record<string, unknown>,
+            error: msg,
+            timestamp: new Date().toISOString(),
           });
         }
       }
