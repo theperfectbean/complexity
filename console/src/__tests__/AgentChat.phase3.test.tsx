@@ -29,7 +29,7 @@ describe('AgentChat Phase 3 behavior', () => {
     const onModelSwitch = vi.fn();
 
     vi.spyOn(api, 'streamAgentRun').mockImplementation(
-      (_msg, _model, onEvent, onDone) => {
+      (_msg, _model, onEvent) => {
         queueMicrotask(() => {
           onEvent({
             type: 'model_switched',
@@ -37,7 +37,6 @@ describe('AgentChat Phase 3 behavior', () => {
             to: 'openai/gpt-4o-mini',
             reason: 'User switched via /model gpt-4o-mini',
           });
-          onDone();
         });
       },
     );
@@ -49,6 +48,35 @@ describe('AgentChat Phase 3 behavior', () => {
 
     await waitFor(() => {
       expect(onModelSwitch).toHaveBeenCalledWith('openai/gpt-4o-mini');
+    });
+    expect(screen.getByTestId('send-btn')).not.toBeDisabled();
+  });
+
+  it('releases the UI after /help tool results even if the stream stays open', async () => {
+    vi.spyOn(api, 'streamAgentRun').mockImplementation(
+      (_msg, _model, onEvent) => {
+        queueMicrotask(() => {
+          onEvent({
+            type: 'tool_result',
+            tool: 'help',
+            result: {
+              ok: true,
+              summary: 'Available slash commands',
+              widgetHint: { type: 'table' },
+              data: { headers: ['Command'], rows: [['/help']] },
+            },
+          });
+        });
+      },
+    );
+
+    renderChat();
+
+    await userEvent.type(screen.getByTestId('message-input'), '/help');
+    await userEvent.keyboard('{Enter}');
+
+    await waitFor(() => {
+      expect(screen.getByTestId('send-btn')).not.toBeDisabled();
     });
   });
 

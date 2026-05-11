@@ -106,6 +106,7 @@ export function AgentChat({
     const thread = effectiveThreads.find(t => t.id === effectiveActiveId);
     if (thread === undefined || isRunning || userMessage.trim() === '') return;
 
+    const isSlashInput = userMessage.trim().startsWith('/');
     const turnId = uuid();
     const ab = new AbortController();
     abortRef.current = ab;
@@ -125,6 +126,13 @@ export function AgentChat({
       setPendingApproval(null);
     }
 
+    const markTurnComplete = () => {
+      setIsRunning(false);
+      updateThread(thread.id, t => ({
+        ...t, turns: t.turns.map(tr => tr.id === turnId ? { ...tr, isRunning: false } : tr),
+      }));
+    };
+
     streamAgentRun(
       userMessage,
       modelId,
@@ -140,15 +148,19 @@ export function AgentChat({
           const ev = event as Record<string, unknown>;
           if (typeof ev.to === 'string' && typeof ev.reason === 'string' && ev.reason.startsWith('User switched via /model')) {
             onModelSwitch?.(ev.to);
+            if (isSlashInput) {
+              markTurnComplete();
+            }
+          }
+        }
+        if (isSlashInput && event.type === 'tool_result') {
+          const ev = event as Record<string, unknown>;
+          if (ev.tool === 'help' || ev.tool === 'model_list' || ev.tool === 'run_status') {
+            markTurnComplete();
           }
         }
       },
-      () => {
-        setIsRunning(false);
-        updateThread(thread.id, t => ({
-          ...t, turns: t.turns.map(tr => tr.id === turnId ? { ...tr, isRunning: false } : tr),
-        }));
-      },
+      markTurnComplete,
       (err) => {
         setIsRunning(false);
         const errEvent: AgentRunEvent = { type: 'error', message: err };
