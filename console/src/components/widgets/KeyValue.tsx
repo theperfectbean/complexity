@@ -13,10 +13,10 @@ export function KeyValue({ data }: Props) {
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', columnGap: '1rem', rowGap: '0.375rem' }}>
       {pairs.map(([k, v], i) => (
-        <>
-          <span key={`k${i}`} style={{ fontSize: '0.75rem', fontWeight: 500, color: '#718096', whiteSpace: 'nowrap' }}>{k}</span>
-          <span key={`v${i}`} style={{ fontSize: '0.75rem', fontFamily: 'monospace', color: '#e2e8f0', wordBreak: 'break-all' }}>{String(v)}</span>
-        </>
+        <div key={`${k}-${i}`} style={{ display: 'contents' }}>
+          <span style={{ fontSize: '0.75rem', fontWeight: 500, color: '#718096', whiteSpace: 'nowrap' }}>{k}</span>
+          <span style={{ fontSize: '0.75rem', fontFamily: 'monospace', color: '#e2e8f0', wordBreak: 'break-all' }}>{String(v)}</span>
+        </div>
       ))}
     </div>
   );
