@@ -239,12 +239,18 @@ export class AgentService {
 
             if (!approvalResult.approved) {
               yield { type: "approval_decision", approved: false };
+              const denialMessage = 'Tool "' + call.toolName + '" was denied by the user.';
               yield {
                 type: "text",
-                content: `Tool "${call.toolName}" was denied by the user.`,
+                content: denialMessage,
                 role: "assistant",
               };
-              break;
+              messages.push({ role: "assistant", content: denialMessage });
+              state = { ...state, messages, round };
+              state = transitionState(state, "cancelled");
+              yield makeStatusEvent("cancelled");
+              yield { type: "done" };
+              return state;
             }
 
             yield { type: "approval_decision", approved: true };

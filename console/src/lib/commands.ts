@@ -84,7 +84,7 @@ export const modelCommand: SlashCommand = {
   trigger: "model",
   label: "Switch model",
   description: "Switch active LLM (e.g. /model claude or /model llama3)",
-  action: () => null,
+  action: () => '/model ',
 };
 
 // ---- /help command ----
@@ -93,5 +93,7 @@ export const helpCommand: SlashCommand = {
   trigger: "help",
   label: "Help",
   description: "Show available slash commands and tools",
-  action: () => null,
+  action: () => '/help',
 };
+
+SLASH_COMMANDS.push(modelCommand, helpCommand);

@@ -420,6 +420,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         emit({ type: 'run_status', status: 'running' });
 
         let forceSynthesis = false;
+        let activeModel = modelId ?? selectModel(message);
 
         if (approvalId) {
           const approval = await consumeApproval(approvalId, userId, runState.threadId);
@@ -514,7 +515,7 @@ ${JSON.stringify(result, null, 2)}`,
               runId: runState.runId,
               userId,
               threadId: effectiveThreadId,
-              currentModelId: modelId ?? selectModel(message),
+              currentModelId: activeModel,
               availableModels,
             });
 
@@ -530,14 +531,17 @@ ${JSON.stringify(result, null, 2)}`,
                 controller.enqueue(encoder.encode(`data: ${JSON.stringify(persistedEvt)}\n\n`));
                 queuePersist(eventStore.append(runState.runId, persistedEvt as PersistedConsoleEvent));
               }
+              if (metaResult.switchToModel) {
+                activeModel = metaResult.switchToModel;
+              }
               if (metaResult.done) {
                 runState.status = 'completed';
                 persistRunState();
                 await flushPersistence();
                 closed = true;
                 controller.close();
+                return;
               }
-              return;
             }
           }
 
@@ -620,8 +624,7 @@ ${typeof cmdResult.output === 'string' ? cmdResult.output : JSON.stringify(cmdRe
         }
 
         const ctx = buildAgentContext(message, stateSnapshot);
-        const model = modelId ?? selectModel(message);
-        emit({ type: 'context', domain: ctx.domain, model, commandMode });
+        emit({ type: 'context', domain: ctx.domain, model: activeModel, commandMode });
 
         const messages: object[] = runState.messages.length > 0
           ? [...runState.messages]
@@ -640,7 +643,7 @@ ${typeof cmdResult.output === 'string' ? cmdResult.output : JSON.stringify(cmdRe
             return;
           }
 
-          const llmRes = await llmCall(messages, roundTools, model, req.signal);
+          const llmRes = await llmCall(messages, roundTools, activeModel, req.signal);
           if (!llmRes.ok) {
             const errText = await llmRes.text();
             emit({ type: 'error', message: `LLM error ${llmRes.status}: ${errText.slice(0, 200)}` });

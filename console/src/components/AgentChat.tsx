@@ -1,13 +1,14 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Send, Loader2, Activity } from 'lucide-react';
+import { motion } from 'motion/react';
 import { streamAgentRun, type AgentRunEvent } from '../lib/api';
 import { uuid } from '../lib/uuid';
 import { matchCommands, type SlashCommand } from '../lib/commands';
 import { CommandMenu } from './CommandMenu';
 import { Markdown } from './Markdown';
-import { ThreadSidebar } from './ThreadSidebar';
 import { WidgetRenderer } from './WidgetRenderer';
 import type { ToolResultEnvelope } from '../lib/protocol';
+import { cn } from '../lib/utils';
 
 interface ConversationTurn {
   id: string;
@@ -26,34 +27,39 @@ interface Thread {
 interface Props {
   initialContext?: string;
   onContextUsed?: () => void;
+  modelId?: string;
+  threads: Thread[];
+  setThreads: React.Dispatch<React.SetStateAction<Thread[]>>;
+  activeId: string;
+  focusToken?: number;
 }
 
 const STORAGE_KEY = 'fleet_console_threads_v1';
 
-function loadThreads(): Thread[] {
+export function loadThreads(): Thread[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     return raw ? (JSON.parse(raw) as Thread[]) : [];
   } catch { return []; }
 }
 
-function saveThreads(threads: Thread[]): void {
+export function saveThreads(threads: Thread[]): void {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(threads)); } catch { /* ignore */ }
 }
 
-function makeThread(): Thread {
+export function makeThread(): Thread {
   return { id: uuid(), title: 'New conversation', createdAt: new Date().toISOString(), turns: [] };
 }
 
-export function AgentChat({ initialContext, onContextUsed }: Props) {
-  const [threads, setThreads] = useState<Thread[]>(() => {
-    const ts = loadThreads();
-    return ts.length > 0 ? ts : [makeThread()];
-  });
-  const [activeId, setActiveId] = useState<string>(() => {
-    const ts = loadThreads();
-    return ts.length > 0 ? (ts[0]?.id ?? '') : '';
-  });
+export function AgentChat({ 
+  initialContext, 
+  onContextUsed, 
+  modelId = 'perplexity/sonar',
+  threads,
+  setThreads,
+  activeId,
+  focusToken = 0,
+}: Props) {
   const [input, setInput] = useState('');
   const [isRunning, setIsRunning] = useState(false);
   const [pendingApproval, setPendingApproval] = useState<{approvalId: string; threadId?: string} | null>(null);
@@ -64,24 +70,27 @@ export function AgentChat({ initialContext, onContextUsed }: Props) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
-    if (activeId === '' && threads.length > 0) setActiveId(threads[0].id);
-  }, [activeId, threads]);
-
-  useEffect(() => {
     if (initialContext) { setInput(initialContext); onContextUsed?.(); }
   }, [initialContext, onContextUsed]);
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); });
-  useEffect(() => { saveThreads(threads); }, [threads]);
+  
+  useEffect(() => { 
+    if (threads.length > 0) saveThreads(threads); 
+  }, [threads]);
 
   useEffect(() => {
     const el = textareaRef.current;
-    if (el) { el.style.height = 'auto'; el.style.height = `${el.scrollHeight}px`; }
+    if (el) { el.style.height = 'auto'; el.style.height = (el.scrollHeight) + 'px'; }
   }, [input]);
+
+  useEffect(() => {
+    textareaRef.current?.focus();
+  }, [focusToken, activeId]);
 
   const updateThread = useCallback((threadId: string, updater: (t: Thread) => Thread) => {
     setThreads(prev => prev.map(t => t.id === threadId ? updater(t) : t));
-  }, []);
+  }, [setThreads]);
 
   const submitMessage = (userMessage: string, extraBodyOverride?: Record<string, unknown>) => {
     const thread = threads.find(t => t.id === activeId);
@@ -108,7 +117,7 @@ export function AgentChat({ initialContext, onContextUsed }: Props) {
 
     streamAgentRun(
       userMessage,
-      'default',
+      modelId,
       (event) => {
         updateThread(thread.id, t => ({
         ...t, turns: t.turns.map(tr => tr.id === turnId ? { ...tr, events: [...tr.events, event] } : tr),
@@ -136,27 +145,8 @@ export function AgentChat({ initialContext, onContextUsed }: Props) {
     );
   };
 
-  const handleNewThread = () => {
-    const t = makeThread();
-    setThreads(prev => [t, ...prev]);
-    setActiveId(t.id);
-  };
-
-  const handleDeleteThread = (id: string) => {
-    setThreads(prev => {
-      const next = prev.filter(t => t.id !== id);
-      if (id === activeId) {
-        const remaining = next.length > 0 ? next : [makeThread()];
-        const newThreads = next.length > 0 ? next : remaining;
-        setActiveId(remaining[0].id);
-        return newThreads;
-      }
-      return next.length > 0 ? next : [makeThread()];
-    });
-  };
-
   const clearActiveThread = () => {
-    setThreads(prev => prev.map(t => t.id === activeId ? { ...t, turns: [] } : t));
+    updateThread(activeId, t => ({ ...t, turns: [] }));
     setShowCmdMenu(false);
     setCmdQuery('');
     setInput('');
@@ -209,45 +199,33 @@ export function AgentChat({ initialContext, onContextUsed }: Props) {
   };
 
   const activeThread = threads.find(t => t.id === activeId);
-  const sidebarThreads = threads.map(t => ({
-    id: t.id,
-    title: t.turns[0]?.userMessage.slice(0, 40) || t.title,
-    createdAt: t.createdAt,
-  }));
 
   return (
-    <div data-testid="agent-chat" style={{ display: 'flex', height: '100%', background: 'var(--bg-page)', color: 'var(--text)', fontFamily: 'inherit' }}>
-      <ThreadSidebar
-        threads={sidebarThreads}
-        activeId={activeId}
-        onSelect={setActiveId}
-        onNew={handleNewThread}
-        onDelete={handleDeleteThread}
-      />
-
-      <main style={{ flex: 1, display: 'flex', flexDirection: 'column', maxWidth: '860px', margin: '0 auto', position: 'relative', width: '100%' }}>
-        <div data-testid="turn-list" style={{ flex: 1, overflowY: 'auto', padding: '2rem 1.5rem', display: 'flex', flexDirection: 'column', gap: '2.5rem' }}>
+    <div data-testid='agent-chat' className='flex h-full bg-background text-foreground font-inherit'>
+      <main className='flex-1 flex flex-col max-w-[800px] mx-auto relative w-full'>
+        <div data-testid='turn-list' className='flex-1 overflow-y-auto px-4 md:px-0 py-10 flex flex-col gap-0'>
           {activeThread?.turns.length === 0 && (
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text-empty)', textAlign: 'center', padding: '3rem 2rem', gap: '1rem', minHeight: '40vh' }}>
-              <div style={{ padding: '1rem', borderRadius: '50%', background: 'var(--accent-subtle)' }}>
-                <Activity size={28} style={{ color: 'var(--accent)' }} />
+            <div className='flex-1 flex flex-col items-center justify-center text-center px-8 py-20 gap-4 min-h-[40vh]'>
+              <div className='p-4 rounded-full bg-primary/10'>
+                <Activity size={32} className='text-primary' />
               </div>
               <div>
-                <p style={{ margin: '0 0 0.5rem', fontSize: '1.05rem', fontWeight: 500, color: 'var(--text-secondary)' }}>Fleet Console</p>
-                <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--text-empty)', maxWidth: '360px' }}>
-                  Ask about your Proxmox cluster — container status, resource usage, service health, and more.
+                <p className='m-0 mb-2 text-xl font-semibold tracking-tight'>Cluster Console</p>
+                <p className='m-0 text-sm text-muted-foreground max-w-[400px] leading-relaxed'>
+                  How can I help you manage your Proxmox infrastructure today?
                 </p>
               </div>
             </div>
           )}
-          {activeThread?.turns.map(turn => (
-            <div key={turn.id} data-testid="conversation-turn" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                <div data-testid="user-message" style={{ maxWidth: '80%', padding: '0.75rem 1.125rem', background: 'var(--accent)', color: 'var(--primary-foreground)', borderRadius: '1.25rem', borderBottomRightRadius: '0.25rem', fontSize: '0.93rem', lineHeight: 1.5 }}>
+          {activeThread?.turns.map((turn) => (
+            <div key={turn.id} data-testid='conversation-turn' className='flex flex-col gap-0'>
+              <div className='flex flex-col items-end py-4'>
+                <div data-testid='user-message' className='max-w-[85%] md:max-w-[75%] px-5 py-3.5 bg-muted/60 text-foreground rounded-2xl font-medium leading-[1.6] shadow-2xs'>
                   {turn.userMessage}
                 </div>
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+
+              <div className='group relative flex flex-col gap-0 pt-4 pb-12'>
                 {turn.events.map((ev, idx) => (
                   <EventBlock
                     key={idx}
@@ -267,11 +245,11 @@ export function AgentChat({ initialContext, onContextUsed }: Props) {
           <div ref={bottomRef} />
         </div>
 
-        <div style={{ padding: '1.25rem 1.5rem 1.5rem', background: `linear-gradient(to top, var(--bg-page) 80%, transparent)` }}>
+        <div className='px-4 md:px-0 pb-8 pt-4 sticky bottom-0 bg-gradient-to-t from-background via-background/90 to-transparent'>
           <form
-            data-testid="message-form"
+            data-testid='message-form'
             onSubmit={(e) => { e.preventDefault(); submitMessage(input); setInput(''); }}
-            style={{ position: 'relative', display: 'flex', alignItems: 'flex-end' }}
+            className='relative flex items-end max-w-[800px] mx-auto'
           >
             {showCmdMenu && (
               <CommandMenu
@@ -282,52 +260,29 @@ export function AgentChat({ initialContext, onContextUsed }: Props) {
             )}
             <textarea
               ref={textareaRef}
-              data-testid="message-input"
+              data-testid='message-input'
               value={input}
               onChange={handleInputChange}
               onKeyDown={handleKeyDown}
-              placeholder="Ask about your cluster…  (Enter to send, Shift+Enter for newline)"
+              placeholder='Ask Cluster Console...'
               disabled={isRunning}
               rows={1}
-              style={{
-                width: '100%', padding: '0.875rem 3.5rem 0.875rem 1.125rem',
-                background: 'var(--bg-surface)', border: '1px solid var(--border)',
-                borderRadius: '0.875rem', color: 'var(--text)', fontSize: '0.9375rem',
-                outline: 'none', resize: 'none', overflow: 'hidden', lineHeight: 1.5,
-                maxHeight: '200px', overflowY: 'auto', boxShadow: 'var(--shadow-sm)',
-              }}
+              className='w-full pl-5 pr-14 py-4 bg-card border border-border shadow-sm rounded-2xl text-foreground text-[0.9375rem] font-medium outline-none resize-none overflow-hidden leading-[1.6] max-h-[200px] overflow-y-auto ring-1 ring-primary/20 focus:ring-primary/40 focus:border-primary/30 transition-all'
             />
-            {isRunning && (
-              <button
-                data-testid="cancel-btn"
-                type="button"
-                onClick={() => { abortRef.current?.abort(); }}
-                style={{
-                  position: 'absolute', right: '3.5rem', bottom: '0.5rem',
-                  background: 'none', border: 'none', borderRadius: '0.5rem',
-                  padding: '0.4rem 0.5rem', cursor: 'pointer',
-                  color: 'var(--text-secondary)', fontSize: '0.75rem',
-                }}
-              >
-                Stop
-              </button>
-            )}
+            
             <button
-              data-testid="send-btn"
-              type="submit"
+              data-testid='send-btn'
+              type='submit'
               disabled={input.trim() === '' || isRunning}
-              style={{
-                position: 'absolute', right: '0.625rem', bottom: '0.5rem',
-                background: isRunning ? 'transparent' : 'var(--accent)',
-                border: 'none', borderRadius: '0.5rem', padding: '0.4rem 0.45rem',
-                cursor: 'pointer', display: 'flex', alignItems: 'center',
-                opacity: input.trim() !== '' || isRunning ? 1 : 0.35,
-                transition: 'opacity 0.15s',
-              }}
+              className={cn(
+                'absolute right-2.5 bottom-2.5 h-10 w-10 flex items-center justify-center rounded-xl transition-all',
+                isRunning ? 'bg-transparent' : 'bg-primary text-primary-foreground shadow-sm hover:bg-primary/90',
+                (input.trim() === '' && !isRunning) && 'opacity-30 pointer-events-none'
+              )}
             >
               {isRunning
-                ? <Loader2 size={17} className="animate-spin" style={{ color: 'var(--text-secondary)' }} />
-                : <Send size={17} style={{ color: 'var(--primary-foreground)' }} />}
+                ? <Loader2 size={18} className='animate-spin text-muted-foreground' />
+                : <Send size={18} />}
             </button>
           </form>
         </div>
@@ -339,20 +294,16 @@ export function AgentChat({ initialContext, onContextUsed }: Props) {
 function ToolResult({ toolName, result }: { toolName: string; result: unknown }) {
   const [open, setOpen] = useState(false);
   return (
-    <div data-testid="tool-result" style={{ border: '1px solid var(--border)', borderRadius: '0.75rem', overflow: 'hidden', boxShadow: 'var(--shadow-sm)' }}>
+    <div data-testid='tool-result' className='my-4 border border-border/60 rounded-2xl overflow-hidden bg-card/30 shadow-2xs'>
       <button
         onClick={() => setOpen(o => !o)}
-        style={{
-          width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '0.5rem 0.875rem', background: 'var(--bg-surface-alt)', border: 'none',
-          cursor: 'pointer', color: 'var(--text-secondary)', fontSize: '0.775rem', textAlign: 'left',
-        }}
+        className='w-full flex items-center justify-between px-4 py-2.5 bg-muted/20 border-none cursor-pointer text-muted-foreground text-[0.75rem] font-semibold uppercase tracking-wider text-left hover:bg-muted/40 transition-colors'
       >
-        <span>Result: <span style={{ color: 'var(--accent)', fontWeight: 500 }}>{toolName}</span></span>
-        <span style={{ transition: 'transform 0.2s', transform: open ? 'rotate(180deg)' : 'none', fontSize: '0.65rem', opacity: 0.6 }}>▾</span>
+        <span>Tool Result: <span className='text-primary'>{toolName}</span></span>
+        <span className={cn('transition-transform duration-200 opacity-60', open && 'rotate-180')}>▾</span>
       </button>
-      <div style={{ maxHeight: open ? '600px' : '0', overflow: 'hidden', transition: 'max-height 0.25s ease' }}>
-        <div style={{ padding: '0.875rem' }}>
+      <div className={cn('overflow-hidden transition-[max-height] duration-300 ease-in-out', open ? 'max-h-[800px]' : 'max-h-0')}>
+        <div className='p-4'>
           <WidgetRenderer toolName={toolName} result={result as ToolResultEnvelope} />
         </div>
       </div>
@@ -366,68 +317,110 @@ function EventBlock({ event, onApprove, onCancelApproval }: {
   onCancelApproval?: () => void;
 }) {
   const e = event as Record<string, unknown>;
+  const streamNoticeResult: ToolResultEnvelope = {
+    ok: true,
+    widgetHint: { type: 'key_value' },
+    summary: '',
+    data: {},
+  };
   switch (event.type) {
     case 'text':
     case 'assistant_message': {
       const text = (e.content as string) || ((e.message as Record<string, string>)?.text ?? '');
+      if (!text) return null;
+      
+      // If it looks like raw JSON, render it as a syntax-highlighted block
+      if (text.trim().startsWith('{') || text.trim().startsWith('[')) {
+          return (
+            <div data-testid='assistant-message-json' className='max-w-none break-words text-[0.8rem] font-mono opacity-60 px-4 py-2 bg-muted/10 rounded-xl border border-border/40 my-2'>
+              <Markdown text={'```json\n' + text + '\n```'} />
+            </div>
+          );
+      }
+      
       return (
-        <div data-testid="assistant-message" style={{ fontSize: '0.9375rem', lineHeight: 1.65, color: 'var(--text)' }}>
+        <div data-testid='assistant-message' className='max-w-none break-words text-[0.9375rem] leading-[1.8] text-foreground'>
           <Markdown text={text} />
         </div>
       );
     }
     case 'tool_start':
       return (
-        <div data-testid="tool-start" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-          <Loader2 size={12} className="animate-spin" />
-          <span>Using <code style={{ color: 'var(--accent)', fontWeight: 500 }}>{String(e.tool)}</code>…</span>
-        </div>
+        <motion.div 
+          initial={{ opacity: 0, x: -5 }}
+          animate={{ opacity: 1, x: 0 }}
+          className='flex items-center gap-3 my-3 text-[13px] text-muted-foreground'
+        >
+          <div className='flex h-6 w-6 items-center justify-center rounded-full border border-primary/20 bg-primary/5 shadow-sm'>
+            <div className='h-2 w-2 animate-pulse rounded-full bg-primary' />
+          </div>
+          <span className='font-medium'>Using {String(e.tool)}...</span>
+        </motion.div>
       );
     case 'tool_result':
       return <ToolResult toolName={String(e.tool)} result={e.result} />;
+    case 'model_switched':
+      return (
+        <div className='my-3'>
+          <WidgetRenderer
+            toolName='agent_event'
+            result={streamNoticeResult}
+            streamEvent={event as { type: 'model_switched'; from: string; to: string; reason: string }}
+          />
+        </div>
+      );
+    case 'context_summarized':
+      return (
+        <div className='my-3'>
+          <WidgetRenderer
+            toolName='agent_event'
+            result={streamNoticeResult}
+            streamEvent={event as { type: 'context_summarized'; originalTokens: number; summaryTokens: number }}
+          />
+        </div>
+      );
     case 'error':
       return (
-        <div data-testid="error-block" style={{ color: 'var(--error)', fontSize: '0.85rem', padding: '0.75rem 1rem', background: 'color-mix(in srgb, var(--error) 10%, transparent)', borderRadius: '0.625rem', border: '1px solid color-mix(in srgb, var(--error) 25%, transparent)' }}>
+        <div data-testid='error-block' className='my-4 text-destructive text-sm px-4 py-3 bg-destructive/5 rounded-xl border border-destructive/20'>
           Error: {String(e.message ?? e.error)}
         </div>
       );
     case 'tool_error':
       return (
-        <div data-testid="tool-error-block" style={{ color: 'var(--error)', fontSize: '0.85rem', padding: '0.75rem 1rem', background: 'color-mix(in srgb, var(--error) 10%, transparent)', borderRadius: '0.625rem', border: '1px solid color-mix(in srgb, var(--error) 25%, transparent)' }}>
-          ✗ {String(e.error ?? e.message)}
+        <div data-testid='tool-error-block' className='my-4 text-destructive text-sm px-4 py-3 bg-destructive/5 rounded-xl border border-destructive/20'>
+          ✗ Tool Error: {String(e.error ?? e.message)}
         </div>
       );
     case 'run_started':
     case 'run_status': {
-      const runId = String(e.runId ?? '');
       const status = e.status ? String(e.status) : undefined;
+      if (!status || status === 'completed') return null;
       return (
-        <div data-testid="run-meta" style={{ fontSize: '0.75rem', color: 'var(--text-muted)', opacity: 0.7 }}>
-          <span>{runId}</span>
-          {status && <> &middot; <span>{status}</span></>}
+        <div data-testid='run-meta' className='text-[10px] font-bold uppercase tracking-widest text-muted-foreground/40 mb-2'>
+           {status}
         </div>
       );
     }
     case 'destructive_confirm': {
-      const approvalId = String(e.approvalId ?? '');
-      const approvalThreadId = e.threadId as string | undefined;
+      const e_id = String(e.approvalId ?? '');
+      const t_id = e.threadId as string | undefined;
       return (
-        <div data-testid="destructive-confirm" style={{ padding: '1rem', border: '1px solid color-mix(in srgb, var(--error) 40%, transparent)', borderRadius: '0.75rem', background: 'color-mix(in srgb, var(--error) 8%, transparent)', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-          <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--text)' }}>
-            {String(e.message ?? 'Destructive action requires approval.')}
+        <div data-testid='destructive-confirm' className='my-4 p-5 border border-destructive/30 rounded-2xl bg-destructive/5 flex flex-col gap-4 shadow-2xs'>
+          <p className='m-0 text-sm font-medium text-foreground leading-relaxed'>
+            {String(e.message ?? 'This action requires explicit approval.')}
           </p>
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <div className='flex gap-2'>
             <button
-              type="button"
-              onClick={() => onApprove?.(approvalId, approvalThreadId)}
-              style={{ padding: '0.375rem 1rem', background: 'var(--accent)', color: 'var(--primary-foreground)', border: 'none', borderRadius: '0.5rem', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 500 }}
+              type='button'
+              onClick={() => onApprove?.(e_id, t_id)}
+              className='px-5 py-2 bg-destructive text-white border-none rounded-xl cursor-pointer text-xs font-bold uppercase tracking-wider hover:opacity-90 transition-opacity shadow-sm'
             >
-              Approve
+              Approve Action
             </button>
             <button
-              type="button"
+              type='button'
               onClick={() => onCancelApproval?.()}
-              style={{ padding: '0.375rem 1rem', background: 'transparent', color: 'var(--text-secondary)', border: '1px solid var(--border)', borderRadius: '0.5rem', cursor: 'pointer', fontSize: '0.85rem' }}
+              className='px-5 py-2 bg-background text-muted-foreground border border-border rounded-xl cursor-pointer text-xs font-bold uppercase tracking-wider hover:bg-muted transition-colors'
             >
               Cancel
             </button>
