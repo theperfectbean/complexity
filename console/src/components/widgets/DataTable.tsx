@@ -5,6 +5,21 @@ interface Props {
 }
 
 function parseRows(data: unknown): { headers: string[]; rows: string[][] } {
+  if (
+    typeof data === 'object' &&
+    data !== null &&
+    'headers' in data &&
+    'rows' in data &&
+    Array.isArray((data as { headers: unknown }).headers) &&
+    Array.isArray((data as { rows: unknown }).rows)
+  ) {
+    return {
+      headers: (data as { headers: unknown[] }).headers.map((header) => String(header)),
+      rows: (data as { rows: unknown[] }).rows.map((row) =>
+        Array.isArray(row) ? row.map((cell) => String(cell ?? '')) : [String(row ?? '')],
+      ),
+    };
+  }
   if (!Array.isArray(data) || data.length === 0) return { headers: [], rows: [] };
   const first = data[0];
   if (typeof first !== 'object' || first === null) return { headers: [], rows: [] };

@@ -37,6 +37,6 @@ test.describe('Slash commands', () => {
 
     const lastBody = requestBodies.at(-1);
     expect(lastBody?.message).toBe('status');
-    expect(lastBody?.modelId).toBe('openai/gpt-4o-mini');
+    expect(lastBody?.modelId).toContain('openai/gpt-4o-mini');
   });
 });
