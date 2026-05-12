@@ -17,67 +17,63 @@ export const TelemetryDashboard: React.FC<TelemetryDashboardProps> = ({ data }) 
       data-testid="telemetry-dashboard"
       className="animate-fade-in"
       style={{
-        padding: '20px',
-        background: 'var(--bg-elevated)',
-        borderRadius: '12px',
+        padding: '16px',
+        background: 'var(--bg-surface)',
+        borderRadius: '8px',
         border: '1px solid var(--border-light)',
         height: '100%',
         display: 'flex',
         flexDirection: 'column'
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px', borderBottom: '1px solid var(--border-light)', paddingBottom: '12px' }}>
-        <Database size={18} color="var(--accent-cyan)" />
-        <h3 style={{ margin: 0, fontSize: '1rem' }}>Storage Telemetry</h3>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', borderBottom: '1px solid var(--border-light)', paddingBottom: '10px' }}>
+        <Database size={14} color="var(--accent-primary)" />
+        <h3 style={{ margin: 0, fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)' }}>
+          Telemetry
+        </h3>
       </div>
       
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', overflowY: 'auto', flex: 1 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', overflowY: 'auto', flex: 1 }}>
         {data.map((item) => {
           const percentage = Math.round((item.used / item.total) * 100);
           const isWarning = percentage > 85;
-          const color = isWarning ? 'var(--accent-crimson)' : 'var(--accent-emerald)';
-          const glow = isWarning ? 'var(--accent-crimson-glow)' : 'var(--accent-emerald-glow)';
+          const color = isWarning ? 'var(--accent-crimson)' : 'var(--accent-primary)';
 
           return (
             <div 
               key={item.node} 
               data-testid={`storage-widget-${item.node}`}
               style={{ 
-                padding: '16px', 
-                background: 'var(--bg-surface)', 
-                borderRadius: '8px', 
-                border: '1px solid var(--border-light)',
-                transition: 'transform 0.2s ease',
-                cursor: 'default'
+                padding: '12px', 
+                background: 'var(--bg-base)', 
+                borderRadius: '6px', 
+                border: '1px solid var(--border-light)'
               }}
-              onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
-              onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 600 }}>
-                  <HardDrive size={14} color="var(--text-secondary)" />
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 500, fontSize: '0.85rem' }}>
+                  <HardDrive size={12} color="var(--text-muted)" />
                   {item.node}
                 </div>
-                <div style={{ fontSize: '0.85rem', color: isWarning ? color : 'var(--text-secondary)', fontWeight: isWarning ? 600 : 400 }}>
-                  {percentage}% Used
+                <div style={{ fontSize: '0.75rem', color: isWarning ? 'var(--accent-crimson)' : 'var(--text-secondary)' }}>
+                  {percentage}%
                 </div>
               </div>
 
-              <div style={{ width: '100%', height: '8px', background: 'var(--bg-base)', borderRadius: '4px', overflow: 'hidden' }}>
+              <div style={{ width: '100%', height: '4px', background: 'var(--bg-elevated)', borderRadius: '2px', overflow: 'hidden' }}>
                 <div 
                   style={{ 
                     width: `${percentage}%`, 
                     height: '100%', 
                     background: color,
-                    boxShadow: `0 0 10px ${glow}`,
-                    transition: 'width 1s cubic-bezier(0.4, 0, 0.2, 1)'
+                    transition: 'width 1s ease-out'
                   }} 
                 />
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginTop: '8px', color: 'var(--text-muted)' }}>
-                <span>{item.used}GB</span>
-                <span>{item.total}GB</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.65rem', marginTop: '6px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+                <span>{item.used}G</span>
+                <span>{item.total}G</span>
               </div>
             </div>
           );

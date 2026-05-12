@@ -18,22 +18,29 @@ export const TerminalBlock: React.FC<TerminalBlockProps> = ({ initialContent, on
     const term = new Terminal({
       cursorBlink: true,
       theme: {
-        background: '#18181b', // var(--bg-surface)
-        foreground: '#f4f4f5', // var(--text-primary)
-        cursor: '#06b6d4',     // var(--accent-cyan)
-        cursorAccent: '#06b6d4',
-        selectionBackground: 'rgba(6, 182, 212, 0.3)',
+        background: '#1c1c1c', // var(--bg-base)
+        foreground: '#f2f2f2', // var(--text-primary)
+        cursor: '#f1d898',     // var(--accent-primary)
+        cursorAccent: '#f1d898',
+        selectionBackground: 'rgba(241, 216, 152, 0.2)',
+        black: '#1c1c1c',
+        red: '#fb7185',
+        green: '#34d399',
+        yellow: '#f1d898',
+        blue: '#38bdf8',
+        magenta: '#a78bfa',
+        cyan: '#22d3ee',
+        white: '#f2f2f2',
       },
       fontFamily: "'JetBrains Mono', monospace",
-      fontSize: 13,
-      lineHeight: 1.4
+      fontSize: 12,
+      lineHeight: 1.5
     });
 
     const fitAddon = new FitAddon();
     term.loadAddon(fitAddon);
     term.open(terminalRef.current);
     
-    // Slight delay to ensure DOM is ready for exact measurement
     setTimeout(() => fitAddon.fit(), 50);
 
     if (initialContent) {
@@ -61,32 +68,32 @@ export const TerminalBlock: React.FC<TerminalBlockProps> = ({ initialContent, on
       className="animate-slide-up"
       style={{ 
         width: '100%', 
-        height: '400px', 
-        background: 'var(--bg-surface)', 
-        borderRadius: '12px',
+        height: '450px', 
+        background: 'var(--bg-base)', 
+        borderRadius: '8px',
         border: '1px solid var(--border-light)',
         overflow: 'hidden',
-        boxShadow: '0 8px 30px rgba(0,0,0,0.4)',
-        position: 'relative'
+        position: 'relative',
+        boxShadow: 'inset 0 2px 10px rgba(0,0,0,0.2)'
       }}
     >
       <div style={{
         position: 'absolute',
         top: 0, left: 0, right: 0,
-        height: '36px',
-        background: 'rgba(39, 39, 42, 0.5)',
+        height: '32px',
+        background: 'var(--bg-surface)',
         borderBottom: '1px solid var(--border-light)',
         display: 'flex',
         alignItems: 'center',
-        padding: '0 16px',
-        gap: '8px',
+        padding: '0 12px',
+        gap: '6px',
         zIndex: 10
       }}>
-        <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#ef4444' }} />
-        <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#eab308' }} />
-        <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#10b981' }} />
-        <span style={{ marginLeft: '10px', fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
-          agent-execution-stream
+        <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#444' }} />
+        <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#444' }} />
+        <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#444' }} />
+        <span style={{ marginLeft: '8px', fontSize: '10px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', textTransform: 'lowercase' }}>
+          tty0.complexity.agent
         </span>
       </div>
       <div 
@@ -94,8 +101,9 @@ export const TerminalBlock: React.FC<TerminalBlockProps> = ({ initialContent, on
         style={{ 
           width: '100%', 
           height: '100%', 
-          paddingTop: '40px', // Make room for fake header
-          paddingLeft: '10px'
+          paddingTop: '36px',
+          paddingLeft: '12px',
+          paddingBottom: '12px'
         }} 
       />
     </div>

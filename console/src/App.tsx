@@ -16,32 +16,23 @@ function App() {
       flexDirection: 'column', 
       height: '100vh', 
       background: 'var(--bg-base)',
-      fontFamily: 'var(--font-ui)'
+      fontFamily: 'var(--font-ui)',
+      color: 'var(--text-primary)'
     }}>
       {/* Header */}
       <header style={{
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        padding: '16px 24px',
+        padding: '12px 24px',
         borderBottom: '1px solid var(--border-light)',
         background: 'var(--bg-surface)'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div style={{ 
-            background: 'var(--accent-cyan-glow)', 
-            padding: '8px', 
-            borderRadius: '8px',
-            border: '1px solid rgba(6, 182, 212, 0.3)'
-          }}>
-            <TerminalSquare size={20} color="var(--accent-cyan)" />
-          </div>
-          <div>
-            <h1 style={{ fontSize: '1.1rem', margin: 0, fontWeight: 600, letterSpacing: '-0.02em' }}>
-              Complexity <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>Console</span>
-            </h1>
-            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>AI-Driven Terminal Multiplexer</div>
-          </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <TerminalSquare size={18} color="var(--accent-primary)" />
+          <h1 style={{ fontSize: '0.95rem', margin: 0, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            Complexity <span style={{ opacity: 0.5, fontWeight: 400 }}>Console</span>
+          </h1>
         </div>
         
         <ContextIndicator />
@@ -50,44 +41,42 @@ function App() {
       {/* Main Workspace */}
       <main style={{ 
         flex: 1, 
-        padding: '24px', 
+        padding: '20px', 
         display: 'grid', 
-        gridTemplateColumns: state.context.telemetryData ? '1fr 380px' : '1fr', 
-        gap: '24px',
+        gridTemplateColumns: state.context.telemetryData ? '1fr 340px' : '1fr', 
+        gap: '20px',
         overflow: 'hidden'
       }}>
         
         {/* Terminal Area */}
-        <section style={{ display: 'flex', flexDirection: 'column', gap: '16px', height: '100%' }}>
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', paddingLeft: '4px' }}>
-              <Cpu size={16} color="var(--text-secondary)" />
-              <h2 style={{ fontSize: '0.9rem', margin: 0, color: 'var(--text-secondary)', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                Execution Stream
-              </h2>
-            </div>
-            
-            <div style={{ flex: 1, minHeight: 0 }}>
-              <TerminalBlock initialContent={state.context.terminalContent.join('')} />
-            </div>
+        <section style={{ display: 'flex', flexDirection: 'column', gap: '12px', height: '100%' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingLeft: '4px' }}>
+            <Cpu size={14} color="var(--text-secondary)" />
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 500, textTransform: 'uppercase' }}>
+              Execution
+            </span>
+          </div>
+          
+          <div style={{ flex: 1, minHeight: 0 }}>
+            <TerminalBlock initialContent={state.context.terminalContent.join('')} />
           </div>
         </section>
 
         {/* Telemetry Area (Conditional) */}
         {state.context.telemetryData && (
-          <aside style={{ height: '100%', overflow: 'hidden' }}>
+          <aside style={{ height: '100%', overflow: 'hidden' }} className="animate-fade-in">
             <TelemetryDashboard data={state.context.telemetryData} />
           </aside>
         )}
       </main>
 
-      {/* Fixed Command Input Footer */}
+      {/* Input Footer */}
       <footer style={{
-        padding: '24px',
+        padding: '16px 24px',
         borderTop: '1px solid var(--border-light)',
         background: 'var(--bg-surface)'
       }}>
-        <div style={{ maxWidth: '900px', margin: '0 auto' }}>
+        <div style={{ maxWidth: '800px', margin: '0 auto' }}>
           <CommandInput 
             onExecute={(command) => send({ type: 'EXECUTE', command })} 
             disabled={state.matches('executingTool') || state.matches('awaitingSudo')}
@@ -109,13 +98,13 @@ function App() {
       {/* Global Error Banner */}
       {state.context.error && (
         <div className="animate-slide-up" style={{ 
-          position: 'fixed', bottom: '100px', left: '50%', transform: 'translateX(-50%)',
-          padding: '12px 20px', background: 'var(--bg-surface)', border: '1px solid var(--accent-crimson)', 
-          borderRadius: '8px', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '12px',
-          boxShadow: '0 8px 30px rgba(0,0,0,0.5)', zIndex: 100
+          position: 'fixed', bottom: '80px', left: '50%', transform: 'translateX(-50%)',
+          padding: '10px 16px', background: '#2d1a1e', border: '1px solid var(--accent-crimson)', 
+          borderRadius: '6px', color: '#ffcbd1', display: 'flex', alignItems: 'center', gap: '10px',
+          boxShadow: '0 8px 30px rgba(0,0,0,0.5)', zIndex: 100, fontSize: '0.85rem'
         }}>
-          <ShieldAlert size={18} color="var(--accent-crimson)" />
-          <span style={{ fontSize: '0.9rem' }}>{state.context.error}</span>
+          <ShieldAlert size={14} color="var(--accent-crimson)" />
+          <span>{state.context.error}</span>
         </div>
       )}
     </div>

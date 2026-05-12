@@ -36,37 +36,35 @@ export const CommandInput: React.FC<CommandInputProps> = ({ onExecute, disabled 
     >
       <div style={{
         position: 'absolute',
-        left: '16px',
-        color: disabled ? 'var(--text-muted)' : 'var(--accent-cyan)',
+        left: '14px',
+        color: disabled ? 'var(--text-muted)' : 'var(--accent-primary)',
         display: 'flex',
         alignItems: 'center'
       }}>
-        <TerminalSquare size={18} />
+        <TerminalSquare size={16} />
       </div>
       
       <input
         ref={inputRef}
         type="text"
-        placeholder={disabled ? "Execution in progress..." : "Enter command (e.g., restart plex)..."}
+        placeholder={disabled ? "Processing request..." : "Command node01, node02..."}
         value={command}
         onChange={(e) => setCommand(e.target.value)}
         disabled={disabled}
         style={{
           width: '100%',
-          padding: '16px 48px 16px 44px',
-          fontSize: '0.95rem',
+          padding: '14px 44px 14px 40px',
+          fontSize: '0.9rem',
           fontFamily: 'var(--font-mono)',
-          borderRadius: '12px',
+          borderRadius: '8px',
           border: '1px solid',
           borderColor: disabled ? 'var(--border-light)' : 'var(--border-focus)',
-          background: 'var(--bg-surface)',
+          background: 'var(--bg-base)',
           color: disabled ? 'var(--text-muted)' : 'var(--text-primary)',
           outline: 'none',
-          transition: 'all 0.2s ease',
-          boxShadow: disabled ? 'none' : '0 4px 12px rgba(0,0,0,0.2)',
-          opacity: disabled ? 0.6 : 1
+          transition: 'all 0.2s ease'
         }}
-        onFocus={(e) => e.target.style.borderColor = 'var(--accent-cyan)'}
+        onFocus={(e) => e.target.style.borderColor = 'var(--accent-primary)'}
         onBlur={(e) => e.target.style.borderColor = 'var(--border-focus)'}
       />
 
@@ -75,18 +73,20 @@ export const CommandInput: React.FC<CommandInputProps> = ({ onExecute, disabled 
         disabled={!command.trim() || disabled}
         style={{
           position: 'absolute',
-          right: '12px',
+          right: '10px',
           background: 'transparent',
           border: 'none',
-          color: command.trim() && !disabled ? 'var(--text-primary)' : 'var(--text-muted)',
+          color: command.trim() && !disabled ? 'var(--accent-primary)' : 'var(--text-muted)',
           cursor: command.trim() && !disabled ? 'pointer' : 'default',
           display: 'flex',
           alignItems: 'center',
-          padding: '4px',
-          transition: 'color 0.2s ease'
+          padding: '6px',
+          transition: 'transform 0.1s ease'
         }}
+        onMouseDown={(e) => e.currentTarget.style.transform = 'scale(0.95)'}
+        onMouseUp={(e) => e.currentTarget.style.transform = 'scale(1)'}
       >
-        <Send size={18} />
+        <Send size={16} />
       </button>
     </form>
   );
